@@ -1,0 +1,14 @@
+dist
+.gev-cache
+.gev-logs
+screenshots
+qa-shots
+output
+coverage
+3d-models
+pinokio/ENVIRONMENT
+pinokio/.installed
+src/data/local_data/
+*.geojson
+*.geojsonl
+*.html
