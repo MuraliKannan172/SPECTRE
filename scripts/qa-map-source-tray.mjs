@@ -29,7 +29,15 @@ fs.mkdirSync(shotsDir, { recursive: true });
 const browser = await puppeteer.launch({
   headless: headful ? false : 'new',
   executablePath,
-  args: ['--use-angle=metal', '--enable-gpu', '--no-sandbox'],
+  // Metal is a macOS-only ANGLE backend: passing it on Windows or Linux makes
+  // WebGL initialization fail outright, so Cesium never constructs and this
+  // harness dies at the boot wait before a single assertion runs.
+  args: [
+    ...(process.platform === 'darwin'
+      ? ['--use-angle=metal', '--enable-gpu']
+      : ['--use-gl=angle', '--use-angle=swiftshader']),
+    '--no-sandbox',
+  ],
 });
 const page = await browser.newPage();
 const failures = [];
