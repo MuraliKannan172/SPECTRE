@@ -1,5 +1,64 @@
 # God's Eye View Current State
 
+## Keyboard interaction and focus
+
+- Enter on the map-source disclosure opens immediately. A short Space press
+  opens it on key release. Either route focuses the selected source once visible;
+  a bounded retry handles delayed opening transitions, and closing the tray or
+  moving focus elsewhere cancels the handoff.
+- Keyboard focus rings are a global interface state and stay visible when a
+  button is active or selected. Visual Styles, Location suboptions, Context and
+  mission actions, Cockpit utilities, native fields, and sliders use the same
+  visible-ring contract.
+- A short Space press on a focused control keeps its native key-release action.
+  If it remains held for 500 ms, focus is checked again, the control is blurred,
+  and push-to-talk starts; releasing a claimed hold cannot activate the old
+  control. The same hold works on the map and page background. Text-entry
+  controls remain protected.
+- The Location disclosure is reachable with Tab or Shift+Tab and shows a
+  keyboard focus ring. Its city, point-of-interest, search-toggle, and search
+  field controls show inset rings, including selected items. Enter toggles its
+  tray immediately, while Space does so on release; either route makes the revealed controls immediately reachable by Tab;
+  Escape closes it and clears any unfinished search. Escape from a tray control
+  returns focus to the disclosure; Escape on the disclosure clears focus after closing.
+- Data Layers ON/OFF buttons show a visible keyboard focus ring without
+  changing their enabled state or feed-status presentation.
+- Display controls and shader-parameter sliders show keyboard focus in both
+  the map panel and Cockpit Display. Arrow keys retain native range adjustment.
+  The enabled CCTV camera dropdown shows keyboard focus as well.
+- Tab reaches both Contacts and Space Missions in sequence in every Context
+  state. Left/Right arrows also switch them; the focused tab has a distinct ring
+  even when selected.
+- Keyboard focus on a Space Missions roster item uses the same temporary globe
+  rotation and mission-marker highlight as pointer hover. Focus alone does not
+  select the mission; Enter or Space performs selection. Keyboard and pointer
+  preview ownership remain independent when the pointer is parked over the list.
+- Radio power controls in the full, compact, and Cockpit surfaces, Search Nearby
+  Sites, and Clear Selected Layers remain focusable while lifecycle work is in
+  progress. They announce busy/disabled semantics and ignore repeat activation
+  until the operation settles, so async work cannot drop the keyboard ring.
+- Normal-mode Contacts results preserve the focused action or contact by stable
+  identity while live counts, distance order, and pages refresh. If that contact
+  departs or rotates off the visible page, focus moves to a stable continuation
+  point on the named explanatory note at the end of the list and remains there
+  through later repaints. The following Tab proceeds beyond the results instead
+  of restarting at Contacts or silently focusing another contact.
+- Cockpit Live Signals updates existing contact buttons without replacing or
+  disconnecting the focused one. Tab can continue through the briefing footer
+  to Display and Radio. If the focused contact leaves the list, focus moves
+  once to the current briefing tab; later refreshes do not reclaim it.
+- Cockpit-only Display and Radio launcher icons show a complete inset keyboard
+  ring in their collapsed and expanded states.
+- Escape collapses the nearest expanded panel containing focus before any
+  containing panel acts. Closing from panel content returns focus to that panel's
+  disclosure; closing from the disclosure itself clears focus so the collapsed
+  button does not retain its ring. This includes standard panels, nested
+  Parameters, Cockpit Contact and Live Signals, and Cockpit Display/Radio utilities.
+- The required bottom-left Data attribution control is a named popup button in
+  the Tab order. Enter opens immediately and Space opens on release, then the
+  credit lightbox focuses Close;
+  Close, Escape, or backdrop dismissal restores focus to Data attribution.
+
 ## CCTV launcher and proxy failure responses
 
 `scripts/dev-cctv.sh` delegates startup to `scripts/dev-fresh.sh`. It retains
@@ -793,7 +852,7 @@ This is the current runtime/source-of-truth snapshot for the project.
 >   corridor. Layer toggles stay live from there, and collapsing returns the
 >   plain launcher. The map-only Clear, Share, and Reset Globe actions are hidden
 >   for the duration of Cockpit, both as a group and as individual controls.
->   It uses the `radar` symbol and provides roving keyboard tab navigation. Its action row
+>   It uses the `radar` symbol; both tabs are reachable with Tab and Left/Right arrows switch between them. Its action row
 >   places the single Cockpit entry before Search Nearby Sites. Cockpit removes
 >   the duplicate floating map entry and topline exit; the bottom-center
 >   `EXIT COCKPIT` control (offset downward by a `-95px` bottom margin) plus `Escape`/`C` own exit, with entry/exit focus

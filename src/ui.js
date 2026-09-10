@@ -1016,8 +1016,34 @@ class CockpitViewController {
   onKeyDown(event) {
     if (event.repeat || event.isComposing) return;
     if (event.key === 'Escape' && this.active) {
+      // The credit lightbox owns Escape while its Close control or links hold
+      // focus. Its target handler closes the overlay and restores attribution
+      // focus; Cockpit must stay active behind it.
+      if (event.target?.closest?.('.cesium-credit-lightbox')) return;
       if (document.getElementById('context-radio-dock')?.classList.contains('disclosure-open')) return;
       if (document.querySelector('#cockpit-utility-controls [aria-expanded="true"]')) return;
+      if (this.context?.contains(event.target) && !this.contextCollapsed) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.setContextCollapsed(true);
+        if (event.target === this.contextToggle || this.contextToggle?.contains?.(event.target)) {
+          this.contextToggle?.blur?.();
+        } else {
+          this.contextToggle?.focus({ preventScroll: true });
+        }
+        return;
+      }
+      if (this.signalStream?.contains(event.target) && !this.signalCollapsed) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.setSignalCollapsed(true, { user: true });
+        if (event.target === this.signalToggle || this.signalToggle?.contains?.(event.target)) {
+          this.signalToggle?.blur?.();
+        } else {
+          this.signalToggle?.focus({ preventScroll: true });
+        }
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
       this.exit();
@@ -1851,40 +1877,89 @@ class CockpitViewController {
 
   renderCockpitSignals() {
     if (!this.signalList) return;
-    this.signalList.replaceChildren(...this.signalItems.map((item) => {
-      const entry = document.createElement('li');
-      entry.className = item.tone;
-      const time = document.createElement('time');
-      time.textContent = new Date(item.timestamp).toISOString().slice(11, 19) + 'Z';
-      const body = document.createElement('div');
-      const heading = item.target ? document.createElement('button') : document.createElement('strong');
+    const existing = [...this.signalList.children];
+    const focusedEntry = existing.find((entry) => entry.contains(document.activeElement));
+    const entriesByKey = new Map();
+    for (const entry of existing) {
+      const key = entry.dataset.signalKey;
+      if (!entriesByKey.has(key)) entriesByKey.set(key, []);
+      entriesByKey.get(key).push(entry);
+    }
+    const setText = (element, value) => {
+      if (element.textContent !== value) element.textContent = value;
+    };
+    const entries = this.signalItems.map((item) => {
+      // Identity includes the action target: a reused status key must never
+      // silently turn a focused flight button into a different selection.
+      const key = JSON.stringify([
+        item.key, Boolean(item.target), item.target?.layerId || '', String(item.target?.id ?? ''),
+      ]);
+      let entry = entriesByKey.get(key)?.shift();
+      if (!entry) {
+        entry = document.createElement('li');
+        entry.dataset.signalKey = key;
+        const time = document.createElement('time');
+        const body = document.createElement('div');
+        const heading = document.createElement(item.target ? 'button' : 'strong');
+        if (item.target) {
+          heading.type = 'button';
+          heading.className = 'cockpit-signal-target';
+          const label = document.createElement('span');
+          label.className = 'cockpit-signal-target-label';
+          const rule = document.createElement('span');
+          rule.className = 'cockpit-signal-target-rule';
+          rule.setAttribute('aria-hidden', 'true');
+          const chevron = document.createElement('span');
+          chevron.className = 'material-symbols-outlined cockpit-signal-target-chevron';
+          chevron.setAttribute('aria-hidden', 'true');
+          chevron.textContent = 'chevron_right';
+          heading.append(label, rule, chevron);
+        }
+        body.append(heading, document.createElement('span'));
+        entry.append(time, body);
+      }
+      const [time, body] = entry.children;
+      const [heading, copy] = body.children;
+      const className = item.target ? `${item.tone} actionable` : item.tone;
+      if (entry.className !== className) entry.className = className;
+      setText(time, new Date(item.timestamp).toISOString().slice(11, 19) + 'Z');
       if (item.target) {
-        heading.type = 'button';
-        heading.className = 'cockpit-signal-target';
         heading.dataset.signalLayer = item.target.layerId;
         heading.dataset.signalId = item.target.id;
-        heading.setAttribute('aria-label', `Select flight ${item.title}`);
-        const label = document.createElement('span');
-        label.className = 'cockpit-signal-target-label';
-        label.textContent = item.title;
-        const rule = document.createElement('span');
-        rule.className = 'cockpit-signal-target-rule';
-        rule.setAttribute('aria-hidden', 'true');
-        const chevron = document.createElement('span');
-        chevron.className = 'material-symbols-outlined cockpit-signal-target-chevron';
-        chevron.setAttribute('aria-hidden', 'true');
-        chevron.textContent = 'chevron_right';
-        heading.append(label, rule, chevron);
-        entry.classList.add('actionable');
+        const label = `Select flight ${item.title}`;
+        if (heading.getAttribute('aria-label') !== label) heading.setAttribute('aria-label', label);
+        setText(heading.children[0], item.title);
       } else {
-        heading.textContent = item.title;
+        setText(heading, item.title);
       }
-      const copy = document.createElement('span');
-      copy.textContent = item.detail;
-      body.append(heading, copy);
-      entry.append(time, body);
+      setText(copy, item.detail);
       return entry;
-    }));
+    });
+    const retainedFocus = entries.includes(focusedEntry) ? focusedEntry : null;
+    if (focusedEntry && !retainedFocus) {
+      // A departed contact cannot remain selectable. Continue from the stable
+      // briefing footer instead of dropping keyboard traversal to the page top.
+      (this.briefTabs?.[this.briefPageIndex] || this.signalToggle)?.focus({ preventScroll: true });
+    }
+    for (const entry of existing) if (!entries.includes(entry)) entry.remove();
+
+    // Ordinary insertBefore moves disconnect an element and lose its focus.
+    // Reorder the other rows around the focused row, which stays connected.
+    const focusIndex = retainedFocus ? entries.indexOf(retainedFocus) : -1;
+    if (retainedFocus) {
+      let anchor = retainedFocus;
+      for (let index = focusIndex - 1; index >= 0; index -= 1) {
+        const entry = entries[index];
+        if (entry.nextElementSibling !== anchor) this.signalList.insertBefore(entry, anchor);
+        anchor = entry;
+      }
+    }
+    let anchor = retainedFocus ? retainedFocus.nextElementSibling : this.signalList.firstElementChild;
+    for (let index = focusIndex + 1; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (entry === anchor) anchor = anchor.nextElementSibling;
+      else this.signalList.insertBefore(entry, anchor);
+    }
     this.scheduleContextLayout();
   }
 
@@ -3946,6 +4021,10 @@ export class StyleManager {
     });
 
     for (const targetId of targets) {
+      const panelEl = document.getElementById(targetId);
+      panelEl?.addEventListener('keydown', (event) => {
+        this._collapsePanelOnEscape(event, targetId);
+      });
       this._restorePanelCollapsedState(targetId, {
         allowStored: !this._initialShareState,
       });
@@ -3959,6 +4038,46 @@ export class StyleManager {
     this._initCommandDockPins();
     this._initCommandDockTrayMetrics();
     this._maybeNotifyLayoutReset();
+  }
+
+  /**
+   * Collapses the nearest expanded panel that owns keyboard focus on Escape.
+   * Nested panels consume the event first, so one key closes one level and
+   * returns focus to that level's disclosure. If Escape was pressed on the
+   * disclosure itself, remove focus after closing so the collapsed button does
+   * not keep a stale keyboard ring.
+   * @param {KeyboardEvent} event - Candidate Escape key event.
+   * @param {string} panelId - Collapsible panel containing the listener.
+   * @returns {boolean} Whether this panel handled the key.
+   */
+  _collapsePanelOnEscape(event, panelId) {
+    if (event.key !== 'Escape' || event.defaultPrevented) return false;
+    const panelEl = document.getElementById(panelId);
+    if (!panelEl || panelEl.classList.contains('collapsed') || !panelEl.contains(event.target)) {
+      return false;
+    }
+    const focusedPanel = event.target?.closest?.(
+      '.panel-collapsible:not(.collapsed), #param-slider-panel:not(.collapsed)',
+    );
+    if (focusedPanel && focusedPanel !== panelEl) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (panelId === 'location-bar' && this._locationSearch) {
+      // The document-level Escape cleanup cannot run after this panel consumes
+      // the event. Mirror that cleanup here so reopening Location never reveals
+      // a hidden draft query or expanded search field.
+      this._locationSearch.classList.remove('expanded');
+      this._locationSearch.value = '';
+      this._locationSearch.blur();
+    }
+    this.setPanelCollapsed(panelId, true, { explicit: true });
+    const disclosure = panelEl.querySelector(`[data-dock-toggle-target="${panelId}"]`)
+      || panelEl.querySelector(`[data-collapse-target="${panelId}"]`);
+    const escapedFromDisclosure = event.target === disclosure
+      || disclosure?.contains?.(event.target);
+    if (escapedFromDisclosure) disclosure?.blur?.();
+    else disclosure?.focus?.({ preventScroll: true });
+    return true;
   }
 
   /**
@@ -4263,10 +4382,9 @@ export class StyleManager {
       toggleDisclosure({ focusSource: event.detail === 0 });
     });
     disclosure?.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      // The application-level Space shortcut must not steal activation from a
-      // focused disclosure. One non-repeating keydown is enough; no keyup latch
-      // is retained after focus moves into the tray.
+      if (event.key !== 'Enter') return;
+      // Preserve immediate Enter activation while leaving Space to the native
+      // button path, which emits its synthesized click only after key release.
       event.preventDefault();
       event.stopPropagation();
       if (event.repeat) return;
@@ -4281,13 +4399,10 @@ export class StyleManager {
     });
     panelEl.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
+      if (!event.defaultPrevented) this._collapsePanelOnEscape(event, panelId);
       cancelMapSourceFocus();
-      if (panelEl.classList.contains('collapsed')) return;
-      event.preventDefault();
       clearOpen();
       clearClose();
-      this.setPanelCollapsed(panelId, true, { explicit: true });
-      disclosure?.focus?.({ preventScroll: true });
     });
   }
 
@@ -4657,6 +4772,7 @@ export class StyleManager {
       contextTabs[nextIndex].click();
     }));
     this._globalContextFlightsBtn?.addEventListener('click', () => {
+      if (this._contextModeChanging || this._clearSelectedLayersPromise) return;
       const nextMode = this._contextMode === 'flights' ? null : 'flights';
       this._claimContextVisualAuthority();
       void this._runUserFacingContextAction(
@@ -4674,6 +4790,7 @@ export class StyleManager {
       });
     });
     this._globalContextMissionsBtn?.addEventListener('click', () => {
+      if (this._contextModeChanging || this._clearSelectedLayersPromise) return;
       const nextMode = this._contextMode === 'space-missions' ? null : 'space-missions';
       this._claimContextVisualAuthority();
       void this._runUserFacingContextAction(
@@ -4693,7 +4810,9 @@ export class StyleManager {
     this._installationsSearchBtn?.addEventListener('click', () => {
       if (!this._dataManager?.layers?.has('military-installations')) return;
       const button = this._installationsSearchBtn;
-      button.disabled = true;
+      if (button.getAttribute('aria-busy') === 'true') return;
+      button.setAttribute('aria-disabled', 'true');
+      button.setAttribute('aria-busy', 'true');
       void this._runUserFacingContextAction(async (notificationToken) => {
         const enabled = await this._dataManager.setEnabled('military-installations', true, {
           origin: 'user',
@@ -4708,7 +4827,8 @@ export class StyleManager {
           : 'Nearby installations refreshed'));
         return true;
       }, 'Nearby installations could not be refreshed; try again').finally(() => {
-        button.disabled = false;
+        button.setAttribute('aria-disabled', 'false');
+        button.setAttribute('aria-busy', 'false');
       });
     });
   }
@@ -4923,8 +5043,7 @@ export class StyleManager {
     this._contextModeEntryIntent = null;
     this._contextModeReplacementIntent = null;
     this._contextModeChanging = true;
-    this._globalContextFlightsBtn && (this._globalContextFlightsBtn.disabled = true);
-    this._globalContextMissionsBtn && (this._globalContextMissionsBtn.disabled = true);
+    this._syncContextModeButtons();
     try {
       if (mode !== 'flights' && this.cockpitView?.active) {
         this.cockpitView.exit({ restoreTracking: false });
@@ -5078,8 +5197,6 @@ export class StyleManager {
     } finally {
       if (isCurrent()) {
         this._contextModeChanging = false;
-        this._globalContextFlightsBtn && (this._globalContextFlightsBtn.disabled = false);
-        this._globalContextMissionsBtn && (this._globalContextMissionsBtn.disabled = false);
         this._syncContextModeButtons();
       }
     }
@@ -5326,8 +5443,18 @@ export class StyleManager {
     this._globalContextFlightsBtn?.setAttribute('aria-selected', String(flightsActive));
     this._globalContextMissionsBtn?.classList.toggle('active', missionsActive);
     this._globalContextMissionsBtn?.setAttribute('aria-selected', String(missionsActive));
-    if (this._globalContextFlightsBtn) this._globalContextFlightsBtn.tabIndex = missionsActive ? -1 : 0;
-    if (this._globalContextMissionsBtn) this._globalContextMissionsBtn.tabIndex = missionsActive ? 0 : -1;
+    const transitionBusy = Boolean(this._contextModeChanging);
+    // Both Context choices stay in the ordinary Tab sequence. Arrow keys still
+    // provide tablist navigation, but must not be the only way to reach Space
+    // Missions from the keyboard. Semantic busy state keeps them perceivable
+    // while synchronous click guards prevent a second transition.
+    for (const button of [this._globalContextFlightsBtn, this._globalContextMissionsBtn]) {
+      if (!button) continue;
+      button.disabled = false;
+      button.tabIndex = 0;
+      button.setAttribute('aria-disabled', String(transitionBusy));
+      button.setAttribute('aria-busy', String(transitionBusy));
+    }
     if (this._contextModeStandby) this._contextModeStandby.hidden = flightsActive || missionsActive;
     if (this._contextFlightsView) this._contextFlightsView.hidden = !flightsActive;
     if (this._contextMissionsView) this._contextMissionsView.hidden = !missionsActive;
@@ -5574,9 +5701,11 @@ export class StyleManager {
     };
     const toggleRadio = async (trigger) => {
       if (!this._dataManager?.layers?.has('radio')) return;
+      if (trigger.getAttribute('aria-busy') === 'true') return;
       const enabling = !this._dataManager.isEnabled('radio');
       const revealAfterEnable = enabling && trigger === this._radioEnableBtn;
-      trigger.disabled = true;
+      trigger.setAttribute('aria-disabled', 'true');
+      trigger.setAttribute('aria-busy', 'true');
       try {
         const toggled = await this._runUserFacingContextAction(
           (notificationToken) => this._dataManager.setEnabled('radio', enabling, {
@@ -5592,7 +5721,8 @@ export class StyleManager {
         }
         if (revealAfterEnable) await this._revealRadioControlsAfterExplicitEnable(trigger);
       } finally {
-        trigger.disabled = false;
+        trigger.setAttribute('aria-disabled', 'false');
+        trigger.setAttribute('aria-busy', 'false');
         if (revealAfterEnable && trigger.isConnected) trigger.focus({ preventScroll: true });
       }
     };
@@ -5644,16 +5774,25 @@ export class StyleManager {
       // first-run launcher — one key, two actions. Matches the cockpit
       // disclosure handler directly below.
       event.stopImmediatePropagation();
-      setRadioDisclosure(false, { returnFocus: true });
+      const escapedFromDisclosure = event.target === this._contextRadioToggleBtn
+        || this._contextRadioToggleBtn?.contains?.(event.target);
+      setRadioDisclosure(false, { returnFocus: !escapedFromDisclosure });
+      if (escapedFromDisclosure) this._contextRadioToggleBtn?.blur?.();
     }, { capture: true, signal: this._radioTunerAbort.signal });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
       const displayOpen = this._cockpitDisplayToggleBtn?.getAttribute('aria-expanded') === 'true';
       const radioOpen = this._cockpitRadioToggleBtn?.getAttribute('aria-expanded') === 'true';
       if (!displayOpen && !radioOpen) return;
+      const nestedPanel = event.target?.closest?.('.panel-collapsible:not(.collapsed), #param-slider-panel:not(.collapsed)');
+      if (nestedPanel) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      setCockpitDisclosure(displayOpen ? 'display' : 'radio', false, { returnFocus: true });
+      const kind = displayOpen ? 'display' : 'radio';
+      const disclosure = displayOpen ? this._cockpitDisplayToggleBtn : this._cockpitRadioToggleBtn;
+      const escapedFromDisclosure = event.target === disclosure || disclosure?.contains?.(event.target);
+      setCockpitDisclosure(kind, false, { returnFocus: !escapedFromDisclosure });
+      if (escapedFromDisclosure) disclosure?.blur?.();
     }, { capture: true, signal: this._radioTunerAbort.signal });
     window.addEventListener('gev:cockpit-mode-changed', (event) => {
       if (event?.detail?.active) return;
@@ -5947,7 +6086,9 @@ export class StyleManager {
         'aria-label',
         uncertain ? 'Reconcile Radio — lifecycle uncertain' : `${enabled ? 'Disable' : 'Enable'} Radio`,
       );
-      this._radioEnableBtn.disabled = transitioning;
+      this._radioEnableBtn.disabled = false;
+      this._radioEnableBtn.setAttribute('aria-disabled', String(transitioning));
+      this._radioEnableBtn.setAttribute('aria-busy', String(transitioning));
     }
     if (this._contextRadioMiniEnableBtn) {
       this._contextRadioMiniEnableBtn.classList.toggle('active', enabled);
@@ -5959,7 +6100,9 @@ export class StyleManager {
         'aria-label',
         uncertain ? 'Reconcile Radio — lifecycle uncertain' : `${enabled ? 'Disable' : 'Enable'} Radio`,
       );
-      this._contextRadioMiniEnableBtn.disabled = transitioning;
+      this._contextRadioMiniEnableBtn.disabled = false;
+      this._contextRadioMiniEnableBtn.setAttribute('aria-disabled', String(transitioning));
+      this._contextRadioMiniEnableBtn.setAttribute('aria-busy', String(transitioning));
     }
     if (this._cockpitRadioEnableBtn) {
       this._cockpitRadioEnableBtn.classList.toggle('active', enabled);
@@ -5971,7 +6114,9 @@ export class StyleManager {
         'aria-label',
         uncertain ? 'Reconcile Radio — lifecycle uncertain' : `${enabled ? 'Disable' : 'Enable'} Radio`,
       );
-      this._cockpitRadioEnableBtn.disabled = transitioning;
+      this._cockpitRadioEnableBtn.disabled = false;
+      this._cockpitRadioEnableBtn.setAttribute('aria-disabled', String(transitioning));
+      this._cockpitRadioEnableBtn.setAttribute('aria-busy', String(transitioning));
     }
 
     if (this._radioFilter) {
@@ -7475,7 +7620,7 @@ export class StyleManager {
     });
     const dockToggle = panelEl.querySelector(`[data-dock-toggle-target="${panelEl.id}"]`);
     if (dockToggle) {
-      const panelName = panelEl.querySelector('.panel-title')?.textContent?.trim() || 'panel';
+      const panelName = panelEl.querySelector('.panel-title, .location-toolbar-label')?.textContent?.trim() || 'panel';
       const action = collapsed ? 'Expand' : 'Collapse';
       dockToggle.setAttribute('aria-expanded', String(!collapsed));
       dockToggle.setAttribute('aria-label', `${action} ${panelName}`);
@@ -9694,9 +9839,8 @@ export class StyleManager {
     this._preservePanelStateDuringLayerClear = true;
     this._syncContextModeButtons();
     this._userFacingContextNotificationTokens.add(notificationToken);
-    this._globalContextFlightsBtn && (this._globalContextFlightsBtn.disabled = true);
-    this._globalContextMissionsBtn && (this._globalContextMissionsBtn.disabled = true);
-    this._clearSelectedLayersBtn.disabled = true;
+    this._clearSelectedLayersBtn.setAttribute('aria-disabled', 'true');
+    this._clearSelectedLayersBtn.setAttribute('aria-busy', 'true');
     this._clearSelectedLayersBtn.setAttribute('aria-label', 'Clearing selected data layers');
 
     const managerOperation = this._dataManager.clearSelectedLayers({
@@ -9728,10 +9872,9 @@ export class StyleManager {
       if (generation === this._contextModeGeneration) {
         this._contextModeChanging = false;
         this._syncContextModeButtons();
-        this._globalContextFlightsBtn && (this._globalContextFlightsBtn.disabled = false);
-        this._globalContextMissionsBtn && (this._globalContextMissionsBtn.disabled = false);
       }
-      this._clearSelectedLayersBtn.disabled = false;
+      this._clearSelectedLayersBtn.setAttribute('aria-disabled', 'false');
+      this._clearSelectedLayersBtn.setAttribute('aria-busy', 'false');
       this._clearSelectedLayersBtn.setAttribute('aria-label', 'Clear selected data layers');
       this._preservePanelStateDuringLayerClear = false;
       this._clearSelectedLayersManagerPromise = null;
