@@ -7,6 +7,16 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Fixed
 
+- `scripts/dev-cctv.sh` now binds to `localhost` by default, matching
+  `dev-fresh.sh` and `dev-secure.sh`. Set `HOST=0.0.0.0` to opt in to LAN
+  exposure. (#265)
+- The Celestrak, terrain-heights, adsbdb, and launch-library proxies no longer
+  place raw exception text or upstream error bodies in HTTP responses; the real
+  error is logged server-side and the client gets a generic message. (#262, #263)
+- `naturalEarthRegions.js`’s internal `haversineKm` takes `(lat, lon, lat, lon)`
+  like every sibling implementation instead of longitude-first. (#274)
+- Dropped `CCTV_AUTO_CALIBRATE` and `CCTV_DRAPE_MESH` from `.env.example`; no
+  code reads them. (#270)
 - Mapped-site outages show their scheduled retry countdown and distinguish
   known Overpass rate limits, timeouts, and query failures. Search feedback no
   longer claims a refresh succeeded while the layer is unavailable or loading.

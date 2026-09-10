@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 PORT="${PORT:-4173}"
-HOST="${HOST:-0.0.0.0}"
+# Local-only by default; set HOST=0.0.0.0 explicitly to expose on the LAN.
+HOST="${HOST:-localhost}"
 CCTV_SOURCES_FILE="${CCTV_SOURCES_FILE:-config/cctv_sources.austin.json}"
 CCTV_PREFER_AUSTIN="${CCTV_PREFER_AUSTIN:-1}"
 CCTV_AUSTIN_MAX_SOURCES="${CCTV_AUSTIN_MAX_SOURCES:-36}"
