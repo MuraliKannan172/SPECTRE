@@ -13,6 +13,10 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+- Datacenter and dam marker stems use bounded, zoom-dependent active sets with
+  stable selection during camera motion. Close-up stems scale to the actual
+  camera distance; source totals and submarine cables remain unchanged.
+
 - Keyboard focus rings now survive active/selected button styles across the
   interface. Visual Styles, Location cities and points of interest, search,
   Context/mission actions, Cockpit utilities, and sliders retain a distinct

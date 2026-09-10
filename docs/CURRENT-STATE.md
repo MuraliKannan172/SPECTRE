@@ -1,5 +1,16 @@
 # God's Eye View Current State
 
+## Infrastructure marker visibility
+
+Datacenters and dams retain their full datasets while limiting active marker
+stems per layer: 80 at camera heights of 3,000 km or above, 200 from 200 km,
+and 420 below 200 km. Selection favors existing label priority and nearby
+features, retains stable choices across small camera movements, and refreshes
+during continuous motion. Disable/re-enable resets selection cleanly.
+Close-up stem sizing uses camera-to-feature distance without a 5 km minimum.
+The submarine-cable renderer is unchanged. These limits bound active stem work;
+they do not reduce the materialized entity count or establish an FPS gain.
+
 ## Keyboard interaction and focus
 
 - Enter on the map-source disclosure opens immediately. A short Space press
