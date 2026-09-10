@@ -158,9 +158,18 @@ try {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
     // The controller commits `activeId` before its fallback promise callback
-    // emits the terminal error state that re-syncs the chips. Give that
-    // callback one turn so the DOM assertion observes the completed contract.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // emits the terminal error state that re-syncs the chips, and Cesium drops
+    // the Esri credit on a later render frame again. A fixed delay races both:
+    // 50ms was enough most runs and not enough on a slow one, which is the same
+    // flake as the tray timers above (#54). Poll the observable truth instead.
+    const domDeadline = performance.now() + 3000;
+    const settled = () => !document.body.innerText.includes('Powered by Esri')
+      && [...document.querySelectorAll('.map-stack-chip')]
+        .filter((chip) => chip.getAttribute('aria-pressed') === 'true')
+        .every((chip) => chip.dataset.stackId === 'osm');
+    while (!settled() && performance.now() < domDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
     const afterTwo = {
       activeId: controller.getActiveId(),
       lastError: controller.getState().lastError,
