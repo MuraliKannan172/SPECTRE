@@ -437,11 +437,11 @@ export function createLocalGeoJsonLayer({
     init: async (viewer) => {
       // DataLayerManager calls this once
     },
-    
+
     update: async (viewer) => {
       // DataLayerManager calls this when enabled
     },
-    
+
     /**
      * @returns {{count:number, lastUpdate:number|null, error:string|null}}
      *   A dead layer must be distinguishable from an empty one: a failed load
@@ -508,9 +508,9 @@ export function createLocalGeoJsonLayer({
             const text = await response.text();
             if (_destroyed) return;
             const lines = text.split('\n').filter(l => l.trim().length > 0);
-          
+
             const features = lines.map(line => JSON.parse(line));
-          
+
             const geojson = {
               type: 'FeatureCollection',
               features
@@ -548,19 +548,19 @@ export function createLocalGeoJsonLayer({
             _count = entities.length;
             _stemRecords = [];
             _stemGeometryDirty = true;
-          
+
             for (let i = 0; i < entities.length; i++) {
               const feature = entities[i];
               feature.__localLayerId = id; // Tag it so our click handler knows it belongs to this layer
-            
+
               let pos = feature.position?.getValue(Cesium.JulianDate.now());
-            
+
               if (!pos) {
                 // It's a polygon or line
                 if (feature.polygon) {
                   feature.polygon.outline = true;
                   feature.polygon.outlineColor = baseColor;
-                
+
                   // Calculate center point for the stem
                   const hierarchy = feature.polygon.hierarchy?.getValue(Cesium.JulianDate.now());
                   if (hierarchy && hierarchy.positions && hierarchy.positions.length > 0) {
@@ -668,15 +668,15 @@ export function createLocalGeoJsonLayer({
             _clickHandler.setInputAction((click) => {
               if (!_enabled) return;
               const picked = viewer.scene.pick(click.position);
-            
+
               if (picked && picked.id && picked.id.__localLayerId === id) {
                 const entity = picked.id;
                 viewer.selectedEntity = entity;
                 selectEntityContext(entity);
-              
+
                 // We zoom to the surface base of the stem or the center of the polygon
                 let targetPos = null;
-              
+
                 if (entity.polyline) {
                   // If it's a stem, fly to the base
                   const positions = entity.polyline.positions.getValue(Cesium.JulianDate.now());
@@ -690,13 +690,13 @@ export function createLocalGeoJsonLayer({
                     targetPos = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
                   }
                 }
-              
+
                 if (targetPos) {
                   const carto = Cesium.Cartographic.fromCartesian(targetPos);
-                
+
                   // Disable interactions so Cesium doesn't magically cancel the flight
                   viewer.scene.screenSpaceCameraController.enableInputs = false;
-                
+
                   viewer.camera.flyTo({
                     destination: Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 5000),
                     duration: 1.5,
@@ -753,7 +753,7 @@ export function createLocalGeoJsonLayer({
           const occluder = new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84, cameraPos);
           const visibleOverlayRecords = [];
           const refreshStemGeometry = _stemGeometryDirty;
-          
+
           // A scene that cannot sample heights can never ground a record, so it
           // must never arm a retry (the arm would re-arm on every requested
           // frame, forever) and must not spend ANY per-record work trying.
