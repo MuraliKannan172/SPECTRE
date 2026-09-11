@@ -11,4 +11,12 @@ pinokio/.installed
 src/data/local_data/
 *.geojson
 *.geojsonl
-*.html
+
+# Local configuration, generated assets and browser evidence
+.env
+.env.*
+!.env.example
+node_modules
+.vite
+.vite-*
+*.min.js

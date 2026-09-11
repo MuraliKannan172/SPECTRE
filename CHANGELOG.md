@@ -13,6 +13,13 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+### Development
+
+- Adopt Prettier tooling contributed by RohanDaCoder (#227), with an explicit
+  file scope, pinned formatter and Linux/Windows CI checks. Format the reusable
+  infrastructure modules and their consumer tests. Package boundary checks keep
+  those exports separate from app startup and local Node services.
+
 ### Fixed
 
 - Separate optional Google server credentials for Places and Street View from
