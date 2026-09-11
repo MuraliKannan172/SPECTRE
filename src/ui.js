@@ -4107,6 +4107,17 @@ export class StyleManager {
     let closeTimer = null;
     let lastWheelTime = 0;
     let disclosureFocusTimer = null;
+    let focusRequest = 0;
+
+    const cancelMapSourceFocus = () => {
+      clearTimeout(disclosureFocusTimer);
+      disclosureFocusTimer = null;
+      focusRequest += 1;
+    };
+    if (panelId === 'control-panel') {
+      this._cancelMapSourceFocus?.();
+      this._cancelMapSourceFocus = cancelMapSourceFocus;
+    }
 
     const clearOpen = () => {
       if (!openTimer) return;
@@ -4190,13 +4201,15 @@ export class StyleManager {
     });
 
     panelEl.addEventListener('pointerdown', () => {
+      cancelMapSourceFocus();
       clearOpen();
       clearClose();
     });
 
     const focusMapSource = () => {
       if (panelId !== 'control-panel') return false;
-      const chip = panelEl.querySelector('.map-stack-chip.active, .map-stack-chip');
+      const chip = panelEl.querySelector('.map-stack-chip.active')
+        || panelEl.querySelector('.map-stack-chip');
       if (!chip?.focus) return false;
       chip.focus({ preventScroll: true });
       // .focus() on a still-hidden element is a SILENT no-op, so the caller
@@ -4213,12 +4226,19 @@ export class StyleManager {
     // cadence until focus actually lands, bounded so a permanently hidden tray
     // cannot spin.
     const scheduleMapSourceFocus = () => {
-      clearTimeout(disclosureFocusTimer);
+      cancelMapSourceFocus();
+      if (panelId !== 'control-panel') return;
+      const request = focusRequest;
       let attempts = 0;
       const attemptFocus = () => {
+        if (request !== focusRequest) return;
         disclosureFocusTimer = null;
-        if (panelEl.classList.contains('collapsed')) return;
+        if (this._disposed || panelEl.classList.contains('collapsed')) return;
+        // A Tab or click elsewhere owns focus now. A delayed transition must
+        // not pull the keyboard back into a tray the user has already left.
+        if (document.activeElement !== disclosure) return;
         if (focusMapSource()) return;
+        if (request !== focusRequest) return;
         if (++attempts > 24) return; // ~720ms past the first try, then give up
         disclosureFocusTimer = window.setTimeout(attemptFocus, 30);
       };
@@ -4226,6 +4246,7 @@ export class StyleManager {
     };
 
     const toggleDisclosure = ({ focusSource = false } = {}) => {
+      cancelMapSourceFocus();
       clearOpen();
       clearClose();
       const shouldOpen = panelEl.classList.contains('collapsed');
@@ -4254,11 +4275,14 @@ export class StyleManager {
 
     panelEl.addEventListener('focusin', () => clearClose());
     panelEl.addEventListener('focusout', (event) => {
+      cancelMapSourceFocus();
       if (panelEl.contains(event.relatedTarget)) return;
       scheduleClose();
     });
     panelEl.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || panelEl.classList.contains('collapsed')) return;
+      if (event.key !== 'Escape') return;
+      cancelMapSourceFocus();
+      if (panelEl.classList.contains('collapsed')) return;
       event.preventDefault();
       clearOpen();
       clearClose();
@@ -7695,6 +7719,7 @@ export class StyleManager {
     persist = true,
     syncShare = true,
   } = {}) {
+    if (panelId === 'control-panel' && collapsed) this._cancelMapSourceFocus?.();
     const panelEl = document.getElementById(panelId);
     if (!panelEl) return;
     if (explicit && !restore) this.shareLinkManager?.claimRestoreLane?.('panel', panelId);
