@@ -37,7 +37,8 @@ import path from 'node:path';
 const APP_URL = process.env.QA_BASE_URL || 'http://localhost:4173';
 const argv = Object.fromEntries(process.argv.slice(2)
   .map((a) => a.replace(/^--/, '').split('=')).map(([k, v]) => [k, v ?? true]));
-const ANGLE = String(argv.angle || 'metal');
+// Metal is a macOS-only ANGLE backend; defaulting to it off-Mac fails WebGL init.
+const ANGLE = String(argv.angle || (process.platform === 'darwin' ? 'metal' : 'swiftshader'));
 const HEADFUL = !!argv.headful;
 // Austin airport apron by default — the site qa-floor-verify pins, where the
 // mesh sits ~150 m above the geoid and burial is unmistakable.
