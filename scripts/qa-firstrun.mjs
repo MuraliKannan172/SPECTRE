@@ -332,14 +332,17 @@ async function runArbitrationSection(page, { shots, consoleErrors }) {
       `session=${escUnderLightbox.session}`,
     );
     record(
-      'the lightbox keeps its OWN ESC semantics (Cesium binds none, so it stays)',
-      lightboxAfterEsc.shown,
+      'ESC closes attribution without dismissing the launcher underneath',
+      !lightboxAfterEsc.shown,
       `overlay shown=${lightboxAfterEsc.shown}`,
     );
 
-    // The guard disarms the launcher; it must never break it. Close the overlay
-    // the way a visitor does and the key comes straight back.
-    await page.evaluate(() => document.querySelector('.cesium-credit-lightbox-close')?.click());
+    // The attribution keyboard handler closes the overlay and restores focus.
+    // A second Escape belongs to the now-uncovered launcher.
+    const attributionFocusRestored = await page.evaluate(() => (
+      document.activeElement === document.querySelector('#cesium-credits .cesium-credit-expand-link')
+    ));
+    record('closing attribution restores its disclosure focus', attributionFocusRestored);
     await sleep(300);
     const uncovered = await launcherState();
     record('closing the lightbox hands the card back the key',

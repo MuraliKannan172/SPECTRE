@@ -15,7 +15,7 @@
  * The contact must stay ON the mesh through phase B. Without the hold it falls
  * to the geoid, which at an inland field is ~150 m of burial.
  *
- *   node scripts/qa-floor-hold.mjs                       # real GPU (ANGLE/Metal)
+ *   node scripts/qa-floor-hold.mjs                       # Metal on macOS, SwiftShader elsewhere
  *   node scripts/qa-floor-hold.mjs --headful             # watch it
  *   QA_BASE_URL=http://localhost:4257 node scripts/qa-floor-hold.mjs
  *
@@ -25,10 +25,11 @@
  * under Metal — a backend comparison at one point, not to be confused with the
  * same-backend run-to-run spread (122.1 m vs 20.6 m on a cell centre) that
  * retired the hold chain's unvalidated tier. The
- * default is the real GPU. Under `--angle=swiftshader` the rendered-mesh oracle
- * is reported as unavailable rather than trusted, and the run falls back to the
- * bare-earth DEM (fetched server-side, so the simulated outage cannot reach
- * it) — a weaker but still decisive check, since the geoid sits ~150 m below it.
+ * default is Metal on macOS and SwiftShader elsewhere; `--angle` overrides it.
+ * Mesh samples describe the selected backend, not another GPU's rendered LOD.
+ * An unavailable rendered-mesh oracle remains a failed check, even if the
+ * separate bare-earth DEM check passes. Software evidence does not establish
+ * real-GPU visual correctness.
  */
 import puppeteer from 'puppeteer';
 import fs from 'node:fs';
