@@ -1645,8 +1645,7 @@ function celestrakProxy() {
             send(502, 'celestrak fetch failed and no cache available', 'NONE');
           }
         } catch (err) {
-          console.error('[celestrak-proxy]', err?.message || String(err));
-          send(500, 'celestrak proxy error', 'ERROR');
+          send(500, `celestrak proxy error: ${err?.message || err}`, 'ERROR');
         }
       });
     },
@@ -1756,12 +1755,10 @@ function rocketLaunchesProxy() {
           send(res, 200, stale.body, 'STALE-ERROR');
           return;
         }
-        // Upstream error bodies stay server-side; the client gets a generic message.
-        if (error?.upstreamBody) console.warn('[launch-library-proxy] upstream error body:', error.upstreamBody);
         send(
           res,
           Number.isInteger(error?.upstreamStatus) ? error.upstreamStatus : 502,
-          JSON.stringify({ error: 'Launch Library 2 unavailable' }),
+          error?.upstreamBody || JSON.stringify({ error: 'Launch Library 2 unavailable' }),
           'NONE',
         );
       }
@@ -2097,11 +2094,11 @@ function firmsProxy() {
     for (const source of SOURCES) {
       try {
         const records = filterTrailing24h(await fetchSource(key, source), now);
-        sources.push({ source, count: records.length, ok: true });
         // NOT fires.push(...records): spread passes each record as an argument,
         // and a world/2 VIIRS pull exceeds V8's argument limit (~125k) at
         // ~131k records — RangeError, and the whole source is silently dropped.
         for (const record of records) fires.push(record);
+        sources.push({ source, count: records.length, ok: true });
       } catch (err) {
         console.warn(`[firms-proxy] ${source} fetch failed:`, err?.message || err);
         sources.push({ source, count: 0, ok: false });
@@ -2376,8 +2373,7 @@ function terrainHeightsProxy() {
           }
           send(outcome.status, outcome.body);
         } catch (err) {
-          console.error('[terrain-heights-proxy]', err?.message || String(err));
-          send(500, { error: 'terrain heights proxy error' });
+          send(500, { error: `terrain heights proxy error: ${err?.message || err}` });
         }
       });
     },
@@ -2498,8 +2494,7 @@ function adsbdbProxy() {
           }
           return send(404, { error: 'unknown endpoint' });
         } catch (err) {
-          console.error('[adsbdb-proxy]', err?.message || String(err));
-          return send(500, { error: 'adsbdb proxy error' });
+          return send(500, { error: String(err?.message || err) });
         }
       });
     },

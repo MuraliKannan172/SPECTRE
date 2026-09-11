@@ -440,7 +440,7 @@
              mirrors SCOPE_FEATHER_RATIO_DEFAULT in src/scopeMask.js. Feather
              softens the black mask edge; label fading is the separate Fade
              slider. -->
-        <input type="range" class="pp-slider" id="scope-feather-slider" min="0" max="100" value="11" title="Scope edge feather as a percentage of the keyhole radius" />
+        <input type="range" class="pp-slider" id="scope-feather-slider" min="0" max="100" value="11" aria-label="Scope edge feather" title="Scope edge feather as a percentage of the keyhole radius" />
         <span class="pp-slider-value" id="scope-feather-value">11%</span>
       </div>
     </div>
@@ -460,7 +460,7 @@
         <span class="pp-label">Bloom</span>
       </button>
       <div class="pp-slider-row" id="bloom-slider-row">
-        <input type="range" class="pp-slider" id="bloom-intensity-slider" min="0" max="200" value="0" />
+        <input type="range" class="pp-slider" id="bloom-intensity-slider" min="0" max="200" value="0" aria-label="Bloom intensity" />
         <span class="pp-slider-value" id="bloom-intensity-value">0%</span>
       </div>
     </div>
@@ -470,7 +470,7 @@
         <span class="pp-label">Sharpen</span>
       </button>
       <div class="pp-slider-row" id="sharpen-slider-row">
-        <input type="range" class="pp-slider" id="sharpen-intensity-slider" min="0" max="100" value="49" />
+        <input type="range" class="pp-slider" id="sharpen-intensity-slider" min="0" max="100" value="49" aria-label="Sharpen intensity" />
         <span class="pp-slider-value" id="sharpen-intensity-value">49%</span>
       </div>
     </div>
@@ -565,7 +565,7 @@
             <button id="search-toggle" class="search-toggle-btn" title="Search any location">
               <span>&#x1F50E;</span>
             </button>
-            <input type="text" id="location-search" placeholder="Search any location..." autocomplete="off" spellcheck="false" />
+            <input type="text" id="location-search" placeholder="Search any location..." autocomplete="off" spellcheck="false" aria-label="Search location by name or coordinates" />
           </div>
         </div>
       </div>

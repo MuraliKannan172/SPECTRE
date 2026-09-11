@@ -491,10 +491,7 @@ async function main() {
     ...(executablePath ? { executablePath } : {}),
     args: [
       '--no-sandbox', '--disable-setuid-sandbox',
-      // Metal is a macOS-only ANGLE backend; anywhere else it fails WebGL init.
-      ...(process.platform === 'darwin'
-        ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']
-        : ['--use-gl=angle', '--use-angle=swiftshader']),
+      '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist',
       '--disable-dev-shm-usage', '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding', '--window-size=1440,900',
     ],

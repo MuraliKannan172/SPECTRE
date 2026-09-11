@@ -34,8 +34,7 @@ function ringAreaKm2(ring) {
   return Math.abs((sum * EARTH_RADIUS_KM * EARTH_RADIUS_KM) / 2);
 }
 
-/** Great-circle distance in km. Arg order matches every sibling: (lat, lon, lat, lon). */
-function haversineKm(lat1, lon1, lat2, lon2) {
+function haversineKm(lon1, lat1, lon2, lat2) {
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const h = Math.sin(dLat / 2) ** 2
@@ -148,7 +147,7 @@ function buildEntries(pack, kind) {
       polygons,
       areaKm2,
       bbox: [minLon, minLat, maxLon, maxLat],
-      bboxDiagonalKm: haversineKm(minLat, minLon, maxLat, maxLon),
+      bboxDiagonalKm: haversineKm(minLon, minLat, maxLon, maxLat),
     });
   }
   return out;
