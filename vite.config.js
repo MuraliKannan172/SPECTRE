@@ -1645,7 +1645,7 @@ function celestrakProxy() {
             send(502, 'celestrak fetch failed and no cache available', 'NONE');
           }
         } catch (err) {
-          send(500, `celestrak proxy error: ${err?.message || err}`, 'ERROR');
+          send(500, 'celestrak proxy error', 'ERROR');
         }
       });
     },
@@ -1758,7 +1758,7 @@ function rocketLaunchesProxy() {
         send(
           res,
           Number.isInteger(error?.upstreamStatus) ? error.upstreamStatus : 502,
-          error?.upstreamBody || JSON.stringify({ error: 'Launch Library 2 unavailable' }),
+          JSON.stringify({ error: 'Launch Library 2 unavailable' }),
           'NONE',
         );
       }
@@ -2373,7 +2373,7 @@ function terrainHeightsProxy() {
           }
           send(outcome.status, outcome.body);
         } catch (err) {
-          send(500, { error: `terrain heights proxy error: ${err?.message || err}` });
+          send(500, { error: 'terrain heights proxy error' });
         }
       });
     },
@@ -2494,7 +2494,7 @@ function adsbdbProxy() {
           }
           return send(404, { error: 'unknown endpoint' });
         } catch (err) {
-          return send(500, { error: String(err?.message || err) });
+          return send(500, { error: 'adsbdb proxy error' });
         }
       });
     },
