@@ -15,6 +15,8 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Fixed
 
+- FIRMS records a source as successful only after appending its rows, avoiding
+  contradictory success/failure status if aggregation throws.
 - Radio country filtering and voice country requests now resolve common English
   names and exonyms that `Intl.DisplayNames`' primary label omits, so requests
   like "play radio in Turkey" no longer fail closed (Turkey → Türkiye, plus

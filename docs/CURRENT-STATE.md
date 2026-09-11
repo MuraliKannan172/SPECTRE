@@ -10,6 +10,13 @@ Launch payloads with missing records now say PAYLOAD DATA UNAVAILABLE. Missing n
 
 Updated: August 24, 2026
 
+## FIRMS source status
+
+The FIRMS proxy records source success after appending its rows. If aggregation
+throws, that source reports failure without a contradictory success entry.
+The existing per-record append continues to support large feeds; sequential
+fetching, trailing-24-hour filtering and partial-success caching are unchanged.
+
 ## Installations and map-source guidance
 
 - On an uncached Overpass failure, mapped installations keep their existing
