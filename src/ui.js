@@ -8930,6 +8930,7 @@ export class StyleManager {
       const slider = document.createElement('input');
       slider.type = 'range';
       slider.className = 'param-slider';
+      slider.setAttribute('aria-label', uMeta.label);
       slider.min = uMeta.min;
       slider.max = uMeta.max;
       slider.step = uMeta.max <= 1 ? '0.01' : '0.1';

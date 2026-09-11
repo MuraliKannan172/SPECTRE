@@ -15,6 +15,8 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Fixed
 
+- Scope, Bloom, Sharpen, location search and generated style sliders expose
+  explicit accessible names. The first-run checkbox retains its native label.
 - FIRMS records a source as successful only after appending its rows, avoiding
   contradictory success/failure status if aggregation throws.
 - Radio country filtering and voice country requests now resolve common English

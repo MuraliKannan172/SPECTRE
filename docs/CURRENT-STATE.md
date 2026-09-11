@@ -10,6 +10,13 @@ Launch payloads with missing records now say PAYLOAD DATA UNAVAILABLE. Missing n
 
 Updated: August 24, 2026
 
+## Control names for assistive technology
+
+Scope, Bloom, Sharpen and location search have explicit accessible names.
+Generated style sliders use the same name as their visible parameter label.
+The first-run suppression checkbox keeps its native wrapping label, so its
+accessible name remains "Don't show this again". Control behavior is unchanged.
+
 ## FIRMS source status
 
 The FIRMS proxy records source success after appending its rows. If aggregation
