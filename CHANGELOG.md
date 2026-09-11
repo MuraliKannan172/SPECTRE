@@ -6,6 +6,8 @@ Earthquake refreshes validate the complete feed and construct replacement entiti
 
 Non-object or array-valued properties reject the response instead of being treated as an unknown magnitude.
 
+Launch payloads with missing records now say PAYLOAD DATA UNAVAILABLE. Missing names use Unnamed payload; absent or invalid mass stays unknown instead of appearing as 0 KG.
+
 This changelog records public product changes. For the authoritative description
 of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
