@@ -1,5 +1,21 @@
 # God's Eye View Current State
 
+## CCTV launcher and proxy failure responses
+
+`scripts/dev-cctv.sh` delegates startup to `scripts/dev-fresh.sh`. It retains
+its Austin source file, Austin preference, 36-camera Austin limit, and 48-camera
+total limit, with environment overrides. Keys are optional; credential loading
+and names-only provider provenance follow the normal launcher. The default
+binding is localhost. An explicit `HOST=0.0.0.0` uses the same LAN warning as
+normal startup.
+
+The CelesTrak, Launch Library, terrain-height, and ADSBDB middleware return
+fixed messages for unexpected failures. Launch Library retains its upstream
+HTTP failure status and no-store policy but does not forward the upstream body.
+Existing successful, in-flight, missing-data, and stale-cache behavior remains
+in place. Failure diagnostics identify the service and, for Launch Library,
+HTTP status without printing raw exception text or upstream bodies.
+
 ## Map Source keyboard focus
 
 Keyboard opening focuses the selected map-source tile, falling back to the first
