@@ -1336,3 +1336,15 @@ test('globe-LOD re-selects during continuous motion, without ever seeing a moveE
   env.preRender.raise();
   assert.deepEqual(env.layer.getLodDiagnostics(), parked, 'a parked camera never re-selects');
 });
+
+
+test('standalone publisher retains its default host for an undefined override', () => {
+  const publisher = createLocalInfrastructureOverlayPublisher({
+    sourceId: 'local-default-host-test', host: undefined,
+  });
+  assert.doesNotThrow(() => {
+    publisher.show();
+    publisher.hide();
+    publisher.destroy();
+  });
+});
