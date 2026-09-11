@@ -50,6 +50,10 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   stale-data fallback. Concurrent identical requests share the same last-good
   fallback when all mirrors refuse, without duplicating upstream requests.
 
+- Refresh vulnerable transitive dependencies and update browser/image tooling
+  to Puppeteer 25.10.0 and Sharp 0.35.4. Cesium remains on 1.138.0.
+  Browser QA awaits the new asynchronous executable-path lookup.
+
 ## [0.1.1] — 2026-09-01 — Installation and live-data fixes
 
 ### Changed
