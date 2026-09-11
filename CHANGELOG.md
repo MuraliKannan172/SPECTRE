@@ -19,7 +19,7 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   browser harness renderer portability fixes contributed by Tom-Neverwinter.
   macOS retains Metal; other platforms default to SwiftShader. Cockpit renderer
   assertions and evidence labels follow the actual selected mode. Floor-hold
-  keeps its mesh and terrain assertions; software runs are not real-GPU evidence.
+  explicitly selects its measured 2D billboard mode and keeps its mesh and terrain assertions; software runs are not real-GPU evidence.
   First-run QA now checks the existing attribution Escape-close/focus-return
   behavior while preserving the launcher-underneath regression checks.
 

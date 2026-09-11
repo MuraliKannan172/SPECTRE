@@ -110,6 +110,10 @@ await page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 120000 });
 await page.waitForFunction(() => window.__godsEyeView?.viewer && window.__godsEyeView?.dataManager,
   { timeout: 150000 });
 await sleep(12000); // let the boot fly-to settle before pinning
+await page.evaluate(() => {
+  document.querySelector('#first-run-launcher:not([hidden]) [data-first-run-choice="explore"]')?.click();
+});
+await sleep(600); // let the launcher dismissal finish before taking evidence
 
 await page.evaluate((site) => { window.__SITE = site; }, SITE);
 const pin = () => page.evaluate(() => {
@@ -125,7 +129,16 @@ const pin = () => page.evaluate(() => {
   v.camera.moveEnd.raiseEvent();
 });
 await pin();
-await page.evaluate(async () => { await window.__godsEyeView.dataManager.toggle('flights'); });
+const billboardMode = await page.evaluate(async () => {
+  const manager = window.__godsEyeView.dataManager;
+  const flights = manager.layers.get('flights').module;
+  // This harness measures billboard positions. A ready 3D model deliberately
+  // hides its billboard; that handoff is covered by track-regression instead.
+  flights.setParams({ models3d: false });
+  await manager.toggle('flights');
+  return flights.getParams().models3d === false;
+});
+record('the billboard floor test is explicitly in 2D aircraft mode', billboardMode);
 
 /** Reads the contact's rendered height and the rendered mesh beneath it. */
 const measure = () => page.evaluate(async (icao) => {

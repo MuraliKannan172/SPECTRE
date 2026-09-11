@@ -225,6 +225,8 @@ While recording, call out anything in these areas — this is the feedback I mos
 The first-run, view-target prewarm, cockpit-plates and floor-hold harnesses
 select Metal on macOS and SwiftShader on other platforms. Cockpit-plates also
 accepts `--swiftshader` on macOS; floor-hold retains `--angle=<backend>`.
+Floor-hold explicitly selects 2D aircraft mode because it measures billboard
+positions; the tracking suite covers the 3D handoff.
 Software runs validate their assertions but do not establish real-GPU visual
 correctness. Floor-hold retains both mesh and DEM checks: an unavailable mesh
 oracle fails the run even when the DEM check passes. Record the backend with
