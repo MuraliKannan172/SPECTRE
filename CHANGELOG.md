@@ -13,6 +13,49 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+- Keyboard focus rings now survive active/selected button styles across the
+  interface. Visual Styles, Location cities and points of interest, search,
+  Context/mission actions, Cockpit utilities, and sliders retain a distinct
+  focus indicator.
+- A short Space press activates a focused control only on key release. Holding
+  Space for 500 ms blurs that control before push-to-talk starts, and release is
+  then consumed so it cannot also activate the old control. The same hold works
+  from the map or page background; text-entry controls remain protected.
+- The Location disclosure is reachable with Tab and shows keyboard focus;
+  its city, point-of-interest, and search controls do too. Escape from inside
+  the tray returns focus to its disclosure and discards any unfinished search;
+  Escape on the disclosure itself closes the tray and clears that focus.
+- Data Layers ON/OFF buttons show a keyboard focus ring independently of
+  their enabled and feed-status colors.
+- Display buttons, layout selectors, mode buttons, and sliders show a visible
+  keyboard focus ring, including the controls used in Cockpit Display. Enabled
+  CCTV camera dropdowns also show keyboard focus.
+- Context tabs keep a distinct keyboard ring when selected. Their existing
+  Left/Right arrow navigation continues to switch Contacts and Space Missions,
+  and both choices remain reachable through ordinary Tab navigation.
+- Tabbing through the Space Missions roster now drives the same temporary globe
+  rotation and mission-marker highlight as pointer hover, without selecting the
+  mission. Keyboard and pointer previews no longer cancel each other.
+- Radio power controls, Search Nearby Sites, and Clear Selected Layers retain
+  keyboard focus while their async work is busy. They expose that busy state to
+  assistive technology and ignore repeated activation until the work settles.
+- Live Contacts results retain keyboard focus by contact identity when counts,
+  distance order, or pages refresh. If a focused contact departs or rotates off
+  the visible page, focus moves to the named explanatory note at the end of the
+  list and survives later refreshes there, so the next Tab proceeds beyond the
+  list instead of restarting at Contacts or silently selecting another contact.
+- Cockpit Live Signals retains keyboard focus during live updates and contact
+  reordering, allowing Tab to continue to Display and Radio. If the focused
+  contact leaves the list, focus moves to the current briefing tab.
+- Cockpit-only Display and Radio launchers show complete inset focus rings.
+- Escape collapses the nearest expanded panel containing keyboard focus and
+  returns focus to that panel's disclosure when closing from its contents.
+  Escape on the disclosure itself closes without leaving the collapsed control
+  focused. Cockpit Contact and Live Signals panels follow the same nesting rule.
+- Cesium's bottom-left Data attribution control and lightbox Close control are
+  in the Tab order and support Enter and Space. Close, Escape, and backdrop
+  dismissal restore focus and synchronize the disclosure state.
+
 - CCTV testing uses the normal launcher for keyless startup, credential loading,
   localhost binding, and explicit LAN-exposure warnings while retaining its
   smaller source-pack limits.
