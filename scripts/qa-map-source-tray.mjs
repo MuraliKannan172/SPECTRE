@@ -29,7 +29,15 @@ fs.mkdirSync(shotsDir, { recursive: true });
 const browser = await puppeteer.launch({
   headless: headful ? false : 'new',
   executablePath,
-  args: ['--use-angle=metal', '--enable-gpu', '--no-sandbox'],
+  // Metal is a macOS-only ANGLE backend: passing it on Windows or Linux makes
+  // WebGL initialization fail outright, so Cesium never constructs and this
+  // harness dies at the boot wait before a single assertion runs.
+  args: [
+    ...(process.platform === 'darwin'
+      ? ['--use-angle=metal', '--enable-gpu']
+      : ['--use-gl=angle', '--use-angle=swiftshader']),
+    '--no-sandbox',
+  ],
 });
 const page = await browser.newPage();
 const failures = [];
@@ -158,9 +166,17 @@ try {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
     // The controller commits `activeId` before its fallback promise callback
-    // emits the terminal error state that re-syncs the chips. Give that
-    // callback one turn so the DOM assertion observes the completed contract.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // emits the terminal error state that re-syncs the chips, and Cesium drops
+    // the Esri credit on a later render frame again. A fixed delay races both:
+    // 50ms was enough most runs and not enough on a slow one, which is the same
+    // flake as the tray timers above (#54). Poll the observable truth instead.
+    const domDeadline = performance.now() + 3000;
+    const settled = () => !document.body.innerText.includes('Powered by Esri')
+      && JSON.stringify([...document.querySelectorAll('.map-stack-chip[aria-pressed="true"]')]
+        .map((chip) => chip.dataset.stackId)) === JSON.stringify(['osm']);
+    while (!settled() && performance.now() < domDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
     const afterTwo = {
       activeId: controller.getActiveId(),
       lastError: controller.getState().lastError,
@@ -190,21 +206,45 @@ try {
     JSON.stringify(esriTileFailureFallback),
   );
 
+  // The tray's state changes are timer-driven: opening schedules the focus
+  // hand-off to a Map Source tile 240ms later (scheduleMapSourceFocus in
+  // ui.js). A fixed sleep races that timer rather than observing it settle —
+  // 300ms left only 60ms of margin, which is what made these checks flake on
+  // a clean checkout (#54). Wait on controller truth instead, the way the
+  // Bing-switch check further down already does.
+  // The wait only settles state; the check() below it is still the assertion,
+  // so a swallowed timeout surfaces as that check failing with real values
+  // rather than as an opaque puppeteer error.
+  const waitTray = (wantExpanded, wantFocus) => page.waitForFunction(
+    (expanded, focus) => {
+      const toggle = document.getElementById('control-panel-toggle');
+      if (toggle?.getAttribute('aria-expanded') !== expanded) return false;
+      if (!focus) return true;
+      const active = document.activeElement;
+      return focus === 'toggle'
+        ? active?.id === 'control-panel-toggle'
+        : active?.dataset?.stackId === focus;
+    },
+    { timeout: 2000 },
+    wantExpanded, wantFocus,
+  ).catch(() => {});
+
+  const keyboardSource = await page.evaluate(() => window.__godsEyeView.styleManager.mapStackController.getActiveId());
   await page.focus('#control-panel-toggle');
   await page.keyboard.press('Enter');
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await waitTray('true', keyboardSource);
   const keyboardOpen = await page.evaluate(() => ({
     expanded: document.getElementById('control-panel-toggle').getAttribute('aria-expanded'),
     activeStack: document.activeElement?.dataset?.stackId || null,
   }));
   check(
-    'Enter opens the tray and hands focus to a Map Source tile',
-    keyboardOpen.expanded === 'true' && keyboardOpen.activeStack === 'photoreal',
+    'Enter opens the tray and hands focus to the selected Map Source tile',
+    keyboardOpen.expanded === 'true' && keyboardOpen.activeStack === keyboardSource,
     JSON.stringify(keyboardOpen),
   );
 
   await page.keyboard.press('Escape');
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await waitTray('false', 'toggle');
   const keyboardClose = await page.evaluate(() => ({
     expanded: document.getElementById('control-panel-toggle').getAttribute('aria-expanded'),
     activeId: document.activeElement?.id || null,
@@ -216,14 +256,14 @@ try {
   );
 
   await page.keyboard.press('Space');
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await waitTray('true', keyboardSource);
   const spaceOpen = await page.evaluate(() => ({
     expanded: document.getElementById('control-panel-toggle').getAttribute('aria-expanded'),
     activeStack: document.activeElement?.dataset?.stackId || null,
   }));
   check(
     'Space opens the tray through the same keyboard path',
-    spaceOpen.expanded === 'true' && spaceOpen.activeStack === 'photoreal',
+    spaceOpen.expanded === 'true' && spaceOpen.activeStack === keyboardSource,
     JSON.stringify(spaceOpen),
   );
 
@@ -231,18 +271,67 @@ try {
   await page.keyboard.down('Enter');
   await new Promise((resolve) => setTimeout(resolve, 320));
   await page.keyboard.up('Enter');
+  await waitTray('true', keyboardSource); // let the hold's scheduled focus hand-off land
   await page.keyboard.press('Escape');
+  await waitTray('false', 'toggle');
   await page.keyboard.press('Enter');
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await waitTray('true', keyboardSource);
   const longHoldRecovery = await page.evaluate(() => ({
     expanded: document.getElementById('control-panel-toggle').getAttribute('aria-expanded'),
     activeStack: document.activeElement?.dataset?.stackId || null,
   }));
   check(
     'long Enter hold cannot strand the disclosure keyboard path',
-    longHoldRecovery.expanded === 'true' && longHoldRecovery.activeStack === 'photoreal',
+    longHoldRecovery.expanded === 'true' && longHoldRecovery.activeStack === keyboardSource,
     JSON.stringify(longHoldRecovery),
   );
+
+  // Force a delayed visible state while using the real controller and keyboard routes.
+  const hideTray = () => page.evaluate(() => {
+    const manager = window.__godsEyeView.styleManager;
+    manager.setPanelCollapsed('control-panel', true);
+    window.__qaTrayStyles = [...document.querySelectorAll('.map-stack-chip')]
+      .map((chip) => [chip, chip.style.cssText]);
+    for (const [chip] of window.__qaTrayStyles) chip.style.setProperty('visibility', 'hidden', 'important');
+    document.getElementById('control-panel-toggle').focus();
+  });
+  const showTray = () => page.evaluate(() => {
+    for (const [chip, cssText] of window.__qaTrayStyles) chip.style.cssText = cssText;
+    delete window.__qaTrayStyles;
+  });
+  await hideTray();
+  await page.keyboard.press('Enter');
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  const delayedBefore = await page.evaluate(() => document.activeElement?.id);
+  await showTray();
+  await waitTray('true', keyboardSource);
+  const delayedAfter = await page.evaluate(() => document.activeElement?.dataset?.stackId);
+  check('a delayed visible tray receives selected-source focus after the first attempt',
+    delayedBefore === 'control-panel-toggle' && delayedAfter === keyboardSource,
+    JSON.stringify({ delayedBefore, delayedAfter, keyboardSource }));
+
+  await hideTray();
+  await page.keyboard.press('Enter');
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  await page.keyboard.press('Tab');
+  const departure = await page.evaluate(() => {
+    window.__qaDepartedFocus = document.activeElement;
+    return document.activeElement !== document.getElementById('control-panel-toggle');
+  });
+  await showTray();
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const focusRetained = await page.evaluate(() => {
+    const same = document.activeElement === window.__qaDepartedFocus;
+    delete window.__qaDepartedFocus;
+    return same;
+  });
+  check('Tab away during the opening transition revokes delayed focus', departure && focusRetained,
+    JSON.stringify({ departure, focusRetained }));
+
+  await page.evaluate(() => window.__godsEyeView.styleManager.setPanelCollapsed('control-panel', true));
+  await page.focus('#control-panel-toggle');
+  await page.keyboard.press('Enter');
+  await waitTray('true', keyboardSource);
 
   if (forceKeyless) {
     await page.evaluate(async () => {
@@ -575,8 +664,17 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 200));
   await page.focus('#control-panel-toggle');
   await page.keyboard.press('Enter'); // opens and hands focus to the active tile
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  await page.keyboard.press('Tab'); // tab ONTO a tile, keyboard modality
+  const selectedForHold = await page.evaluate(() => window.__godsEyeView.styleManager.mapStackController.getActiveId());
+  await waitTray('true', selectedForHold);
+  // Keyless starts on OSM, the last tile. Tab forward there correctly leaves
+  // the tray, so navigate to a neighbouring tile in the available direction.
+  const activeIsLastTile = await page.evaluate(() => {
+    const chips = [...document.querySelectorAll('#map-stack-chips .map-stack-chip')];
+    return document.activeElement === chips.at(-1);
+  });
+  if (activeIsLastTile) await page.keyboard.down('Shift');
+  await page.keyboard.press('Tab');
+  if (activeIsLastTile) await page.keyboard.up('Shift');
   await page.keyboard.press('Enter'); // activate it from the keyboard
   await new Promise((resolve) => setTimeout(resolve, 200));
   const keyboardAfterActivate = await page.evaluate(() => ({

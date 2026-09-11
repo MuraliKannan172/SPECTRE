@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+## Map Source keyboard focus
+
+Keyboard opening focuses the selected map-source tile, falling back to the first
+only when no source is selected. A bounded retry handles delayed tray visibility.
+Moving focus away, pointer interaction, closing the tray, or disposing the UI
+cancels pending work; a later reopening cannot inherit an old focus request.
+
 ## September 8, 2026
 
 Earthquake refreshes validate the complete feed and construct replacement entities before clearing the previous snapshot. Malformed rows and duplicate rendered IDs retain the last good entities, overlays, count and timestamp and report a malformed response; unknown magnitude is excluded from M2.5+ rendering.
