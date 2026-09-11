@@ -359,6 +359,19 @@ test('malformed earthquake refresh preserves entities, overlays, count and times
     assert.equal(await layer.update(viewer), true);
     const entity = dataSources[0].entities.values[0];
     const stats = layer.getStats();
+    for (const properties of ['invalid', 123, [], true]) {
+      const bad = { ...good, id: 'bad-properties', properties };
+      for (const features of [[bad], [good, bad]]) {
+        respond(features);
+        assert.equal(await layer.update(viewer), false);
+        assert.equal(dataSources[0].entities.values.length, 1);
+        assert.equal(dataSources[0].entities.values[0], entity);
+        assert.equal(layer.getStats().count, stats.count);
+        assert.equal(layer.getStats().lastUpdate, stats.lastUpdate);
+        assert.equal(layer.getStats().error, 'Malformed USGS response');
+        assert.equal(publications.length, 1);
+      }
+    }
     for (const bad of [null, { ...good, geometry: null },
       { ...good, geometry: { type: 'LineString', coordinates: [1, 2] } },
       { ...good, geometry: { coordinates: [181, 20] } },

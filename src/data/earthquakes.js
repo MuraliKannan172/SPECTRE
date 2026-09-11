@@ -130,6 +130,7 @@ export function normalizeEarthquakeSnapshot(geojson) {
     const coordinates = feature?.geometry?.coordinates;
     const properties = feature?.properties;
     if (!Array.isArray(coordinates) || coordinates.length < 2 || !properties
+      || typeof properties !== 'object' || Array.isArray(properties)
       || (feature.geometry.type != null && feature.geometry.type !== 'Point')) return null;
     const [lon, lat, depthKm] = coordinates;
     const mag = properties.mag;
