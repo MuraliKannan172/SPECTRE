@@ -497,7 +497,7 @@ test('local infrastructure creates no native labels or per-frame geometry callba
   assert.match(source, /const stemPositionBuffers = \[\[base, tip\], \[base, tip\]\]/);
   assert.match(source, /record\.entity\.polyline\.positions\.setValue\(stemPositions\)/);
   assert.match(source, /viewer\.camera\.moveEnd\.addEventListener/);
-  assert.match(source, /if \(refreshStemGeometry\)/);
+  assert.match(source, /if \(refreshStemGeometry \|\| terrainFloorChanged\)/);
   assert.match(source, /now - _lastVisibilityUpdate < VISIBILITY_UPDATE_MS/);
 });
 
@@ -726,6 +726,41 @@ test('ground sampling waits for visible globe tiles before caching a height', as
   env.preRender.raise();
   assert.equal(env.sampleCalls.count, 1, 'the existing retry must sample the settled scene');
   assert.ok(Math.abs(baseHeightM(env) - 117) < 0.01);
+});
+
+test('settled terrain refinement lifts an already sampled stem without another GPU sample', async (t) => {
+  const env = await createRealLocalLayerHarness({
+    sampleHeightSupported: true, sampleHeight: () => 117,
+  });
+  const clock = installFakeClock(t);
+  t.after(() => { env.layer.destroy(env.viewer); env.cleanup(); });
+  let terrain = 117;
+  const globe = { show: true, tilesLoaded: true, getHeight: () => terrain };
+  env.viewer.scene.globe = globe;
+  setCameraAltitude(env, 20_000);
+  env.preRender.raise();
+  assert.ok(Math.abs(baseHeightM(env) - 117) < 0.01);
+
+  terrain = 120;
+  globe.tilesLoaded = false;
+  clock.advance(500);
+  env.preRender.raise();
+  assert.ok(Math.abs(baseHeightM(env) - 117) < 0.01, 'wait for the refined mesh to settle');
+  globe.tilesLoaded = true;
+  clock.advance(500);
+  env.preRender.raise();
+  assert.ok(Math.abs(baseHeightM(env) - 120) < 0.01, 'a parked marker must follow the refined floor');
+
+  terrain = 110;
+  clock.advance(500);
+  env.preRender.raise();
+  assert.ok(Math.abs(baseHeightM(env) - 120) < 0.01, 'a lower floor must not flatten existing geometry');
+  terrain = 140;
+  globe.show = false;
+  clock.advance(500);
+  env.preRender.raise();
+  assert.ok(Math.abs(baseHeightM(env) - 120) < 0.01, 'hidden globe terrain must not constrain geometry');
+  assert.equal(env.sampleCalls.count, 1, 'terrain maintenance must not repeat the GPU readback');
 });
 
 for (const [terrainHeight, sampledHeight, expectedHeight, globeShown] of [

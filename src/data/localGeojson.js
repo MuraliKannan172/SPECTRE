@@ -807,7 +807,8 @@ export function createLocalGeoJsonLayer({
             if (!isActive) continue;
 
             const wasGroundSampled = record.groundSampled;
-            if (refreshStemGeometry) {
+            const terrainFloorChanged = refreshLocalTerrainFloor(viewer, record);
+            if (refreshStemGeometry || terrainFloorChanged) {
               updateLocalStemGeometry(viewer, record, now);
             } else if (canSampleGround && !record.groundSampled
               && now - record.lastGroundSampleMs >= GROUND_SAMPLE_RETRY_MS) {
@@ -911,6 +912,21 @@ function insertLocalCellContender(contenders, record) {
   if (contenders.length > LOCAL_OVERLAY_CELL_SURPLUS) contenders.length = LOCAL_OVERLAY_CELL_SURPLUS;
 }
 
+function refreshLocalTerrainFloor(viewer, record) {
+  const globe = viewer.scene.globe;
+  if (!record.groundSampled || !globe?.show || globe.tilesLoaded === false) return false;
+  if (Cesium.Cartesian3.distance(viewer.camera.positionWC, record.base)
+    >= GROUND_SAMPLE_MAX_DISTANCE_M) return false;
+  // Camera motion can refine terrain after the first successful depth sample.
+  // Reuse the loaded mesh on existing bounded walks; never arm a timer or do
+  // another GPU readback just to maintain this floor. Keep roof elevations.
+  const height = globe.getHeight?.(record.carto);
+  if (!Number.isFinite(height) || Math.abs(height) > GROUND_SAMPLE_MAX_ABS_HEIGHT_M
+    || height <= record.groundHeight) return false;
+  setLocalGroundHeight(record, height);
+  return true;
+}
+
 function sampleLocalGroundHeight(viewer, record, now) {
   if (record.groundSampled || !viewer.scene.sampleHeightSupported) return false;
   if (now - record.lastGroundSampleMs < GROUND_SAMPLE_RETRY_MS) return false;
@@ -933,7 +949,12 @@ function sampleLocalGroundHeight(viewer, record, now) {
     sampled = Math.max(sampled, terrainHeight);
   }
   record.groundSampled = true;
-  record.groundHeight = sampled;
+  setLocalGroundHeight(record, sampled);
+  return true;
+}
+
+function setLocalGroundHeight(record, height) {
+  record.groundHeight = height;
   Cesium.Cartesian3.fromRadians(
     record.carto.longitude,
     record.carto.latitude,
@@ -942,7 +963,6 @@ function sampleLocalGroundHeight(viewer, record, now) {
     record.base,
   );
   record.entity.__localBaseCartesian = record.base;
-  return true;
 }
 
 function updateLocalStemGeometry(viewer, record, now, knownDistance = null) {

@@ -12,7 +12,9 @@ Unchanged overlay entries do not request another frame; moved positions,
 changed membership and re-enabling still publish. Ground sampling waits for
 visible globe tiles to settle and uses valid loaded terrain as a floor while
 retaining rooftop and below-sea-level elevations. A hidden globe does not
-constrain photoreal geometry, and retry work remains bounded.
+constrain photoreal geometry, and retry work remains bounded. Already sampled
+nearby markers follow higher settled terrain on existing bounded walks, without
+additional GPU samples or timers, when close-up tile detail refines the floor.
 The submarine-cable renderer is unchanged. These limits bound active stem work;
 they do not reduce the materialized entity count or establish an FPS gain.
 
