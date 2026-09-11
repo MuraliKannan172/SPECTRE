@@ -230,3 +230,10 @@ test('pointer leave preserves established keyboard focus and the open tray', () 
 });
 
 
+
+test('disposed UI cannot complete a pending handoff', () => {
+  const h = harness({ hidden: true }); h.key(); h.tick();
+  h.manager._disposed = true; h.show(); h.drain();
+  assert.equal(h.document.activeElement, h.disclosure);
+  assert.equal(h.calls(), 1); assert.equal(h.timers.size, 0);
+});

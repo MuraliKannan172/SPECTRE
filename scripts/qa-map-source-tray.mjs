@@ -172,9 +172,8 @@ try {
     // flake as the tray timers above (#54). Poll the observable truth instead.
     const domDeadline = performance.now() + 3000;
     const settled = () => !document.body.innerText.includes('Powered by Esri')
-      && [...document.querySelectorAll('.map-stack-chip')]
-        .filter((chip) => chip.getAttribute('aria-pressed') === 'true')
-        .every((chip) => chip.dataset.stackId === 'osm');
+      && JSON.stringify([...document.querySelectorAll('.map-stack-chip[aria-pressed="true"]')]
+        .map((chip) => chip.dataset.stackId)) === JSON.stringify(['osm']);
     while (!settled() && performance.now() < domDeadline) {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
@@ -230,16 +229,17 @@ try {
     wantExpanded, wantFocus,
   ).catch(() => {});
 
+  const keyboardSource = await page.evaluate(() => window.__godsEyeView.styleManager.mapStackController.getActiveId());
   await page.focus('#control-panel-toggle');
   await page.keyboard.press('Enter');
-  await waitTray('true', 'photoreal');
+  await waitTray('true', keyboardSource);
   const keyboardOpen = await page.evaluate(() => ({
     expanded: document.getElementById('control-panel-toggle').getAttribute('aria-expanded'),
     activeStack: document.activeElement?.dataset?.stackId || null,
   }));
   check(
-    'Enter opens the tray and hands focus to a Map Source tile',
-    keyboardOpen.expanded === 'true' && keyboardOpen.activeStack === 'photoreal',
+    'Enter opens the tray and hands focus to the selected Map Source tile',
+    keyboardOpen.expanded === 'true' && keyboardOpen.activeStack === keyboardSource,
     JSON.stringify(keyboardOpen),
   );
 
@@ -256,14 +256,14 @@ try {
   );
 
   await page.keyboard.press('Space');
-  await waitTray('true', 'photoreal');
+  await waitTray('true', keyboardSource);
   const spaceOpen = await page.evaluate(() => ({
     expanded: document.getElementById('control-panel-toggle').getAttribute('aria-expanded'),
     activeStack: document.activeElement?.dataset?.stackId || null,
   }));
   check(
     'Space opens the tray through the same keyboard path',
-    spaceOpen.expanded === 'true' && spaceOpen.activeStack === 'photoreal',
+    spaceOpen.expanded === 'true' && spaceOpen.activeStack === keyboardSource,
     JSON.stringify(spaceOpen),
   );
 
@@ -271,20 +271,67 @@ try {
   await page.keyboard.down('Enter');
   await new Promise((resolve) => setTimeout(resolve, 320));
   await page.keyboard.up('Enter');
-  await waitTray('true', 'photoreal'); // let the hold's scheduled focus hand-off land
+  await waitTray('true', keyboardSource); // let the hold's scheduled focus hand-off land
   await page.keyboard.press('Escape');
   await waitTray('false', 'toggle');
   await page.keyboard.press('Enter');
-  await waitTray('true', 'photoreal');
+  await waitTray('true', keyboardSource);
   const longHoldRecovery = await page.evaluate(() => ({
     expanded: document.getElementById('control-panel-toggle').getAttribute('aria-expanded'),
     activeStack: document.activeElement?.dataset?.stackId || null,
   }));
   check(
     'long Enter hold cannot strand the disclosure keyboard path',
-    longHoldRecovery.expanded === 'true' && longHoldRecovery.activeStack === 'photoreal',
+    longHoldRecovery.expanded === 'true' && longHoldRecovery.activeStack === keyboardSource,
     JSON.stringify(longHoldRecovery),
   );
+
+  // Force a delayed visible state while using the real controller and keyboard routes.
+  const hideTray = () => page.evaluate(() => {
+    const manager = window.__godsEyeView.styleManager;
+    manager.setPanelCollapsed('control-panel', true);
+    window.__qaTrayStyles = [...document.querySelectorAll('.map-stack-chip')]
+      .map((chip) => [chip, chip.style.cssText]);
+    for (const [chip] of window.__qaTrayStyles) chip.style.setProperty('visibility', 'hidden', 'important');
+    document.getElementById('control-panel-toggle').focus();
+  });
+  const showTray = () => page.evaluate(() => {
+    for (const [chip, cssText] of window.__qaTrayStyles) chip.style.cssText = cssText;
+    delete window.__qaTrayStyles;
+  });
+  await hideTray();
+  await page.keyboard.press('Enter');
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  const delayedBefore = await page.evaluate(() => document.activeElement?.id);
+  await showTray();
+  await waitTray('true', keyboardSource);
+  const delayedAfter = await page.evaluate(() => document.activeElement?.dataset?.stackId);
+  check('a delayed visible tray receives selected-source focus after the first attempt',
+    delayedBefore === 'control-panel-toggle' && delayedAfter === keyboardSource,
+    JSON.stringify({ delayedBefore, delayedAfter, keyboardSource }));
+
+  await hideTray();
+  await page.keyboard.press('Enter');
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  await page.keyboard.press('Tab');
+  const departure = await page.evaluate(() => {
+    window.__qaDepartedFocus = document.activeElement;
+    return document.activeElement !== document.getElementById('control-panel-toggle');
+  });
+  await showTray();
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const focusRetained = await page.evaluate(() => {
+    const same = document.activeElement === window.__qaDepartedFocus;
+    delete window.__qaDepartedFocus;
+    return same;
+  });
+  check('Tab away during the opening transition revokes delayed focus', departure && focusRetained,
+    JSON.stringify({ departure, focusRetained }));
+
+  await page.evaluate(() => window.__godsEyeView.styleManager.setPanelCollapsed('control-panel', true));
+  await page.focus('#control-panel-toggle');
+  await page.keyboard.press('Enter');
+  await waitTray('true', keyboardSource);
 
   if (forceKeyless) {
     await page.evaluate(async () => {
@@ -617,8 +664,17 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 200));
   await page.focus('#control-panel-toggle');
   await page.keyboard.press('Enter'); // opens and hands focus to the active tile
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  await page.keyboard.press('Tab'); // tab ONTO a tile, keyboard modality
+  const selectedForHold = await page.evaluate(() => window.__godsEyeView.styleManager.mapStackController.getActiveId());
+  await waitTray('true', selectedForHold);
+  // Keyless starts on OSM, the last tile. Tab forward there correctly leaves
+  // the tray, so navigate to a neighbouring tile in the available direction.
+  const activeIsLastTile = await page.evaluate(() => {
+    const chips = [...document.querySelectorAll('#map-stack-chips .map-stack-chip')];
+    return document.activeElement === chips.at(-1);
+  });
+  if (activeIsLastTile) await page.keyboard.down('Shift');
+  await page.keyboard.press('Tab');
+  if (activeIsLastTile) await page.keyboard.up('Shift');
   await page.keyboard.press('Enter'); // activate it from the keyboard
   await new Promise((resolve) => setTimeout(resolve, 200));
   const keyboardAfterActivate = await page.evaluate(() => ({
