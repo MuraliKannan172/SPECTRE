@@ -13,6 +13,14 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+- CCTV testing uses the normal launcher for keyless startup, credential loading,
+  localhost binding, and explicit LAN-exposure warnings while retaining its
+  smaller source-pack limits.
+- CelesTrak, Launch Library, terrain-height, and aircraft-enrichment failures
+  return generic error messages. Related diagnostics omit raw exception details
+  and upstream error bodies; response statuses and cache fallback remain intact.
+  Includes the security fixes contributed by Tom-Neverwinter in PR #171.
+
 ### Fixed
 
 - Map Source keyboard opening retries focus until the selected tile is visible.
