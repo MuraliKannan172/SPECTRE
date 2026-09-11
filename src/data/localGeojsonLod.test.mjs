@@ -58,7 +58,7 @@ test('infraLodBudget band boundaries are inclusive at the lower edge', () => {
   assert.deepEqual(infraLodBudget(INFRA_LOD_REGIONAL_HEIGHT_M - 1), { activeLimit: INFRA_LOD_ACTIVE_MAX });
 });
 
-test('infraLodBudget treats non-finite / negative height as the global (cheapest) band', () => {
+test('infraLodBudget uses the global band for non-finite height and clamps negative height to zero', () => {
   assert.deepEqual(infraLodBudget(undefined), { activeLimit: INFRA_LOD_ACTIVE_MIN });
   assert.deepEqual(infraLodBudget(NaN), { activeLimit: INFRA_LOD_ACTIVE_MIN });
   assert.deepEqual(infraLodBudget(Number.POSITIVE_INFINITY), { activeLimit: INFRA_LOD_ACTIVE_MIN });

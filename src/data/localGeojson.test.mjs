@@ -314,6 +314,33 @@ test('local overlay publisher owns add/remove/visibility lifecycle and becomes i
   assert.deepEqual(calls[7], ['visible', 'local-datacenters', false]);
 });
 
+test('slow parked frames do not keep republishing the same local overlay cohort', async (t) => {
+  const env = await createRealLocalLayerHarness();
+  const clock = installFakeClock(t);
+  t.after(() => { env.layer.destroy(env.viewer); env.cleanup(); });
+  const publications = () => env.hostCalls.filter(([type]) => type === 'entries');
+  env.preRender.raise();
+  assert.equal(publications().length, 1);
+  assert.ok(publications()[0][2].length > 0, 'the initial cohort must be populated');
+  for (let i = 0; i < 6; i++) {
+    clock.advance(1_000); // Every slow frame passes the 450 ms source throttle.
+    env.preRender.raise();
+  }
+  assert.equal(publications().length, 1,
+    'unchanged publication invalidates the real host and requests another slow frame');
+
+  const camera = env.viewer.camera.positionWC;
+  env.viewer.camera.positionWC = Cesium.Cartesian3.add(camera,
+    new Cesium.Cartesian3(10_000, 0, 0), new Cesium.Cartesian3());
+  env.moveEnd.raise();
+  env.preRender.raise();
+  assert.equal(publications().length, 2, 'changed stem positions must still reach the host');
+  env.layer.disable(env.viewer);
+  await env.layer.enable(env.viewer);
+  env.preRender.raise();
+  assert.equal(publications().length, 3, 're-enable must republish after clearing the host');
+});
+
 test('real layer disable clears its published host entries and balances settle listeners', async () => {
   const env = await createRealLocalLayerHarness();
   env.preRender.raise();
@@ -681,6 +708,44 @@ function setCameraAltitude(env, altM) {
 
 function governorReasons() {
   return getRenderGovernorDiagnostics().recentRequests.map((entry) => entry.reason);
+}
+
+test('ground sampling waits for visible globe tiles before caching a height', async (t) => {
+  const env = await createRealLocalLayerHarness({
+    sampleHeightSupported: true, sampleHeight: () => 117,
+  });
+  const clock = installFakeClock(t);
+  t.after(() => { env.layer.destroy(env.viewer); env.cleanup(); });
+  env.viewer.scene.globe = { show: true, tilesLoaded: false, getHeight: () => 117 };
+  setCameraAltitude(env, 20_000);
+  env.preRender.raise();
+  assert.equal(env.sampleCalls.count, 0, 'streaming terrain must not become a permanent coarse sample');
+  assert.ok(Math.abs(baseHeightM(env)) < 0.01);
+  env.viewer.scene.globe.tilesLoaded = true;
+  clock.advance(2_100);
+  env.preRender.raise();
+  assert.equal(env.sampleCalls.count, 1, 'the existing retry must sample the settled scene');
+  assert.ok(Math.abs(baseHeightM(env) - 117) < 0.01);
+});
+
+for (const [terrainHeight, sampledHeight, expectedHeight, globeShown] of [
+  [117, -2238, 117, true],
+  [-400, -410, -400, true],
+  [117, 180, 180, true],
+  [117, -20, -20, false],
+]) {
+  test(`ground sampling respects terrain ${terrainHeight} and geometry ${sampledHeight} with globe ${globeShown}`, async (t) => {
+    const env = await createRealLocalLayerHarness({
+      sampleHeightSupported: true, sampleHeight: () => sampledHeight,
+    });
+    installFakeClock(t);
+    t.after(() => { env.layer.destroy(env.viewer); env.cleanup(); });
+    env.viewer.scene.globe = { show: globeShown, getHeight: () => terrainHeight };
+    setCameraAltitude(env, 20_000);
+    env.preRender.raise();
+    assert.ok(Math.abs(baseHeightM(env) - expectedHeight) < 0.01,
+      `base ${baseHeightM(env)} must respect the visible terrain without flattening roofs or below-sea-level terrain`);
+  });
 }
 
 test('a failed ground sample schedules the retry frame the idle governor would never produce', async (t) => {

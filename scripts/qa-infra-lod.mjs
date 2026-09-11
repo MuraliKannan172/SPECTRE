@@ -296,12 +296,27 @@ try {
 
   // ── parked-idle honesty: the LOD walk must not force continuous render ─
   await new Promise((r) => setTimeout(r, 4_000));
-  const idle = await page.evaluate(() => new Promise((resolve) => {
-    const scene = window.__godsEyeView.viewer.scene;
-    let renders = 0;
-    const remove = scene.postRender.addEventListener(() => { renders += 1; });
-    setTimeout(() => { remove(); resolve({ renders }); }, 5_000);
-  }));
+  const idle = await page.evaluate(async () => {
+    const { getRenderGovernorDiagnostics } = await import('/src/renderGovernor.js');
+    return new Promise((resolve) => {
+      const scene = window.__godsEyeView.viewer.scene;
+      const startedAt = Date.now();
+      const tilesLoadedBefore = scene.globe.tilesLoaded;
+      let renders = 0;
+      let framesWithPendingTiles = 0;
+      const remove = scene.postRender.addEventListener(() => {
+        renders += 1;
+        if (!scene.globe.tilesLoaded) framesWithPendingTiles += 1;
+      });
+      setTimeout(() => {
+        remove();
+        const governor = getRenderGovernorDiagnostics();
+        resolve({ renders, tilesLoadedBefore, tilesLoadedAfter: scene.globe.tilesLoaded,
+          framesWithPendingTiles, mode: governor.mode, holds: governor.holds,
+          requests: governor.recentRequests.filter(request => request.at >= startedAt) });
+      }, 5_000);
+    });
+  });
   report(CONTROL
     ? 'parked idle, control (postRender fires / 5s)'
     : 'parked idle with infra ON (postRender fires / 5s)', idle);

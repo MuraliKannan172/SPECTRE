@@ -8,6 +8,11 @@ and 420 below 200 km. Selection favors existing label priority and nearby
 features, retains stable choices across small camera movements, and refreshes
 during continuous motion. Disable/re-enable resets selection cleanly.
 Close-up stem sizing uses camera-to-feature distance without a 5 km minimum.
+Unchanged overlay entries do not request another frame; moved positions,
+changed membership and re-enabling still publish. Ground sampling waits for
+visible globe tiles to settle and uses valid loaded terrain as a floor while
+retaining rooftop and below-sea-level elevations. A hidden globe does not
+constrain photoreal geometry, and retry work remains bounded.
 The submarine-cable renderer is unchanged. These limits bound active stem work;
 they do not reduce the materialized entity count or establish an FPS gain.
 

@@ -225,6 +225,11 @@ export function createLocalInfrastructureOverlayPublisher({
   let visible = false;
   let published = false;
   let destroyed = false;
+  // Local entries have immutable metadata and a mutable Cartesian position.
+  // Snapshot coordinates: retaining only the entry reference would miss a
+  // stem tip moving in place. Republishing an unchanged cohort invalidates
+  // the host and can sustain a render loop when frames exceed the 450 ms walk.
+  let lastPublication = null;
   const sourceOptions = {
     cohortLimit: LOCAL_OVERLAY_COHORT_LIMIT,
     collisionCapacity: LOCAL_OVERLAY_COLLISION_CAPACITY,
@@ -239,7 +244,18 @@ export function createLocalInfrastructureOverlayPublisher({
     },
     publish(entries) {
       if (destroyed || !visible) return;
+      if (lastPublication && entries.length === lastPublication.length
+        && entries.every((entry, index) => {
+          const previous = lastPublication[index];
+          return entry === previous.entry
+            && entry.position?.x === previous.x
+            && entry.position?.y === previous.y
+            && entry.position?.z === previous.z;
+        })) return;
       host.setEntries(sourceId, entries, sourceOptions);
+      lastPublication = entries.map(entry => ({
+        entry, x: entry.position?.x, y: entry.position?.y, z: entry.position?.z,
+      }));
       published = entries.length > 0;
     },
     hide() {
@@ -248,6 +264,7 @@ export function createLocalInfrastructureOverlayPublisher({
       if (visible) host.setVisible(sourceId, false);
       visible = false;
       published = false;
+      lastPublication = null;
     },
     destroy() {
       if (destroyed) return;
@@ -255,6 +272,7 @@ export function createLocalInfrastructureOverlayPublisher({
       if (visible) host.setVisible(sourceId, false);
       visible = false;
       published = false;
+      lastPublication = null;
       destroyed = true;
     },
   };
@@ -897,6 +915,8 @@ function sampleLocalGroundHeight(viewer, record, now) {
   if (record.groundSampled || !viewer.scene.sampleHeightSupported) return false;
   if (now - record.lastGroundSampleMs < GROUND_SAMPLE_RETRY_MS) return false;
   record.lastGroundSampleMs = now;
+  const globe = viewer.scene.globe;
+  if (globe?.show && globe.tilesLoaded === false) return false;
   let sampled;
   try {
     sampled = viewer.scene.sampleHeight(record.carto, [record.entity]);
@@ -904,6 +924,14 @@ function sampleLocalGroundHeight(viewer, record, now) {
     return false; // tiles not ready; retry on a later bounded update
   }
   if (!Number.isFinite(sampled) || Math.abs(sampled) > GROUND_SAMPLE_MAX_ABS_HEIGHT_M) return false;
+  // A coarse scene-depth sample can lie below the terrain already loaded by
+  // the visible globe. Keep that terrain as a floor while allowing roofs and
+  // valid below-sea-level elevations. Photoreal scenes hide the globe, so its
+  // inactive terrain must not constrain their geometry.
+  const terrainHeight = globe?.show ? globe.getHeight?.(record.carto) : undefined;
+  if (Number.isFinite(terrainHeight) && Math.abs(terrainHeight) <= GROUND_SAMPLE_MAX_ABS_HEIGHT_M) {
+    sampled = Math.max(sampled, terrainHeight);
+  }
   record.groundSampled = true;
   record.groundHeight = sampled;
   Cesium.Cartesian3.fromRadians(
