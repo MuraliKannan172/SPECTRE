@@ -489,7 +489,7 @@ for (const [heightM, minStemM, maxStemM] of [[500, 45, 90], [10000, 1100, 1400]]
 }
 
 test('local infrastructure creates no native labels or per-frame geometry callbacks', () => {
-  const source = readFileSync(new URL('./localGeojson.js', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('./localGeojsonCore.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /new Cesium\.LabelGraphics/);
   assert.doesNotMatch(source, /new Cesium\.CallbackProperty/);
   assert.match(source, /feature\.position = tip/);
