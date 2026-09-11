@@ -3,6 +3,7 @@ import { governorRequestRender } from '../renderGovernor.js';
 import {
   clearSelectedEntityContextForLayer,
   registerEntityContext,
+  removeEntityContextsForLayer,
   selectEntityContext,
 } from './contextStore.js';
 import {
@@ -328,6 +329,8 @@ export function createLocalGeoJsonLayer({
   let _stemGeometryDirty = true;
   let _lastVisibilityUpdate = 0;
   let _destroyed = false;
+  let _loadPromise = null;
+  let _loadController = null;
   /**
    * Globe-LOD active set: the record ids allowed to carry a live stem right
    * now. This bounds geometry refreshes and ground-sample work to the
@@ -487,220 +490,240 @@ export function createLocalGeoJsonLayer({
 
       // 1. Initialize data source
       if (!_dataSource) {
-        const baseColor = Cesium.Color.fromCssColorString(color);
+        if (!_loadPromise) _loadPromise = (async () => {
+          _loadController = new AbortController();
+          const baseColor = Cesium.Color.fromCssColorString(color);
 
-        // Fetch and parse JSON Lines (.geojsonl) into a FeatureCollection.
-        // The source is built into a local and committed to `_dataSource`
-        // only once setup finishes: a half-built source published early would
-        // make every later enable() skip this block, so the layer could never
-        // clear its error or retry.
-        _error = null;
-        let loaded = null;
-        // Whether the scene has actually accepted `loaded` — the two rollback
-        // windows (before vs after the add settles) need different cleanup.
-        let addedToScene = false;
-        try {
-          const response = await fetch(url);
-          // A 404 returns an HTML body that would otherwise die in JSON.parse
-          // one line later, reported as a parse error for a missing file.
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status ?? '?'}`);
-          }
-          const text = await response.text();
-          const lines = text.split('\n').filter(l => l.trim().length > 0);
+          // Fetch and parse JSON Lines (.geojsonl) into a FeatureCollection.
+          // The source is built into a local and committed to `_dataSource`
+          // only once setup finishes: a half-built source published early would
+          // make every later enable() skip this block, so the layer could never
+          // clear its error or retry.
+          _error = null;
+          let loaded = null;
+          // Whether the scene has actually accepted `loaded` — the two rollback
+          // windows (before vs after the add settles) need different cleanup.
+          let addedToScene = false;
+          try {
+            const response = await fetch(url, { signal: _loadController.signal });
+            if (_destroyed) return;
+            // A 404 returns an HTML body that would otherwise die in JSON.parse
+            // one line later, reported as a parse error for a missing file.
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status ?? '?'}`);
+            }
+            const text = await response.text();
+            if (_destroyed) return;
+            const lines = text.split('\n').filter(l => l.trim().length > 0);
           
-          const features = lines.map(line => JSON.parse(line));
+            const features = lines.map(line => JSON.parse(line));
           
-          const geojson = {
-            type: 'FeatureCollection',
-            features
-          };
+            const geojson = {
+              type: 'FeatureCollection',
+              features
+            };
 
-          // Natively parse into entities and use it as our _dataSource
-          loaded = await Cesium.GeoJsonDataSource.load(geojson, {
-            clampToGround: true,
-            stroke: baseColor,
-            fill: baseColor.withAlpha(0.3),
-            strokeWidth: 2,
-            markerSize: 8,
-            markerColor: baseColor,
-          });
+            // Natively parse into entities and use it as our _dataSource
+            loaded = await Cesium.GeoJsonDataSource.load(geojson, {
+              clampToGround: true,
+              stroke: baseColor,
+              fill: baseColor.withAlpha(0.3),
+              strokeWidth: 2,
+              markerSize: 8,
+              markerColor: baseColor,
+            });
 
-          loaded.name = name;
-          loaded.show = false;
-          // Cesium's DataSourceCollection.add() returns a promise and only
-          // inserts on a later microtask. Without this await, a throw during
-          // post-processing would roll back a source the scene had not
-          // accepted yet — and Cesium would then insert the "removed" source
-          // anyway, leaving an orphan the retry would double up on. Awaiting
-          // also routes an add() rejection into the error path below instead
-          // of leaving it uncaught with healthy-looking stats.
-          await viewer.dataSources.add(loaded);
-          addedToScene = true;
-
-          // Convert parsed points into 3D stems or style polygons
-          const entities = loaded.entities.values;
-          _count = entities.length;
-          _stemRecords = [];
-          _stemGeometryDirty = true;
-          
-          for (let i = 0; i < entities.length; i++) {
-            const feature = entities[i];
-            feature.__localLayerId = id; // Tag it so our click handler knows it belongs to this layer
-            
-            let pos = feature.position?.getValue(Cesium.JulianDate.now());
-            
-            if (!pos) {
-              // It's a polygon or line
-              if (feature.polygon) {
-                feature.polygon.outline = true;
-                feature.polygon.outlineColor = baseColor;
-                
-                // Calculate center point for the stem
-                const hierarchy = feature.polygon.hierarchy?.getValue(Cesium.JulianDate.now());
-                if (hierarchy && hierarchy.positions && hierarchy.positions.length > 0) {
-                  pos = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
-                }
-              }
+            if (_destroyed) return;
+            loaded.name = name;
+            loaded.show = false;
+            // Cesium's DataSourceCollection.add() returns a promise and only
+            // inserts on a later microtask. Without this await, a throw during
+            // post-processing would roll back a source the scene had not
+            // accepted yet — and Cesium would then insert the "removed" source
+            // anyway, leaving an orphan the retry would double up on. Awaiting
+            // also routes an add() rejection into the error path below instead
+            // of leaving it uncaught with healthy-looking stats.
+            await viewer.dataSources.add(loaded);
+            addedToScene = true;
+            if (_destroyed) {
+              viewer.dataSources.remove(loaded, true);
+              return;
             }
 
-            if (!pos) continue;
+            // Convert parsed points into 3D stems or style polygons
+            const entities = loaded.entities.values;
+            _count = entities.length;
+            _stemRecords = [];
+            _stemGeometryDirty = true;
+          
+            for (let i = 0; i < entities.length; i++) {
+              const feature = entities[i];
+              feature.__localLayerId = id; // Tag it so our click handler knows it belongs to this layer
+            
+              let pos = feature.position?.getValue(Cesium.JulianDate.now());
+            
+              if (!pos) {
+                // It's a polygon or line
+                if (feature.polygon) {
+                  feature.polygon.outline = true;
+                  feature.polygon.outlineColor = baseColor;
+                
+                  // Calculate center point for the stem
+                  const hierarchy = feature.polygon.hierarchy?.getValue(Cesium.JulianDate.now());
+                  if (hierarchy && hierarchy.positions && hierarchy.positions.length > 0) {
+                    pos = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
+                  }
+                }
+              }
 
-            const carto = Cesium.Cartographic.fromCartesian(pos);
-            const groundHeight = 0; // Ellipsoid surface until a scene sample lands
-            const tipHeight = 2000; // Initial Stem height
+              if (!pos) continue;
 
-            const base = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, groundHeight);
-            const tip = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, tipHeight);
-            const properties = propertyObject(feature);
-            const recordId = String(feature.id ?? i);
+              const carto = Cesium.Cartographic.fromCartesian(pos);
+              const groundHeight = 0; // Ellipsoid surface until a scene sample lands
+              const tipHeight = 2000; // Initial Stem height
 
-            // Store references for bounded stem scaling and native picking.
-            feature.__localBaseCarto = carto;
-            feature.__localBaseCartesian = base;
-            registerEntityContext(feature, {
-              id: `${id}:${recordId}`,
-              layerId: id,
-              layerName: name,
-              source,
-              dataSource: loaded,
-              label: featureLabelFromProperties(properties, id),
-              properties,
-              latitude: Number(Cesium.Math.toDegrees(carto.latitude).toFixed(6)),
-              longitude: Number(Cesium.Math.toDegrees(carto.longitude).toFixed(6)),
-            });
+              const base = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, groundHeight);
+              const tip = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, tipHeight);
+              const properties = propertyObject(feature);
+              const recordId = String(feature.id ?? i);
 
-            // Constant properties are refreshed on the existing 450 ms source
-            // cadence. Cesium no longer evaluates 2-3 callbacks per entity on
-            // every frame, while the point/stem pick surface stays native.
-            feature.position = tip;
-            const stemPositionBuffers = [[base, tip], [base, tip]];
-            feature.polyline = new Cesium.PolylineGraphics({
-              positions: stemPositionBuffers[0],
-              width: 3.5,
-              material: new Cesium.ColorMaterialProperty(baseColor),
-            });
-            feature.point = new Cesium.PointGraphics({
-              pixelSize: 10,
-              color: baseColor,
-              outlineColor: Cesium.Color.BLACK,
-              outlineWidth: 2,
-              // Never depth-cull the anchor against the photoreal mesh —
-              // globe-horizon culling is handled by the pre-render occluder.
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            });
-
-            const priority = labelPriorityFromProperties(properties, id);
-            _stemRecords.push({
-              id: recordId,
-              entity: feature,
-              carto,
-              base,
-              tip,
-              nextTip: Cesium.Cartesian3.clone(tip),
-              stemPositionBuffers,
-              stemPositionBufferIndex: 0,
-              groundHeight,
-              groundSampled: false,
-              lastGroundSampleMs: 0,
-              priority,
-              entry: labels ? createLocalInfrastructureOverlayEntry({
-                id: recordId,
+              // Store references for bounded stem scaling and native picking.
+              feature.__localBaseCarto = carto;
+              feature.__localBaseCartesian = base;
+              registerEntityContext(feature, {
+                id: `${id}:${recordId}`,
                 layerId: id,
-                position: tip,
+                layerName: name,
+                source,
+                dataSource: loaded,
+                label: featureLabelFromProperties(properties, id),
                 properties,
-                priority,
-                accent: color,
-              }) : null,
-            });
-          }
-          // Setup finished — publish it.
-          _dataSource = loaded;
-          _lastUpdate = Date.now();
-        } catch (e) {
-          // The dataset ships with the build, so this is a broken install,
-          // not a blip — it has to reach the chip, not just the console.
-          _error = localDatasetError(e);
-          // Roll the partial build back so a later enable() retries from
-          // scratch instead of inheriting a half-populated source. Only the
-          // post-add window has something in the scene to remove: a failure
-          // before (or inside) add() never reached the collection, and
-          // removing then would race Cesium's pending insert.
-          if (addedToScene) {
-            try { viewer?.dataSources?.remove(loaded, true); } catch { /* already gone */ }
-          }
-          _count = 0;
-          _stemRecords = [];
-          console.error(`Failed to load ${id}:`, e);
-        }
+                latitude: Number(Cesium.Math.toDegrees(carto.latitude).toFixed(6)),
+                longitude: Number(Cesium.Math.toDegrees(carto.longitude).toFixed(6)),
+              });
 
-        // 2. Install native global click handler
-        if (!_clickHandler) {
-          _clickHandler = screenSpaceEventHandlerFactory(viewer.scene.canvas);
-          _clickHandler.setInputAction((click) => {
-            if (!_enabled) return;
-            const picked = viewer.scene.pick(click.position);
-            
-            if (picked && picked.id && picked.id.__localLayerId === id) {
-              const entity = picked.id;
-              viewer.selectedEntity = entity;
-              selectEntityContext(entity);
-              
-              // We zoom to the surface base of the stem or the center of the polygon
-              let targetPos = null;
-              
-              if (entity.polyline) {
-                // If it's a stem, fly to the base
-                const positions = entity.polyline.positions.getValue(Cesium.JulianDate.now());
-                if (positions && positions.length > 0) {
-                  targetPos = positions[0];
-                }
-              } else if (entity.polygon && entity.polygon.hierarchy) {
-                // If it's a polygon, just fly to its center
-                const hierarchy = entity.polygon.hierarchy.getValue(Cesium.JulianDate.now());
-                if (hierarchy && hierarchy.positions.length > 0) {
-                  targetPos = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
-                }
-              }
-              
-              if (targetPos) {
-                const carto = Cesium.Cartographic.fromCartesian(targetPos);
-                
-                // Disable interactions so Cesium doesn't magically cancel the flight
-                viewer.scene.screenSpaceCameraController.enableInputs = false;
-                
-                viewer.camera.flyTo({
-                  destination: Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 5000),
-                  duration: 1.5,
-                  complete: () => { viewer.scene.screenSpaceCameraController.enableInputs = true; },
-                  cancel: () => { viewer.scene.screenSpaceCameraController.enableInputs = true; },
-                });
-              }
+              // Constant properties are refreshed on the existing 450 ms source
+              // cadence. Cesium no longer evaluates 2-3 callbacks per entity on
+              // every frame, while the point/stem pick surface stays native.
+              feature.position = tip;
+              const stemPositionBuffers = [[base, tip], [base, tip]];
+              feature.polyline = new Cesium.PolylineGraphics({
+                positions: stemPositionBuffers[0],
+                width: 3.5,
+                material: new Cesium.ColorMaterialProperty(baseColor),
+              });
+              feature.point = new Cesium.PointGraphics({
+                pixelSize: 10,
+                color: baseColor,
+                outlineColor: Cesium.Color.BLACK,
+                outlineWidth: 2,
+                // Never depth-cull the anchor against the photoreal mesh —
+                // globe-horizon culling is handled by the pre-render occluder.
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              });
+
+              const priority = labelPriorityFromProperties(properties, id);
+              _stemRecords.push({
+                id: recordId,
+                entity: feature,
+                carto,
+                base,
+                tip,
+                nextTip: Cesium.Cartesian3.clone(tip),
+                stemPositionBuffers,
+                stemPositionBufferIndex: 0,
+                groundHeight,
+                groundSampled: false,
+                lastGroundSampleMs: 0,
+                priority,
+                entry: labels ? createLocalInfrastructureOverlayEntry({
+                  id: recordId,
+                  layerId: id,
+                  position: tip,
+                  properties,
+                  priority,
+                  accent: color,
+                }) : null,
+              });
             }
-          }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+            // Setup finished — publish it.
+            _dataSource = loaded;
+            _lastUpdate = Date.now();
+          } catch (e) {
+            // The dataset ships with the build, so this is a broken install,
+            // not a blip — it has to reach the chip, not just the console.
+            if (!_destroyed) _error = localDatasetError(e);
+            // Roll the partial build back so a later enable() retries from
+            // scratch instead of inheriting a half-populated source. Only the
+            // post-add window has something in the scene to remove: a failure
+            // before (or inside) add() never reached the collection, and
+            // removing then would race Cesium's pending insert.
+            if (addedToScene) {
+              try { viewer?.dataSources?.remove(loaded, true); } catch { /* already gone */ }
+            }
+            if (_destroyed) return;
+            removeEntityContextsForLayer(id);
+            _count = 0;
+            _stemRecords = [];
+            console.error(`Failed to load ${id}:`, e);
+          }
+
+          if (_destroyed) return;
+          // 2. Install native global click handler
+          if (!_clickHandler) {
+            _clickHandler = screenSpaceEventHandlerFactory(viewer.scene.canvas);
+            _clickHandler.setInputAction((click) => {
+              if (!_enabled) return;
+              const picked = viewer.scene.pick(click.position);
+            
+              if (picked && picked.id && picked.id.__localLayerId === id) {
+                const entity = picked.id;
+                viewer.selectedEntity = entity;
+                selectEntityContext(entity);
+              
+                // We zoom to the surface base of the stem or the center of the polygon
+                let targetPos = null;
+              
+                if (entity.polyline) {
+                  // If it's a stem, fly to the base
+                  const positions = entity.polyline.positions.getValue(Cesium.JulianDate.now());
+                  if (positions && positions.length > 0) {
+                    targetPos = positions[0];
+                  }
+                } else if (entity.polygon && entity.polygon.hierarchy) {
+                  // If it's a polygon, just fly to its center
+                  const hierarchy = entity.polygon.hierarchy.getValue(Cesium.JulianDate.now());
+                  if (hierarchy && hierarchy.positions.length > 0) {
+                    targetPos = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
+                  }
+                }
+              
+                if (targetPos) {
+                  const carto = Cesium.Cartographic.fromCartesian(targetPos);
+                
+                  // Disable interactions so Cesium doesn't magically cancel the flight
+                  viewer.scene.screenSpaceCameraController.enableInputs = false;
+                
+                  viewer.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 5000),
+                    duration: 1.5,
+                    complete: () => { viewer.scene.screenSpaceCameraController.enableInputs = true; },
+                    cancel: () => { viewer.scene.screenSpaceCameraController.enableInputs = true; },
+                  });
+                }
+              }
+            }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+          }
+        })();
+        try {
+          await _loadPromise;
+        } finally {
+          _loadPromise = null;
+          _loadController = null;
         }
       }
 
+      if (_destroyed) return;
       // 3. Add an incredibly fast pre-render occluder to hide points behind the globe
       if (_enabled && !_preRenderRemover) {
         _preRenderRemover = viewer.scene.preRender.addEventListener(() => {
@@ -879,9 +902,11 @@ export function createLocalGeoJsonLayer({
     destroy: (viewer) => {
       if (_destroyed) return;
       _destroyed = true;
+      _loadController?.abort();
       // Defensively disable first so listeners and selection state are
       // torn down even if destroy is called while the layer is enabled.
       disableLayer(viewer);
+      removeEntityContextsForLayer(id);
       if (_clickHandler) {
         _clickHandler.destroy();
         _clickHandler = null;
