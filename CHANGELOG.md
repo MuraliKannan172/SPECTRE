@@ -15,6 +15,12 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Fixed
 
+- Separate optional Google server credentials for Places and Street View from
+  the browser key, contributed by Tom-Neverwinter (#110). Provider Settings,
+  Pinokio's app-specific credential handling and setup diagnostics recognize
+  both keys. The Street View tool prefers the server key across environment
+  and `.env` sources. Existing single-key and keyless setups remain supported.
+
 - Complete the first-run, view-target prewarm, cockpit-plates and floor-hold
   browser harness renderer portability fixes contributed by Tom-Neverwinter.
   macOS retains Metal; other platforms default to SwiftShader. Cockpit renderer
