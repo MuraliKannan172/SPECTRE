@@ -33,6 +33,8 @@
   ],
   "scripts": {
     "doctor": "node scripts/setup-doctor.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "dev": "vite",
     "dev:secure": "./scripts/dev-secure.sh",
     "opensky:import": "./scripts/opensky-import-client.sh",
@@ -51,6 +53,9 @@
     "satellite.js": "^6.0.2"
   },
   "devDependencies": {
+    "prettier": "^3.9.6",
+    "puppeteer": "^24.37.5",
+    "sharp": "^0.34.5",
     "puppeteer": "^25.10.0",
     "sharp": "^0.35.4",
     "vite": "^6.0.0",
