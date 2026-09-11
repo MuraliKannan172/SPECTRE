@@ -2,6 +2,17 @@
 
 ## Infrastructure marker visibility
 
+Datacenter/dam registration uses fresh reusable factories with the application's
+existing context, overlay and render functions. The scoped package exports do
+not import standalone application globals; see
+[the infrastructure interface](INFRASTRUCTURE-LAYERS.md) for lifecycle and asset
+requirements.
+
+Local GeoJSON layers coalesce concurrent enables into one load. Disabling while
+loading keeps the result hidden; destruction aborts the fetch and rejects late
+parse/add results. Destruction and failed setup remove owned context records,
+so replacing a layer cannot retain stale entities or listeners.
+
 Datacenters and dams retain their full datasets while limiting active marker
 stems per layer: 80 at camera heights of 3,000 km or above, 200 from 200 km,
 and 420 below 200 km. Selection favors existing label priority and nearby

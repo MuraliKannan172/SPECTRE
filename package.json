@@ -56,5 +56,10 @@
     "vite": "^6.0.0",
     "vite-plugin-cesium": "^1.2.23",
     "ws": "^8.21.0"
+  },
+  "exports": {
+    "./infrastructure": "./src/data/infrastructure.js",
+    "./infrastructure/geojson": "./src/data/localGeojsonCore.js",
+    "./infrastructure/lod": "./src/data/localGeojsonLod.js"
   }
 }
