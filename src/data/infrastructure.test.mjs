@@ -97,3 +97,34 @@ test('two viewers use their supplied contexts and dispose independently', async 
   assert.equal(hosts[1].records.size, 1);
   assert.equal(instances[1].viewer.dataSources.length, 1);
 });
+
+test('consumer build includes only infrastructure code and resolves assets under a non-root base', async () => {
+  const { build } = await import('vite');
+  const { fileURLToPath } = await import('node:url');
+  const result = await build({
+    configFile: false,
+    logLevel: 'silent',
+    base: '/example/',
+    build: {
+      write: false,
+      assetsInlineLimit: 0,
+      rollupOptions: {
+        input: fileURLToPath(import.meta.resolve('gods-eye-view/infrastructure')),
+        external: ['cesium'],
+        preserveEntrySignatures: 'strict',
+      },
+    },
+  });
+  const output = result.output;
+  const entry = output.find(item => item.type === 'chunk' && item.isEntry);
+  const sources = Object.keys(entry.modules).filter(id => id.endsWith('.js'));
+  assert.deepEqual(sources.map(id => id.split('/').at(-1)).sort(), [
+    'infrastructure.js', 'localGeojsonCore.js', 'localGeojsonLod.js',
+  ]);
+  assert.deepEqual(entry.imports, ['cesium'], 'the viewer supplies the same Cesium dependency');
+  for (const name of ['datacenters', 'dams']) {
+    const asset = output.find(item => item.type === 'asset' && item.fileName.includes(name));
+    assert.ok(asset, `${name} must be emitted`);
+    assert.ok(entry.code.includes(`/example/${asset.fileName}`), `${name} must retain the consumer base path`);
+  }
+});
