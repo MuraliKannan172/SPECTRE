@@ -1,5 +1,14 @@
 # God's Eye View Current State
 
+## Scoped formatting and package checks
+
+`npm run format` and `npm run format:check` operate on the explicit adopted-file
+list. `npm run check:boundaries` checks the browser dependency graph of all
+current package exports; infrastructure owns its three implementation modules
+and takes Cesium from the consumer. CI runs both checks on Linux and Windows.
+The standalone app, layer behavior and public export paths remain unchanged.
+See [component ownership and adoption](CODE-BOUNDARIES.md).
+
 ## Google browser and server keys
 
 Local Places nearby/text search and the CCTV Street View fallback prefer

@@ -51,6 +51,22 @@ The highest-leverage places to jump in:
 - Match the surrounding code — comment density, naming, and idiom.
 - Prefer small, reviewable commits. Conventional-commit-style prefixes (`feat:`, `fix:`, `perf:`, `docs:`) are appreciated but not required.
 
+## Formatting and reusable components
+
+Run `npm run format` before submitting changes to adopted modules, then
+`npm run format:check` and `npm run check:boundaries`. Formatting uses the
+explicit file list in `scripts/format-scope.json`; add newly extracted modules
+and tests there in a separate mechanical commit. Keep unadopted files consistent
+with their surrounding style. CI checks all adopted files and package boundaries
+on Linux and Windows.
+
+Reusable package exports own their state and receive application operations
+through explicit callbacks. They must not import the standalone bootstrap or
+local Node services. Update `scripts/package-boundaries.json` and consumer tests
+when adding an export or expanding a component. See
+[formatting and component boundaries](docs/CODE-BOUNDARIES.md) for the current
+ownership and adoption process.
+
 ## Pull requests
 
 1. Branch off `main`.

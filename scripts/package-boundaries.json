@@ -1,0 +1,15 @@
+{
+  "infrastructure": {
+    "exports": [
+      "./infrastructure",
+      "./infrastructure/geojson",
+      "./infrastructure/lod"
+    ],
+    "modules": [
+      "src/data/infrastructure.js",
+      "src/data/localGeojsonCore.js",
+      "src/data/localGeojsonLod.js"
+    ],
+    "external": ["cesium"]
+  }
+}
