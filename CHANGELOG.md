@@ -1,5 +1,13 @@
 # Changelog
 
+## September 8, 2026
+
+Earthquake refreshes validate the complete feed and construct replacement entities before clearing the previous snapshot. Malformed rows and duplicate rendered IDs retain the last good entities, overlays, count and timestamp and report a malformed response; unknown magnitude is excluded from M2.5+ rendering.
+
+Non-object or array-valued properties reject the response instead of being treated as an unknown magnitude.
+
+Launch payloads with missing records now say PAYLOAD DATA UNAVAILABLE. Missing names use Unnamed payload; absent or invalid mass stays unknown instead of appearing as 0 KG.
+
 This changelog records public product changes. For the authoritative description
 of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
@@ -7,6 +15,15 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Fixed
 
+- Scope, Bloom, Sharpen, location search and generated style sliders expose
+  explicit accessible names. The first-run checkbox retains its native label.
+- FIRMS records a source as successful only after appending its rows, avoiding
+  contradictory success/failure status if aggregation throws.
+- Radio country filtering and voice country requests now resolve common English
+  names and exonyms that `Intl.DisplayNames`' primary label omits, so requests
+  like "play radio in Turkey" no longer fail closed (Turkey → Türkiye, plus
+  Myanmar/Burma, UAE, Holland, Swaziland, East Timor, Cabo Verde, Vatican).
+  Ambiguous names such as a bare "Congo" or "Korea" still fail closed.
 - Mapped-site outages show their scheduled retry countdown and distinguish
   known Overpass rate limits, timeouts, and query failures. Search feedback no
   longer claims a refresh succeeded while the layer is unavailable or loading.

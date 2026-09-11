@@ -1,6 +1,28 @@
 # God's Eye View Current State
 
+## September 8, 2026
+
+Earthquake refreshes validate the complete feed and construct replacement entities before clearing the previous snapshot. Malformed rows and duplicate rendered IDs retain the last good entities, overlays, count and timestamp and report a malformed response; unknown magnitude is excluded from M2.5+ rendering.
+
+Non-object or array-valued properties reject the response instead of being treated as an unknown magnitude.
+
+Launch payloads with missing records now say PAYLOAD DATA UNAVAILABLE. Missing names use Unnamed payload; absent or invalid mass stays unknown instead of appearing as 0 KG.
+
 Updated: August 24, 2026
+
+## Control names for assistive technology
+
+Scope, Bloom, Sharpen and location search have explicit accessible names.
+Generated style sliders use the same name as their visible parameter label.
+The first-run suppression checkbox keeps its native wrapping label, so its
+accessible name remains "Don't show this again". Control behavior is unchanged.
+
+## FIRMS source status
+
+The FIRMS proxy records source success after appending its rows. If aggregation
+throws, that source reports failure without a contradictory success entry.
+The existing per-record append continues to support large feeds; sequential
+fetching, trailing-24-hour filtering and partial-success caching are unchanged.
 
 ## Installations and map-source guidance
 
@@ -1684,9 +1706,11 @@ preserves object identity for an idempotent repeat of the same generation, and
 degrades without replacement if a fresh response presents an older generation.
 Snapshot records mark community metadata as untrusted, and Radio tool results
 omit station names so directory text never becomes model instruction context.
-One bounded country parser maps recognized ISO codes and English/common names
-through proxy metadata and final station selection, while malformed, non-ISO,
-control-containing, and oversized inputs fail closed. Literal or resolved
+One bounded country parser maps recognized ISO codes and English/common names —
+including widely used exonyms the Intl display label omits (Turkey, Holland,
+Burma, and similar) — through proxy metadata and final station selection, while
+malformed, non-ISO, control-containing, ambiguous, and oversized inputs fail
+closed. Literal or resolved
 non-global IPv4/IPv6 targets are refused. Destroy fully releases the Radio audio
 session, voice ducking/restoration, request state, filter, selection, volume,
 accepted snapshot, and feed telemetry before re-initialization; monotonic
