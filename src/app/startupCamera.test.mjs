@@ -8,7 +8,15 @@ test('teardown before the initial camera delay prevents a late flight', (t) => {
   let cancelled = 0;
   const stop = flyToAustin({
     isDestroyed: () => false,
-    camera: { setView() {}, flyTo() { flights++; }, cancelFlight() { cancelled++; } },
+    camera: {
+      setView() {},
+      flyTo() {
+        flights++;
+      },
+      cancelFlight() {
+        cancelled++;
+      },
+    },
   });
   stop();
   t.mock.timers.tick(1000);

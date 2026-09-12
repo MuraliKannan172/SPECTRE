@@ -9,10 +9,21 @@ const STOP_ORDER = ['tools', 'controls', 'data', 'scene'];
  * @param {{createScene:Function,createControls:Function,createData:Function,createTools:Function}} constructors
  * @returns {{start:Function,destroy:Function,subscribe:Function,getState:Function,getComponents:Function}}
  */
-export function createApplication({ createScene, createControls, createData, createTools }) {
-  const factories = { scene: createScene, controls: createControls, data: createData, tools: createTools };
+export function createApplication({
+  createScene,
+  createControls,
+  createData,
+  createTools,
+}) {
+  const factories = {
+    scene: createScene,
+    controls: createControls,
+    data: createData,
+    tools: createTools,
+  };
   for (const phase of START_ORDER) {
-    if (typeof factories[phase] !== 'function') throw new TypeError(`Missing ${phase} constructor`);
+    if (typeof factories[phase] !== 'function')
+      throw new TypeError(`Missing ${phase} constructor`);
   }
   const controller = new AbortController();
   const cleanups = Object.fromEntries(START_ORDER.map((phase) => [phase, []]));
@@ -26,7 +37,11 @@ export function createApplication({ createScene, createControls, createData, cre
   function publish(status, phase = null) {
     state = Object.freeze({ status, phase });
     for (const listener of [...listeners]) {
-      try { listener(state); } catch { console.error('Application state listener failed'); }
+      try {
+        listener(state);
+      } catch {
+        console.error('Application state listener failed');
+      }
     }
   }
 
@@ -35,11 +50,16 @@ export function createApplication({ createScene, createControls, createData, cre
       const errors = [];
       for (const phase of STOP_ORDER) {
         while (cleanups[phase].length) {
-          try { await cleanups[phase].pop()(); } catch (error) { errors.push(error); }
+          try {
+            await cleanups[phase].pop()();
+          } catch (error) {
+            errors.push(error);
+          }
         }
         delete components[phase];
       }
-      if (errors.length) throw new AggregateError(errors, 'Application cleanup failed');
+      if (errors.length)
+        throw new AggregateError(errors, 'Application cleanup failed');
     });
     return cleanupPromise;
   }
@@ -57,7 +77,9 @@ export function createApplication({ createScene, createControls, createData, cre
             signal: controller.signal,
             defer(dispose) {
               if (!acceptingCleanup || typeof dispose !== 'function') {
-                throw new TypeError('Register cleanup during component construction');
+                throw new TypeError(
+                  'Register cleanup during component construction',
+                );
               }
               cleanups[phase].push(dispose);
             },
@@ -73,8 +95,13 @@ export function createApplication({ createScene, createControls, createData, cre
     } catch (error) {
       controller.abort();
       let failure = error;
-      try { await cleanup(); } catch (cleanupError) {
-        failure = new AggregateError([error, cleanupError], 'Application startup and cleanup failed');
+      try {
+        await cleanup();
+      } catch (cleanupError) {
+        failure = new AggregateError(
+          [error, cleanupError],
+          'Application startup and cleanup failed',
+        );
       }
       if (!destroyPromise) publish('failed');
       throw failure;
@@ -83,7 +110,8 @@ export function createApplication({ createScene, createControls, createData, cre
 
   return Object.freeze({
     start() {
-      if (destroyPromise) return Promise.reject(new Error('Application has been destroyed'));
+      if (destroyPromise)
+        return Promise.reject(new Error('Application has been destroyed'));
       // Assign before notifying subscribers, including reentrant start/destroy.
       startPromise ||= Promise.resolve().then(initialize);
       return startPromise;
@@ -109,10 +137,15 @@ export function createApplication({ createScene, createControls, createData, cre
     getState: () => state,
     getComponents: () => Object.freeze({ ...components }),
     subscribe(listener) {
-      if (typeof listener !== 'function') throw new TypeError('Expected a state listener');
+      if (typeof listener !== 'function')
+        throw new TypeError('Expected a state listener');
       if (state.status === 'destroyed') return () => {};
       listeners.add(listener);
-      try { listener(state); } catch { console.error('Application state listener failed'); }
+      try {
+        listener(state);
+      } catch {
+        console.error('Application state listener failed');
+      }
       return () => listeners.delete(listener);
     },
   });

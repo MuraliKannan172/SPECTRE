@@ -6,12 +6,12 @@ listeners. Construction is also inactive until the caller invokes `start()`.
 
 The caller supplies four constructors, in this order:
 
-| Constructor | Receives | Standalone implementation |
-| --- | --- | --- |
-| `createScene` | `signal`, `defer` | Viewer, attribution and initial map |
-| `createControls` | `scene`, `signal`, `defer` | Style manager and camera presentation |
-| `createData` | `scene`, `controls`, `signal`, `defer` | Layer catalog, registration and restoration |
-| `createTools` | `scene`, `controls`, `data`, `signal`, `defer` | Scenes, annotations, voice and page listeners |
+| Constructor      | Receives                                       | Standalone implementation                     |
+| ---------------- | ---------------------------------------------- | --------------------------------------------- |
+| `createScene`    | `signal`, `defer`                              | Viewer, attribution and initial map           |
+| `createControls` | `scene`, `signal`, `defer`                     | Style manager and camera presentation         |
+| `createData`     | `scene`, `controls`, `signal`, `defer`         | Layer catalog, registration and restoration   |
+| `createTools`    | `scene`, `controls`, `data`, `signal`, `defer` | Scenes, annotations, voice and page listeners |
 
 Each constructor returns its component object, or a promise for that object.
 Those objects are passed unchanged to later constructors. Configuration and

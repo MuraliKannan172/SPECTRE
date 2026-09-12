@@ -8,15 +8,23 @@ import { createLocalTools } from './tools.js';
 let constructed = false;
 
 /** Compose the standalone application once per page. Reload to start again. */
-export function createLocalApplication({ googleApiKey, cesiumToken, allowQaRegistration = false }) {
-  if (constructed) throw new Error('The standalone application already owns this page');
+export function createLocalApplication({
+  googleApiKey,
+  cesiumToken,
+  allowQaRegistration = false,
+}) {
+  if (constructed)
+    throw new Error('The standalone application already owns this page');
   constructed = true;
   const loadingScreen = document.getElementById('loading-screen');
   const loaderStatus = loadingScreen.querySelector('.loader-status');
   return createApplication({
-    createScene: (context) => createLocalScene({ ...context, googleApiKey, cesiumToken, loaderStatus }),
-    createControls: (context) => createLocalControls({ ...context, loaderStatus }),
-    createData: (context) => createLocalData({ ...context, allowQaRegistration }),
+    createScene: (context) =>
+      createLocalScene({ ...context, googleApiKey, cesiumToken, loaderStatus }),
+    createControls: (context) =>
+      createLocalControls({ ...context, loaderStatus }),
+    createData: (context) =>
+      createLocalData({ ...context, allowQaRegistration }),
     createTools: (context) => createLocalTools({ ...context, loadingScreen }),
   });
 }

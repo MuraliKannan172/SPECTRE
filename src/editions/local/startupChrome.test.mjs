@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('./startupChrome.js', import.meta.url), 'utf8')
+const source = readFileSync(
+  new URL('./startupChrome.js', import.meta.url),
+  'utf8',
+)
   .replace(/^import .*;\n/gm, '')
   .replace('export function', 'function');
 
@@ -16,13 +19,21 @@ function fixture() {
   const controller = new AbortController();
   const context = {
     console,
-    setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
-    clearTimeout(id) { timers.delete(id); },
+    setTimeout(fn, delay) {
+      const id = ++nextTimer;
+      timers.set(id, { fn, delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
     initFirstRunExperience() {
       events.push('welcome');
       return { destroy: () => events.push('welcome:destroy') };
     },
-    async initKeySetup() { return { destroy: () => events.push('settings:destroy') }; },
+    async initKeySetup() {
+      return { destroy: () => events.push('settings:destroy') };
+    },
   };
   vm.createContext(context);
   vm.runInContext(source, context);
@@ -32,21 +43,34 @@ function fixture() {
       addEventListener: (type, listener) => listeners.set(type, listener),
       removeEventListener: (type) => listeners.delete(type),
     },
-    styleManager: { initialRestorePromise: new Promise((resolve) => { restored = resolve; }) },
+    styleManager: {
+      initialRestorePromise: new Promise((resolve) => {
+        restored = resolve;
+      }),
+    },
     dataManager: {},
     signal: controller.signal,
   });
   return {
-    events, listeners, stop, restored, controller,
+    events,
+    listeners,
+    stop,
+    restored,
+    controller,
     fire(delay) {
       for (const [id, task] of timers) {
-        if (task.delay === delay) { timers.delete(id); task.fn(); }
+        if (task.delay === delay) {
+          timers.delete(id);
+          task.fn();
+        }
       }
     },
     timers,
   };
 }
-async function flush() { for (let i = 0; i < 12; i++) await Promise.resolve(); }
+async function flush() {
+  for (let i = 0; i < 12; i++) await Promise.resolve();
+}
 
 test('welcome waits for restoration, minimum delay, and the cover transition', async () => {
   const f = fixture();

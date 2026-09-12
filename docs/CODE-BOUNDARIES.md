@@ -16,13 +16,13 @@ excluded. The formatter validates every entry before writing any file.
 
 ## Current component ownership
 
-| Surface                                | Owns                                                                   | Receives from its caller                            |
-| -------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
-| `gods-eye-view/infrastructure`         | Datacenter/dam definitions and fresh layer construction                | Context, overlay and render operations              |
-| `gods-eye-view/infrastructure/geojson` | Data loading, Cesium entities, selection handling and resource cleanup | A viewer and those same operations                  |
-| `gods-eye-view/infrastructure/lod`     | Pure visibility budgets and selection policy                           | Position/visibility records and camera measurements |
-| `src/data/localGeojson.js`             | Standalone compatibility wiring                                        | The application's existing shared services          |
-| `src/main.js`, `src/editions/local/` and `vite.config.js`     | Standalone startup and local Node services                             | Local configuration                                 |
+| Surface                                                   | Owns                                                                   | Receives from its caller                            |
+| --------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| `gods-eye-view/infrastructure`                            | Datacenter/dam definitions and fresh layer construction                | Context, overlay and render operations              |
+| `gods-eye-view/infrastructure/geojson`                    | Data loading, Cesium entities, selection handling and resource cleanup | A viewer and those same operations                  |
+| `gods-eye-view/infrastructure/lod`                        | Pure visibility budgets and selection policy                           | Position/visibility records and camera measurements |
+| `src/data/localGeojson.js`                                | Standalone compatibility wiring                                        | The application's existing shared services          |
+| `src/main.js`, `src/editions/local/` and `vite.config.js` | Standalone startup and local Node services                             | Local configuration                                 |
 
 The scoped package exports are browser source modules. Use their documented
 exports instead of importing standalone startup or reaching into internal files.
