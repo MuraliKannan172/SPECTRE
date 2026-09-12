@@ -30,7 +30,9 @@ export function createStandaloneTools({
     if (window.__gevAnnotations === annotations) delete window.__gevAnnotations;
     annotations.destroy();
   });
-  defer(startStandaloneChrome({ loadingScreen, styleManager, dataManager, signal }));
+  defer(
+    startStandaloneChrome({ loadingScreen, styleManager, dataManager, signal }),
+  );
   // Idle render governor: flips the scene into requestRenderMode whenever
   // nothing animates per frame. Installed AFTER every module above has had
   // its chance to register pre-install holds. (perf wave 2)

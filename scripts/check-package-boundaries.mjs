@@ -70,7 +70,11 @@ export async function checkPackageBoundaries(root) {
     const input = group.exports.map((key) => {
       const declaration = pkg.exports[key];
       const target = node ? declaration?.node : declaration;
-      if (node && (typeof declaration !== 'object' || Object.keys(declaration).join() !== 'node')) {
+      if (
+        node &&
+        (typeof declaration !== 'object' ||
+          Object.keys(declaration).join() !== 'node')
+      ) {
         throw new Error(`Node export must have only a node condition: ${key}`);
       }
       if (

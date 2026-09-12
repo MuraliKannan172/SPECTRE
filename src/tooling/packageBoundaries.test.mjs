@@ -78,14 +78,32 @@ test('dynamic imports obey the same component ownership rule', async (t) => {
 
 test('a Node build export must be explicitly classified and scoped', async (t) => {
   const root = await fixture(t);
-  await writeFile(path.join(root, 'package.json'), JSON.stringify({
-    name: 'boundary-fixture', type: 'module', exports: { './feature': { node: './entry.js' } },
-  }));
-  await writeFile(path.join(root, 'scripts/package-boundaries.json'), JSON.stringify({
-    feature: { runtime: 'node', exports: ['./feature'], modules: ['entry.js'], external: [] },
-  }));
-  assert.deepEqual(await checkPackageBoundaries(root), [{ name: 'feature', exports: 1, modules: 1 }]);
-  await writeFile(path.join(root, 'entry.js'), "import './startup.js'; export const value = 1;");
+  await writeFile(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      name: 'boundary-fixture',
+      type: 'module',
+      exports: { './feature': { node: './entry.js' } },
+    }),
+  );
+  await writeFile(
+    path.join(root, 'scripts/package-boundaries.json'),
+    JSON.stringify({
+      feature: {
+        runtime: 'node',
+        exports: ['./feature'],
+        modules: ['entry.js'],
+        external: [],
+      },
+    }),
+  );
+  assert.deepEqual(await checkPackageBoundaries(root), [
+    { name: 'feature', exports: 1, modules: 1 },
+  ]);
+  await writeFile(
+    path.join(root, 'entry.js'),
+    "import './startup.js'; export const value = 1;",
+  );
   await writeFile(path.join(root, 'startup.js'), 'export const app = 2;');
   await assert.rejects(checkPackageBoundaries(root), /unowned module.*startup/);
 });

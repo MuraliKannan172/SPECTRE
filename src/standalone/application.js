@@ -20,11 +20,17 @@ export function createStandaloneApplication({
   const loaderStatus = loadingScreen.querySelector('.loader-status');
   return createApplication({
     createScene: (context) =>
-      createStandaloneScene({ ...context, googleApiKey, cesiumToken, loaderStatus }),
+      createStandaloneScene({
+        ...context,
+        googleApiKey,
+        cesiumToken,
+        loaderStatus,
+      }),
     createControls: (context) =>
       createStandaloneControls({ ...context, loaderStatus }),
     createData: (context) =>
       createStandaloneData({ ...context, allowQaRegistration }),
-    createTools: (context) => createStandaloneTools({ ...context, loadingScreen }),
+    createTools: (context) =>
+      createStandaloneTools({ ...context, loadingScreen }),
   });
 }

@@ -27,5 +27,9 @@
   "src/standalone/scene.js",
   "src/standalone/startupChrome.js",
   "src/standalone/startupChrome.test.mjs",
-  "src/standalone/tools.js"
+  "src/standalone/tools.js",
+  "build/vite.js",
+  "server/standalone/vite.config.js",
+  "vite.config.js",
+  "src/tooling/viteBuild.test.mjs"
 ]
