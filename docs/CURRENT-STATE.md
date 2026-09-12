@@ -1,5 +1,19 @@
 # God's Eye View Current State
 
+## Application startup and shutdown
+
+The standalone entry now composes scene setup, controls, layer registration and
+tools through the reusable application lifecycle. Map defaults, layer order,
+share restoration, voice setup and the running debug handle retain their behavior.
+The welcome card still waits for restoration and the loading-cover transition.
+
+Startup failure cleans up acquired resources. Explicit application destruction
+aborts construction, cancels pending playback/annotations and delayed welcome UI,
+then releases controls, layers and the viewer. Destruction is terminal; the
+standalone page must be reloaded to start again. The exported lifecycle and viewer
+helpers do not import the standalone entry or discover configuration. See
+[application construction](APPLICATION.md).
+
 ## Scoped formatting and package checks
 
 `npm run format` and `npm run format:check` operate on the explicit adopted-file

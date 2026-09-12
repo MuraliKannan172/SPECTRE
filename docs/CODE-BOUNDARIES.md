@@ -16,15 +16,15 @@ excluded. The formatter validates every entry before writing any file.
 
 ## Current component ownership
 
-| Surface                                | Owns                                                                   | Receives from its caller                            |
-| -------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
-| `gods-eye-view/infrastructure`         | Datacenter/dam definitions and fresh layer construction                | Context, overlay and render operations              |
-| `gods-eye-view/infrastructure/geojson` | Data loading, Cesium entities, selection handling and resource cleanup | A viewer and those same operations                  |
-| `gods-eye-view/infrastructure/lod`     | Pure visibility budgets and selection policy                           | Position/visibility records and camera measurements |
-| `src/data/localGeojson.js`             | Standalone compatibility wiring                                        | The application's existing shared services          |
-| `src/main.js` and `vite.config.js`     | Standalone startup and local Node services                             | Local configuration                                 |
+| Surface                                                   | Owns                                                                   | Receives from its caller                            |
+| --------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| `gods-eye-view/infrastructure`                            | Datacenter/dam definitions and fresh layer construction                | Context, overlay and render operations              |
+| `gods-eye-view/infrastructure/geojson`                    | Data loading, Cesium entities, selection handling and resource cleanup | A viewer and those same operations                  |
+| `gods-eye-view/infrastructure/lod`                        | Pure visibility budgets and selection policy                           | Position/visibility records and camera measurements |
+| `src/data/localGeojson.js`                                | Standalone compatibility wiring                                        | The application's existing shared services          |
+| `src/main.js`, `src/editions/local/` and `vite.config.js` | Standalone startup and local Node services                             | Local configuration                                 |
 
-The three scoped package exports are browser source modules. Use their documented
+The scoped package exports are browser source modules. Use their documented
 exports instead of importing standalone startup or reaching into internal files.
 The application owns the viewer, context store, overlay host and render scheduler;
 layers use the supplied callbacks. See [the infrastructure contract](INFRASTRUCTURE-LAYERS.md).
@@ -44,7 +44,12 @@ component, add its ownership and consumer tests together. Node services must use
 separate entry points and their own checks when they become reusable; importing
 them into a browser component is not supported. No Node service is exported yet.
 
-This setup establishes boundaries for the existing infrastructure component.
-Application construction, UI panels and individual source adapters remain future
-extractions; they should become smaller modules with explicit lifecycle owners
-as their callers migrate.
+`gods-eye-view/application` owns construction order, startup state, cancellation
+and disposal of caller-supplied components. Its only owned module is
+`src/app/application.js`. `gods-eye-view/application/viewer` separately owns the
+standard Cesium viewer configuration in `src/app/viewer.js`; Cesium stays external.
+Neither export imports standalone UI, layers, tools or configuration. See
+[application construction](APPLICATION.md) for the contracts and current limits.
+
+UI panels and individual source adapters remain future extractions. They should
+become smaller modules with explicit lifecycle owners as their callers migrate.
