@@ -39,12 +39,19 @@ export function terrainHeightsProxy() {
     diskLoaded = true;
     try {
       const parsed = JSON.parse(await fsp.readFile(CACHE_PATH, 'utf8'));
-      const pointEntries = parsed?.version === 2 && parsed.points && typeof parsed.points === 'object'
-        ? parsed.points
-        : null;
+      const pointEntries =
+        parsed?.version === 2 &&
+        parsed.points &&
+        typeof parsed.points === 'object'
+          ? parsed.points
+          : null;
       if (pointEntries) {
         for (const [key, entry] of Object.entries(pointEntries)) {
-          if (entry && Number.isFinite(entry.at) && validTerrainResult(entry.result)) {
+          if (
+            entry &&
+            Number.isFinite(entry.at) &&
+            validTerrainResult(entry.result)
+          ) {
             mem.set(key, entry);
           }
         }
@@ -53,18 +60,27 @@ export function terrainHeightsProxy() {
         // positionally present results; an absent value never becomes height 0.
         for (const [rawPoints, entry] of Object.entries(parsed)) {
           const points = parseTerrainPoints(rawPoints);
-          if (!points || !entry || !Number.isFinite(entry.at) || !Array.isArray(entry.results)) continue;
+          if (
+            !points ||
+            !entry ||
+            !Number.isFinite(entry.at) ||
+            !Array.isArray(entry.results)
+          )
+            continue;
           for (let i = 0; i < points.length; i += 1) {
             const result = entry.results[i];
             if (!validTerrainResult(result)) continue;
             const key = terrainPointKey(points[i]);
             const existing = mem.get(key);
-            if (!existing || entry.at > existing.at) mem.set(key, { at: entry.at, result });
+            if (!existing || entry.at > existing.at)
+              mem.set(key, { at: entry.at, result });
           }
         }
         diskDirty = mem.size > 0;
       }
-    } catch { /* no disk cache yet */ }
+    } catch {
+      /* no disk cache yet */
+    }
     // Periodic flush, same shape as adsbdbProxy: coalesce writes instead of
     // hitting disk on every request.
     setInterval(async () => {
@@ -97,7 +113,8 @@ export function terrainHeightsProxy() {
       const chunkResults = await fetchTerrainChunkWithRetry(chunk);
       // Keep later chunks aligned even if a malformed upstream response omits
       // trailing positions. The resolver will reject each null individually.
-      for (let j = 0; j < chunk.length; j += 1) results.push(chunkResults[j] ?? null);
+      for (let j = 0; j < chunk.length; j += 1)
+        results.push(chunkResults[j] ?? null);
     }
     return results;
   }
@@ -106,10 +123,9 @@ export function terrainHeightsProxy() {
   function fetchMissingSingleFlight(points) {
     const key = points.map(terrainPointKey).join(';');
     if (!inflight.has(key)) {
-      const request = fetchUpstreamAll(points)
-        .finally(() => {
-          if (inflight.get(key) === request) inflight.delete(key);
-        });
+      const request = fetchUpstreamAll(points).finally(() => {
+        if (inflight.get(key) === request) inflight.delete(key);
+      });
       inflight.set(key, request);
     }
     return inflight.get(key);
@@ -130,11 +146,16 @@ export function terrainHeightsProxy() {
           const rawPoints = parsedUrl.searchParams.get('points');
           const points = parseTerrainPoints(rawPoints);
           if (!points) {
-            send(400, { error: 'invalid points parameter — expected "lon,lat;lon,lat;…" with finite numbers' });
+            send(400, {
+              error:
+                'invalid points parameter — expected "lon,lat;lon,lat;…" with finite numbers',
+            });
             return;
           }
           if (points.length > MAX_POINTS) {
-            send(500, { error: `too many points (${points.length}); max ${MAX_POINTS} per request` });
+            send(500, {
+              error: `too many points (${points.length}); max ${MAX_POINTS} per request`,
+            });
             return;
           }
 
@@ -147,8 +168,8 @@ export function terrainHeightsProxy() {
           if (outcome.cacheChanged) diskDirty = true;
           if (outcome.upstreamError) {
             console.warn(
-              '[terrain-heights-proxy] refresh incomplete'
-              + ' — serving stale points when available'
+              '[terrain-heights-proxy] refresh incomplete' +
+                ' — serving stale points when available',
             );
           }
           send(outcome.status, outcome.body);

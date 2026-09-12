@@ -19,7 +19,9 @@ const GBFS_ALLOWED_HOSTS = new Set([
  * @returns {boolean}
  */
 export function isAllowedGbfsHost(hostname) {
-  const host = String(hostname || '').trim().toLowerCase();
+  const host = String(hostname || '')
+    .trim()
+    .toLowerCase();
   if (!host) return false;
   if (GBFS_ALLOWED_HOSTS.has(host)) return true;
   return host.endsWith('.publicbikesystem.net');

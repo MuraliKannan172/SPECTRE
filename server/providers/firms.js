@@ -49,10 +49,16 @@ export function firmsProxy() {
     diskChecked = true;
     try {
       const parsed = JSON.parse(await fsp.readFile(CACHE_PATH, 'utf8'));
-      if (Number.isFinite(parsed?.at) && Array.isArray(parsed?.sources) && Array.isArray(parsed?.fires)) {
+      if (
+        Number.isFinite(parsed?.at) &&
+        Array.isArray(parsed?.sources) &&
+        Array.isArray(parsed?.fires)
+      ) {
         mem = parsed;
       }
-    } catch { /* no disk cache yet */ }
+    } catch {
+      /* no disk cache yet */
+    }
   }
 
   async function writeDisk(entry) {
@@ -97,7 +103,10 @@ export function firmsProxy() {
         for (const record of records) fires.push(record);
         sources.push({ source, count: records.length, ok: true });
       } catch (err) {
-        console.warn(`[firms-proxy] ${source} fetch failed:`, err?.message || err);
+        console.warn(
+          `[firms-proxy] ${source} fetch failed:`,
+          err?.message || err,
+        );
         sources.push({ source, count: 0, ok: false });
       }
     }
@@ -136,9 +145,14 @@ export function firmsProxy() {
           const body = await res.json();
           const used = Number(body?.current_transactions);
           const limit = Number(body?.transaction_limit);
-          return Number.isFinite(used) && Number.isFinite(limit) ? { used, limit } : null;
+          return Number.isFinite(used) && Number.isFinite(limit)
+            ? { used, limit }
+            : null;
         } catch (err) {
-          console.warn('[firms-proxy] mapkey status failed:', err?.message || err);
+          console.warn(
+            '[firms-proxy] mapkey status failed:',
+            err?.message || err,
+          );
           return null;
         }
       })()
@@ -146,7 +160,9 @@ export function firmsProxy() {
           statusCache = { at: Date.now(), transactions };
           return transactions;
         })
-        .finally(() => { statusInflight = null; });
+        .finally(() => {
+          statusInflight = null;
+        });
     }
     return statusInflight;
   }
@@ -157,7 +173,10 @@ export function firmsProxy() {
       server.middlewares.use('/api/firms', async (req, res) => {
         const sendJson = (status, obj) => {
           if (res.headersSent) return;
-          res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.writeHead(status, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          });
           res.end(JSON.stringify(obj));
         };
         try {
@@ -167,7 +186,14 @@ export function firmsProxy() {
 
           if (subPath === '/status') {
             if (!key) {
-              sendJson(200, { hasKey: false, lastFetch: null, count: null, stale: false, ttlMs: TTL_MS, transactions: null });
+              sendJson(200, {
+                hasKey: false,
+                lastFetch: null,
+                count: null,
+                stale: false,
+                ttlMs: TTL_MS,
+                transactions: null,
+              });
               return;
             }
             const transactions = await getTransactions(key);
@@ -203,10 +229,14 @@ export function firmsProxy() {
                 return fresh;
               })
               .catch((err) => {
-                console.warn(`[firms-proxy] refresh failed (${err?.message || err}) — serving cache if any`);
+                console.warn(
+                  `[firms-proxy] refresh failed (${err?.message || err}) — serving cache if any`,
+                );
                 return null;
               })
-              .finally(() => { inflight = null; });
+              .finally(() => {
+                inflight = null;
+              });
           }
           const pending = inflight;
           const fresh = await pending;
@@ -215,7 +245,9 @@ export function firmsProxy() {
           } else if (entry) {
             sendJson(200, buildPayload(entry, true)); // upstream down — stale beats empty
           } else {
-            sendJson(502, { error: 'firms fetch failed and no cache available' });
+            sendJson(502, {
+              error: 'firms fetch failed and no cache available',
+            });
           }
         } catch (err) {
           console.warn('[firms-proxy] error:', err?.message || err);

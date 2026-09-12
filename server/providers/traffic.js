@@ -60,10 +60,16 @@ export function tomtomProxy() {
     budgetLoaded = true;
     try {
       const parsed = JSON.parse(await fsp.readFile(BUDGET_PATH, 'utf8'));
-      if (parsed && typeof parsed.date === 'string' && Number.isFinite(parsed.count)) {
+      if (
+        parsed &&
+        typeof parsed.date === 'string' &&
+        Number.isFinite(parsed.count)
+      ) {
         budget = parsed;
       }
-    } catch { /* no budget file yet */ }
+    } catch {
+      /* no budget file yet */
+    }
   }
 
   async function persistBudget() {
@@ -87,7 +93,8 @@ export function tomtomProxy() {
     void persistBudget();
   }
 
-  const tilePath = (key) => path.join(CACHE_DIR, `flow-${key.replaceAll('/', '-')}.pbf`);
+  const tilePath = (key) =>
+    path.join(CACHE_DIR, `flow-${key.replaceAll('/', '-')}.pbf`);
 
   /** Disk-cache read; tile age comes from the file's mtime. */
   async function readDiskTile(key) {
@@ -97,7 +104,9 @@ export function tomtomProxy() {
         fsp.readFile(tilePath(key)),
       ]);
       return { at: stat.mtimeMs, buf };
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   async function writeDiskTile(key, buf) {
@@ -105,7 +114,10 @@ export function tomtomProxy() {
       await fsp.mkdir(CACHE_DIR, { recursive: true });
       await fsp.writeFile(tilePath(key), buf);
     } catch (err) {
-      console.warn(`[tomtom-proxy] tile cache write failed for ${key}:`, err?.message || err);
+      console.warn(
+        `[tomtom-proxy] tile cache write failed for ${key}:`,
+        err?.message || err,
+      );
     }
   }
 
@@ -119,10 +131,13 @@ export function tomtomProxy() {
   }
 
   async function fetchUpstream(z, x, y) {
-    const url = 'https://api.tomtom.com/traffic/map/4/tile/flow/relative/'
-      + `${z}/${x}/${y}.pbf?key=${encodeURIComponent(process.env.TOMTOM_API_KEY)}`;
+    const url =
+      'https://api.tomtom.com/traffic/map/4/tile/flow/relative/' +
+      `${z}/${x}/${y}.pbf?key=${encodeURIComponent(process.env.TOMTOM_API_KEY)}`;
     recordUpstreamFetch(); // attempts count — upstream bills the request either way
-    const res = await fetch(url, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length === 0) throw new Error('empty tile body');
@@ -161,7 +176,12 @@ export function tomtomProxy() {
           if (urlPath === '/status') {
             const hasKey = Boolean(process.env.TOMTOM_API_KEY);
             const b = currentBudget();
-            sendJson(200, { hasKey, dailyCount: b.count, budget: dailyBudgetLimit(), date: b.date });
+            sendJson(200, {
+              hasKey,
+              dailyCount: b.count,
+              budget: dailyBudgetLimit(),
+              date: b.date,
+            });
             return;
           }
 
@@ -208,18 +228,23 @@ export function tomtomProxy() {
 
           // Stale or missing → refresh, single-flight per tile.
           if (!inflight.has(key)) {
-            inflight.set(key, fetchUpstream(z, x, y)
-              .then(async (buf) => {
-                const fresh = { at: Date.now(), buf };
-                memSet(key, fresh);
-                await writeDiskTile(key, buf);
-                return fresh;
-              })
-              .catch((err) => {
-                console.warn(`[tomtom-proxy] ${key} fetch failed (${err?.message || err}) — serving stale if any`);
-                return null;
-              })
-              .finally(() => inflight.delete(key)));
+            inflight.set(
+              key,
+              fetchUpstream(z, x, y)
+                .then(async (buf) => {
+                  const fresh = { at: Date.now(), buf };
+                  memSet(key, fresh);
+                  await writeDiskTile(key, buf);
+                  return fresh;
+                })
+                .catch((err) => {
+                  console.warn(
+                    `[tomtom-proxy] ${key} fetch failed (${err?.message || err}) — serving stale if any`,
+                  );
+                  return null;
+                })
+                .finally(() => inflight.delete(key)),
+            );
           }
           const fresh = await inflight.get(key);
           if (fresh) {
