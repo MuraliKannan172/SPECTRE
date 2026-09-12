@@ -1,5 +1,15 @@
 # God's Eye View Current State
 
+## Landmark annotation identity
+
+When a landmark geocode contains only address components, annotations retain
+its requested name for outline matching. A city or neighborhood address no
+longer replaces the landmark's identity. Without a canonical feature name,
+outline candidates must contain the geocoded anchor or closely match the
+requested name; otherwise the annotation stays at its geocoded point.
+Genuine feature-name components and existing administrative/monument matching
+retain their established behavior.
+
 ## Build configuration and local provider boundaries
 
 `vite.config.js` delegates to `server/standalone/vite.config.js`, which loads
