@@ -28,7 +28,11 @@ export async function readResponseTextCapped(response, maxBytes) {
     if (done) break;
     total += value.byteLength;
     if (total > maxBytes) {
-      try { await reader.cancel(); } catch { /* no-op */ }
+      try {
+        await reader.cancel();
+      } catch {
+        /* no-op */
+      }
       const err = new Error('Upstream response too large');
       err.code = 'RESPONSE_TOO_LARGE';
       throw err;
@@ -85,12 +89,21 @@ export function coalesceProxyRequest(inFlight, key, create) {
 export async function readCappedResponseText(upstream, maxBytes) {
   const declared = Number(upstream.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) {
-    try { await upstream.body?.cancel(); } catch { /* no-op */ }
+    try {
+      await upstream.body?.cancel();
+    } catch {
+      /* no-op */
+    }
     return { tooLarge: true, text: '' };
   }
-  if (!upstream.body || typeof upstream.body[Symbol.asyncIterator] !== 'function') {
+  if (
+    !upstream.body ||
+    typeof upstream.body[Symbol.asyncIterator] !== 'function'
+  ) {
     const text = await upstream.text();
-    return text.length > maxBytes ? { tooLarge: true, text: '' } : { tooLarge: false, text };
+    return text.length > maxBytes
+      ? { tooLarge: true, text: '' }
+      : { tooLarge: false, text };
   }
   const decoder = new TextDecoder();
   let text = '';
@@ -98,7 +111,11 @@ export async function readCappedResponseText(upstream, maxBytes) {
   for await (const chunk of upstream.body) {
     total += chunk.length;
     if (total > maxBytes) {
-      try { await upstream.body.cancel(); } catch { /* no-op */ }
+      try {
+        await upstream.body.cancel();
+      } catch {
+        /* no-op */
+      }
       return { tooLarge: true, text: '' };
     }
     text += decoder.decode(chunk, { stream: true });

@@ -20,7 +20,11 @@ export function adsbLolProxy() {
         try {
           const now = Date.now();
           if (_cache && now - _cacheAt < CACHE_MS) {
-            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-ADS-B-Cache': 'HIT' });
+            res.writeHead(200, {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+              'X-ADS-B-Cache': 'HIT',
+            });
             res.end(_cache);
             return;
           }
@@ -32,12 +36,19 @@ export function adsbLolProxy() {
             _cache = body;
             _cacheAt = now;
           }
-          res.writeHead(upstream.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-ADS-B-Cache': 'MISS' });
+          res.writeHead(upstream.status, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+            'X-ADS-B-Cache': 'MISS',
+          });
           res.end(body);
         } catch (e) {
           console.error('[adsb.lol Proxy]', e.message);
           if (_cache) {
-            res.writeHead(200, { 'Content-Type': 'application/json', 'X-ADS-B-Cache': 'STALE' });
+            res.writeHead(200, {
+              'Content-Type': 'application/json',
+              'X-ADS-B-Cache': 'STALE',
+            });
             res.end(_cache);
             return;
           }

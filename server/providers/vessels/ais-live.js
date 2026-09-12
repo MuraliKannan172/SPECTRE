@@ -3,12 +3,24 @@ import { createRequire } from 'node:module';
 import { createAisStreamAdapter } from '../../../src/data/aisStreamAdapter.js';
 import { parseSilenceTimeoutEnv } from '../../../src/data/aisWatchdog.js';
 import { clampInt } from '../common/query.js';
-import { AISSTREAM_CACHE_MAX, AISSTREAM_STALE_MS, ingestAisStreamEnvelope, readAisTrack, aisStreamRows, newestAisPositionAt } from './ais-store.js';
+import {
+  AISSTREAM_CACHE_MAX,
+  AISSTREAM_STALE_MS,
+  ingestAisStreamEnvelope,
+  readAisTrack,
+  aisStreamRows,
+  newestAisPositionAt,
+} from './ais-store.js';
 // ---------------------------------------------------------------------------
 // AISStream live vessel cache state
 // ---------------------------------------------------------------------------
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
-const AISSTREAM_DEFAULT_BBOXES = [[[-90, -180], [90, 180]]];
+const AISSTREAM_DEFAULT_BBOXES = [
+  [
+    [-90, -180],
+    [90, 180],
+  ],
+];
 const AISSTREAM_DEFAULT_MESSAGE_TYPES = [
   'PositionReport',
   'StandardClassBPositionReport',
@@ -67,25 +79,40 @@ export function aisLiveProxy() {
         // Track sub-route MUST be handled before the rows snapshot — this
         // mount prefix-matches every subpath, so without this branch
         // /api/ais-live/track would be silently answered with vessel rows.
-        if (incoming.pathname === '/track' || incoming.pathname.startsWith('/track/')) {
+        if (
+          incoming.pathname === '/track' ||
+          incoming.pathname.startsWith('/track/')
+        ) {
           const mmsi = String(incoming.searchParams.get('mmsi') || '').trim();
           res.statusCode = /^\d{5,10}$/.test(mmsi) ? 200 : 400;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
           if (res.statusCode !== 200) {
-            res.end(JSON.stringify({ error: 'mmsi query param required', samples: [] }));
+            res.end(
+              JSON.stringify({
+                error: 'mmsi query param required',
+                samples: [],
+              }),
+            );
             return;
           }
-          res.end(JSON.stringify({
-            mmsi,
-            samples: readAisTrack(mmsi),
-            source: 'AISStream (accumulated since server start)',
-            retainedSec: Math.floor(AISSTREAM_STALE_MS / 1000),
-          }));
+          res.end(
+            JSON.stringify({
+              mmsi,
+              samples: readAisTrack(mmsi),
+              source: 'AISStream (accumulated since server start)',
+              retainedSec: Math.floor(AISSTREAM_STALE_MS / 1000),
+            }),
+          );
           return;
         }
 
-        const maxRows = clampInt(incoming.searchParams.get('maxRows'), 1, AISSTREAM_CACHE_MAX, AISSTREAM_CACHE_MAX);
+        const maxRows = clampInt(
+          incoming.searchParams.get('maxRows'),
+          1,
+          AISSTREAM_CACHE_MAX,
+          AISSTREAM_CACHE_MAX,
+        );
         const rows = aisStreamRows(maxRows);
 
         const feed = aisStreamStatusSnapshot();
@@ -93,27 +120,34 @@ export function aisLiveProxy() {
         res.statusCode = process.env.AISSTREAM_API_KEY ? 200 : 503;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
-        res.end(JSON.stringify({
-          rows,
-          source: 'AISStream',
-          status: feed.status,
-          error: feed.error,
-          refreshing: feed.status !== 'live',
-          newestPositionAt: newestAisPositionAt(rows),
-          lastMessageAt: feed.lastMessageAt,
-          // Honest-failure metadata: how long the feed has been quiet, which
-          // recovery attempt we are on, and when the next one lands.
-          silentForMs: feed.silentForMs,
-          reconnectAttempt: feed.reconnectAttempt,
-          nextAttemptAt: feed.nextAttemptAt,
-          staleAfterMs: feed.staleAfterMs,
-          watchdog: feed.watchdog,
-        }));
+        res.end(
+          JSON.stringify({
+            rows,
+            source: 'AISStream',
+            status: feed.status,
+            error: feed.error,
+            refreshing: feed.status !== 'live',
+            newestPositionAt: newestAisPositionAt(rows),
+            lastMessageAt: feed.lastMessageAt,
+            // Honest-failure metadata: how long the feed has been quiet, which
+            // recovery attempt we are on, and when the next one lands.
+            silentForMs: feed.silentForMs,
+            reconnectAttempt: feed.reconnectAttempt,
+            nextAttemptAt: feed.nextAttemptAt,
+            staleAfterMs: feed.staleAfterMs,
+            watchdog: feed.watchdog,
+          }),
+        );
       } catch (error) {
         res.statusCode = 502;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
-        res.end(JSON.stringify({ error: error?.message || 'AIS live stream error', rows: [] }));
+        res.end(
+          JSON.stringify({
+            error: error?.message || 'AIS live stream error',
+            rows: [],
+          }),
+        );
       }
     });
   }
@@ -161,7 +195,10 @@ function aisWebSocketImpl() {
     _aisWebSocketImpl = createRequire(import.meta.url)('ws');
   } catch (error) {
     _aisWebSocketImpl = null;
-    console.warn('[AISStream] `ws` is unavailable; the live vessel feed is off.', error?.message || '');
+    console.warn(
+      '[AISStream] `ws` is unavailable; the live vessel feed is off.',
+      error?.message || '',
+    );
   }
   return _aisWebSocketImpl;
 }
@@ -188,9 +225,13 @@ function aisWatchdogPolicy() {
     process.env.AISSTREAM_SILENCE_TIMEOUT_MS,
     (message) => console.warn(message),
   );
-  const reportMs = override.kind === 'timeout' ? override.value : AISSTREAM_SILENCE_REPORT_MS;
+  const reportMs =
+    override.kind === 'timeout' ? override.value : AISSTREAM_SILENCE_REPORT_MS;
   _aisWatchdogPolicy = {
-    silenceWatch: override.kind === 'off' ? false : (override.kind === 'timeout' || !customSubscription),
+    silenceWatch:
+      override.kind === 'off'
+        ? false
+        : override.kind === 'timeout' || !customSubscription,
     reportMs,
     recycleMs: Math.round(reportMs * AISSTREAM_RECYCLE_RATIO),
     // Overridable so the watchdog can be exercised end-to-end against a local
@@ -200,7 +241,6 @@ function aisWatchdogPolicy() {
   };
   return _aisWatchdogPolicy;
 }
-
 
 /**
  * The transport adapter, built on first use and kept for the module lifetime.
@@ -273,7 +313,9 @@ function aisStreamStatusSnapshot() {
   if (snapshot) return snapshot;
   return {
     status: process.env.AISSTREAM_API_KEY ? 'idle' : 'missing-key',
-    error: process.env.AISSTREAM_API_KEY ? null : 'AISSTREAM_API_KEY is not set',
+    error: process.env.AISSTREAM_API_KEY
+      ? null
+      : 'AISSTREAM_API_KEY is not set',
     lastMessageAt: null,
     silentForMs: null,
     reconnectAttempt: 0,
@@ -327,8 +369,14 @@ function disposeAisStream() {
 function aisStreamSubscription() {
   return {
     APIKey: process.env.AISSTREAM_API_KEY,
-    BoundingBoxes: parseJsonEnv('AISSTREAM_BOUNDING_BOXES', AISSTREAM_DEFAULT_BBOXES),
-    FilterMessageTypes: parseCsvOrJsonEnv('AISSTREAM_MESSAGE_TYPES', AISSTREAM_DEFAULT_MESSAGE_TYPES),
+    BoundingBoxes: parseJsonEnv(
+      'AISSTREAM_BOUNDING_BOXES',
+      AISSTREAM_DEFAULT_BBOXES,
+    ),
+    FilterMessageTypes: parseCsvOrJsonEnv(
+      'AISSTREAM_MESSAGE_TYPES',
+      AISSTREAM_DEFAULT_MESSAGE_TYPES,
+    ),
   };
 }
 
@@ -350,6 +398,9 @@ function parseCsvOrJsonEnv(key, fallback) {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : fallback;
   } catch {
-    return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
   }
 }
