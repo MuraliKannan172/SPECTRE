@@ -57,5 +57,17 @@
   "server/providers/space/celestrak.js",
   "server/providers/space/launch-library.js",
   "src/data/spaceProviderRequests.js",
-  "src/tooling/spaceProviders.test.mjs"
+  "src/tooling/spaceProviders.test.mjs",
+  "server/providers/terrain.js",
+  "server/providers/traffic.js",
+  "server/providers/firms.js",
+  "server/providers/gbfs.js",
+  "src/data/gbfsSource.js",
+  "src/data/terrainHeightsProxy.js",
+  "src/data/terrainHeightsProxy.test.mjs",
+  "src/data/tomtomTiles.js",
+  "src/data/tomtomTiles.test.mjs",
+  "src/data/firmsCsv.js",
+  "src/data/firmsCsv.test.mjs",
+  "src/tooling/environmentProviders.test.mjs"
 ]

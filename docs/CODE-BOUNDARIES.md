@@ -132,3 +132,23 @@ Callers supply the group or end date and own validation, credentials, transport,
 response limits and cache policy. The boundary gate checks this portable entry
 separately from the Node providers. Satellite rendering and launch replay remain
 in their existing browser modules.
+
+## Terrain, traffic, fires and bike-share providers
+
+`gods-eye-view/server/providers/terrain`, `/traffic`, `/firms` and `/gbfs`
+are separate Node-only entries. Each owns its existing middleware and
+process-scoped cache or request handling. Standalone composition mounts them in
+the original order; their imports do not start acquisition.
+
+`gods-eye-view/sources/terrain` exports existing point-key, retry and cache
+reconstruction mechanics with injectable acquisition dependencies.
+`gods-eye-view/sources/traffic` exports tile math and budget calculations.
+`gods-eye-view/sources/gbfs` exports host/path acceptance and cache-header rules.
+These entries import no Node middleware, application configuration or rendering.
+Callers retain their request admission and transport policy. FIRMS CSV parsing
+remains an owned dependency of the FIRMS Node provider. The boundary gate
+checks each entry independently.
+
+Browser terrain sampling, traffic matching/drawing, fire overlays and bike-share
+layer lifecycle remain in their current modules. This extraction changes no
+source defaults, credentials, quotas, data interpretation or visual behavior.

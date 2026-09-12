@@ -81,6 +81,21 @@
     "./server/providers/space": {
       "node": "./server/providers/space.js"
     },
-    "./sources/space": "./src/data/spaceProviderRequests.js"
+    "./sources/space": "./src/data/spaceProviderRequests.js",
+    "./server/providers/terrain": {
+      "node": "./server/providers/terrain.js"
+    },
+    "./sources/terrain": "./src/data/terrainHeightsProxy.js",
+    "./server/providers/traffic": {
+      "node": "./server/providers/traffic.js"
+    },
+    "./sources/traffic": "./src/data/tomtomTiles.js",
+    "./server/providers/firms": {
+      "node": "./server/providers/firms.js"
+    },
+    "./server/providers/gbfs": {
+      "node": "./server/providers/gbfs.js"
+    },
+    "./sources/gbfs": "./src/data/gbfsSource.js"
   }
 }
