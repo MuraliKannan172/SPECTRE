@@ -10,27 +10,47 @@
       "src/data/localGeojsonCore.js",
       "src/data/localGeojsonLod.js"
     ],
-    "external": ["cesium"]
+    "external": [
+      "cesium"
+    ]
   },
   "application": {
-    "exports": ["./application"],
-    "modules": ["src/app/application.js"],
+    "exports": [
+      "./application"
+    ],
+    "modules": [
+      "src/app/application.js"
+    ],
     "external": []
   },
   "viewer": {
-    "exports": ["./application/viewer"],
-    "modules": ["src/app/viewer.js"],
-    "external": ["cesium"]
+    "exports": [
+      "./application/viewer"
+    ],
+    "modules": [
+      "src/app/viewer.js"
+    ],
+    "external": [
+      "cesium"
+    ]
   },
   "vite-build": {
     "runtime": "node",
-    "exports": ["./build/vite"],
-    "modules": ["build/vite.js"],
-    "external": ["vite-plugin-cesium"]
+    "exports": [
+      "./build/vite"
+    ],
+    "modules": [
+      "build/vite.js"
+    ],
+    "external": [
+      "vite-plugin-cesium"
+    ]
   },
   "live-providers": {
     "runtime": "node",
-    "exports": ["./server/providers/live"],
+    "exports": [
+      "./server/providers/live"
+    ],
     "modules": [
       "server/providers/live.js",
       "server/providers/common/http.js",
@@ -45,11 +65,44 @@
       "src/data/aisStreamAdapter.js",
       "src/data/aisWatchdog.js"
     ],
-    "external": ["ws"]
+    "external": [
+      "ws"
+    ]
   },
   "adsb-lol-source": {
-    "exports": ["./sources/adsb-lol"],
-    "modules": ["src/data/adsbLolFallback.js"],
+    "exports": [
+      "./sources/adsb-lol"
+    ],
+    "modules": [
+      "src/data/adsbLolFallback.js"
+    ],
+    "external": []
+  },
+  "place-providers": {
+    "runtime": "node",
+    "exports": [
+      "./server/providers/places"
+    ],
+    "modules": [
+      "server/providers/places.js",
+      "server/providers/places/google.js",
+      "server/providers/places/google-key.js",
+      "server/providers/places/routes.js",
+      "server/providers/common/rate-limit.js",
+      "server/providers/common/geo.js",
+      "server/providers/common/http.js",
+      "scripts/google-server-key.mjs",
+      "src/data/placeProviderPayloads.js"
+    ],
+    "external": []
+  },
+  "place-payloads": {
+    "exports": [
+      "./sources/places"
+    ],
+    "modules": [
+      "src/data/placeProviderPayloads.js"
+    ],
     "external": []
   }
 }
