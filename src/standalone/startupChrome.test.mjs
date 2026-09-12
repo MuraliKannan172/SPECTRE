@@ -37,7 +37,7 @@ function fixture() {
   };
   vm.createContext(context);
   vm.runInContext(source, context);
-  const stop = context.startLocalChrome({
+  const stop = context.startStandaloneChrome({
     loadingScreen: {
       classList: { add: (value) => events.push(value) },
       addEventListener: (type, listener) => listeners.set(type, listener),

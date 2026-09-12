@@ -84,7 +84,7 @@ standalone share-restoration result keep their existing separate contracts.
 ## Standalone wiring
 
 `src/main.js` reads the existing browser configuration and starts
-`src/editions/local/application.js`. That module selects the four implementations
+`src/standalone/application.js`. That module selects the four implementations
 in its directory. Scene setup, controls, layer registration, tools and loading
 chrome have separate owners. The existing `window.__godsEyeView` debugging shape
 is preserved while the app is running.

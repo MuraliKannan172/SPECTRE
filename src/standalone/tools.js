@@ -1,18 +1,18 @@
-import { SceneDirector } from '../../scenes/director.js';
-import { initAnnotations } from '../../annotations/index.js';
-import { initGevVoiceCommands } from '../../voice/gevRealtime.js';
-import { installScopeMask, destroyScopeMask } from '../../scopeMask.js';
+import { SceneDirector } from '../scenes/director.js';
+import { initAnnotations } from '../annotations/index.js';
+import { initGevVoiceCommands } from '../voice/gevRealtime.js';
+import { installScopeMask, destroyScopeMask } from '../scopeMask.js';
 import {
   installRenderGovernor,
   getRenderGovernorDiagnostics,
   governorRequestRender,
   holdContinuousRender,
   releaseContinuousRender,
-} from '../../renderGovernor.js';
-import { startLocalChrome } from './startupChrome.js';
+} from '../renderGovernor.js';
+import { startStandaloneChrome } from './startupChrome.js';
 
 /** Attach scene tools, rendering listeners and the standalone debug handle. */
-export function createLocalTools({
+export function createStandaloneTools({
   scene,
   controls,
   data,
@@ -30,7 +30,9 @@ export function createLocalTools({
     if (window.__gevAnnotations === annotations) delete window.__gevAnnotations;
     annotations.destroy();
   });
-  defer(startLocalChrome({ loadingScreen, styleManager, dataManager, signal }));
+  defer(
+    startStandaloneChrome({ loadingScreen, styleManager, dataManager, signal }),
+  );
   // Idle render governor: flips the scene into requestRenderMode whenever
   // nothing animates per frame. Installed AFTER every module above has had
   // its chance to register pre-install holds. (perf wave 2)

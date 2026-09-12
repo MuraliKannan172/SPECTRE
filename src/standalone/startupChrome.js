@@ -1,8 +1,8 @@
-import { initFirstRunExperience } from '../../firstRunExperience.js';
-import { initKeySetup } from '../../keySetup.js';
+import { initFirstRunExperience } from '../firstRunExperience.js';
+import { initKeySetup } from '../keySetup.js';
 
 /** Reveal welcome controls only after restoration and the loading transition. */
-export function startLocalChrome({
+export function startStandaloneChrome({
   loadingScreen,
   styleManager,
   dataManager,

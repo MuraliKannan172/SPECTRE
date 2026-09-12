@@ -21,5 +21,11 @@
     "exports": ["./application/viewer"],
     "modules": ["src/app/viewer.js"],
     "external": ["cesium"]
+  },
+  "vite-build": {
+    "runtime": "node",
+    "exports": ["./build/vite"],
+    "modules": ["build/vite.js"],
+    "external": ["vite-plugin-cesium"]
   }
 }

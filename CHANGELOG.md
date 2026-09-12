@@ -13,6 +13,13 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+### Changed
+- Separate explicit browser build settings from standalone environment loading
+  and local provider middleware. Preserve provider behavior and root named exports.
+- Rename standalone browser startup to `src/standalone/` and add a Node-only
+  `gods-eye-view/build/vite` export with checked package ownership.
+
+
 ### Development
 
 - Extract application lifecycle and viewer exports. Split standalone startup into

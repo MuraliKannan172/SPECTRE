@@ -1,15 +1,15 @@
 import * as Cesium from 'cesium';
-import { createApplicationViewer } from '../../app/viewer.js';
-import { registerDataCredits } from '../../data/dataCredits.js';
-import { configureCreditKeyboardAccess } from '../../creditKeyboard.js';
-import { MapStackController } from '../../mapStackController.js';
-import { loadPhotorealisticTileset } from '../../mapStartup.js';
-import { initLogoGaze } from '../../logoGaze.js';
-import { uninstallRenderGovernor } from '../../renderGovernor.js';
+import { createApplicationViewer } from '../app/viewer.js';
+import { registerDataCredits } from '../data/dataCredits.js';
+import { configureCreditKeyboardAccess } from '../creditKeyboard.js';
+import { MapStackController } from '../mapStackController.js';
+import { loadPhotorealisticTileset } from '../mapStartup.js';
+import { initLogoGaze } from '../logoGaze.js';
+import { uninstallRenderGovernor } from '../renderGovernor.js';
 import { describeError } from './errors.js';
 
 /** Construct the standalone globe using the caller's local configuration. */
-export async function createLocalScene({
+export async function createStandaloneScene({
   googleApiKey,
   cesiumToken,
   loaderStatus,
