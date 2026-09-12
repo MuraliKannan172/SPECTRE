@@ -13,7 +13,10 @@ export function makeRateLimiter({ windowMs, max, globalMax }) {
     globalTimes = globalTimes.filter((t) => now - t < windowMs);
     if (globalMax && globalTimes.length >= globalMax) return false; // global backstop
     const recent = (hits.get(key) || []).filter((t) => now - t < windowMs);
-    if (recent.length >= max) { hits.set(key, recent); return false; }
+    if (recent.length >= max) {
+      hits.set(key, recent);
+      return false;
+    }
     recent.push(now);
     hits.set(key, recent);
     globalTimes.push(now);
@@ -46,7 +49,11 @@ export function makeRateLimiter({ windowMs, max, globalMax }) {
 export function makeOptInRateLimiter(envValue) {
   const max = Number(envValue);
   if (!Number.isFinite(max) || max <= 0) return null; // unset/0/garbage -> unlimited
-  return makeRateLimiter({ windowMs: 60_000, max: Math.floor(max), globalMax: Math.floor(max) * 20 });
+  return makeRateLimiter({
+    windowMs: 60_000,
+    max: Math.floor(max),
+    globalMax: Math.floor(max) * 20,
+  });
 }
 
 /**
