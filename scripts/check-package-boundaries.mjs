@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build, normalizePath } from 'vite';
 
-/** Build each browser export group and reject imports outside its declared ownership. */
+/** Build each browser or Node export group and reject imports outside its declared ownership. */
 export async function checkPackageBoundaries(root) {
   root = await realpath(root);
   const readJson = async (name) =>
@@ -24,6 +24,10 @@ export async function checkPackageBoundaries(root) {
   }
   const reports = [];
   for (const [name, group] of Object.entries(groups)) {
+    const node = group.runtime === 'node';
+    if (group.runtime && !['browser', 'node'].includes(group.runtime)) {
+      throw new Error(`Invalid boundary runtime: ${name}`);
+    }
     if (
       !Array.isArray(group.modules) ||
       !group.modules.length ||
@@ -55,15 +59,20 @@ export async function checkPackageBoundaries(root) {
     for (const external of group.external) {
       if (
         !Object.hasOwn(pkg.dependencies || {}, external) &&
-        !Object.hasOwn(pkg.peerDependencies || {}, external)
+        !Object.hasOwn(pkg.peerDependencies || {}, external) &&
+        !(node && Object.hasOwn(pkg.devDependencies || {}, external))
       ) {
         throw new Error(
-          `Boundary external must be a declared runtime dependency: ${external}`,
+          `Boundary external must be a declared dependency for its runtime: ${external}`,
         );
       }
     }
     const input = group.exports.map((key) => {
-      const target = pkg.exports[key];
+      const declaration = pkg.exports[key];
+      const target = node ? declaration?.node : declaration;
+      if (node && (typeof declaration !== 'object' || Object.keys(declaration).join() !== 'node')) {
+        throw new Error(`Node export must have only a node condition: ${key}`);
+      }
       if (
         typeof target !== 'string' ||
         !target.startsWith('./') ||
@@ -79,6 +88,7 @@ export async function checkPackageBoundaries(root) {
       configFile: false,
       envFile: false,
       publicDir: false,
+      ssr: node ? { noExternal: true } : undefined,
       logLevel: 'silent',
       plugins: [
         {
@@ -94,6 +104,7 @@ export async function checkPackageBoundaries(root) {
         },
       ],
       build: {
+        ssr: node,
         lib: { entry: input, formats: ['es'] },
         write: false,
         minify: false,

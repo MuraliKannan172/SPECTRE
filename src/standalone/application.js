@@ -1,14 +1,14 @@
-import { createApplication } from '../../app/application.js';
-import { createLocalScene } from './scene.js';
-import { createLocalControls } from './controls.js';
-import { createLocalData } from './data.js';
-import { createLocalTools } from './tools.js';
+import { createApplication } from '../app/application.js';
+import { createStandaloneScene } from './scene.js';
+import { createStandaloneControls } from './controls.js';
+import { createStandaloneData } from './data.js';
+import { createStandaloneTools } from './tools.js';
 
 // The existing controls and layer catalog contain page-scoped state.
 let constructed = false;
 
 /** Compose the standalone application once per page. Reload to start again. */
-export function createLocalApplication({
+export function createStandaloneApplication({
   googleApiKey,
   cesiumToken,
   allowQaRegistration = false,
@@ -20,11 +20,11 @@ export function createLocalApplication({
   const loaderStatus = loadingScreen.querySelector('.loader-status');
   return createApplication({
     createScene: (context) =>
-      createLocalScene({ ...context, googleApiKey, cesiumToken, loaderStatus }),
+      createStandaloneScene({ ...context, googleApiKey, cesiumToken, loaderStatus }),
     createControls: (context) =>
-      createLocalControls({ ...context, loaderStatus }),
+      createStandaloneControls({ ...context, loaderStatus }),
     createData: (context) =>
-      createLocalData({ ...context, allowQaRegistration }),
-    createTools: (context) => createLocalTools({ ...context, loadingScreen }),
+      createStandaloneData({ ...context, allowQaRegistration }),
+    createTools: (context) => createStandaloneTools({ ...context, loadingScreen }),
   });
 }

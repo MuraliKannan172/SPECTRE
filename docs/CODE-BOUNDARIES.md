@@ -22,9 +22,9 @@ excluded. The formatter validates every entry before writing any file.
 | `gods-eye-view/infrastructure/geojson`                    | Data loading, Cesium entities, selection handling and resource cleanup | A viewer and those same operations                  |
 | `gods-eye-view/infrastructure/lod`                        | Pure visibility budgets and selection policy                           | Position/visibility records and camera measurements |
 | `src/data/localGeojson.js`                                | Standalone compatibility wiring                                        | The application's existing shared services          |
-| `src/main.js`, `src/editions/local/` and `vite.config.js` | Standalone startup and local Node services                             | Local configuration                                 |
+| `src/main.js` and `src/standalone/` | Standalone browser startup                             | Local configuration                                 |
 
-The scoped package exports are browser source modules. Use their documented
+The application and infrastructure exports are browser source modules. Use their documented
 exports instead of importing standalone startup or reaching into internal files.
 The application owns the viewer, context store, overlay host and render scheduler;
 layers use the supplied callbacks. See [the infrastructure contract](INFRASTRUCTURE-LAYERS.md).
@@ -42,7 +42,7 @@ They check build-time imports, not arbitrary runtime-generated module URLs.
 Keep runtime module discovery out of these exports. When extracting another
 component, add its ownership and consumer tests together. Node services must use
 separate entry points and their own checks when they become reusable; importing
-them into a browser component is not supported. No Node service is exported yet.
+them into a browser component is not supported. No provider service is exported yet.
 
 `gods-eye-view/application` owns construction order, startup state, cancellation
 and disposal of caller-supplied components. Its only owned module is
@@ -53,3 +53,35 @@ Neither export imports standalone UI, layers, tools or configuration. See
 
 UI panels and individual source adapters remain future extractions. They should
 become smaller modules with explicit lifecycle owners as their callers migrate.
+
+
+## Build and standalone server configuration
+
+`gods-eye-view/build/vite` is a separate Node-only export. `build/vite.js`
+creates standard Cesium/Vite browser settings from explicit inputs. It imports
+only the declared `vite-plugin-cesium` build dependency, discovers no environment,
+and constructs no provider middleware. Call it from a Vite configuration:
+
+```js
+import { createBrowserViteConfig } from 'gods-eye-view/build/vite';
+
+export default createBrowserViteConfig({
+  plugins: [],
+  googleApiKey: undefined,
+  cesiumToken: undefined,
+});
+```
+
+Consumers supply compatible Vite and vite-plugin-cesium development dependencies.
+The package's `node` export condition has no browser fallback. The boundary gate
+builds this group for Node, with the declared build dependency external; its
+owned module list is checked just like browser groups. Browser groups cannot
+use build-only dependency exceptions.
+
+`server/standalone/vite.config.js` loads the root environment and passes selected
+browser keys, host/port and the ordered local provider plugins to this helper.
+`server/providers/local.js` still owns provider process state, routes and
+credential-store paths. Provider Settings writes to the same root `.env` or
+Pinokio store as before. `vite.config.js` preserves the default configuration and
+existing named provider exports for tools/tests. The provider module remains
+large; later extractions should split complete provider families and their tests.
