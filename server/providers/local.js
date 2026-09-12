@@ -3540,6 +3540,18 @@ function toReadable(body) {
   return null;
 }
 
+/**
+ * Pipe an upstream fetch Response (image or video) to the client HTTP response.
+ *
+ * Forwards Content-Type, Content-Length, Content-Range, Accept-Ranges, and
+ * Cache-Control headers from the upstream. Falls back to buffered arrayBuffer
+ * if the body is not streamable.
+ *
+ * @param {import('http').ServerResponse} res
+ * @param {Response} upstream - fetch() Response object.
+ * @param {object} [opts]
+ * @param {string} [opts.sourceHeader='upstream'] - Value for X-CCTV-Source header.
+ */
 async function proxyMediaResponse(res, upstream, { sourceHeader = 'upstream' } = {}) {
   const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
   const cacheControl = upstream.headers.get('cache-control') || 'no-store';

@@ -66,18 +66,6 @@ export function coalesceProxyRequest(inFlight, key, create) {
 }
 
 /**
- * Pipe an upstream fetch Response (image or video) to the client HTTP response.
- *
- * Forwards Content-Type, Content-Length, Content-Range, Accept-Ranges, and
- * Cache-Control headers from the upstream. Falls back to buffered arrayBuffer
- * if the body is not streamable.
- *
- * @param {import('http').ServerResponse} res
- * @param {Response} upstream - fetch() Response object.
- * @param {object} [opts]
- * @param {string} [opts.sourceHeader='upstream'] - Value for X-CCTV-Source header.
- */
-/**
  * Read a fetch Response body as text while enforcing a hard byte cap during
  * the read — so a malicious or buggy upstream that streams an unbounded body
  * (no/oversized Content-Length, chunked) can't OOM the proxy. Returns
