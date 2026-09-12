@@ -129,7 +129,7 @@ test('OpenSky state and track routes share tokens, retain cache and use regional
   const fresh = await import(
     `../../server/providers/aircraft/opensky.js?fallback=${now}`
   );
-  environment(t, { OPENSKY_AUTH_MODE: 'anon' });
+  process.env.OPENSKY_AUTH_MODE = 'anon';
   const fallback = await install(fresh.openSkyProxy())(
     '/api/opensky',
     '?lat=30&lon=-97',
@@ -177,8 +177,8 @@ test('AIS preview route ingests through the socket, returns tracks and disposes 
     socket.on('message', (raw) => {
       assert.equal(JSON.parse(raw).APIKey, 'fixture-key');
       for (const [lat, epoch] of [
-        [30, 1_800_000_000],
-        [30.01, 1_800_000_060],
+        [30, Math.floor(Date.now() / 1000) - 120],
+        [30.01, Math.floor(Date.now() / 1000) - 60],
       ]) {
         socket.send(
           JSON.stringify({
