@@ -1,5 +1,15 @@
 # God's Eye View Current State
 
+## Terrain, traffic, fire and bike-share provider modules
+
+Local composition now imports separate Node modules for Re:Earth heights,
+TomTom flow tiles, NASA FIRMS detections and GBFS station feeds. Existing routes,
+plugin order, server-key selection, validation, disk caches, budgets, retries
+and stale/error responses remain unchanged. Each has a Node-only package entry
+under `gods-eye-view/server/providers/`. Portable terrain mechanics, traffic tile
+math and GBFS source rules are available under `gods-eye-view/sources/`.
+The browser layers and their rendering remain in their existing modules.
+
 ## Landmark annotation identity
 
 When a landmark geocode contains only address components, annotations retain
