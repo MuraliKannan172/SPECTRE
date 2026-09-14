@@ -1,5 +1,259 @@
 # God's Eye View Current State
 
+Data Centers, Dams and Submarine Cables release their built Cesium data sources
+and record references when disabled. Parsed datasets remain cached for the layer
+lifetime, so re-enable rebuilds entities without downloading or parsing again;
+this can take longer than simply revealing hidden entities. Destruction clears
+the parsed cache as well. A disable during loading cannot leave a completed
+build hidden in the scene.
+
+CCTV exposes a factory through `./layers/cctv`. Catalog and health requests,
+frame/media URLs, camera records, ground placement, geometry queues, playback,
+projection, cards, calibration and interaction have separate components. The
+standalone entry supplies application-owned scene, ground and activation services.
+Each layer owns its state and visibility listener; destruction cancels source
+reads and pending initialization. Malformed health responses retain prior health.
+Existing catalog fallback, camera poses, frame pacing and coverage controls remain.
+
+Traffic and bikeshare expose factories through `./layers/traffic` and
+`./layers/bikeshare`. Traffic separates road requests, ingestion, animation,
+flow matching, styling, viewport lifecycle and development timing. Each source
+owns its decoded flow cache; cancelled bodies cannot refill it. Bikeshare
+separates its city registry, station source, parsing, rendering, selection and
+proximity lifecycle. Existing standalone sources, live/simulated labels, road
+budgets, station availability and polling behavior are retained.
+
+Installations and proximity context now expose `./layers/installations` and
+`./layers/awareness` factories. Each owns its records, selection, presentation,
+navigation and lifecycle. The standalone entries supply existing scene operations
+and the aircraft/vessel/installation instances used for proximity queries.
+Installation requests use a bounded source adapter; explicit nearby-place search
+remains separate from ordinary mapped-site loading. Invalid snapshots retain the
+previous display, and cancelled requests cannot publish a later failure state.
+Viewport limits, saturation retry, placement, query caps and controls are retained.
+
+Satellite and mission layers expose separate factories through `./layers/satellites`
+and `./layers/launches`. Each owns its catalog, render state, tracking, interaction
+and teardown. Source adapters retain the existing CelesTrak and Launch Library
+endpoints; standalone entries provide scene services and the satellite dependency.
+The mission factory separates paths, replay, camera, panel, overlays and placement.
+Pending mission requests abort on disable/destruction and malformed launch
+snapshots preserve the last accepted display. Catalog groups, propagation cadence,
+tracking intent, replay timing, controls and source attribution remain unchanged.
+
+The fire layer now exposes `./layers/firms`: an instance factory with separate
+snapshot requests, records, rendering, cards, selection, viewport scheduling and
+terrain-anchor batching. The standalone entry supplies the existing FIRMS source
+and scene services. Disable and teardown cancel pending refreshes; malformed
+snapshots preserve the last good display. Refresh restoration keeps selection
+identity without announcing a new user selection. Source/label, LOD thresholds,
+card limits, fire identities, altitude placement and analyst records are retained.
+
+Earthquake rendering is exposed through `./layers/earthquakes`. The layer owns
+its entities and request lifecycle; the application supplies the overlay host
+and snapshot source. The standalone adapter keeps the existing USGS daily feed,
+M2.5+ filtering, static discs, magnitude labels and analyst records. Disabling or
+destroying the layer cancels pending work and ignores late results.
+
+## Vessel components and sources
+
+`src/data/aisLiveVessels.js` assembles `createVesselLayer` from the
+`./layers/vessels` package entry. The factory owns feed lifecycle, keyed records,
+rendering, selection, trails and cards in separate components. The standalone
+entry supplies its AISStream source, scene services and existing row limits.
+
+Incomplete observations retain missing keyed vessels for at most five minutes
+since their last accepted receipt, within the renderer's row budget (plus the
+existing selected-contact pin). Complete observations keep the existing removal
+policy. Empty or failed observations preserve warm data with the existing feed
+health warning and first-connect grace period. Source timestamps remain source
+timestamps; receipt does not turn an unknown epoch into a fresh update.
+
+A refreshed record keeps its identity while updating its history reference.
+Selection changes, disable and destruction cancel pending trail requests; late
+responses cannot refill a cleared or replacement trail. Heading and course,
+sea-surface placement, click ownership and card selection policy are unchanged.
+
+
+## Military-flight components and aircraft mechanics
+
+`gods-eye-view/layers/military` exports `createMilitaryFlightLayer`. It uses the
+same normalized observation contract as civil flights, with separate military
+classification, styling, model and tracking policy. Each instance owns its
+contacts, history, scratch objects, model loads and cancellation lifetime.
+Applications supply the existing scene services and resolve model asset URLs;
+`src/data/militaryFlights.js` keeps the standalone layer API and adsb.lol source.
+A source may retain a bounded stale-status reason; the standalone cached-feed
+behavior remains unchanged.
+
+`gods-eye-view/aircraft` exports the existing shared classification, icon,
+metadata, motion, altitude, model-anchor, proximity and selection calculations.
+It also exports `createMilitaryRegistry`, an explicitly constructed owner for
+known military identities and active-layer transitions. Its optional background
+poll consumes the optional `getIdentities` capability, falling back to normalized
+positioned records when a source has no identity-only capability. The adsb.lol
+adapter preserves known identities without requiring positions; those entries
+still cannot enter the renderer. Source replacement
+and disposal abort pending work and clear retained identities; construction
+starts no network request. Both standalone aircraft layers use one registry.
+
+## Civil-flight components
+
+`gods-eye-view/layers/flights` exports `createCivilFlightLayer`. Each instance
+owns its contacts, histories, model collections, scratch objects and lifecycle.
+State, ingestion, enrichment, motion/floor interpolation, rendering, tracking and
+queries live in separate files under `src/layers/flights`. The standalone
+`src/data/flights.js` assembles the existing OpenSky source and scene services.
+
+Applications supply the existing floor/snap, geoid, picking, sprite, camera,
+trail, focus, readout, context, aircraft presentation and render services.
+The factory never constructs a second application registry. Configure a source
+before initialization; replacing it while initialized is rejected. Model loads
+use the supplied asset resolver, including the preload path. Enrichment receives
+an abort signal and cannot update a later lifecycle after destruction. Existing
+camera, terrain floor, trail, selection and measured model-size policies remain.
+
+## Browser live-source observations
+
+Flights, Military Flights and AIS Vessels obtain snapshots and optional history
+through `gods-eye-view/sources/live`. The standalone adapters use the existing
+same-origin routes. Aircraft observations distinguish barometric metres from
+WGS84 ellipsoid metres and retain source position/contact epochs; vessel records
+retain separate heading/course and sea-surface datum. History is a best-effort
+addition to the locally accumulated trail, never a promise of complete coverage.
+
+Snapshot coverage, completeness and freshness are separate fields. A partially
+admitted aircraft snapshot retains absent contacts for up to five minutes before
+the usual missed-poll eviction. Unknown snapshot times remain unknown in stats. An invalid nonempty
+snapshot retains the previous display. Empty vessel refreshes retain the existing
+first-connect grace and warm-data behavior. Known source failures have bounded
+messages; arbitrary HTTP response bodies are not surfaced as diagnostics.
+Sources receive cancellation signals and check them after body parsing. The
+layer's existing lifecycle and selection guards continue to reject late work.
+
+
+## State and action outcomes
+
+Share preferences, place lookups and Scene playback expose immutable snapshots
+and disposable subscriptions. Share settings drive URL updates; lookup outcomes
+drive Location labels and busy/error feedback. Superseded or disposed lookups
+cannot publish accepted destinations. Each completion carries its own request
+identity so an older completion cannot clear the current search indicator.
+
+Scene controls consume playback state and editing outcomes from the director.
+Progress updates carry a small playback snapshot and preserve shot-row identity;
+editing outcomes include a copy of the affected scene or shot. Subscriptions
+start with current state, isolate listener failures and stop on disposal.
+`gods-eye-view/scenes` exports the same director used by the standalone app.
+
+## UI shell and component ownership
+
+The standalone entry composes the UI with the application's existing layer,
+terrain, navigation and rendering operations. The shell receives those instances
+and assembles the controls. Panel layout scheduling, position preferences and
+active drags, loading notices, recording presentation and DOM lookup have focused
+owners. Disposal revokes queued presentation and listeners before asynchronous
+Context restoration, cancels an unfinished drag without saving it, restores the
+recording HUD and releases status decoration without replacing accessible text.
+The ordinary control snapshot includes the current 3D model toggle and mode.
+
+`style.css` imports component styles in their original cascade order. Scene,
+share, HUD and layer engines retain their existing behavior and entry points.
+
+## Scene control ownership
+
+Scene controls own creation/deletion prompts, panel listeners, shot rows, playback/recording presentation
+and keyboard cancellation. The director supplies project reads and explicit
+editing/playback actions while retaining persistence, camera and layer sequencing.
+Shot selection updates the highlight without replacing the row, preserving
+native double-click rename. Replacing rows revokes their old listeners. Disposal stops controls immediately;
+late file and failed-action completions cannot update removed presentation.
+
+## Cockpit component ownership
+
+Cockpit presentation is separated from its camera/controller behavior. Existing
+layer, terrain and rendering operations are supplied by composition, retaining
+the same tracked identity, ground acquisition, motion correction and cadence.
+The Display portal owns group anchors, focus/scroll restoration and listeners.
+Superseded portal frames cannot repaint old state or steal focus after disposal;
+retained Cockpit actions cannot restart a disposed controller. Input, subscriptions
+and queued panel work stop before asynchronous layer restoration; final camera
+and portal cleanup follows that restoration.
+
+
+## Context coordination
+
+Context controls own Contacts/Space Missions state, entry and exit transactions,
+layer snapshots and restoration. The application supplies the existing manager,
+installations search and camera/panel actions. Tab listeners and pending
+presentation work stop during disposal; layer restoration retains its existing
+compensation and latest-intent rules. Clear Selected Layers shares this owner,
+so an older restore cannot replay over a newer Clear action.
+
+
+## Camera panel ownership
+
+CCTV controls receive the existing camera port and explicit application actions.
+Frame loading, calibration editing and status display have separate modules;
+providers, camera placement and navigation policy retain their existing owners.
+Changing cameras invalidates old image callbacks and cancels an unfinished
+calibration edit. Failed refreshes preserve settled pixels for the same camera,
+while a newly selected camera never shows the prior camera's image. Disposal
+releases listeners, subscriptions, image handlers, summary timers and chip-hide timers.
+
+
+## UI disposal
+
+UI disposal releases the CCTV subscription, command-dock observer, legacy drag
+resize observer and window resize listener. These remain independent of the
+Location component and are included in whole-UI browser teardown acceptance.
+
+## Radio controls
+
+Radio panel, compact controls and tuner presentation have a dedicated owner.
+It receives playback, layer actions and layout callbacks; station ingestion,
+marker placement, audio playback and camera policy stay with their existing
+owners. Tuner calculations have a pure entry, with existing layer exports
+preserved. Destruction removes listeners and state subscriptions before ending
+tuning; a delayed Enable result cannot reveal or refocus removed controls.
+
+
+## Location control ownership
+
+City/POI rows, search/reset bindings, location readouts and the orbit indicator
+have a dedicated component with explicit navigation actions. A separate lookup
+controller cancels superseded searches and checks camera authority before flight
+and result presentation. Existing search providers and camera handoff policy are
+preserved. Replacing or closing a POI row cancels its pending expansion frame;
+destruction releases listeners, pending searches and the orbit indicator.
+
+
+## Layer panel ownership
+
+Layer rows, feed feedback, counts, focus-preserving chips and toggle listeners
+are owned by a renderer-free panel component. The layer manager supplies current
+snapshots, lifecycle actions and row descriptors. Remount and teardown remove
+listeners and row subscriptions; obsolete completions do not repaint old rows.
+The clear control presents busy state while its existing action owns the transaction.
+
+
+## Map Source control ownership
+
+Map Source controls own chip listeners, source-state subscriptions and selection
+feedback. Loading remains with the supplied map controller. The active chip
+follows the source actually displayed, including fallback; obsolete completions
+cannot overwrite a newer selection. Refresh and destruction revoke old listeners
+and destruction suppresses late UI updates. Available choices and setup behavior
+remain unchanged.
+
+## Visual effects ownership
+
+VisualEffects owns style-stage creation, crossfades, animation scheduling, bloom
+and sharpen. Display supplies actions and renders settings; effect execution has
+no DOM dependency. Existing presets and the 500 ms transition remain unchanged.
+Stopping the controller revokes animation before asynchronous UI teardown; final
+destruction removes its stages and restores the borrowed bloom configuration.
+
 ## Display control ownership
 
 Display button, selector and slider listeners have a single destroyable owner.
@@ -3022,3 +3276,30 @@ nanoid 3.3.19. Cesium remains on 1.138.0. Browser QA uses Puppeteer 25.10.0;
 image-processing tools use Sharp 0.35.4. QA scripts await Puppeteer's asynchronous
 executable-path lookup before testing or passing the path to Chrome. Supported Node versions remain
 24.14.x and 26.x. Use `npm ci` to reproduce the checked-in dependency tree.
+
+### Traffic city navigation
+
+Traffic checks the final camera view on arrival and retries a failed road request
+while the camera is stationary, backing off from 1.5 to 30 seconds. Failed road
+requests report an unavailable source. Leaving the traffic altitude range or
+disabling the layer cancels pending work; superseded road and flow requests cannot
+release the current request or keep its loading indicator active.
+
+### Optional frame-rate readout
+
+Backtick (`) toggles an FPS readout beneath the title logo. It counts actual
+Cesium post-render events over one-second windows and does not request extra
+frames. Typing fields, modified keys and key repeats do not toggle it. The
+readout starts hidden each session and releases its timer and frame listener
+when hidden or when the application is disposed.
+
+
+## Radio components
+
+The radio entry composes one layer from directory ingestion, station queries,
+selection, globe rendering and playback modules. Its source supplies directory
+metadata and click reporting; scene, ground and overlay services are provided
+explicitly. Each constructed layer owns its catalog, audio and lifecycle state.
+Existing catalog validation, category filters, tuning and voice playback behavior
+remain unchanged. Audio connects directly to the broadcaster after an explicit
+play action; the source does not relay or record streams.
