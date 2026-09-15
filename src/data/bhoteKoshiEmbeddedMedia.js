@@ -595,7 +595,13 @@ export function createBhoteKoshiEmbeddedMedia({
   facebookLoader = loadFacebookSdk,
   youtubeLoader = loadYouTubeApi,
 } = {}) {
-  if (!documentRef?.createElement || !viewer) {
+  // Pinokio externalizes HTTPS iframe navigation, including hidden preloads.
+  // Use the existing source-card/local-clip fallback before allocating provider
+  // resources. Browsers visiting the same Pinokio-launched server keep embeds.
+  const pinokioShell = /(?:^|\s)Pinokio\/[^\s]+/i.test(
+    globalRef.navigator?.userAgent || '',
+  );
+  if (pinokioShell || !documentRef?.createElement || !viewer) {
     return {
       warm: () => false,
       show: () => false,

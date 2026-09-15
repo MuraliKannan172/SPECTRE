@@ -1,5 +1,9 @@
 # Changelog
 
+- Keep Nepal provider media inside the Pinokio compatibility boundary: use
+  source-linked fallback cards instead of automatic embeds or hidden preloads
+  that launch an external browser. Ordinary browsers retain embedded playback.
+
 - Extract a portable Director shot runner and connect existing scene playback to
   it. Preserve authored content, project files, camera/layer behavior and source
   attribution; document the planned timeline, scene-file and data-pack boundaries.

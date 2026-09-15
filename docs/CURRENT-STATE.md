@@ -11,6 +11,14 @@ Search framing and annotations request semantic map features from an explicit so
 
 Nepal media preloads survive repeated camera-flight updates, but Stop, event disable and replacement remove abandoned frames and revoke pending Facebook sessions. Fallback evidence-card clicks respect the shared drawing-tool pointer lease.
 
+In the Pinokio browser shell, Nepal provider embeds and hidden preloads are
+disabled before creating frames or loading provider SDKs, because the shell can
+redirect iframe navigation to an external browser. Existing source-linked cards
+remain available, and Open Original is an explicit action. Optional approved
+local clips still use the existing fallback; the public pack bundles no witness
+clips. Chrome and Safari retain embeds even when visiting a Pinokio-launched
+server. This compatibility fallback does not repair Pinokio's navigation handler.
+
 Nepal flood lines classify the active terrain or photoreal surface, and the surge marker follows that surface. Geographic route coordinates are unchanged; dynamic lines do not rely on unsupported depth-failure materials. Later media-only shots keep their completed source-path history throughout arrival and card reveal.
 
 Scene Stop, replacement, seek, and teardown revoke the Upper Valley locator's delayed camera approach and orbit while preserving its visible callout. A revoked timer or camera callback cannot start another flight or interfere with a newer shot.
