@@ -172,7 +172,12 @@ export class RealtimeTurns {
     if (!sent) this.responseCreatePending = false;
   }
 
+  ownsConversation(channel) {
+    return this.dc === channel && channel?.readyState === 'open';
+  }
+
   async handleRealtimeEvent(event) {
+    const eventChannel = this.dc;
     let payload = null;
     try {
       payload = JSON.parse(event.data);
@@ -410,6 +415,7 @@ export class RealtimeTurns {
                 radioHandoffEpochAtStart === this.radio.radioHandoffEpoch),
           },
         );
+        if (!this.ownsConversation(eventChannel)) return;
         if (result?.ok && result.radioPlaybackRequested) {
           const sessionIsCurrent =
             this.activeToolAbortControllers.has(toolController) &&
@@ -494,6 +500,8 @@ export class RealtimeTurns {
           this.radio.releaseTool(toolController);
         }
       }
+      // Rejections also arrive after cancellation; never publish into a new session.
+      if (!this.ownsConversation(eventChannel)) return;
       if (radioReservationToken && result?.ok) {
         // Successful authority commits before its output is serialized. The
         // sibling abort synchronously restores manager ownership, so report
@@ -560,6 +568,7 @@ export class RealtimeTurns {
           error: error?.message || String(error),
         });
       }
+      if (!this.ownsConversation(eventChannel)) return;
       // Keep the Radio handoff wording authoritative even when another tool
       // result follows Radio in the same multi-intent response.
       this.queueResponseCreate(

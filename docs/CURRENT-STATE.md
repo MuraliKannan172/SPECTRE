@@ -6,7 +6,8 @@ controller exports and session/backend contracts remain available. Tool protocol
 response wording, push-to-talk timing, model preferences and Radio confirmation
 order are preserved. Stopped connections, stale offers and delayed captures cannot affect a
 replacement session; audio meters release failed initialization and reject revoked
-frames. See [voice ownership](VOICE-OWNERSHIP.md).
+frames. Delayed action results and post-capture continuations cannot resume a
+stopped conversation or send output into a replacement. See [voice ownership](VOICE-OWNERSHIP.md).
 
 The application shell composes focused state owners for navigation, destination
 lookup/orbit, Cockpit, visual settings, panel layout, aircraft display and layer

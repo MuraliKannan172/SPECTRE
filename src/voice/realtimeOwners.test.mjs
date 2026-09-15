@@ -24,9 +24,9 @@ function browser(t) {
     addTrack() {}
     createDataChannel() {
       this.channel = {
-        readyState: 'open', handlers: new Map(),
+        readyState: 'open', handlers: new Map(), sent: [],
         addEventListener(type, handler) { this.handlers.set(type, handler); },
-        send() {}, close() { this.readyState = 'closed'; },
+        send(message) { this.sent.push(JSON.parse(message)); }, close() { this.readyState = 'closed'; },
       };
       return this.channel;
     }
@@ -216,4 +216,50 @@ test('stopping one audio meter revokes retained frames without stopping another 
   assert.equal(frames.length, 3, 'the other meter retains its own render lifetime');
   second.stopVoiceVisualizer();
   assert.deepEqual(contexts.map(c => c.closes), [1, 1]);
+});
+
+test('late action or viewport completion cannot resume a stopped or replacement conversation', async (t) => {
+  browser(t);
+  for (const phase of ['tool', 'tool-error', 'viewport']) {
+    for (const restart of [false, true]) {
+      let finish;
+      const controller = new GevRealtimeController({
+        runner: phase === 'viewport'
+          ? async () => ({ ok: true, ...localContext })
+          : () => new Promise((resolve, reject) => {
+              finish = phase === 'tool-error'
+                ? () => reject(new Error('superseded action failed'))
+                : () => resolve({ ok: true, action: 'get_entity_context' });
+            }),
+        backend: {
+          async requestToken() { return { token: 'synthetic', model: resolveVoiceModel('mini').id }; },
+          async negotiate() { return 'answer'; },
+        },
+        debugSink: null,
+        ui: { root: { dataset: {}, classList: { remove() {} }, querySelectorAll: () => [] }, status: {}, detail: {} },
+      });
+      if (phase === 'viewport') controller._viewport.capture = () => new Promise(resolve => {
+        finish = () => resolve('data:image/jpeg;base64,abc');
+      });
+      await controller.start();
+      controller.dc.handlers.get('open')();
+      const pending = controller.handleRealtimeEvent({ data: JSON.stringify({
+        type: 'response.function_call_arguments.done', name: 'get_entity_context',
+        call_id: 'delayed', arguments: '{}',
+      }) });
+      while (!finish) await new Promise(resolve => setImmediate(resolve));
+      controller.stop();
+      if (restart) {
+        await controller.start();
+        controller.dc.handlers.get('open')();
+      }
+      const status = controller.status;
+      finish();
+      await pending;
+      assert.equal(controller.status, status, `${phase}: stopped status stays owned by the new lifetime`);
+      assert.deepEqual(controller.dc?.sent || [], [], `${phase}: no old result or response reaches the replacement`);
+      assert.equal(controller.pendingResponseInstructions, null);
+      controller.stop();
+    }
+  }
 });

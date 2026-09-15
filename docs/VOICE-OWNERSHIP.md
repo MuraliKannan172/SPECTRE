@@ -25,6 +25,8 @@ stops audio analysis, releases media and clears conversation/input state. Full
 removal also detaches UI, keyboard, annotation and Radio observers. Radio takeover
 retains confirmed playback through that same shutdown path. A late offer, peer callback,
 viewport capture or cancelled meter frame cannot enter a replacement session.
+Action and post-capture continuations retain their conversation identity before
+publishing output, queueing a response or changing status.
 
 Behavioral invariants remain in force: a 500 ms Space hold claims push-to-talk;
 short control taps and text entry remain native; a click-started session stays
