@@ -12,6 +12,8 @@
  * State is persisted to localStorage and can be exported/imported as JSON.
  */
 
+import { resolveCameraPose, resolveCameraMove } from '../director/camera.js';
+import { createCameraMotion } from './cameraMotion.js';
 import { createStateChannel } from '../app/stateChannel.js';
 import { SceneControls } from '../ui/scenes.js';
 import { buildPlaybackQueue, playSceneQueue } from '../director/playback.js';
@@ -84,6 +86,22 @@ export class SceneDirector {
     this.dataManager = dataManager;
     this._isMapStackAvailable = isMapStackAvailable;
     this._scenePacks = scenePacks;
+    this._cameraMotion = createCameraMotion({
+      applyPose: (pose) => this._setCameraView(pose),
+    });
+    const yieldCamera = () => {
+      if (this._usesAuthoredCamera && !this._claimingCamera)
+        this.stopScene('Camera ownership changed');
+    };
+    this._cameraHandoffUnsubscribe =
+      styleManager.subscribeCameraHandoff?.(yieldCamera);
+    const canvas = viewer.scene?.canvas;
+    for (const event of ['pointerdown', 'wheel'])
+      canvas?.addEventListener(event, yieldCamera, { passive: true });
+    this._removeCameraInput = () => {
+      for (const event of ['pointerdown', 'wheel'])
+        canvas?.removeEventListener(event, yieldCamera);
+    };
 
     /** @type {boolean} True while a scene run is in progress */
     this._running = false;
@@ -179,6 +197,9 @@ export class SceneDirector {
     this._destroyed = true;
     this._sceneSeekGeneration++;
     this._visibilityUnsubscribe?.();
+    this._cameraHandoffUnsubscribe?.();
+    this._removeCameraInput?.();
+    this._cameraMotion?.destroy();
     this._controls?.destroy();
     this._state.destroy();
     this._destroyPromise = Promise.resolve().then(async () => {
@@ -903,7 +924,9 @@ export class SceneDirector {
     const camera = this.styleManager.getCameraState();
     if (!camera) return;
 
-    shot.camera = camera;
+    shot.camera = shot.move
+      ? { ...camera, altitudeReference: 'ellipsoid' }
+      : camera;
     shot.visual = this.styleManager.getVisualState();
     shot.layers = this._captureLayerStates();
 
@@ -955,11 +978,12 @@ export class SceneDirector {
   async _loadShot(
     sceneId,
     shotId,
-    { flyDuration = 2.2, fromCamera = null, sceneSeek = null } = {},
+    { flyDuration = null, fromCamera = null, sceneSeek = null } = {},
   ) {
     if (this._running) return { started: false, reason: 'already-running' };
     const { scene, shot } = this._getShot(sceneId, shotId);
     if (!scene || !shot) return { started: false, reason: 'shot-not-found' };
+    flyDuration ??= shot.move ? shot.durationSec : 2.2;
     const previousScene =
       this._project.scenes.find((item) => item.id === this._loadedSceneId) ||
       null;
@@ -972,6 +996,7 @@ export class SceneDirector {
     // means an in-flight layer transition is cancelled (and rolled back by the
     // manager) rather than merely ignored once it has already committed.
     this._cancelActiveSceneTravel();
+    this._usesAuthoredCamera = !!shot.move;
     this._loadAbort?.abort();
     const controller = new AbortController();
     this._loadAbort = controller;
@@ -1017,7 +1042,9 @@ export class SceneDirector {
       return { started: false, reason: 'layers-refused' };
     }
     if (seekState) {
-      this._setCameraView(seekState.camera || shot.camera);
+      this._setCameraView(
+        seekState.camera || resolveCameraPose(scene, shot.camera),
+      );
       this._setProgress(seekState.sceneProgress);
       this._publishSceneClock(scene, shot, seekState.sceneElapsedSec, {
         running: false,
@@ -1044,10 +1071,10 @@ export class SceneDirector {
     );
     const cameraTravel = this._beginShotTravel(scene, shot, flyDuration);
     try {
-      // _flyCamera calls Cesium's flyTo synchronously before yielding. Publish
-      // the trail phase immediately afterward so its clock overlaps actual
+      // Camera motion starts synchronously before yielding. Publish the
+      // trail phase immediately afterward so its clock overlaps actual
       // camera motion, never an earlier asynchronous layer-reconcile wait.
-      const flight = this._flyCamera(shot.camera, flyDuration, token);
+      const flight = this._flyShotCamera(scene, shot, flyDuration, token);
       this._publishShotTravel(scene, shot, cameraTravel);
       await flight;
     } catch (error) {
@@ -1171,6 +1198,8 @@ export class SceneDirector {
 
   /** Revoke layer-owned travel motion before a newer load, STOP, or teardown. */
   _cancelActiveSceneTravel() {
+    this._cameraMotion?.cancel();
+    this._usesAuthoredCamera = false;
     // The opening locator owns an additional delayed approach/orbit even after
     // the director's authored flight has settled. Revoke it before cancelling
     // the camera, whose moveEnd/complete callbacks may already be queued.
@@ -1242,7 +1271,9 @@ export class SceneDirector {
       scene.shots[(shotIndex - 1 + scene.shots.length) % scene.shots.length];
     const result = await this.loadShot(sceneId, shotId, {
       flyDuration: shot.durationSec || DEFAULT_SHOT_DURATION_SEC,
-      fromCamera: previousShot?.camera || null,
+      fromCamera: shot.move
+        ? null
+        : resolveCameraPose(scene, previousShot?.camera),
     });
     return result || { started: false, reason: 'cancelled' };
   }
@@ -1291,7 +1322,8 @@ export class SceneDirector {
   /** Read timing diagnostics without exposing timer handles or mutable clock state. */
   getPlaybackTimingState() {
     return {
-      activeTimers: this._clock.activeTimers,
+      activeTimers:
+        this._clock.activeTimers + (this._cameraMotion?.active ? 1 : 0),
       snapshot: this._clock.snapshot,
     };
   }
@@ -1345,7 +1377,9 @@ export class SceneDirector {
       }
     }
     if (!applied) return false;
-    this._setCameraView(seekState.camera || shot.camera);
+    this._setCameraView(
+      seekState.camera || resolveCameraPose(scene, shot.camera),
+    );
     this._setProgress(seekState.sceneProgress);
     this._publishSceneClock(scene, shot, seekState.sceneElapsedSec, {
       running: false,
@@ -1419,10 +1453,13 @@ export class SceneDirector {
     // Older/headless style managers may predate the facade — proceed then.
     if (typeof this.styleManager?.runImmediateNavigation !== 'function')
       return true;
-    const claimed = this.styleManager.runImmediateNavigation(
-      'scene',
-      () => true,
-    );
+    let claimed;
+    this._claimingCamera = true;
+    try {
+      claimed = this.styleManager.runImmediateNavigation('scene', () => true);
+    } finally {
+      this._claimingCamera = false;
+    }
     if (claimed === false) {
       this._updateStatus('Camera unavailable — exit cockpit first');
       return false;
@@ -1444,7 +1481,7 @@ export class SceneDirector {
       ),
       orientation: {
         heading: Cesium.Math.toRadians(cameraState.heading || 0),
-        pitch: Cesium.Math.toRadians(cameraState.pitch || -35),
+        pitch: Cesium.Math.toRadians(cameraState.pitch ?? -35),
         roll: Cesium.Math.toRadians(cameraState.roll || 0),
       },
     });
@@ -1580,6 +1617,8 @@ export class SceneDirector {
     this._loadAbort = null;
     this._loadGeneration++;
     this._clock.stopShot();
+
+    this._usesAuthoredCamera = queue.some(({ shot }) => !!shot.move);
 
     // Transition to running state
     this._running = true;
@@ -1957,6 +1996,23 @@ export class SceneDirector {
     return true;
   }
 
+  /** Use the authored sampler only for explicit moves; ordinary shots keep their existing flights. */
+  async _flyShotCamera(scene, shot, durationSec, token) {
+    const move = resolveCameraMove(scene, shot);
+    if (!move)
+      return this._flyCamera(
+        resolveCameraPose(scene, shot.camera),
+        durationSec,
+        token,
+      );
+    const completed = await this._cameraMotion.play(
+      { ...move, durationSec },
+      token,
+    );
+    if (!completed && !token.cancelled && !this._destroyed)
+      this.stopScene('Camera move interrupted');
+  }
+
   /**
    * Fly the Cesium camera to the given position over the specified duration
    * using cubic ease-in-out. Resolves when the flight completes, is cancelled,
@@ -1998,7 +2054,7 @@ export class SceneDirector {
         destination,
         orientation: {
           heading: Cesium.Math.toRadians(cameraState.heading || 0),
-          pitch: Cesium.Math.toRadians(cameraState.pitch || -35),
+          pitch: Cesium.Math.toRadians(cameraState.pitch ?? -35),
           roll: Cesium.Math.toRadians(cameraState.roll || 0),
         },
         duration,

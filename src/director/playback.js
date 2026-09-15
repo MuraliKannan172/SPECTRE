@@ -112,3 +112,9 @@ export {
   SCENE_DOCUMENT_VERSION,
   SCENE_DOCUMENT_LIMITS,
 } from './document.js';
+
+export {
+  resolveCameraPose,
+  resolveCameraMove,
+  sampleCameraMove,
+} from './camera.js';
