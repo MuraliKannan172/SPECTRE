@@ -1,5 +1,7 @@
 # Changelog
 
+- Keep parked transit vehicles aligned to their world course during camera orbits, fall back to reported bearing, and keep vehicles with no course consistently screen-up.
+
 - Separate Realtime connection, response/tool, Radio, input/audio, cost, viewport
   and diagnostic ownership while preserving voice controls and protocol behavior.
   Revoke stale connection offers/capture callbacks and release failed or stopped audio
