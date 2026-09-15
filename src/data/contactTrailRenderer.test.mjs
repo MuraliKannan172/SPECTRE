@@ -160,8 +160,8 @@ test('ground body and clipped head stay inside rebuild and frame geometry budget
   Cesium.ApproximateTerrainHeights._terrainHeights = JSON.parse(
     readFileSync(
       new URL(
-        '../../node_modules/@cesium/engine/Source/Assets/approximateTerrainHeights.json',
-        import.meta.url,
+        import.meta
+          .resolve('@cesium/engine/Source/Assets/approximateTerrainHeights.json'),
       ),
     ),
   );

@@ -1118,7 +1118,18 @@
       "src/voice/session.js",
       "src/voice/sessionCommands.js",
       "src/voice/realtimeSession.js",
-      "src/voice/realtimeEvents.js"
+      "src/voice/realtimeEvents.js",
+      "src/voice/realtimePreferences.js",
+      "src/voice/realtimeProtocol.js",
+      "src/voice/realtimeDiagnostics.js",
+      "src/voice/realtimeViewport.js",
+      "src/voice/realtimeInputPolicy.js",
+      "src/voice/realtimeInput.js",
+      "src/voice/realtimeCost.js",
+      "src/voice/realtimeFacade.js",
+      "src/voice/realtimeRadio.js",
+      "src/voice/realtimeTurns.js",
+      "src/voice/realtimeConnection.js"
     ],
     "external": []
   },
@@ -1712,7 +1723,18 @@
       "src/ui/aircraftDisplay.js",
       "src/ui/layerBindings.js",
       "src/ui/displayBindings.js",
-      "src/ui/shellFacade.js"
+      "src/ui/shellFacade.js",
+      "src/voice/realtimePreferences.js",
+      "src/voice/realtimeProtocol.js",
+      "src/voice/realtimeDiagnostics.js",
+      "src/voice/realtimeViewport.js",
+      "src/voice/realtimeInputPolicy.js",
+      "src/voice/realtimeInput.js",
+      "src/voice/realtimeCost.js",
+      "src/voice/realtimeFacade.js",
+      "src/voice/realtimeRadio.js",
+      "src/voice/realtimeTurns.js",
+      "src/voice/realtimeConnection.js"
     ],
     "external": [
       "@mapbox/vector-tile",
