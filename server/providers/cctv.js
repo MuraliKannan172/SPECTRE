@@ -311,7 +311,12 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
             // GET /api/cctv/health serializes `message`, and the CCTV panel
             // renders it as a status label, so the raw error would leave the
             // server by a different door than the sanitized body below and
-            // land on screen. Keep the detail in the log.
+            // land on screen.
+            //
+            // The log line drops the text too, unlike the catch at the bottom
+            // of this file: a media-fetch failure names the camera's upstream
+            // host, and these lines get pasted into issues. The status codes
+            // below carry the diagnosis — 504 for a timeout, 502 otherwise.
             console.warn('[CCTV Proxy] media fetch failed');
             setHealth(cameraId, {
               status: 'degraded',
