@@ -1,5 +1,10 @@
 # Changelog
 
+- Director validates bounded version-3 scene files before replacing a project,
+  preserves unreadable browser saves, migrates legacy bloom once and preserves
+  zero-pitch/low-altitude camera and scope/detection edits. Project normalization has a separate owner.
+
+
 - Separate Director timing, seek calculations, playback clocks and registered
   scene-pack presentation rules. Preserve authored content and controls; Stop
   releases pending hold timers and stale ticks cannot affect replacement playback.
