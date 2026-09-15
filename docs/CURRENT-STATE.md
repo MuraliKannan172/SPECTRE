@@ -25,8 +25,11 @@ Pure authored-time/seek calculations and a playback clock now own timing,
 hold deadlines and subscriptions. Stop immediately clears timers and settles
 holds; stale tick callbacks cannot publish into a replacement. Registered pack
 rules own presentation overrides and Nepal map fallback without changing saved
-shots or content. The versioned scene/data-pack format remains planned in
-[Director](DIRECTOR.md).
+shots or content. Scene-document validation and legacy migration now have separate
+owners. Invalid imports preserve the current project; unreadable saved projects
+are protected from fallback writes. Version 3 remains the export format, with
+zero pitch, low camera heights, scope and detection edits preserved. See [the document contract](SCENE-DOCUMENT.md);
+data packs and interactions remain planned in [Director](DIRECTOR.md).
 
 Search framing and annotations request semantic map features from an explicit source. The Overpass adapter owns bounded queries, member/tag decoding and request deadlines; callers retain candidate ranking, outline caching, deferred retries and scene placement. Empty, transient and throttled outcomes remain distinct. Traffic sources return road records and installation sources return mapped records with freshness/saturation metadata, so their layers no longer decode upstream elements. ALPR already normalizes its records in the source. Default providers, footprints, road directions, exact-viewport retries and source attribution are unchanged.
 

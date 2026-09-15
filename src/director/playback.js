@@ -103,3 +103,12 @@ export {
   cameraAtProgress,
 } from './timeline.js';
 export { createPlaybackClock } from './clock.js';
+
+export {
+  parseSceneDocument,
+  validateSceneDocument,
+  stringifySceneDocument,
+  SceneDocumentError,
+  SCENE_DOCUMENT_VERSION,
+  SCENE_DOCUMENT_LIMITS,
+} from './document.js';

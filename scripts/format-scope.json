@@ -732,5 +732,6 @@
   "src/director/clock.test.mjs",
   "src/director/timeline.test.mjs",
   "src/scenes/packs/registry.test.mjs",
-  "scripts/qa-director-timing.mjs"
+  "scripts/qa-director-timing.mjs",
+  "src/director/document.test.mjs"
 ]

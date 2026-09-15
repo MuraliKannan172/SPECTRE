@@ -23,7 +23,6 @@ import {
   getSceneAppendRecipeById,
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
-import { MAP_STACKS } from '../maps/catalog.js';
 import { createDefaultScenePacks } from './packs/defaults.js';
 import {
   layerStatesForShot,
@@ -34,380 +33,27 @@ import {
 import { sceneTimingForShot, sceneSeekState } from '../director/timeline.js';
 import { createPlaybackClock } from '../director/clock.js';
 import {
-  BLOOM_INTENSITY_DEFAULT,
-  BLOOM_SCALE_VERSION,
-  decodeBloomIntensity,
-} from '../bloom.js';
+  normalizeLayerEntry,
+  PROJECT_VERSION,
+  DEFAULT_SHOT_DURATION_SEC,
+  DEFAULT_HOLD_SEC,
+  uid,
+  deepClone,
+  recipeToScene,
+  createDefaultProject,
+  normalizeShot,
+  normalizeProject,
+} from './project.js';
+import {
+  parseSceneDocument,
+  stringifySceneDocument,
+  SCENE_DOCUMENT_LIMITS,
+  SceneDocumentError,
+} from '../director/document.js';
 
 /** @constant {string} localStorage key for the serialized project */
 const STORAGE_KEY = 'godsEyeView.sceneProject.v2';
 const STORAGE_CHECKPOINT_KEY = 'godsEyeView.sceneProject.checkpoint.v1';
-/** @constant {number} Current schema version for project migration */
-const PROJECT_VERSION = 3;
-/** @constant {number} Fallback camera flight duration per shot (seconds) */
-const DEFAULT_SHOT_DURATION_SEC = 4;
-/** @constant {number} Default hold/pause after a shot completes (seconds) */
-const DEFAULT_HOLD_SEC = 0.9;
-const SCENE_MAP_STACK_IDS = new Set(MAP_STACKS.map(({ id }) => id));
-
-/**
- * Generate a short random identifier with the given prefix.
- * @param {string} prefix - e.g. 'shot', 'scene'
- * @returns {string} Identifier like "shot-a1b2c3d4"
- */
-function uid(prefix) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-/**
- * Deep-clone a JSON-serializable value via round-trip stringify/parse.
- * @param {*} value
- * @returns {*}
- */
-function deepClone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-/**
- * Normalize a raw layer state entry into a canonical { enabled, params? } shape.
- * Accepts both boolean shorthand and full object forms.
- * @param {boolean|Object} entry - Raw layer state (boolean or { enabled, params })
- * @returns {{ enabled: boolean, params?: Object }}
- */
-function normalizeLayerEntry(entry) {
-  if (entry && typeof entry === 'object') {
-    return {
-      enabled: !!entry.enabled,
-      params:
-        entry.params && typeof entry.params === 'object'
-          ? deepClone(entry.params)
-          : undefined,
-    };
-  }
-  return { enabled: !!entry };
-}
-
-/**
- * Normalize a raw bloom post-processing state, migrating intensity values
- * across bloom scale versions so older saved projects render correctly.
- * @param {Object} rawBloom - Raw bloom state from storage or recipe
- * @param {Object} [options]
- * @param {number} [options.projectVersion] - Schema version of the source project
- * @param {number} [options.fallbackIntensity] - Default intensity if not stored
- * @returns {{ enabled: boolean, intensity: number, version: number }}
- */
-function normalizeBloomState(
-  rawBloom = {},
-  { projectVersion = PROJECT_VERSION, fallbackIntensity = 50 } = {},
-) {
-  // Determine which bloom scale the stored value was encoded under.
-  // Older projects (version < PROJECT_VERSION) used scale version 1.
-  const explicitVersion = Number(rawBloom.version);
-  const bloomVersion = Number.isFinite(explicitVersion)
-    ? explicitVersion
-    : projectVersion >= PROJECT_VERSION
-      ? BLOOM_SCALE_VERSION
-      : 1;
-
-  const rawIntensity = Number.isFinite(Number(rawBloom.intensity))
-    ? Number(rawBloom.intensity)
-    : fallbackIntensity;
-
-  return {
-    enabled: !!rawBloom.enabled,
-    intensity: decodeBloomIntensity(rawIntensity, bloomVersion),
-    version: BLOOM_SCALE_VERSION,
-  };
-}
-
-/**
- * Convert a static scene recipe (from recipes.js) into a mutable scene object
- * with fully normalized shots. Each keyframe in the recipe's cameraPath becomes
- * one shot, inheriting the recipe's style, post, and layer configuration.
- * @param {Object} recipe - A SCENE_RECIPES entry
- * @returns {{ id: string, title: string, releaseLayerIds: string[], shots: Object[] }}
- */
-function recipeToScene(recipe) {
-  const post = recipe.post || {};
-  const ui = recipe.ui || {};
-  const styleParams =
-    post.styleParams && typeof post.styleParams === 'object'
-      ? deepClone(post.styleParams)
-      : {};
-
-  // Normalize layer targets from the recipe into canonical form
-  const layers = {};
-  for (const [layerId, target] of Object.entries(recipe.layers || {})) {
-    layers[layerId] = normalizeLayerEntry(target);
-  }
-
-  // Derive HUD visibility/variant from recipe's ui.hudMode string
-  const hudMode = ui.hudMode || 'minimal';
-  const hudVisible = hudMode !== 'off';
-  const hudVariant = hudMode === 'minimal' ? 'minimal' : 'tactical';
-
-  // Convert each cameraPath keyframe into a shot with shared visual state
-  const path = recipe.cameraPath || [];
-  const shots = path.map((keyframe, idx) => {
-    const keyframeLayers = deepClone(layers);
-    for (const [layerId, target] of Object.entries(keyframe.layers || {})) {
-      keyframeLayers[layerId] = normalizeLayerEntry(target);
-    }
-    const mapStack = keyframe.mapStack || post.mapStack;
-    return {
-      id: uid('shot'),
-      title: keyframe.title || `Shot ${idx + 1}`,
-      durationSec: Math.max(
-        0.2,
-        keyframe.duration || DEFAULT_SHOT_DURATION_SEC,
-      ),
-      holdSec: Math.max(0, keyframe.hold || 0),
-      camera: {
-        lat: keyframe.lat,
-        lon: keyframe.lon,
-        alt: keyframe.alt,
-        heading: keyframe.heading || 0,
-        pitch: keyframe.pitch || -40,
-        roll: keyframe.roll || 0,
-      },
-      visual: {
-        style: recipe.style || 'normal',
-        bloom: {
-          enabled:
-            typeof post.bloom === 'number' ? post.bloom > 0 : !!post.bloom,
-          intensity:
-            typeof post.bloom === 'number'
-              ? decodeBloomIntensity(post.bloom, 1)
-              : BLOOM_INTENSITY_DEFAULT,
-          version: BLOOM_SCALE_VERSION,
-        },
-        sharpen: {
-          enabled:
-            typeof post.sharpen === 'boolean' ? post.sharpen : !!post.sharpen,
-          intensity: 65,
-        },
-        hud: {
-          visible: hudVisible,
-          variant: hudVariant,
-        },
-        detection: {
-          mode: post.detectionMode || 'OFF',
-          density: 35,
-        },
-        ...(SCENE_MAP_STACK_IDS.has(mapStack) ? { mapStack } : {}),
-        styleParams,
-      },
-      layers: keyframeLayers,
-      ...(recipe.id ? { sourcePackId: recipe.id } : {}),
-      ...(recipe.version ? { sourcePackVersion: recipe.version } : {}),
-    };
-  });
-
-  return {
-    id: recipe.id || uid('scene'),
-    title: recipe.title || 'Untitled Scene',
-    releaseLayerIds: [
-      ...new Set(
-        (Array.isArray(recipe.releaseLayerIds)
-          ? recipe.releaseLayerIds
-          : []
-        ).filter((layerId) => typeof layerId === 'string' && layerId.trim()),
-      ),
-    ],
-    appliedShotPacks: [],
-    shots,
-  };
-}
-
-/**
- * Create a fresh default project by converting all built-in SCENE_RECIPES.
- * @returns {Object} A new project object with version, timestamps, and scenes
- */
-function createDefaultProject() {
-  return {
-    version: PROJECT_VERSION,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    installedBuiltInSceneIds: SCENE_RECIPES.filter(
-      (recipe) => typeof recipe.installAlongsideSceneId === 'string',
-    ).map((recipe) => recipe.id),
-    scenes: SCENE_RECIPES.map(recipeToScene),
-  };
-}
-
-/**
- * Normalize a raw shot object from storage or capture into a fully validated
- * shape with safe defaults for every field. Handles version migration for
- * bloom intensity and coerces all numeric fields.
- * @param {Object} rawShot - Raw shot data (may be incomplete or from an older schema)
- * @param {number} [index=0] - Positional index used for fallback title
- * @param {Object} [options]
- * @param {number} [options.projectVersion] - Schema version of the enclosing project
- * @returns {Object} Fully normalized shot
- */
-function normalizeShot(
-  rawShot,
-  index = 0,
-  { projectVersion = PROJECT_VERSION } = {},
-) {
-  const camera = rawShot?.camera || {};
-  const visual = rawShot?.visual || {};
-  const bloom = visual.bloom || {};
-  const sharpen = visual.sharpen || {};
-  const hud = visual.hud || {};
-  const detection = visual.detection || {};
-
-  return {
-    id: rawShot?.id || uid('shot'),
-    title: rawShot?.title || `Shot ${index + 1}`,
-    durationSec: Math.max(
-      0.2,
-      Number(rawShot?.durationSec) || DEFAULT_SHOT_DURATION_SEC,
-    ),
-    holdSec: Math.max(0, Number(rawShot?.holdSec) || 0),
-    camera: {
-      lat: Number(camera.lat) || 0,
-      lon: Number(camera.lon) || 0,
-      alt: Math.max(100, Number(camera.alt) || 800),
-      heading: Number(camera.heading) || 0,
-      pitch: Number(camera.pitch) || -35,
-      roll: Number(camera.roll) || 0,
-    },
-    visual: {
-      style: visual.style || 'normal',
-      bloom: normalizeBloomState(bloom, {
-        projectVersion,
-        fallbackIntensity: 50,
-      }),
-      sharpen: {
-        enabled: !!sharpen.enabled,
-        intensity: Math.max(
-          0,
-          Math.min(
-            100,
-            Number.isFinite(Number(sharpen.intensity))
-              ? Number(sharpen.intensity)
-              : 65,
-          ),
-        ),
-      },
-      hud: {
-        visible: typeof hud.visible === 'boolean' ? hud.visible : true,
-        variant: typeof hud.variant === 'string' ? hud.variant : 'tactical',
-      },
-      detection: {
-        mode: typeof detection.mode === 'string' ? detection.mode : 'OFF',
-        density: Math.max(
-          0,
-          Math.min(
-            100,
-            Number.isFinite(Number(detection.density))
-              ? Number(detection.density)
-              : 35,
-          ),
-        ),
-      },
-      ...(SCENE_MAP_STACK_IDS.has(visual.mapStack)
-        ? { mapStack: visual.mapStack }
-        : {}),
-      styleParams:
-        visual.styleParams && typeof visual.styleParams === 'object'
-          ? deepClone(visual.styleParams)
-          : {},
-    },
-    layers: Object.fromEntries(
-      Object.entries(rawShot?.layers || {}).map(([layerId, value]) => [
-        layerId,
-        normalizeLayerEntry(value),
-      ]),
-    ),
-    ...(typeof rawShot?.sourcePackId === 'string'
-      ? { sourcePackId: rawShot.sourcePackId }
-      : {}),
-    ...(Number.isFinite(Number(rawShot?.sourcePackVersion))
-      ? { sourcePackVersion: Number(rawShot.sourcePackVersion) }
-      : {}),
-  };
-}
-
-/**
- * Normalize and migrate an entire project object loaded from storage or import.
- * Falls back to the default recipe-based project when input is invalid or empty.
- * @param {Object|null} rawProject - Raw project data (potentially from an older schema)
- * @returns {Object} Fully normalized project at the current PROJECT_VERSION
- */
-function normalizeProject(rawProject) {
-  if (!rawProject || typeof rawProject !== 'object')
-    return createDefaultProject();
-  const projectVersion = Number.isFinite(Number(rawProject.version))
-    ? Number(rawProject.version)
-    : 1;
-
-  const scenesRaw = Array.isArray(rawProject.scenes) ? rawProject.scenes : [];
-  const scenes = scenesRaw
-    .map((scene, sceneIdx) => {
-      const shotsRaw = Array.isArray(scene?.shots) ? scene.shots : [];
-      const shots = shotsRaw.map((shot, shotIdx) =>
-        normalizeShot(shot, shotIdx, { projectVersion }),
-      );
-      return {
-        id: scene?.id || uid('scene'),
-        title: scene?.title || `Scene ${sceneIdx + 1}`,
-        releaseLayerIds: [
-          ...new Set(
-            (Array.isArray(scene?.releaseLayerIds)
-              ? scene.releaseLayerIds
-              : []
-            ).filter(
-              (layerId) => typeof layerId === 'string' && layerId.trim(),
-            ),
-          ),
-        ],
-        appliedShotPacks: (Array.isArray(scene?.appliedShotPacks)
-          ? scene.appliedShotPacks
-          : []
-        )
-          .filter((entry) => typeof entry?.id === 'string')
-          .map((entry) => ({
-            id: entry.id,
-            version: Number(entry.version) || 1,
-            ...(entry.shotBindings && typeof entry.shotBindings === 'object'
-              ? {
-                  shotBindings: Object.fromEntries(
-                    Object.entries(entry.shotBindings).filter(
-                      ([title, shotId]) =>
-                        typeof title === 'string' && typeof shotId === 'string',
-                    ),
-                  ),
-                }
-              : {}),
-          })),
-        shots,
-      };
-    })
-    // Keep scenes that have shots or at least a title
-    .filter((scene) => scene.shots.length > 0 || scene.title);
-
-  if (!scenes.length) {
-    return createDefaultProject();
-  }
-
-  return {
-    version: PROJECT_VERSION,
-    createdAt: rawProject.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    installedBuiltInSceneIds: [
-      ...new Set(
-        (Array.isArray(rawProject.installedBuiltInSceneIds)
-          ? rawProject.installedBuiltInSceneIds
-          : []
-        ).filter((sceneId) => typeof sceneId === 'string' && sceneId.trim()),
-      ),
-    ],
-    scenes,
-  };
-}
-
 /**
  * Orchestrates deterministic cinematic scene playback.
  *
@@ -475,7 +121,9 @@ export class SceneDirector {
     this._loadedSceneId = null;
 
     this._presentation = {
-      status: 'Ready',
+      status: this._storageReadError
+        ? 'Saved project could not be read; storage preserved. Import a valid file to resume saving.'
+        : 'Ready',
       progress: 0,
       runtime: '',
       playbackActive: false,
@@ -555,7 +203,7 @@ export class SceneDirector {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return createDefaultProject();
-      const project = normalizeProject(JSON.parse(raw));
+      const project = normalizeProject(parseSceneDocument(raw));
       const installed = new Set(project.installedBuiltInSceneIds || []);
       let migrated = false;
       for (const recipe of SCENE_RECIPES) {
@@ -586,7 +234,9 @@ export class SceneDirector {
       if (migrated) {
         project.installedBuiltInSceneIds = [...installed];
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+          const payload = JSON.stringify(project);
+          parseSceneDocument(payload);
+          localStorage.setItem(STORAGE_KEY, payload);
         } catch (e) {
           // Keep the migrated in-memory project usable even if this origin
           // refuses persistence; the normal UI save path will surface errors.
@@ -597,16 +247,26 @@ export class SceneDirector {
         }
       }
       return project;
-    } catch {
+    } catch (error) {
+      // Never overwrite an unreadable or newer saved document with defaults.
+      this._storageReadError = error;
       return createDefaultProject();
     }
   }
 
   /** Persist the current project state to localStorage with an updated timestamp. */
   _saveProject() {
+    if (this._storageReadError) {
+      this._toastStorageError(
+        'Scene not saved — existing saved project could not be read. Export edits or import a valid file.',
+      );
+      return;
+    }
     this._project.updatedAt = new Date().toISOString();
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this._project));
+      const payload = JSON.stringify(this._project);
+      parseSceneDocument(payload);
+      localStorage.setItem(STORAGE_KEY, payload);
     } catch (e) {
       // Private browsing / block-all-cookies / quota-exceeded throws here. The
       // in-memory project stays usable this session, but persistence failed —
@@ -615,13 +275,18 @@ export class SceneDirector {
         '[Scenes] Could not persist project (storage unavailable):',
         e,
       );
-      this._toastStorageError();
+      this._toastStorageError(
+        e instanceof SceneDocumentError
+          ? `Scene not saved — ${e.message}`
+          : undefined,
+      );
     }
   }
 
   /** Surface a "scene not saved" notice via the global toast + scene status line. */
-  _toastStorageError() {
-    const message = 'Scene not saved — browser storage unavailable';
+  _toastStorageError(
+    message = 'Scene not saved — browser storage unavailable',
+  ) {
     this._updateStatus(message);
     try {
       const toast = document.getElementById('toast');
@@ -2038,7 +1703,13 @@ export class SceneDirector {
   exportProject() {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `scene-presets-${stamp}.json`;
-    const payload = JSON.stringify(this._project, null, 2);
+    let payload;
+    try {
+      payload = stringifySceneDocument(this._project);
+    } catch (error) {
+      this._updateStatus(`Export failed: ${error.message}`);
+      return;
+    }
     // Trigger a browser download via a temporary anchor element
     const blob = new Blob([payload], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2059,18 +1730,34 @@ export class SceneDirector {
    * @param {File} file - Browser File object from an <input type="file">
    */
   async importProjectFile(file) {
+    const generation = (this._importGeneration =
+      (this._importGeneration || 0) + 1);
     try {
+      if (file.size > SCENE_DOCUMENT_LIMITS.bytes) {
+        throw new SceneDocumentError('$', 'file exceeds 5 MiB');
+      }
       const text = await file.text();
-      if (this._destroyed) return;
-      const parsed = JSON.parse(text);
-      this._project = normalizeProject(parsed);
-      this._selectedSceneId = this._project.scenes[0]?.id || null;
-      this._selectedShotId = this._project.scenes[0]?.shots[0]?.id || null;
+      if (this._destroyed || generation !== this._importGeneration) return;
+      const project = normalizeProject(parseSceneDocument(text));
+      // Validate before touching playback, selection or the saved project.
+      this.stopScene('Importing project');
+      await Promise.allSettled([...(this._pendingWork || [])]);
+      if (this._destroyed || generation !== this._importGeneration) return;
+      this._project = project;
+      this._storageReadError = null;
+      this._selectedSceneId = project.scenes[0]?.id || null;
+      this._selectedShotId = project.scenes[0]?.shots[0]?.id || null;
+      this._loadedSceneId = null;
       this._saveProject();
-      this._publish({ type: 'project-imported', project: this._project });
+      this._publish({ type: 'project-imported', project });
       this._updateStatus(`Imported ${file.name}`);
-    } catch {
-      this._updateStatus('Import failed (invalid JSON)');
+    } catch (error) {
+      if (this._destroyed || generation !== this._importGeneration) return;
+      this._updateStatus(
+        error instanceof SceneDocumentError
+          ? `Import failed: ${error.message}`
+          : 'Import failed (could not read JSON file)',
+      );
     }
   }
 

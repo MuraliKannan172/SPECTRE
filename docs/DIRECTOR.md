@@ -66,13 +66,12 @@ and river coordinates are bundled. See the
    calculations, an owned clock and registered presentation rules preserve
    existing recipes and content. Tests cover direct load, forward/backward seek,
    replay, bounded media waits and cancellation at pending transitions.
-2. **Versioned scene document.** Build on the existing version-3 project export
-   and its importer. Specify a schema and migrations before changing writes.
-   Keep old imports and local-storage projects readable; reject unsupported
-   versions without replacing the current project. Include stable scene, shot,
-   anchor, pack and action IDs. Separate portable authored state from transient
-   loading state and run diagnostics. Bound document size, collection lengths,
-   numeric values and nesting; show errors at the affected field.
+2. **Versioned scene document — implemented for existing camera-pose shots.**
+   [Version 3](SCENE-DOCUMENT.md) remains the write format. Bounded validation
+   rejects malformed files before replacing current state; legacy migration
+   preserves IDs, pack bindings and visual edits. Unreadable saved files are
+   protected from fallback writes. Camera anchors, pack manifests and actions
+   receive stable IDs with their respective later format extensions.
 3. **Camera directions.** Define named geographic anchors and explicit
    move/hold segments: start and destination, duration, easing, heading, pitch,
    roll and stop duration. State coordinate units, altitude reference and

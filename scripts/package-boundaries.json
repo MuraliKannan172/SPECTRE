@@ -617,7 +617,8 @@
     "modules": [
       "src/director/playback.js",
       "src/director/clock.js",
-      "src/director/timeline.js"
+      "src/director/timeline.js",
+      "src/director/document.js"
     ],
     "external": []
   },
@@ -645,7 +646,9 @@
       "src/scenes/shotPresentation.js",
       "src/scenes/packs/registry.js",
       "src/scenes/packs/defaults.js",
-      "src/scenes/packs/nepal.js"
+      "src/scenes/packs/nepal.js",
+      "src/director/document.js",
+      "src/scenes/project.js"
     ],
     "external": ["cesium"]
   },
@@ -1750,7 +1753,9 @@
       "src/scenes/shotPresentation.js",
       "src/scenes/packs/registry.js",
       "src/scenes/packs/defaults.js",
-      "src/scenes/packs/nepal.js"
+      "src/scenes/packs/nepal.js",
+      "src/director/document.js",
+      "src/scenes/project.js"
     ],
     "external": [
       "@mapbox/vector-tile",
