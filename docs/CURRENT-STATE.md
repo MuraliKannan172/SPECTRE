@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+Director's ordered shot runner is exported independently of rendering, UI,
+storage and scene content. The existing scene controller supplies an adapter for
+visual/layer state, camera travel, media holds and release. Playback cancellation,
+preview cleanup, saved projects and all scene assets/attribution are preserved.
+Timeline extraction and a shareable scene/data-pack format are planned in
+[Director](DIRECTOR.md); those follow-up capabilities are not implemented yet.
+
 Search framing and annotations request semantic map features from an explicit source. The Overpass adapter owns bounded queries, member/tag decoding and request deadlines; callers retain candidate ranking, outline caching, deferred retries and scene placement. Empty, transient and throttled outcomes remain distinct. Traffic sources return road records and installation sources return mapped records with freshness/saturation metadata, so their layers no longer decode upstream elements. ALPR already normalizes its records in the source. Default providers, footprints, road directions, exact-viewport retries and source attribution are unchanged.
 
 Nepal media preloads survive repeated camera-flight updates, but Stop, event disable and replacement remove abandoned frames and revoke pending Facebook sessions. Fallback evidence-card clicks respect the shared drawing-tool pointer lease.
