@@ -606,6 +606,11 @@
     ],
     "external": []
   },
+  "director": {
+    "exports": ["./director"],
+    "modules": ["src/director/playback.js"],
+    "external": []
+  },
   "scenes": {
     "exports": ["./scenes"],
     "modules": [
@@ -615,6 +620,8 @@
       "src/data/bhoteKoshiFloodPath.js",
       "src/maps/catalog.js",
       "src/scenes/director.js",
+      "src/scenes/playbackAdapter.js",
+      "src/director/playback.js",
       "src/scenes/recipes.js",
       "src/scenes/scenePolicy.js",
       "src/bloom.js",
@@ -1518,6 +1525,8 @@
       "src/renderGovernor.js",
       "src/rightRailPolicy.js",
       "src/scenes/director.js",
+      "src/scenes/playbackAdapter.js",
+      "src/director/playback.js",
       "src/scenes/recipes.js",
       "src/scenes/scenePolicy.js",
       "src/scopeMask.js",
