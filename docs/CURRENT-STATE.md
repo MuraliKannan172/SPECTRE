@@ -1,5 +1,13 @@
 # God's Eye View Current State
 
+Realtime voice composes separate connection, response/tool, Radio handoff, input
+and audio-meter, cost, viewport-context and diagnostic owners. The existing
+controller exports and session/backend contracts remain available. Tool protocol,
+response wording, push-to-talk timing, model preferences and Radio confirmation
+order are preserved. Stopped connections, stale offers and delayed captures cannot affect a
+replacement session; audio meters release failed initialization and reject revoked
+frames. See [voice ownership](VOICE-OWNERSHIP.md).
+
 The application shell composes focused state owners for navigation, destination
 lookup/orbit, Cockpit, visual settings, panel layout, aircraft display and layer
 bindings. Keyboard/display subscriptions have a separate lifetime; existing

@@ -1,5 +1,10 @@
 # Changelog
 
+- Separate Realtime connection, response/tool, Radio, input/audio, cost, viewport
+  and diagnostic ownership while preserving voice controls and protocol behavior.
+  Revoke stale connection offers/capture callbacks and release failed or stopped audio
+  meters; add recorded push-to-talk acceptance alongside click-start voice.
+
 - Separate application-shell responsibilities and state ownership while preserving
   the layer, scene and voice API. Revoke pending globe-reset callbacks on disposal
   and detach old Directions services when replacing a data manager.
