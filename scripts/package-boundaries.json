@@ -614,7 +614,11 @@
   },
   "director": {
     "exports": ["./director"],
-    "modules": ["src/director/playback.js"],
+    "modules": [
+      "src/director/playback.js",
+      "src/director/clock.js",
+      "src/director/timeline.js"
+    ],
     "external": []
   },
   "scenes": {
@@ -635,7 +639,13 @@
       "src/ui/scenes.js",
       "src/ui/sceneControls.js",
       "src/ui/scenePresentation.js",
-      "src/contextModePolicy.js"
+      "src/contextModePolicy.js",
+      "src/director/clock.js",
+      "src/director/timeline.js",
+      "src/scenes/shotPresentation.js",
+      "src/scenes/packs/registry.js",
+      "src/scenes/packs/defaults.js",
+      "src/scenes/packs/nepal.js"
     ],
     "external": ["cesium"]
   },
@@ -1734,7 +1744,13 @@
       "src/voice/realtimeFacade.js",
       "src/voice/realtimeRadio.js",
       "src/voice/realtimeTurns.js",
-      "src/voice/realtimeConnection.js"
+      "src/voice/realtimeConnection.js",
+      "src/director/clock.js",
+      "src/director/timeline.js",
+      "src/scenes/shotPresentation.js",
+      "src/scenes/packs/registry.js",
+      "src/scenes/packs/defaults.js",
+      "src/scenes/packs/nepal.js"
     ],
     "external": [
       "@mapbox/vector-tile",

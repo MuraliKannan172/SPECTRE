@@ -728,5 +728,9 @@
   "scripts/qa-transit-recovery.mjs",
   "scripts/format-runtime.json",
   "src/tooling/transitService.test.mjs",
-  "src/sources/overpassFeatures.test.mjs"
+  "src/sources/overpassFeatures.test.mjs",
+  "src/director/clock.test.mjs",
+  "src/director/timeline.test.mjs",
+  "src/scenes/packs/registry.test.mjs",
+  "scripts/qa-director-timing.mjs"
 ]

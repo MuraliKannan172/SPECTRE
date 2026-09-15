@@ -24,7 +24,15 @@ import {
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
 import { MAP_STACKS } from '../maps/catalog.js';
-import { INCIDENT_OVERVIEW_HOLD_SEC } from '../data/bhoteKoshiIncidentPlaces.js';
+import { createDefaultScenePacks } from './packs/defaults.js';
+import {
+  layerStatesForShot,
+  visualStateForShot,
+  effectiveShotHoldSec,
+  shotRuntimeDurationSec,
+} from './shotPresentation.js';
+import { sceneTimingForShot, sceneSeekState } from '../director/timeline.js';
+import { createPlaybackClock } from '../director/clock.js';
 import {
   BLOOM_INTENSITY_DEFAULT,
   BLOOM_SCALE_VERSION,
@@ -41,10 +49,6 @@ const DEFAULT_SHOT_DURATION_SEC = 4;
 /** @constant {number} Default hold/pause after a shot completes (seconds) */
 const DEFAULT_HOLD_SEC = 0.9;
 const SCENE_MAP_STACK_IDS = new Set(MAP_STACKS.map(({ id }) => id));
-
-function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
-}
 
 /**
  * Generate a short random identifier with the given prefix.
@@ -422,7 +426,10 @@ export class SceneDirector {
     viewer,
     styleManager,
     dataManager,
-    { isMapStackAvailable = () => false } = {},
+    {
+      isMapStackAvailable = () => false,
+      scenePacks = createDefaultScenePacks(),
+    } = {},
   ) {
     this._destroyed = false;
     this._pendingWork = new Set();
@@ -430,6 +437,7 @@ export class SceneDirector {
     this.styleManager = styleManager;
     this.dataManager = dataManager;
     this._isMapStackAvailable = isMapStackAvailable;
+    this._scenePacks = scenePacks;
 
     /** @type {boolean} True while a scene run is in progress */
     this._running = false;
@@ -446,12 +454,11 @@ export class SceneDirector {
     this._runAbort = null;
     /** @type {AbortController|null} Aborts the in-flight LOAD's layer transitions */
     this._loadAbort = null;
-    /** @type {number|null} setInterval ID for the progress bar ticker */
-    this._progressTimer = null;
-    this._shotProgressTimer = null;
-    this._sceneClockTimer = null;
-    this._sceneClockListeners = new Set();
-    this._sceneClockSnapshot = null;
+    this._clock = createPlaybackClock({
+      isRunning: () => this._running,
+      timingForShot: (scene, shot) => this._sceneTimingForShot(scene, shot),
+      onProgress: (progress) => this._setProgress(progress),
+    });
     this._runIdleResolvers = new Set();
     this._sceneSeekGeneration = 0;
     /** @type {Object|null} Telemetry accumulator for the current run */
@@ -533,11 +540,8 @@ export class SceneDirector {
       this.viewer.camera.cancelFlight();
       clearTimeout(this._storageToastTimer);
       await Promise.allSettled(this._pendingWork || []);
-      clearInterval(this._progressTimer);
-      clearInterval(this._shotProgressTimer);
-      clearInterval(this._sceneClockTimer);
+      this._clock.destroy();
       this._cancelActiveSceneTravel();
-      this._sceneClockListeners.clear();
     });
     return this._destroyPromise;
   }
@@ -1307,8 +1311,7 @@ export class SceneDirector {
     const controller = new AbortController();
     this._loadAbort = controller;
     const token = this._loadToken(++this._loadGeneration, controller.signal);
-    clearInterval(this._shotProgressTimer);
-    this._shotProgressTimer = null;
+    this._clock.stopShot();
     this._setProgress(0);
 
     if (previousScene && previousScene.id !== scene.id) {
@@ -1385,8 +1388,7 @@ export class SceneDirector {
     } catch (error) {
       this._cancelActiveSceneTravel();
       if (!token.cancelled) {
-        clearInterval(this._shotProgressTimer);
-        this._shotProgressTimer = null;
+        this._clock.stopShot();
       }
       throw error;
     }
@@ -1417,188 +1419,27 @@ export class SceneDirector {
    * This keeps an appended event lens from leaking backward into the scene's
    * original authored shots while leaving ordinary sparse layer state intact.
    */
-  _layerStatesForShot(
-    scene,
-    shot,
-    { cameraSettled = false, cameraTravel = null, sceneSeek = null } = {},
-  ) {
-    const states = deepClone(shot?.layers || {});
-    const shotIndex =
-      scene?.shots?.findIndex(({ id }) => id === shot?.id) ?? -1;
-    const sceneShotDurations =
-      scene?.shots?.map((sceneShot) =>
-        this._shotRuntimeDurationSec(scene, sceneShot),
-      ) || [];
-    const sceneDurationSec = sceneShotDurations.reduce(
-      (sum, duration) => sum + duration,
-      0,
-    );
-    const authoredSceneElapsedSec = sceneShotDurations
-      .slice(0, Math.max(0, shotIndex))
-      .reduce((sum, duration) => sum + duration, 0);
-    const sceneElapsedSec = sceneSeek
-      ? Math.max(
-          0,
-          Math.min(sceneDurationSec, Number(sceneSeek.sceneElapsedSec) || 0),
-        )
-      : authoredSceneElapsedSec;
-    const sourceRecipe = getSceneAppendRecipeById(shot?.sourcePackId);
-    for (const state of Object.values(states)) {
-      if (state?.params?.presentation !== 'scene-beat') continue;
-      state.params.sceneSurface ||= shot.sourcePackId
-        ? 'evidence-beat'
-        : 'panel-only';
-      const runtimeControls =
-        sourceRecipe?.runtimeControlsByBeat?.[state.params.beatId];
-      if (runtimeControls) {
-        state.params.sceneControls = {
-          ...state.params.sceneControls,
-          ...runtimeControls,
-          ...(runtimeControls.deferEvidenceUntilCameraSettled
-            ? { cameraSettled }
-            : {}),
-          ...(sceneSeek
-            ? {
-                timelineSeek: {
-                  shotElapsedSec: Number(sceneSeek.shotElapsedSec) || 0,
-                  flightDurationSec: Number(sceneSeek.flightDurationSec) || 0,
-                  holdDurationSec: Number(sceneSeek.holdDurationSec) || 0,
-                  holdElapsedSec: Number(sceneSeek.holdElapsedSec) || 0,
-                  cameraProgress: clamp01(
-                    Number(sceneSeek.cameraProgress) || 0,
-                  ),
-                  holdProgress: clamp01(Number(sceneSeek.holdProgress) || 0),
-                },
-              }
-            : {}),
-        };
-        if (runtimeControls.evidencePathDuringCamera && cameraTravel) {
-          state.params.sceneControls.cameraTravel = { ...cameraTravel };
-        }
-      }
-      state.params.sceneContext = {
-        sceneId: scene.id,
-        sceneTitle: scene.title,
-        shotId: shot.id,
-        shotTitle: shot.title,
-        shotIndex,
-        shotCount: scene.shots.length,
-        durationSec: shot.durationSec || DEFAULT_SHOT_DURATION_SEC,
-        holdSec: this._effectiveShotHoldSec(scene, shot, states),
-        sceneElapsedSec,
-        sceneDurationSec,
-        sceneProgress:
-          sceneDurationSec > 0 ? sceneElapsedSec / sceneDurationSec : 0,
-        ...(sceneSeek
-          ? {
-              shotElapsedSec: Number(sceneSeek.shotElapsedSec) || 0,
-              shotProgress: clamp01(Number(sceneSeek.shotProgress) || 0),
-              seeking: true,
-            }
-          : {}),
-      };
-    }
-    for (const layerId of scene?.releaseLayerIds || []) {
-      if (!Object.hasOwn(states, layerId)) states[layerId] = { enabled: false };
-    }
-    return states;
+  _layerStatesForShot(scene, shot, options) {
+    return layerStatesForShot(scene, shot, this._scenePacks, options);
   }
 
   /** Keep installed append-pack shots on any surface declared by their source recipe. */
   _visualStateForShot(shot) {
-    const sourceRecipe = getSceneAppendRecipeById(shot?.sourcePackId);
-    const sceneBeatState = Object.values(shot?.layers || {}).find(
-      (state) => state?.params?.presentation === 'scene-beat',
+    return visualStateForShot(
+      shot,
+      this._scenePacks,
+      this._isMapStackAvailable,
     );
-    const controls = {
-      ...sceneBeatState?.params?.sceneControls,
-      ...sourceRecipe?.runtimeControlsByBeat?.[sceneBeatState?.params?.beatId],
-    };
-    if (controls.imageryComparison === true) {
-      return { ...(shot.visual || {}), mapStack: 'esri-imagery' };
-    }
-    if (
-      sourceRecipe?.standaloneSurfaceBeatIds?.includes(
-        sceneBeatState?.params?.beatId,
-      )
-    ) {
-      return { ...(shot.visual || {}), mapStack: 'esri-imagery' };
-    }
-    const visual = sourceRecipe?.photorealSurfaceBeatIds?.includes(
-      sceneBeatState?.params?.beatId,
-    )
-      ? { ...(shot.visual || {}), mapStack: 'photoreal' }
-      : shot?.visual || {};
-    const isNepalShot =
-      shot?.layers?.['bhote-koshi-2026']?.enabled ||
-      shot?.layers?.['bhote-koshi-locator']?.enabled;
-    // Check actual loaded capability, not the presence of a credential. A key
-    // can exist even when its tileset failed to initialize. Resolve at playback
-    // time so saved cameras and provider preferences remain portable.
-    if (
-      isNepalShot &&
-      visual.mapStack === 'photoreal' &&
-      !this._isMapStackAvailable('photoreal')
-    ) {
-      return { ...visual, mapStack: 'esri-imagery' };
-    }
-    return visual;
   }
 
   /** Keep a shot on its final camera pose until its authored layer reveal finishes. */
   _effectiveShotHoldSec(scene, shot, resolvedStates = null) {
-    const states = resolvedStates || this._layerStatesForShot(scene, shot);
-    const recipe = getSceneAppendRecipeById(shot?.sourcePackId);
-    const overrides = Object.values(states)
-      .filter(
-        (state) =>
-          state?.enabled && state.params?.presentation === 'scene-beat',
-      )
-      .map((state) => recipe?.runtimeHoldSecByBeat?.[state.params.beatId])
-      .filter((value) => Number.isFinite(value) && value >= 0);
-    const authoredHoldSec = overrides.length
-      ? Math.max(...overrides)
-      : Number(shot?.holdSec) || 0;
-    const overview = states['bhote-koshi-locator'];
-    const overviewHoldSec =
-      overview?.enabled &&
-      overview.params?.presentation === 'bhote-koshi-incident-places'
-        ? INCIDENT_OVERVIEW_HOLD_SEC
-        : 0;
-    return Object.values(states).reduce(
-      (holdSec, state) => {
-        const controls = state?.params?.sceneControls;
-        return Math.max(
-          holdSec,
-          Number(controls?.minimumHoldSec) || 0,
-          controls?.evidenceSequence === true
-            ? Number(controls.evidenceSequenceDurationSec) || 0
-            : 0,
-        );
-      },
-      Math.max(overviewHoldSec, authoredHoldSec),
-    );
+    return effectiveShotHoldSec(scene, shot, this._scenePacks, resolvedStates);
   }
 
   /** Resolve one shot's authored flight plus any runtime-enforced hold. */
   _shotRuntimeDurationSec(scene, shot) {
-    const states = deepClone(shot?.layers || {});
-    const sourceRecipe = getSceneAppendRecipeById(shot?.sourcePackId);
-    for (const state of Object.values(states)) {
-      if (state?.params?.presentation !== 'scene-beat') continue;
-      const runtimeControls =
-        sourceRecipe?.runtimeControlsByBeat?.[state.params.beatId];
-      if (runtimeControls) {
-        state.params.sceneControls = {
-          ...state.params.sceneControls,
-          ...runtimeControls,
-        };
-      }
-    }
-    return (
-      (shot?.durationSec || DEFAULT_SHOT_DURATION_SEC) +
-      this._effectiveShotHoldSec(scene, shot, states)
-    );
+    return shotRuntimeDurationSec(scene, shot, this._scenePacks);
   }
 
   /** Signal camera-dependent layers only after the authored flight completes. */
@@ -1668,9 +1509,9 @@ export class SceneDirector {
     // The opening locator owns an additional delayed approach/orbit even after
     // the director's authored flight has settled. Revoke it before cancelling
     // the camera, whose moveEnd/complete callbacks may already be queued.
-    this.dataManager?.layers
-      ?.get('bhote-koshi-locator')
-      ?.module.cancelSceneMotion?.();
+    this._scenePacks.cancelMotion(
+      (id) => this.dataManager?.layers?.get(id)?.module,
+    );
     const active = this._activeSceneTravel;
     if (!active) return false;
     this._activeSceneTravel = null;
@@ -1767,150 +1608,37 @@ export class SceneDirector {
 
   /** Resolve absolute authored-clock timing for one shot. */
   _sceneTimingForShot(scene, shot) {
-    const durations =
-      scene?.shots?.map((item) => this._shotRuntimeDurationSec(scene, item)) ||
-      [];
-    const shotIndex =
-      scene?.shots?.findIndex(({ id }) => id === shot?.id) ?? -1;
-    const totalSec = durations.reduce((sum, duration) => sum + duration, 0);
-    const startElapsedSec = durations
-      .slice(0, Math.max(0, shotIndex))
-      .reduce((sum, duration) => sum + duration, 0);
-    const durationSec = shotIndex >= 0 ? durations[shotIndex] : 0;
-    const endElapsedSec = Math.min(totalSec, startElapsedSec + durationSec);
-    return {
-      shotIndex,
-      totalSec,
-      durationSec,
-      startElapsedSec,
-      endElapsedSec,
-      startProgress: totalSec > 0 ? startElapsedSec / totalSec : 0,
-      endProgress: totalSec > 0 ? endElapsedSec / totalSec : 1,
-      durationProgress: totalSec > 0 ? durationSec / totalSec : 0,
-    };
-  }
-
-  /** Interpolate an authored camera flight at a normalized time. */
-  _cameraAtProgress(fromCamera, toCamera, progress) {
-    const target = toCamera || fromCamera;
-    const source = fromCamera || target;
-    if (!source || !target) return target || source || null;
-    const t = clamp01(Number(progress) || 0);
-    const eased = t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
-    const lerp = (from, to) =>
-      Number(from) + (Number(to) - Number(from)) * eased;
-    const lerpAngle = (from, to) => {
-      const start = Number(from) || 0;
-      const delta = ((Number(to) - start + 540) % 360) - 180;
-      return start + delta * eased;
-    };
-    return {
-      lat: lerp(source.lat, target.lat),
-      lon: lerp(source.lon, target.lon),
-      alt: lerp(source.alt, target.alt),
-      heading: lerpAngle(source.heading, target.heading),
-      pitch: lerp(source.pitch, target.pitch),
-      roll: lerpAngle(source.roll, target.roll),
-    };
+    return sceneTimingForShot(scene, shot, (scene, shot) =>
+      this._shotRuntimeDurationSec(scene, shot),
+    );
   }
 
   /** Resolve a normalized scene-clock position to a shot, phase, and camera pose. */
   _sceneSeekState(scene, progress) {
-    if (!scene?.shots?.length) return null;
-    const normalized = clamp01(Number(progress) || 0);
-    const durations = scene.shots.map((shot) =>
-      this._shotRuntimeDurationSec(scene, shot),
+    return sceneSeekState(
+      scene,
+      progress,
+      (scene, shot) => this._shotRuntimeDurationSec(scene, shot),
+      (scene, shot) => this._effectiveShotHoldSec(scene, shot),
     );
-    const totalSec = durations.reduce((sum, duration) => sum + duration, 0);
-    const targetSec = normalized * Math.max(0, totalSec);
-    let startElapsedSec = 0;
-    let shotIndex = scene.shots.length - 1;
-    for (let index = 0; index < scene.shots.length; index += 1) {
-      const endElapsedSec = startElapsedSec + durations[index];
-      if (targetSec < endElapsedSec || index === scene.shots.length - 1) {
-        shotIndex = index;
-        break;
-      }
-      startElapsedSec = endElapsedSec;
-    }
-    const shot = scene.shots[shotIndex];
-    const flightDurationSec = shot.durationSec || DEFAULT_SHOT_DURATION_SEC;
-    const holdDurationSec = this._effectiveShotHoldSec(scene, shot);
-    const shotDurationSec = Math.max(
-      0.001,
-      flightDurationSec + holdDurationSec,
-    );
-    const shotElapsedSec = Math.max(
-      0,
-      Math.min(shotDurationSec, targetSec - startElapsedSec),
-    );
-    const cameraProgress = clamp01(
-      shotElapsedSec / Math.max(0.001, flightDurationSec),
-    );
-    const holdElapsedSec = Math.max(0, shotElapsedSec - flightDurationSec);
-    const holdProgress =
-      holdDurationSec > 0 ? clamp01(holdElapsedSec / holdDurationSec) : 1;
-    const previousCamera = scene.shots[shotIndex - 1]?.camera || shot.camera;
+  }
+
+  /** Read timing diagnostics without exposing timer handles or mutable clock state. */
+  getPlaybackTimingState() {
     return {
-      sceneProgress: totalSec > 0 ? targetSec / totalSec : 0,
-      sceneElapsedSec: targetSec,
-      sceneDurationSec: totalSec,
-      shotIndex,
-      shot,
-      shotElapsedSec,
-      shotProgress: clamp01(shotElapsedSec / shotDurationSec),
-      flightDurationSec,
-      holdDurationSec,
-      holdElapsedSec,
-      cameraProgress,
-      holdProgress,
-      camera: this._cameraAtProgress(
-        previousCamera,
-        shot.camera,
-        cameraProgress,
-      ),
+      activeTimers: this._clock.activeTimers,
+      snapshot: this._clock.snapshot,
     };
   }
 
   /** Subscribe a scene-owned panel to the authoritative authored clock. */
   subscribeSceneClock(listener) {
-    if (typeof listener !== 'function') return () => {};
-    this._sceneClockListeners.add(listener);
-    if (this._sceneClockSnapshot) listener({ ...this._sceneClockSnapshot });
-    return () => this._sceneClockListeners.delete(listener);
+    return this._clock.subscribe(listener);
   }
 
   /** Publish one authoritative scene-clock snapshot to attached panels. */
-  _publishSceneClock(
-    scene,
-    shot,
-    sceneElapsedSec,
-    { running = this._running, seeking = false } = {},
-  ) {
-    if (!scene || !shot) return;
-    const timing = this._sceneTimingForShot(scene, shot);
-    const elapsedSec = Math.max(
-      0,
-      Math.min(timing.totalSec, Number(sceneElapsedSec) || 0),
-    );
-    this._sceneClockSnapshot = {
-      sceneId: scene.id,
-      shotId: shot.id,
-      shotIndex: timing.shotIndex,
-      shotCount: scene.shots.length,
-      sceneElapsedSec: elapsedSec,
-      sceneDurationSec: timing.totalSec,
-      sceneProgress: timing.totalSec > 0 ? elapsedSec / timing.totalSec : 0,
-      running: Boolean(running),
-      seeking: Boolean(seeking),
-    };
-    for (const listener of this._sceneClockListeners) {
-      try {
-        listener({ ...this._sceneClockSnapshot });
-      } catch (error) {
-        console.warn('[Scenes] Scene clock listener failed:', error);
-      }
-    }
+  _publishSceneClock(scene, shot, sceneElapsedSec, options) {
+    return this._clock.publish(scene, shot, sceneElapsedSec, options);
   }
 
   /** Wait for an interrupted run to release camera and layer ownership. */
@@ -1935,8 +1663,7 @@ export class SceneDirector {
     this._loadAbort?.abort();
     this._loadAbort = null;
     this._loadGeneration += 1;
-    clearInterval(this._shotProgressTimer);
-    this._shotProgressTimer = null;
+    this._clock.stopShot();
     const states = this._layerStatesForShot(scene, shot, {
       cameraSettled: seekState.cameraProgress >= 1,
       sceneSeek: seekState,
@@ -2187,8 +1914,7 @@ export class SceneDirector {
     this._loadAbort?.abort();
     this._loadAbort = null;
     this._loadGeneration++;
-    clearInterval(this._shotProgressTimer);
-    this._shotProgressTimer = null;
+    this._clock.stopShot();
 
     // Transition to running state
     this._running = true;
@@ -2297,24 +2023,10 @@ export class SceneDirector {
     this._loadAbort?.abort();
     this._loadAbort = null;
     this._loadGeneration++;
-    clearInterval(this._shotProgressTimer);
-    this._shotProgressTimer = null;
+    this._clock.stopShot();
     this._cancelActiveSceneTravel();
     this.viewer.camera.cancelFlight();
-    if (this._sceneClockSnapshot) {
-      this._sceneClockSnapshot = {
-        ...this._sceneClockSnapshot,
-        running: false,
-        stopped: true,
-      };
-      for (const listener of this._sceneClockListeners) {
-        try {
-          listener({ ...this._sceneClockSnapshot });
-        } catch {
-          /* Observer cannot block cancellation. */
-        }
-      }
-    }
+    this._clock.stop();
     if (!this._running || !this._runToken) return;
     this._runToken.cancelled = true;
     this._runAbort?.abort();
@@ -2653,14 +2365,9 @@ export class SceneDirector {
     }
   }
 
-  /** Cancellable sleep, polling every ~70 ms for prompt interruption. */
+  /** Wait through the playback clock so Stop also releases pending holds. */
   async _sleep(ms, token) {
-    if (ms <= 0 || token.cancelled) return;
-    const endAt = Date.now() + ms;
-    while (Date.now() < endAt) {
-      if (token.cancelled) return;
-      await new Promise((resolve) => setTimeout(resolve, 70));
-    }
+    return this._clock.wait(ms, token);
   }
 
   /**
@@ -2669,100 +2376,17 @@ export class SceneDirector {
    * @param {number} totalSec - Estimated total duration in seconds
    */
   _startProgressTicker(totalSec) {
-    clearInterval(this._progressTimer);
-    const startMs = Date.now();
-    const totalMs = Math.max(1000, totalSec * 1000);
-    this._progressTimer = setInterval(() => {
-      if (!this._running) return;
-      const elapsedMs = Date.now() - startMs;
-      this._setProgress(elapsedMs / totalMs);
-    }, 100);
+    return this._clock.startRunProgress(totalSec);
   }
 
   /** Track one LOAD/replay flight and hold without pretending a full run is active. */
   _startShotProgress(token, seconds, from, to, sceneClock = null) {
-    clearInterval(this._shotProgressTimer);
-    this._shotProgressTimer = null;
-    if (token.cancelled || this._running) return;
-    this._setProgress(from);
-    if (sceneClock) {
-      this._publishSceneClock(
-        sceneClock.scene,
-        sceneClock.shot,
-        sceneClock.sceneElapsedFrom,
-        { running: false },
-      );
-    }
-    if (seconds <= 0) {
-      this._setProgress(to);
-      if (sceneClock) {
-        this._publishSceneClock(
-          sceneClock.scene,
-          sceneClock.shot,
-          sceneClock.sceneElapsedTo,
-          { running: false },
-        );
-      }
-      return;
-    }
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      if (token.cancelled || this._running) {
-        clearInterval(timer);
-        if (this._shotProgressTimer === timer) this._shotProgressTimer = null;
-        return;
-      }
-      const fraction = clamp01((Date.now() - startedAt) / (seconds * 1000));
-      this._setProgress(from + (to - from) * fraction);
-      if (sceneClock) {
-        this._publishSceneClock(
-          sceneClock.scene,
-          sceneClock.shot,
-          sceneClock.sceneElapsedFrom +
-            (sceneClock.sceneElapsedTo - sceneClock.sceneElapsedFrom) *
-              fraction,
-          { running: false },
-        );
-      }
-      if (fraction >= 1) {
-        clearInterval(timer);
-        if (this._shotProgressTimer === timer) this._shotProgressTimer = null;
-      }
-    }, 100);
-    timer.unref?.();
-    this._shotProgressTimer = timer;
+    return this._clock.startShotProgress(token, seconds, from, to, sceneClock);
   }
 
   /** Drive the public authored clock through one running shot. */
   _startSceneClockTicker(scene, shot, token) {
-    clearInterval(this._sceneClockTimer);
-    const timing = this._sceneTimingForShot(scene, shot);
-    const startedAt = Date.now();
-    this._publishSceneClock(scene, shot, timing.startElapsedSec, {
-      running: true,
-    });
-    const timer = setInterval(() => {
-      if (token.cancelled || !this._running) {
-        clearInterval(timer);
-        if (this._sceneClockTimer === timer) this._sceneClockTimer = null;
-        return;
-      }
-      const shotElapsedSec = Math.min(
-        timing.durationSec,
-        (Date.now() - startedAt) / 1000,
-      );
-      this._publishSceneClock(
-        scene,
-        shot,
-        timing.startElapsedSec + shotElapsedSec,
-        {
-          running: true,
-        },
-      );
-    }, 50);
-    timer.unref?.();
-    this._sceneClockTimer = timer;
-    return timing;
+    return this._clock.startScene(scene, shot, token);
   }
 
   /**
@@ -2771,10 +2395,7 @@ export class SceneDirector {
    * and resets UI buttons to the idle state.
    */
   _finishRun() {
-    clearInterval(this._progressTimer);
-    this._progressTimer = null;
-    clearInterval(this._sceneClockTimer);
-    this._sceneClockTimer = null;
+    this._clock.finish();
     this._setPlaybackKeyboardEnabled(false);
     // Covers the error path too: a run that threw mid-shot must not leave a
     // layer transition running against a director that has stopped watching.
@@ -2801,23 +2422,17 @@ export class SceneDirector {
 
     this._runToken = null;
     this._setButtons(false);
-    if (this._sceneClockSnapshot) {
+    const clockSnapshot = this._clock.snapshot;
+    if (clockSnapshot) {
       const scene = this._project.scenes.find(
-        ({ id }) => id === this._sceneClockSnapshot.sceneId,
+        ({ id }) => id === clockSnapshot.sceneId,
       );
-      const shot = scene?.shots?.find(
-        ({ id }) => id === this._sceneClockSnapshot.shotId,
-      );
+      const shot = scene?.shots?.find(({ id }) => id === clockSnapshot.shotId);
       if (scene && shot) {
-        this._publishSceneClock(
-          scene,
-          shot,
-          this._sceneClockSnapshot.sceneElapsedSec,
-          {
-            running: false,
-            seeking: this._sceneClockSnapshot.seeking,
-          },
-        );
+        this._publishSceneClock(scene, shot, clockSnapshot.sceneElapsedSec, {
+          running: false,
+          seeking: clockSnapshot.seeking,
+        });
       }
     }
     for (const resolve of this._runIdleResolvers) resolve();
@@ -2885,3 +2500,5 @@ export class SceneDirector {
     });
   }
 }
+
+export { createScenePackRegistry } from './packs/registry.js';
