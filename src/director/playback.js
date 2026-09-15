@@ -96,3 +96,10 @@ const SHOT_PHASES = [
   'hold',
   'completeShot',
 ];
+
+export {
+  sceneTimingForShot,
+  sceneSeekState,
+  cameraAtProgress,
+} from './timeline.js';
+export { createPlaybackClock } from './clock.js';

@@ -1,5 +1,10 @@
 # Changelog
 
+- Separate Director timing, seek calculations, playback clocks and registered
+  scene-pack presentation rules. Preserve authored content and controls; Stop
+  releases pending hold timers and stale ticks cannot affect replacement playback.
+
+
 - Keep parked transit vehicles aligned to their world course during camera orbits, fall back to reported bearing, and keep vehicles with no course consistently screen-up.
 
 - Separate Realtime connection, response/tool, Radio, input/audio, cost, viewport

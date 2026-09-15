@@ -51,8 +51,7 @@ export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
       return director._holdShot(scene, shot, token);
     },
     completeShot({ scene, shot, index }) {
-      clearInterval(director._sceneClockTimer);
-      director._sceneClockTimer = null;
+      director._clock.stopSceneTimer();
       director._publishSceneClock(scene, shot, timing.endElapsedSec, {
         running: true,
       });

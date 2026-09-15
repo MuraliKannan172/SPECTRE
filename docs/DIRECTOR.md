@@ -1,7 +1,7 @@
 # Director: reusable scene playback
 
-Director is the scene playback system. The first extraction separates ordered
-shot execution from the scene editor and application rendering. This document
+Director is the scene playback system. Ordered shot execution, authored timing and playback clocks are separated
+from the scene editor and application rendering. This document
 also records the proposed next steps; the sharing format and interactions below
 are a design plan, not features already available.
 
@@ -33,9 +33,26 @@ untrusted file validation belongs at the import boundary.
 
 `src/scenes/playbackAdapter.js` connects this runner to the existing
 `SceneDirector`. The latter still owns editor state, saved-project import/export,
-camera ownership, seeking, clocks and presentation. Pack-specific layer states,
-media holds and map preferences retain their current implementation. This first
-slice does not make the entire scene controller renderer-independent.
+camera ownership and asynchronous load/seek arbitration. Pure seek calculations
+live in `src/director/timeline.js`; `src/director/clock.js` owns the run/load/shot
+tickers, hold deadlines, snapshots and clock subscriptions. Stop settles pending
+holds immediately, and revoked tick callbacks cannot affect a replacement clock.
+`getPlaybackTimingState()` exposes copied snapshots and an active-timer count for
+lifecycle diagnostics without exposing timer handles.
+
+The `director` export also provides `sceneTimingForShot`, `sceneSeekState`,
+`cameraAtProgress` and `createPlaybackClock`. Timeline functions receive duration
+and hold resolvers; the clock receives timing, running-state and progress callbacks.
+They import no renderer, storage, recipe or dataset.
+
+`src/scenes/shotPresentation.js` prepares layer/seek context and resolves holds
+and map preferences through a scene-pack registry. The `scenes` export provides
+`createScenePackRegistry({ recipes, adapters })`; pass the result as `scenePacks`
+in the SceneDirector constructor options. Trusted adapters can supply
+`minimumHoldSec(states)`, `resolveVisual(shot, visual, isMapStackAvailable)` and
+`cancelMotion(getLayerModule)`. Default composition registers the existing Nepal
+presentation rules. These are code-level composition hooks, not executable
+modules imported from scene files. Existing media-owner waits remain bounded.
 
 All authored scenes, assets, IDs, source links, attribution and existing JSON
 projects are preserved. The Nepal sequence remains the contribution introduced
@@ -45,11 +62,10 @@ and river coordinates are bundled. See the
 
 ## Next changes, in order
 
-1. **Timeline and content separation.** Extract pure duration/seek calculations
-   and a clock with an explicit lifetime. Move content-specific hold, layer and
-   presentation rules behind registered scene-pack adapters. Keep existing
-   recipes and content intact. Test direct load, forward/backward seek, replay,
-   media timeout and Stop at every pending transition.
+1. **Timeline and content separation — implemented.** Pure duration/seek
+   calculations, an owned clock and registered presentation rules preserve
+   existing recipes and content. Tests cover direct load, forward/backward seek,
+   replay, bounded media waits and cancellation at pending transitions.
 2. **Versioned scene document.** Build on the existing version-3 project export
    and its importer. Specify a schema and migrations before changing writes.
    Keep old imports and local-storage projects readable; reject unsupported
