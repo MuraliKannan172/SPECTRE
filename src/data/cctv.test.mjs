@@ -14,6 +14,11 @@
 // computeFrustumGeometry is PURE (no viewer, no scene queries) so it runs under
 // plain node:test.
 import { test } from 'node:test';
+// Preserve structural pins across component qualification and formatter wrapping.
+function componentFunctionSource(fn) {
+  return fn.toString().replace(/\blayerState\./g, '').replace(/\bparts\.\w+\./g, '')
+    .replace(/,\s*(?=\))/g, '').replace(/\s+/g, ' ').replace(/\(\s+/g, '(');
+}
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -67,8 +72,8 @@ import {
   activateCctvCameraFromWorldClick,
 } from '../cctvFocusRequest.js';
 
-const UI_SOURCE = fs.readFileSync(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'ui.js'),
+const CCTV_PRESENTATION_SOURCE = fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'ui', 'cctvPresentation.js'),
   'utf8',
 );
 
@@ -208,7 +213,7 @@ test('lazy coverage inserts nothing at catalog init, then materializes only elig
   });
 
   assert.equal(insertCount, 0, 'building a 100-camera catalog must insert zero coverage entities');
-  assert.doesNotMatch(cctvLayer.init.toString(), /buildCoverageEntities|ensure(?:Active|Visible)CoverageEntities/);
+  assert.doesNotMatch(componentFunctionSource(cctvLayer.init), /buildCoverageEntities|ensure(?:Active|Visible)CoverageEntities/);
 
   const activated = materializeCctvActiveCoverageEntities(records[42], build);
   assert.equal(activated.length, 5);
@@ -224,7 +229,7 @@ test('lazy coverage inserts nothing at catalog init, then materializes only elig
   assert.equal(coverageOn.length, 14 * 5);
   assert.equal(insertCount, 15 * 5, 'COVERAGE ON builds only remaining visible/eligible sets');
   assert.equal(records.filter((record) => record.coverageEntities.length > 0).length, 15);
-  assert.match(refreshCoverageStyles.toString(), /ensureVisibleCoverageEntities\(_records, coverageVisible\)/);
+  assert.match(componentFunctionSource(refreshCoverageStyles), /ensureVisibleCoverageEntities\(_records, coverageVisible\)/);
   assert.equal(
     materializeCctvVisibleCoverageEntities(records, visibleIds, build).length,
     0,
@@ -614,7 +619,7 @@ test('CCTV disable→enable defers the active-camera re-probe until its next act
   assert.equal(record.activationDone, false);
   assert.equal(cctvRecordNeedsActivation('active', 'active', record), true);
   assert.doesNotMatch(
-    cctvLayer.enable.toString(),
+    componentFunctionSource(cctvLayer.enable),
     /setActiveCamera|runActivationObstructionProbe|pickFromRay/,
     'enable must restore nominal visuals without entering the activation probe path',
   );
@@ -724,11 +729,11 @@ test('CCTV repeated in-world clicks dispatch focus only for the one real activat
 
   assert.deepEqual(activated, ['atx-cam-3', 'atx-cam-3', 'atx-cam-3']);
   assert.deepEqual(requests, [{ cameraId: 'atx-cam-3' }]);
-  assert.match(cctvLayer.init.toString(), /bindCctvWorldClickGesture\(_clickHandler/);
-  assert.match(cctvLayer.init.toString(), /_cctvOverlayHost\.hitTest/);
-  assert.match(cctvLayer.init.toString(), /sourceId: CCTV_OVERLAY_SOURCE_ID/);
-  assert.match(cctvLayer.init.toString(), /activateCctvCameraFromWorldClick\(cameraId, setActiveCamera\)/);
-  assert.match(cctvLayer.init.toString(), /activateCctvCameraFromWorldClick\(cardId, setActiveCamera\)/);
+  assert.match(componentFunctionSource(cctvLayer.init), /bindCctvWorldClickGesture\(_clickHandler/);
+  assert.match(componentFunctionSource(cctvLayer.init), /_cctvOverlayHost\.hitTest/);
+  assert.match(componentFunctionSource(cctvLayer.init), /sourceId: CCTV_OVERLAY_SOURCE_ID/);
+  assert.match(componentFunctionSource(cctvLayer.init), /activateCctvCameraFromWorldClick\(cameraId, setActiveCamera\)/);
+  assert.match(componentFunctionSource(cctvLayer.init), /activateCctvCameraFromWorldClick\(cardId, setActiveCamera\)/);
 });
 
 // ─── Empty-space deselection and stable null-active state ──────────────────
@@ -795,7 +800,7 @@ test('CCTV empty-click gate excludes every identified scene object, ADJUST, and 
     activeCameraId: 'cam-1',
   }), true, 'an ID-less surface pick remains true empty space');
 
-  const initSource = cctvLayer.init.toString();
+  const initSource = componentFunctionSource(cctvLayer.init);
   assert.ok(
     initSource.indexOf('if (pickedId !== null) return')
       < initSource.indexOf('_cctvOverlayHost.hitTest'),
@@ -931,10 +936,10 @@ test('CCTV null-active coverage, auto-hop, cycling, and panel targets stay hones
     assert.equal(cctvCycleIndex(2, 1, records.length), 0);
     assert.equal(cctvCycleIndex(0, -1, records.length), records.length - 1);
 
-    const renderer = UI_SOURCE.match(/_renderCctvState\(state\) \{[\s\S]*?\n  \}\n/);
+    const renderer = CCTV_PRESENTATION_SOURCE.match(/_renderCctvState\(state\) \{[\s\S]*?\n\}\n/);
     assert.ok(renderer, '_renderCctvState is missing');
     assert.match(renderer[0], /else if \(!activeId\)[\s\S]*?selectedIndex = -1/);
-    assert.match(renderer[0], /_cctvFocusBtn\.disabled = !enabled \|\| cameras\.length === 0 \|\| !activeId/);
+    assert.match(renderer[0], /_cctvFocusBtn\.disabled\s*=\s*!enabled\s*\|\|\s*cameras\.length === 0\s*\|\|\s*!activeId/);
   } finally {
     cctvLayer.setParams({ autoHop: false });
     _setCctvOverlayHostForTest();
