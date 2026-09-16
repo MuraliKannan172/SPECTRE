@@ -124,14 +124,15 @@ test('span clamp handles bounds crossing the antimeridian', () => {
 
   const result = clampBoundsAroundCenter(bounds, center, 0.05);
 
-  assert.ok(result.west >= -180 && result.west < 180);
-  assert.ok(result.east >= -180 && result.east < 180);
+  // west/east are deliberately left unnormalized (may exceed 180) so that
+  // west <= east always holds for downstream consumers (getBoundsCenter,
+  // boundsOverlap) that assume a monotonic box. See #392 review.
+  assert.ok(result.west <= result.east, `west/east not monotonic: ${result.west}, ${result.east}`);
+  assert.ok(Math.abs(result.east - result.west - 0.04) < 1e-12);
 
-  // Wrapped longitude span should remain about 0.04 degrees.
-  const span =
-    result.east >= result.west
-      ? result.east - result.west
-      : result.east - result.west + 360;
-
-  assert.ok(Math.abs(span - 0.04) < 1e-12);
+  // The plain-mean center a caller like getBoundsCenter computes must land
+  // back on the antimeridian near the requested center, not ~180 degrees
+  // away on the opposite side of the planet.
+  const center2 = (result.west + result.east) / 2;
+  assert.ok(Math.abs(center2 - center.lon) < 1e-9, `center drifted: ${center2}`);
 });
