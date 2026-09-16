@@ -1,13 +1,13 @@
 # Scene document format
 
-Scenes exports a UTF-8 JSON project. Version 4 adds [camera directions](DIRECTOR-CAMERA.md)
-and is the write format. Versions 1, 2, 3 and unversioned legacy files migrate on
+Scenes exports a UTF-8 JSON project. Version 5 adds [data packs](DIRECTOR-DATA-PACKS.md)
+and is the write format. Versions 1, 2, 3, 4 and unversioned legacy files migrate on
 import without converting their existing shots into authored moves. Unknown versions or unsupported fields are rejected with
 a field path before the current project, selection or saved bytes change.
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "scenes": [{
     "id": "my-scene",
     "title": "My scene",
@@ -95,7 +95,11 @@ can preserve temporary edits. Storage writes use the same validation before repl
 edits and storage write failures surface an unsaved toast.
 
 Only authored project fields belong in this file. Runtime clocks, camera flights,
-loading progress and run diagnostics remain separate. Version 4 supports scene-local camera anchors and authored moves. Asset-pack
-manifests and declarative interactions remain planned extensions. They will
-receive stable IDs and their own validated migration when introduced. No scene assets, source links, licenses or contributor attribution
+loading progress and run diagnostics remain separate. Camera anchors and authored
+moves arrived in version 4; data packs follow in version 5. Declarative
+interactions remain a planned extension. No scene assets, source links, licenses or contributor attribution
 change with this document boundary.
+
+Version 5 additionally accepts scene `dataPacks` and shot `dataPackIds`, as
+defined in [data packs](DIRECTOR-DATA-PACKS.md). Version-4 camera documents
+continue to import without adding any packs.

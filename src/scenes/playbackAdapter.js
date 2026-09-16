@@ -29,11 +29,18 @@ export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
         { isCurrent: () => !token.cancelled && !token.signal?.aborted },
       );
     },
-    applyLayers({ scene, shot, token }) {
-      return director._applyLayerStates(
+    async applyLayers({ scene, shot, token }) {
+      const result = await director._applyLayerStates(
         director._layerStatesForShot(scene, shot),
         token,
       );
+      if (
+        !token.cancelled &&
+        !result.refused.length &&
+        !(await director._applyDataPacks(scene, shot, token))
+      )
+        throw new Error('Data packs unavailable');
+      return result;
     },
     travel({ scene, shot, token }) {
       director._loadedSceneId = scene.id;

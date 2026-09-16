@@ -1,5 +1,9 @@
 # Changelog
 
+- Director scene documents now support bounded data-pack manifests, per-shot
+  selection and registered GeoJSON/PNG/media loaders with explicit placement,
+  visible attribution and cancellation/disposal on Stop or replacement.
+
 - Director version 4 adds named camera anchors and explicit pose-to-pose moves
   with shared playback/seek interpolation, easing and holds. Navigation and
   manual input cancel authored motion; older scene files retain existing flights.

@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+Director version-5 documents add scene-local data-pack manifests and per-shot
+selection. Registered sources acquire bounded, cancellable assets separately from
+GeoJSON, PNG and manually played media presentation. Storage paths, attribution
+and geographic placement remain distinct; Stop/replacement releases resources.
+Import acquires nothing. See [data packs](DIRECTOR-DATA-PACKS.md). Existing scene
+content, assets and credit remain unchanged.
+
 Director version-4 documents add named geographic anchors and optional explicit
 camera moves with easing, duration and holds. Playback and seek share one
 coordinate sampler; navigation/manual input revokes authored motion and pending
@@ -34,9 +41,9 @@ holds; stale tick callbacks cannot publish into a replacement. Registered pack
 rules own presentation overrides and Nepal map fallback without changing saved
 shots or content. Scene-document validation and legacy migration now have separate
 owners. Invalid imports preserve the current project; unreadable saved projects
-are protected from fallback writes. Version 4 is the export format, with
+are protected from fallback writes. Version 5 is the export format, with
 zero pitch, low camera heights, scope and detection edits preserved. See [the document contract](SCENE-DOCUMENT.md);
-data packs and interactions remain planned in [Director](DIRECTOR.md).
+interactions remain planned in [Director](DIRECTOR.md).
 
 Search framing and annotations request semantic map features from an explicit source. The Overpass adapter owns bounded queries, member/tag decoding and request deadlines; callers retain candidate ranking, outline caching, deferred retries and scene placement. Empty, transient and throttled outcomes remain distinct. Traffic sources return road records and installation sources return mapped records with freshness/saturation metadata, so their layers no longer decode upstream elements. ALPR already normalizes its records in the source. Default providers, footprints, road directions, exact-viewport retries and source attribution are unchanged.
 

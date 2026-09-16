@@ -12,9 +12,10 @@ import {
   uniqueId,
   jsonTree,
 } from './documentFields.js';
+import { validateSceneDataPacks } from './packs/manifest.js';
 import { validateSceneCameras } from './cameraDocument.js';
 export { SCENE_DOCUMENT_LIMITS, SceneDocumentError } from './documentFields.js';
-export const SCENE_DOCUMENT_VERSION = 4;
+export const SCENE_DOCUMENT_VERSION = 5;
 
 function visual(value, path, legacy) {
   fields(value, path, [
@@ -65,7 +66,7 @@ export function validateSceneDocument(project) {
     'scenes',
   ]);
   const version = Object.hasOwn(project, 'version') ? project.version : 1;
-  if (![1, 2, 3, 4].includes(version))
+  if (![1, 2, 3, 4, 5].includes(version))
     fail('$.version', 'unsupported scene project version');
   const legacy = version < 3;
   for (const key of ['createdAt', 'updatedAt'])
@@ -83,6 +84,7 @@ export function validateSceneDocument(project) {
       'appliedShotPacks',
       'shots',
       ...(version >= 4 ? ['anchors'] : []),
+      ...(version >= 5 ? ['dataPacks'] : []),
     ]);
     uniqueId(scene, path, sceneIds);
     optional(scene, 'title', path, (v, p) => string(v, p, 4096));
@@ -123,6 +125,7 @@ export function validateSceneDocument(project) {
         'sourcePackId',
         'sourcePackVersion',
         ...(version >= 4 ? ['move'] : []),
+        ...(version >= 5 ? ['dataPackIds'] : []),
       ]);
       uniqueId(shot, at, shotIds);
       optional(shot, 'title', at, (v, p) => string(v, p, 4096));
@@ -149,6 +152,7 @@ export function validateSceneDocument(project) {
       });
     });
     validateSceneCameras(scene, path, version);
+    validateSceneDataPacks(scene, path);
   });
   return project;
 }
