@@ -19,6 +19,7 @@ export function createAssetDirectorySource({
     );
   return async ({ path, signal, maxBytes = PACK_LIMITS.bytes }) => {
     validateAssetPath(path);
+    signal?.throwIfAborted();
     const response = await fetchImpl(new URL(path, base).href, {
       signal,
       credentials: 'omit',
@@ -26,7 +27,10 @@ export function createAssetDirectorySource({
       referrerPolicy: 'no-referrer',
       cache: 'no-store',
     });
-    if (!response.ok) throw new Error('Asset unavailable');
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {});
+      throw new Error('Asset unavailable');
+    }
     const reader = response.body?.getReader();
     if (!reader) throw new Error('Asset stream unavailable');
     const chunks = [];

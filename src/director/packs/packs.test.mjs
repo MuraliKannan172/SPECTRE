@@ -338,3 +338,28 @@ test('byte and integrity checks run before rendering; adapter names never resolv
   assert.equal(mounted, 1);
   session.destroy();
 });
+
+test('failed responses release their body and an already-cancelled source sends no request', async () => {
+  let cancelled = 0,
+    requests = 0;
+  const source = createAssetDirectorySource({
+    baseUrl: 'https://example.org/packs/',
+    fetchImpl: async () => {
+      requests++;
+      return new Response(
+        new ReadableStream({
+          cancel() {
+            cancelled++;
+          },
+        }),
+        { status: 403 },
+      );
+    },
+  });
+  await assert.rejects(source({ path: 'a.json' }), /unavailable/);
+  assert.equal(cancelled, 1);
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(source({ path: 'a.json', signal: controller.signal }));
+  assert.equal(requests, 1);
+});
