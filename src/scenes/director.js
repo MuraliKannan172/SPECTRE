@@ -26,6 +26,7 @@ import {
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
 import { createSceneDataPacks } from './dataPacks/controller.js';
+import { createSceneInteractions } from './interactions.js';
 import { createDefaultScenePacks } from './packs/defaults.js';
 import {
   layerStatesForShot,
@@ -89,10 +90,23 @@ export class SceneDirector {
     this._isMapStackAvailable = isMapStackAvailable;
     this._scenePacks = scenePacks;
     this._dataPacks = createSceneDataPacks(viewer, dataPacks);
+    this._interactionTransitions = 0;
+    this._interactions = createSceneInteractions(viewer, {
+      available: () =>
+        !this._destroyed && !this._running && !this.viewer.trackedEntity,
+      execute: (action, signal) =>
+        this._trackWork(this._executeInteraction(action, signal)),
+    });
     this._cameraMotion = createCameraMotion({
       applyPose: (pose) => this._setCameraView(pose),
     });
-    const yieldCamera = () => {
+    const yieldCamera = (event) => {
+      // A settled feature click belongs to the action picker, not a new camera gesture.
+      if (
+        event?.type === 'pointerdown' &&
+        this._interactions?.getState().active
+      )
+        return;
       if (this._usesAuthoredCamera && !this._claimingCamera)
         this.stopScene('Camera ownership changed');
     };
@@ -203,6 +217,7 @@ export class SceneDirector {
     this._cameraHandoffUnsubscribe?.();
     this._removeCameraInput?.();
     this._cameraMotion?.destroy();
+    this._interactions?.destroy();
     this._dataPacks?.destroy();
     this._controls?.destroy();
     this._state.destroy();
@@ -976,6 +991,7 @@ export class SceneDirector {
     if (this._destroyed)
       return Promise.resolve({ started: false, reason: 'destroyed' });
     this._sceneSeekGeneration++;
+    this._interactionTransitions = 0;
     return this._trackWork(this._loadShot(sceneId, shotId, options));
   }
 
@@ -1001,6 +1017,7 @@ export class SceneDirector {
     // manager) rather than merely ignored once it has already committed.
     this._cancelActiveSceneTravel();
     this._usesAuthoredCamera = !!shot.move;
+    this._interactions?.clear();
     this._dataPacks?.clear();
     this._loadAbort?.abort();
     const controller = new AbortController();
@@ -1060,6 +1077,7 @@ export class SceneDirector {
       });
       if (this._loadAbort === controller) this._loadAbort = null;
       this._updateStatus(`Seeked: ${scene.title} / ${shot.title}`);
+      this._activateInteractions(scene, shot);
       return { started: true, shotId };
     }
     const holdSec = this._effectiveShotHoldSec(scene, shot);
@@ -1109,6 +1127,7 @@ export class SceneDirector {
     );
 
     if (this._loadAbort === controller) this._loadAbort = null;
+    this._activateInteractions(scene, shot);
     this._shotOutcome('shot-loaded', scene, shot);
     this._updateRuntime('');
     return { started: true, shotId };
@@ -1359,6 +1378,8 @@ export class SceneDirector {
     if (
       !scene ||
       !shot ||
+      shot.dataPackIds?.length ||
+      shot.interactions?.length ||
       this._loadedSceneId !== scene.id ||
       this._selectedShotId !== shot.id
     )
@@ -1621,6 +1642,7 @@ export class SceneDirector {
     // Aborting cancels a layer transition already in flight; bumping the
     // generation disowns everything the load has not yet started.
     this._cancelActiveSceneTravel();
+    this._interactions?.clear();
     this._dataPacks?.clear();
     this._loadAbort?.abort();
     this._loadAbort = null;
@@ -1732,6 +1754,7 @@ export class SceneDirector {
    * @param {string} [reason='Stopped'] - Human-readable cancellation reason
    */
   stopScene(reason = 'Stopped') {
+    this._interactions?.clear();
     this._dataPacks?.clear();
     this._sceneSeekGeneration++;
     this._loadAbort?.abort();
@@ -1761,6 +1784,71 @@ export class SceneDirector {
   /** Copied resource state for lifecycle checks and diagnostics. */
   getDataPackState() {
     return this._dataPacks?.getState() || { status: 'idle', count: 0 };
+  }
+
+  /** Activate only after LOAD/seek settles. Running timelines never branch automatically. */
+  _activateInteractions(scene, shot) {
+    try {
+      this._interactions?.activate(shot, this._dataPacks.getTargets());
+    } catch (error) {
+      this._updateStatus(error.message);
+    }
+  }
+
+  /** Execute a validated action through the existing camera and layer admission paths. */
+  async _executeInteraction(action, signal) {
+    if (signal.aborted || this._running || this._destroyed) return false;
+    const { scene, shot } = this._getShot(
+      this._selectedSceneId,
+      this._selectedShotId,
+    );
+    if (!scene || !shot) return false;
+    if (action.type === 'focus') {
+      if (!this._claimCameraOwnership()) return false;
+      this._cancelActiveSceneTravel();
+      this._clock.stopShot();
+      return this._setCameraView(
+        resolveCameraPose(scene, { anchorId: action.anchorId, pitch: -90 }),
+      );
+    }
+    if (action.type === 'layer') {
+      if (
+        !this.dataManager.getAll().some((layer) => layer.id === action.layerId)
+      )
+        return false;
+      return this.dataManager.setEnabled(action.layerId, action.enabled, {
+        signal,
+        origin: 'scene',
+      });
+    }
+    if (action.type === 'shot') {
+      if (this._interactionTransitions >= 64) {
+        this._updateStatus(
+          'Scene transition limit reached — load a shot to reset',
+        );
+        return false;
+      }
+      this._interactionTransitions++;
+      // Replacement clears this action's owner; the new LOAD owns its own cancellation.
+      const target = scene.shots.find((item) => item.id === action.shotId);
+      return this.seekScene(
+        scene.id,
+        this._sceneTimingForShot(scene, target).startProgress,
+      );
+    }
+    return false;
+  }
+
+  /** Copied interaction state for lifecycle diagnostics. */
+  getInteractionState() {
+    return (
+      this._interactions?.getState() || {
+        active: false,
+        busy: false,
+        selected: null,
+        count: 0,
+      }
+    );
   }
 
   /** Export the entire project as a timestamped JSON file download. */
@@ -1937,6 +2025,7 @@ export class SceneDirector {
    * @returns {Promise<boolean>} True only when every owned layer is released
    */
   async _releaseSceneLayers(scene, token = null) {
+    this._interactions?.clear();
     this._dataPacks?.clear();
     const layerIds = Array.isArray(scene?.releaseLayerIds)
       ? scene.releaseLayerIds

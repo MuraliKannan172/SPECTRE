@@ -739,5 +739,7 @@
   "scripts/qa-director-camera.mjs",
   "src/director/packs/packs.test.mjs",
   "scripts/qa-director-packs.mjs",
-  "src/scenes/dataPacks/presentation.test.mjs"
+  "src/scenes/dataPacks/presentation.test.mjs",
+  "src/director/interactions/interactions.test.mjs",
+  "scripts/qa-director-interactions.mjs"
 ]

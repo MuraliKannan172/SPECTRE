@@ -625,7 +625,9 @@
       "src/director/packs/source.js",
       "src/director/packs/session.js",
       "src/director/packs/geojson.js",
-      "src/director/packs/manifest.js"
+      "src/director/packs/manifest.js",
+      "src/director/interactions/document.js",
+      "src/director/interactions/session.js"
     ],
     "external": []
   },
@@ -666,7 +668,11 @@
       "src/director/packs/manifest.js",
       "src/scenes/dataPacks/controller.js",
       "src/scenes/dataPacks/presentation.js",
-      "src/scenes/dataPacks/geometry.js"
+      "src/scenes/dataPacks/geometry.js",
+      "src/director/interactions/document.js",
+      "src/director/interactions/session.js",
+      "src/scenes/interactions.js",
+      "src/data/inputOwnership.js"
     ],
     "external": ["cesium"]
   },
@@ -1784,7 +1790,10 @@
       "src/director/packs/manifest.js",
       "src/scenes/dataPacks/controller.js",
       "src/scenes/dataPacks/presentation.js",
-      "src/scenes/dataPacks/geometry.js"
+      "src/scenes/dataPacks/geometry.js",
+      "src/director/interactions/document.js",
+      "src/director/interactions/session.js",
+      "src/scenes/interactions.js"
     ],
     "external": [
       "@mapbox/vector-tile",
