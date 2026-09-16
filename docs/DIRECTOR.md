@@ -105,3 +105,5 @@ arbitration, layer cleanup, media timing and provider fallback. Acceptance inclu
 portable runner tests, existing Director regressions and browser playback with
 Stop/seek/replay, plus tracking and voice checks. Use reproducible local fixtures
 for failures and cancellation, alongside live visual checks for actual content.
+
+Declarative actions are implemented in version 6; see [scene actions](DIRECTOR-INTERACTIONS.md) for supported targets, execution and reset semantics.

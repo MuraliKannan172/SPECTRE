@@ -122,3 +122,5 @@ export {
 export { createAssetDirectorySource } from './packs/source.js';
 export { createDataPackSession } from './packs/session.js';
 export { validateDataPack, PACK_LIMITS } from './packs/manifest.js';
+
+export { createInteractionSession } from './interactions/session.js';

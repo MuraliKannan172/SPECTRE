@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+Director version-6 documents add bounded, scene-local feature actions. Settled
+LOAD/seek exposes keyboard-accessible text/source cards, anchor focus, explicit
+shot transitions and admitted layer state changes. Pointer claims take priority;
+Stop/replacement/teardown cancel pending actions and release handlers and UI.
+Same-shot seeks rebuild selected packs and restore declared layer baselines.
+See [scene actions](DIRECTOR-INTERACTIONS.md). Existing scenes/assets and credit remain.
+
 Director version-5 documents add scene-local data-pack manifests and per-shot
 selection. Registered sources acquire bounded, cancellable assets separately from
 GeoJSON, PNG and manually played media presentation. Storage paths, attribution
