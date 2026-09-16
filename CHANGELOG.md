@@ -1,5 +1,11 @@
 # Changelog
 
+- Add nine Ontario transit feeds: TTC, MiWay, Hamilton HSR, Durham Region,
+  YRT/Viva, Guelph, Burlington, Barrie and Kingston, each carrying its own
+  licence quote and attribution. A feed can now name its own modes, so Toronto's
+  trams read "Streetcar" while Helsinki's stay "Tram", and a feed whose route ids
+  are internal keys can translate them to the number a rider would say.
+
 - Cyclone advisories no longer go dark while NHC publishes an advisory ahead
   of its nominal time: advisory and position times up to 90 minutes ahead of
   the server clock are accepted (previously 5 minutes), so the whole feed is
