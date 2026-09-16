@@ -67,11 +67,11 @@ function normalizeBloomState(
   { projectVersion = PROJECT_VERSION, fallbackIntensity = 50 } = {},
 ) {
   // Determine which bloom scale the stored value was encoded under.
-  // Older projects (version < PROJECT_VERSION) used scale version 1.
+  // Older projects (version < 3) used scale version 1.
   const explicitVersion = Number(rawBloom.version);
   const bloomVersion = Number.isFinite(explicitVersion)
     ? explicitVersion
-    : projectVersion >= PROJECT_VERSION
+    : projectVersion >= 3
       ? BLOOM_SCALE_VERSION
       : 1;
 
@@ -231,14 +231,29 @@ export function normalizeShot(
       Number(rawShot?.durationSec) || DEFAULT_SHOT_DURATION_SEC,
     ),
     holdSec: Math.max(0, Number(rawShot?.holdSec) || 0),
-    camera: {
-      lat: Number(camera.lat) || 0,
-      lon: Number(camera.lon) || 0,
-      alt: Number.isFinite(Number(camera.alt)) ? Number(camera.alt) : 800,
-      heading: Number(camera.heading) || 0,
-      pitch: Number.isFinite(Number(camera.pitch)) ? Number(camera.pitch) : -35,
-      roll: Number(camera.roll) || 0,
-    },
+    camera: camera.anchorId
+      ? {
+          anchorId: camera.anchorId,
+          heading: Number(camera.heading) || 0,
+          pitch: Number.isFinite(Number(camera.pitch))
+            ? Number(camera.pitch)
+            : -35,
+          roll: Number(camera.roll) || 0,
+        }
+      : {
+          lat: Number(camera.lat) || 0,
+          lon: Number(camera.lon) || 0,
+          alt: Number.isFinite(Number(camera.alt)) ? Number(camera.alt) : 800,
+          heading: Number(camera.heading) || 0,
+          pitch: Number.isFinite(Number(camera.pitch))
+            ? Number(camera.pitch)
+            : -35,
+          roll: Number(camera.roll) || 0,
+          ...(camera.altitudeReference || rawShot?.move
+            ? { altitudeReference: camera.altitudeReference || 'ellipsoid' }
+            : {}),
+        },
+    ...(rawShot?.move ? { move: deepClone(rawShot.move) } : {}),
     visual: {
       style: visual.style || 'normal',
       bloom: normalizeBloomState(bloom, {
@@ -331,6 +346,7 @@ export function normalizeProject(rawProject) {
       return {
         id: scene?.id || uid('scene'),
         title: scene?.title || `Scene ${sceneIdx + 1}`,
+        ...(scene?.anchors ? { anchors: deepClone(scene.anchors) } : {}),
         releaseLayerIds: [
           ...new Set(
             (Array.isArray(scene?.releaseLayerIds)

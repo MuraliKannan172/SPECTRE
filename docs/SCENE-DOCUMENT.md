@@ -1,13 +1,13 @@
-# Scene document version 3
+# Scene document format
 
-Scenes exports a UTF-8 JSON project. Version 3 remains the write format; existing
-version-3 exports need no conversion. Versions 1, 2 and unversioned legacy files
-are migrated on import. Unknown versions or unsupported fields are rejected with
+Scenes exports a UTF-8 JSON project. Version 4 adds [camera directions](DIRECTOR-CAMERA.md)
+and is the write format. Versions 1, 2, 3 and unversioned legacy files migrate on
+import without converting their existing shots into authored moves. Unknown versions or unsupported fields are rejected with
 a field path before the current project, selection or saved bytes change.
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "scenes": [{
     "id": "my-scene",
     "title": "My scene",
@@ -30,21 +30,21 @@ a field path before the current project, selection or saved bytes change.
 The root requires `scenes` (an array, which may be empty). Optional root fields
 are `version`, `createdAt`, `updatedAt` and `installedBuiltInSceneIds` (string IDs).
 Each scene requires a `shots` array; optional fields are `id`, `title`,
-`releaseLayerIds` and `appliedShotPacks`. A pack marker has `id`, optional numeric
+`releaseLayerIds`, `appliedShotPacks` and version-4 `anchors`. A pack marker has `id`, optional numeric
 `version` and `shotBindings` (original shot title to saved shot ID). These markers
 retain the editor's existing pack-update and rename behavior.
 
 Shots accept `id`, `title`, `durationSec`, `holdSec`, `camera`, `visual`, `layers`,
-`sourcePackId` and `sourcePackVersion`. Scene IDs are unique within the project;
+`sourcePackId`, `sourcePackVersion` and version-4 `move`. Scene IDs are unique within the project;
 shot IDs are unique within their scene. Existing IDs and pack bindings survive
 migration. Missing IDs are generated once and persisted by the next save/export.
 Missing titles and optional camera/visual fields receive the editor's defaults.
 Empty scenes and intentionally empty projects remain empty.
 
-Camera latitude/longitude and heading/pitch/roll use degrees. Altitude uses the
-existing camera-pose height in meters. Import preserves finite heights below
-100 meters and zero pitch, which previously fell through to defaults. Explicit
-altitude-reference and terrain-relative directions are a subsequent format step.
+Camera latitude/longitude and heading/pitch/roll use degrees. Altitude uses
+meters above the WGS84 ellipsoid. Import preserves finite heights below
+100 meters and zero pitch, which previously fell through to defaults. Anchors and explicit moves require the `ellipsoid` altitude reference;
+terrain-relative inputs are rejected. See the camera contract for exact semantics.
 Flight durations retain the editor's minimum of 0.2 seconds and its 4-second
 fallback for zero; holds may be zero.
 
@@ -95,8 +95,7 @@ can preserve temporary edits. Storage writes use the same validation before repl
 edits and storage write failures surface an unsaved toast.
 
 Only authored project fields belong in this file. Runtime clocks, camera flights,
-loading progress and run diagnostics remain separate. Camera anchors, asset-pack
-manifests and declarative interactions are planned extensions, not accepted fields
-in version 3. They will receive stable IDs and their own validated migration when
-introduced. No scene assets, source links, licenses or contributor attribution
+loading progress and run diagnostics remain separate. Version 4 supports scene-local camera anchors and authored moves. Asset-pack
+manifests and declarative interactions remain planned extensions. They will
+receive stable IDs and their own validated migration when introduced. No scene assets, source links, licenses or contributor attribution
 change with this document boundary.

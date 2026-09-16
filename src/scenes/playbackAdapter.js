@@ -40,7 +40,7 @@ export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
       const duration = shot.durationSec || defaultShotDurationSec;
       timing = director._startSceneClockTicker(scene, shot, token);
       travel = director._beginShotTravel(scene, shot, duration);
-      const flight = director._flyCamera(shot.camera, duration, token);
+      const flight = director._flyShotCamera(scene, shot, duration, token);
       director._publishShotTravel(scene, shot, travel);
       return flight;
     },

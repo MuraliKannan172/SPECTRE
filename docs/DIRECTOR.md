@@ -67,16 +67,17 @@ and river coordinates are bundled. See the
    existing recipes and content. Tests cover direct load, forward/backward seek,
    replay, bounded media waits and cancellation at pending transitions.
 2. **Versioned scene document — implemented for existing camera-pose shots.**
-   [Version 3](SCENE-DOCUMENT.md) remains the write format. Bounded validation
+   [The scene document](SCENE-DOCUMENT.md) preserves version-1/2/3 imports. Bounded validation
    rejects malformed files before replacing current state; legacy migration
    preserves IDs, pack bindings and visual edits. Unreadable saved files are
    protected from fallback writes. Camera anchors, pack manifests and actions
    receive stable IDs with their respective later format extensions.
-3. **Camera directions.** Define named geographic anchors and explicit
-   move/hold segments: start and destination, duration, easing, heading, pitch,
-   roll and stop duration. State coordinate units, altitude reference and
-   terrain-relative behavior. Support the current camera-pose shots first;
-   paths, look-at targets and pauses follow with deterministic seek behavior.
+3. **Camera directions — implemented for pose-to-pose moves.**
+   [Version 4](DIRECTOR-CAMERA.md) adds scene-local geographic anchors, explicit
+   start/destination poses, easing, duration and holds. Playback and seek share
+   the same sampler. Ellipsoidal heights are explicit; terrain-relative input
+   is rejected. Existing shots retain ordinary flights. Curved paths, look-at
+   targets and visual authoring are later extensions.
 4. **Data packs and placement.** Define a pack manifest with format/version,
    source, attribution/license and optional integrity/size metadata. Distinguish
    where bytes live (relative files, a URL, or an eventual bundle) from where

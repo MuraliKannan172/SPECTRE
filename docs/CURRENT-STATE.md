@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+Director version-4 documents add named geographic anchors and optional explicit
+camera moves with easing, duration and holds. Playback and seek share one
+coordinate sampler; navigation/manual input revokes authored motion and pending
+holds. Anchor heights and explicit endpoints require the WGS84 ellipsoid
+reference. Legacy projects retain their ordinary flights, content and edits.
+See [camera directions](DIRECTOR-CAMERA.md).
+
 Realtime voice composes separate connection, response/tool, Radio handoff, input
 and audio-meter, cost, viewport-context and diagnostic owners. The existing
 controller exports and session/backend contracts remain available. Tool protocol,
@@ -27,7 +34,7 @@ holds; stale tick callbacks cannot publish into a replacement. Registered pack
 rules own presentation overrides and Nepal map fallback without changing saved
 shots or content. Scene-document validation and legacy migration now have separate
 owners. Invalid imports preserve the current project; unreadable saved projects
-are protected from fallback writes. Version 3 remains the export format, with
+are protected from fallback writes. Version 4 is the export format, with
 zero pitch, low camera heights, scope and detection edits preserved. See [the document contract](SCENE-DOCUMENT.md);
 data packs and interactions remain planned in [Director](DIRECTOR.md).
 

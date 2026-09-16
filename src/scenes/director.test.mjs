@@ -1443,7 +1443,7 @@ test('unsupported stored documents cannot be overwritten by fallback edits', asy
     assert.equal(localStorage.getItem('godsEyeView.sceneProject.v2'), saved);
     await director.importProjectFile({ name: 'valid.json', text: async () => JSON.stringify(PROJECT_FIXTURE) });
     assert.equal(director._storageReadError, null);
-    assert.equal(JSON.parse(localStorage.getItem('godsEyeView.sceneProject.v2')).version, 3);
+    assert.equal(JSON.parse(localStorage.getItem('godsEyeView.sceneProject.v2')).version, 4);
   } finally { restore(); }
 });
 
@@ -1489,5 +1489,31 @@ test('invalid authored edits cannot persist an unreadable project over a good sa
     director._saveProject();
     assert.equal(localStorage.getItem('godsEyeView.sceneProject.v2'), before);
     assert.match(notice, /camera.lat/);
+  } finally { restore(); }
+});
+
+test('zero camera pitch is preserved by both immediate placement and ordinary flight', async () => {
+  const { director, viewer, restore } = makeDirector();
+  try {
+    let placed;
+    viewer.camera.setView = (options) => { placed = options; };
+    const pose = { lat: 10, lon: 20, alt: 500, heading: 0, pitch: 0, roll: 0 };
+    director._setCameraView(pose);
+    assert.equal(placed.orientation.pitch, 0);
+    await director._flyCamera(pose, 0.2, { cancelled: false });
+    assert.equal(viewer.flights.at(-1).orientation.pitch, 0);
+  } finally { restore(); }
+});
+
+test('camera refusal starts no authored frame or playback clock', async () => {
+  const { director, styleManager, viewer, restore } = makeDirector();
+  try {
+    const shot = director._project.scenes[0].shots[0];
+    shot.move = { from: { ...shot.camera, altitudeReference: 'ellipsoid' }, easing: 'linear' };
+    styleManager.runImmediateNavigation = () => false;
+    assert.equal((await director.startScene('scene-1', { single: true })).reason, 'camera-unavailable');
+    assert.equal(director._cameraMotion.active, false);
+    assert.equal(director.getPlaybackTimingState().activeTimers, 0);
+    assert.deepEqual(viewer.flights, []);
   } finally { restore(); }
 });

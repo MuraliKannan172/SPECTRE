@@ -618,7 +618,10 @@
       "src/director/playback.js",
       "src/director/clock.js",
       "src/director/timeline.js",
-      "src/director/document.js"
+      "src/director/document.js",
+      "src/director/documentFields.js",
+      "src/director/cameraDocument.js",
+      "src/director/camera.js"
     ],
     "external": []
   },
@@ -648,7 +651,11 @@
       "src/scenes/packs/defaults.js",
       "src/scenes/packs/nepal.js",
       "src/director/document.js",
-      "src/scenes/project.js"
+      "src/scenes/project.js",
+      "src/director/documentFields.js",
+      "src/director/cameraDocument.js",
+      "src/director/camera.js",
+      "src/scenes/cameraMotion.js"
     ],
     "external": ["cesium"]
   },
@@ -1755,7 +1762,11 @@
       "src/scenes/packs/defaults.js",
       "src/scenes/packs/nepal.js",
       "src/director/document.js",
-      "src/scenes/project.js"
+      "src/scenes/project.js",
+      "src/director/documentFields.js",
+      "src/director/cameraDocument.js",
+      "src/director/camera.js",
+      "src/scenes/cameraMotion.js"
     ],
     "external": [
       "@mapbox/vector-tile",
@@ -2220,7 +2231,11 @@
   },
   "ui-navigation": {
     "exports": ["./ui/navigation"],
-    "modules": ["src/navigationPolicy.js", "src/ui/navigationController.js"],
+    "modules": [
+      "src/navigationPolicy.js",
+      "src/ui/navigationController.js",
+      "src/app/stateChannel.js"
+    ],
     "external": ["cesium"]
   },
   "ui-share-restoration": {
