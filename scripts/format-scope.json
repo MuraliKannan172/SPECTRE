@@ -741,5 +741,7 @@
   "scripts/qa-director-packs.mjs",
   "src/scenes/dataPacks/presentation.test.mjs",
   "src/director/interactions/interactions.test.mjs",
-  "scripts/qa-director-interactions.mjs"
+  "scripts/qa-director-interactions.mjs",
+  "src/director/sharing/sharing.test.mjs",
+  "scripts/qa-director-sharing.mjs"
 ]

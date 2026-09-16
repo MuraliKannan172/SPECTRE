@@ -124,3 +124,14 @@ export { createDataPackSession } from './packs/session.js';
 export { validateDataPack, PACK_LIMITS } from './packs/manifest.js';
 
 export { createInteractionSession } from './interactions/session.js';
+
+export {
+  parseSceneShare,
+  readSceneShare,
+  createSceneBundle,
+  createBundleAssets,
+  BUNDLE_SOURCE,
+  SHARE_LIMITS,
+} from './sharing/bundle.js';
+export { describeSceneShare } from './sharing/preview.js';
+export { editSceneDetails, selectSceneDocument } from './authoring.js';
