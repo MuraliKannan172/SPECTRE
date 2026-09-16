@@ -627,7 +627,11 @@
       "src/director/packs/geojson.js",
       "src/director/packs/manifest.js",
       "src/director/interactions/document.js",
-      "src/director/interactions/session.js"
+      "src/director/interactions/session.js",
+      "src/director/sharing/bundle.js",
+      "src/director/sharing/preview.js",
+      "src/director/sharing/lifetime.js",
+      "src/director/authoring.js"
     ],
     "external": []
   },
@@ -672,7 +676,13 @@
       "src/director/interactions/document.js",
       "src/director/interactions/session.js",
       "src/scenes/interactions.js",
-      "src/data/inputOwnership.js"
+      "src/data/inputOwnership.js",
+      "src/director/sharing/bundle.js",
+      "src/director/sharing/preview.js",
+      "src/director/sharing/lifetime.js",
+      "src/director/authoring.js",
+      "src/scenes/sharing.js",
+      "src/ui/sceneSharing.js"
     ],
     "external": ["cesium"]
   },
@@ -1793,7 +1803,13 @@
       "src/scenes/dataPacks/geometry.js",
       "src/director/interactions/document.js",
       "src/director/interactions/session.js",
-      "src/scenes/interactions.js"
+      "src/scenes/interactions.js",
+      "src/director/sharing/bundle.js",
+      "src/director/sharing/preview.js",
+      "src/director/sharing/lifetime.js",
+      "src/director/authoring.js",
+      "src/scenes/sharing.js",
+      "src/ui/sceneSharing.js"
     ],
     "external": [
       "@mapbox/vector-tile",

@@ -10,6 +10,7 @@ export function createSceneDataPacks(viewer, { sources = {} } = {}) {
   });
   return {
     ...session,
+    sourceIds: () => Object.keys(sources),
     getTargets: () => new Map(targets),
     apply(scene, shot, token) {
       const wanted = new Set(shot.dataPackIds || []);

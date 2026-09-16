@@ -1,5 +1,9 @@
 # Changelog
 
+- Add Director import previews, validated scene/shot detail drafts and selected-scene
+  JSON or asset-bundle sharing. Preserve attribution; verify bounded bundle bytes
+  before admission and release staged work on cancellation or teardown.
+
 - Director scene documents now support bounded data-pack manifests, per-shot
   selection and registered GeoJSON/PNG/media loaders with explicit placement,
   visible attribution and cancellation/disposal on Stop or replacement.

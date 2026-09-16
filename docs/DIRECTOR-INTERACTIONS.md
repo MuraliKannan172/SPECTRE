@@ -62,6 +62,5 @@ interaction owner supplies accessible DOM and picking; pack renderers own the
 feature identities and release them with their geometry. Layer/source admission
 and camera arbitration remain with their existing owners.
 
-Visual authoring, import previews and share bundles remain separate follow-up
-work. For now, author actions in scene JSON and use the existing import/export
-controls. Existing content, assets, notices and contributor credit are preserved.
+Author actions in scene JSON or the validated EDIT DETAILS draft.
+[Import preview and file sharing](DIRECTOR-SHARING.md) preserve those declarations. Existing content, assets, notices and contributor credit are preserved.

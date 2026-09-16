@@ -27,6 +27,12 @@ import {
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
 import { createSceneDataPacks } from './dataPacks/controller.js';
 import { createSceneInteractions } from './interactions.js';
+import { createSceneSharing } from './sharing.js';
+import {
+  createBundleAssets,
+  BUNDLE_SOURCE,
+  readSceneShare,
+} from '../director/sharing/bundle.js';
 import { createDefaultScenePacks } from './packs/defaults.js';
 import {
   layerStatesForShot,
@@ -51,7 +57,6 @@ import {
 import {
   parseSceneDocument,
   stringifySceneDocument,
-  SCENE_DOCUMENT_LIMITS,
   SceneDocumentError,
 } from '../director/document.js';
 
@@ -89,7 +94,15 @@ export class SceneDirector {
     this.dataManager = dataManager;
     this._isMapStackAvailable = isMapStackAvailable;
     this._scenePacks = scenePacks;
-    this._dataPacks = createSceneDataPacks(viewer, dataPacks);
+    this._bundleAssets = createBundleAssets();
+    this._dataPacks = createSceneDataPacks(viewer, {
+      ...dataPacks,
+      sources: {
+        ...dataPacks.sources,
+        [BUNDLE_SOURCE]: this._bundleAssets.source,
+      },
+    });
+    this._sharing = createSceneSharing(this);
     this._interactionTransitions = 0;
     this._interactions = createSceneInteractions(viewer, {
       available: () =>
@@ -217,6 +230,8 @@ export class SceneDirector {
     this._cameraHandoffUnsubscribe?.();
     this._removeCameraInput?.();
     this._cameraMotion?.destroy();
+    this._sharing?.destroy();
+    this._bundleAssets?.clear();
     this._interactions?.destroy();
     this._dataPacks?.destroy();
     this._controls?.destroy();
@@ -369,6 +384,7 @@ export class SceneDirector {
    * Exits silently if the scene-select element is missing (headless/test mode).
    */
   _initUI() {
+    this._sharing?.mount();
     this._controls = new SceneControls({
       subscribe: (listener) => this.subscribe(listener),
       read: () => ({
@@ -404,6 +420,7 @@ export class SceneDirector {
         next: () => this.runNextScene(),
         export: () => this.exportProject(),
         import: (file) => this.importProjectFile(file),
+        reviewImport: (file) => this._sharing.preview(file),
         download: () => this.downloadLastRunMetadata(),
         load: (sceneId, shotId) => this.loadShot(sceneId, shotId),
         deleteShot: (sceneId, shotId) => this.deleteShot(sceneId, shotId),
@@ -1851,6 +1868,14 @@ export class SceneDirector {
     );
   }
 
+  /** Copied authoring and bundled-byte diagnostics for lifecycle checks. */
+  getSharingState() {
+    return {
+      ...this._sharing?.getState(),
+      assets: this._bundleAssets?.getState() || { count: 0, bytes: 0 },
+    };
+  }
+
   /** Export the entire project as a timestamped JSON file download. */
   exportProject() {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1881,30 +1906,66 @@ export class SceneDirector {
    * The file is normalized/migrated on load; invalid JSON shows an error status.
    * @param {File} file - Browser File object from an <input type="file">
    */
-  async importProjectFile(file) {
+  async importProjectFile(
+    file,
+    { prepared, expectedProject, selection, signal } = {},
+  ) {
     const generation = (this._importGeneration =
       (this._importGeneration || 0) + 1);
     try {
-      if (file.size > SCENE_DOCUMENT_LIMITS.bytes) {
-        throw new SceneDocumentError('$', 'file exceeds 5 MiB');
-      }
-      const text = await file.text();
-      if (this._destroyed || generation !== this._importGeneration) return;
-      const project = normalizeProject(parseSceneDocument(text));
+      if (!prepared) this._sharing?.close();
+      const input = prepared || (await readSceneShare(file, { signal }));
+      if (signal?.aborted) return false;
+      if (this._destroyed || generation !== this._importGeneration)
+        return false;
+      const project = normalizeProject(
+        parseSceneDocument(stringifySceneDocument(input.project)),
+      );
+      if (
+        expectedProject &&
+        expectedProject !== JSON.stringify(this._project, null, 2)
+      )
+        return false;
       // Validate before touching playback, selection or the saved project.
       this.stopScene('Importing project');
       await Promise.allSettled([...(this._pendingWork || [])]);
       if (this._destroyed || generation !== this._importGeneration) return;
+      if (
+        signal?.aborted ||
+        (expectedProject &&
+          expectedProject !== JSON.stringify(this._project, null, 2))
+      )
+        return false;
       this._project = project;
+      const retainedPaths = new Set(
+        project.scenes.flatMap((scene) =>
+          (scene.dataPacks || [])
+            .filter((pack) => pack.source.adapter === BUNDLE_SOURCE)
+            .map((pack) => pack.source.path),
+        ),
+      );
+      this._bundleAssets?.replace(
+        new Map(
+          [...(input.assets || [])].filter(([path]) => retainedPaths.has(path)),
+        ),
+      );
       this._storageReadError = null;
-      this._selectedSceneId = project.scenes[0]?.id || null;
-      this._selectedShotId = project.scenes[0]?.shots[0]?.id || null;
+      this._selectedSceneId =
+        selection?.sceneId || project.scenes[0]?.id || null;
+      this._selectedShotId =
+        selection?.shotId || project.scenes[0]?.shots[0]?.id || null;
       this._loadedSceneId = null;
       this._saveProject();
       this._publish({ type: 'project-imported', project });
       this._updateStatus(`Imported ${file.name}`);
+      return true;
     } catch (error) {
-      if (this._destroyed || generation !== this._importGeneration) return;
+      if (
+        signal?.aborted ||
+        this._destroyed ||
+        generation !== this._importGeneration
+      )
+        return false;
       this._updateStatus(
         error instanceof SceneDocumentError
           ? `Import failed: ${error.message}`
