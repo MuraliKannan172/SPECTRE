@@ -603,6 +603,7 @@ export function createBhoteKoshiEmbeddedMedia({
   );
   if (pinokioShell || !documentRef?.createElement || !viewer) {
     return {
+      supportsPlayback: false,
       warm: () => false,
       show: () => false,
       play: () => false,
@@ -1084,6 +1085,7 @@ export function createBhoteKoshiEmbeddedMedia({
   }
 
   return {
+    supportsPlayback: true,
     warm,
     show,
     getPlaybackState: () => record?.youtubeSession?.getState() || null,
