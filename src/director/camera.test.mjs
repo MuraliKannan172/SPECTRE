@@ -62,7 +62,7 @@ test('version 4 retains anchor identity, references and explicit move edits thro
     project,
   );
 });
-test('v3 unversioned bloom already uses scale 2 and is not migrated again in v4', () => {
+test('v3 unversioned bloom already uses scale 2 and is not migrated again in later formats', () => {
   const project = normalizeProject(
     parseSceneDocument(
       JSON.stringify({
@@ -73,7 +73,7 @@ test('v3 unversioned bloom already uses scale 2 and is not migrated again in v4'
       }),
     ),
   );
-  assert.equal(project.version, 4);
+  assert.equal(project.version, 5);
   assert.equal(project.scenes[0].shots[0].visual.bloom.intensity, 50);
 });
 test('move endpoints, easing, shortest arcs and hold agree with scene seeking', () => {

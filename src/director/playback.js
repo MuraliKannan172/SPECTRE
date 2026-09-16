@@ -118,3 +118,7 @@ export {
   resolveCameraMove,
   sampleCameraMove,
 } from './camera.js';
+
+export { createAssetDirectorySource } from './packs/source.js';
+export { createDataPackSession } from './packs/session.js';
+export { validateDataPack, PACK_LIMITS } from './packs/manifest.js';

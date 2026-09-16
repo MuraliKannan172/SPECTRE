@@ -78,14 +78,15 @@ and river coordinates are bundled. See the
    the same sampler. Ellipsoidal heights are explicit; terrain-relative input
    is rejected. Existing shots retain ordinary flights. Curved paths, look-at
    targets and visual authoring are later extensions.
-4. **Data packs and placement.** Define a pack manifest with format/version,
-   source, attribution/license and optional integrity/size metadata. Distinguish
-   where bytes live (relative files, a URL, or an eventual bundle) from where
-   features appear (geographic bounds, anchors, transforms and elevation rules).
-   Start with existing GeoJSON/image/media adapters. Resolve relative paths
-   against an explicit document base; define CORS, caching, missing-asset and
-   offline behavior. Fetch only through registered source adapters with bounded,
-   cancellable loading. Scene files carry no credentials or executable modules.
+4. **Data packs and placement — implemented for bounded assets.**
+   [Version 5](DIRECTOR-DATA-PACKS.md) defines a pack manifest with format/version,
+   source, attribution/license and optional integrity/size metadata. It distinguishes
+   registered asset directories from geographic coordinates, image bounds and
+   media anchors. GeoJSON, PNG and native media adapters load with byte/time
+   limits and explicit ellipsoid heights. Stop and replacement release resources.
+   Paths resolve against a trusted directory base; missing/offline assets fail
+   explicitly. Bundles, transforms and terrain-relative placement remain future
+   extensions. Scene files carry no credentials or executable modules.
 5. **Declarative interactions.** Give pickable features stable IDs and connect
    clicks to a small action registry: show a text/source card, focus an anchor,
    seek a shot, or change an allowed layer state. Define selection feedback,

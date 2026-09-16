@@ -621,7 +621,11 @@
       "src/director/document.js",
       "src/director/documentFields.js",
       "src/director/cameraDocument.js",
-      "src/director/camera.js"
+      "src/director/camera.js",
+      "src/director/packs/source.js",
+      "src/director/packs/session.js",
+      "src/director/packs/geojson.js",
+      "src/director/packs/manifest.js"
     ],
     "external": []
   },
@@ -655,7 +659,14 @@
       "src/director/documentFields.js",
       "src/director/cameraDocument.js",
       "src/director/camera.js",
-      "src/scenes/cameraMotion.js"
+      "src/scenes/cameraMotion.js",
+      "src/director/packs/source.js",
+      "src/director/packs/session.js",
+      "src/director/packs/geojson.js",
+      "src/director/packs/manifest.js",
+      "src/scenes/dataPacks/controller.js",
+      "src/scenes/dataPacks/presentation.js",
+      "src/scenes/dataPacks/geometry.js"
     ],
     "external": ["cesium"]
   },
@@ -1766,7 +1777,14 @@
       "src/director/documentFields.js",
       "src/director/cameraDocument.js",
       "src/director/camera.js",
-      "src/scenes/cameraMotion.js"
+      "src/scenes/cameraMotion.js",
+      "src/director/packs/source.js",
+      "src/director/packs/session.js",
+      "src/director/packs/geojson.js",
+      "src/director/packs/manifest.js",
+      "src/scenes/dataPacks/controller.js",
+      "src/scenes/dataPacks/presentation.js",
+      "src/scenes/dataPacks/geometry.js"
     ],
     "external": [
       "@mapbox/vector-tile",

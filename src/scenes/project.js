@@ -253,6 +253,7 @@ export function normalizeShot(
             ? { altitudeReference: camera.altitudeReference || 'ellipsoid' }
             : {}),
         },
+    ...(rawShot?.dataPackIds ? { dataPackIds: [...rawShot.dataPackIds] } : {}),
     ...(rawShot?.move ? { move: deepClone(rawShot.move) } : {}),
     visual: {
       style: visual.style || 'normal',
@@ -346,6 +347,7 @@ export function normalizeProject(rawProject) {
       return {
         id: scene?.id || uid('scene'),
         title: scene?.title || `Scene ${sceneIdx + 1}`,
+        ...(scene?.dataPacks ? { dataPacks: deepClone(scene.dataPacks) } : {}),
         ...(scene?.anchors ? { anchors: deepClone(scene.anchors) } : {}),
         releaseLayerIds: [
           ...new Set(

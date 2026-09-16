@@ -25,6 +25,7 @@ import {
   getSceneAppendRecipeById,
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
+import { createSceneDataPacks } from './dataPacks/controller.js';
 import { createDefaultScenePacks } from './packs/defaults.js';
 import {
   layerStatesForShot,
@@ -77,6 +78,7 @@ export class SceneDirector {
     {
       isMapStackAvailable = () => false,
       scenePacks = createDefaultScenePacks(),
+      dataPacks = {},
     } = {},
   ) {
     this._destroyed = false;
@@ -86,6 +88,7 @@ export class SceneDirector {
     this.dataManager = dataManager;
     this._isMapStackAvailable = isMapStackAvailable;
     this._scenePacks = scenePacks;
+    this._dataPacks = createSceneDataPacks(viewer, dataPacks);
     this._cameraMotion = createCameraMotion({
       applyPose: (pose) => this._setCameraView(pose),
     });
@@ -200,6 +203,7 @@ export class SceneDirector {
     this._cameraHandoffUnsubscribe?.();
     this._removeCameraInput?.();
     this._cameraMotion?.destroy();
+    this._dataPacks?.destroy();
     this._controls?.destroy();
     this._state.destroy();
     this._destroyPromise = Promise.resolve().then(async () => {
@@ -997,6 +1001,7 @@ export class SceneDirector {
     // manager) rather than merely ignored once it has already committed.
     this._cancelActiveSceneTravel();
     this._usesAuthoredCamera = !!shot.move;
+    this._dataPacks?.clear();
     this._loadAbort?.abort();
     const controller = new AbortController();
     this._loadAbort = controller;
@@ -1041,6 +1046,9 @@ export class SceneDirector {
       if (this._loadAbort === controller) this._loadAbort = null;
       return { started: false, reason: 'layers-refused' };
     }
+    if (!(await this._applyDataPacks(scene, shot, token)))
+      return { started: false, reason: 'data-packs-unavailable' };
+    if (token.cancelled) return;
     if (seekState) {
       this._setCameraView(
         seekState.camera || resolveCameraPose(scene, shot.camera),
@@ -1613,6 +1621,7 @@ export class SceneDirector {
     // Aborting cancels a layer transition already in flight; bumping the
     // generation disowns everything the load has not yet started.
     this._cancelActiveSceneTravel();
+    this._dataPacks?.clear();
     this._loadAbort?.abort();
     this._loadAbort = null;
     this._loadGeneration++;
@@ -1723,6 +1732,7 @@ export class SceneDirector {
    * @param {string} [reason='Stopped'] - Human-readable cancellation reason
    */
   stopScene(reason = 'Stopped') {
+    this._dataPacks?.clear();
     this._sceneSeekGeneration++;
     this._loadAbort?.abort();
     this._loadAbort = null;
@@ -1736,6 +1746,21 @@ export class SceneDirector {
     this._runAbort?.abort();
     this._updateStatus(reason);
     this._logEvent('scene_stopped', { reason });
+  }
+
+  /** Apply only the shot's declared packs through registered sources. */
+  async _applyDataPacks(scene, shot, token) {
+    try {
+      return (await this._dataPacks?.apply(scene, shot, token)) ?? true;
+    } catch (error) {
+      if (!token?.cancelled) this._updateStatus(error.message);
+      return false;
+    }
+  }
+
+  /** Copied resource state for lifecycle checks and diagnostics. */
+  getDataPackState() {
+    return this._dataPacks?.getState() || { status: 'idle', count: 0 };
   }
 
   /** Export the entire project as a timestamped JSON file download. */
@@ -1912,6 +1937,7 @@ export class SceneDirector {
    * @returns {Promise<boolean>} True only when every owned layer is released
    */
   async _releaseSceneLayers(scene, token = null) {
+    this._dataPacks?.clear();
     const layerIds = Array.isArray(scene?.releaseLayerIds)
       ? scene.releaseLayerIds
       : [];
