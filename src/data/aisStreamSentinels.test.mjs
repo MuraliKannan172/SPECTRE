@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aisStreamRows, ingestAisStreamEnvelope } from '../../server/providers/vessels/ais-store.js';
+import {
+  aisStreamRows,
+  ingestAisStreamEnvelope,
+} from '../../server/providers/vessels/ais-store.js';
 
 // ITU-R M.1371 encodes speed over ground in 0.1-knot units and course over
 // ground in 0.1-degree units, reserving the top code of each field for "not
