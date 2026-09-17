@@ -1,5 +1,11 @@
 # Changelog
 
+- Add Bike Share Toronto (1,069 stations) to the bikeshare registry. The system
+  publishes the same PBSC GBFS v2 feeds as the Austin, Honolulu and Chattanooga
+  entries, so it needs no new plumbing; a registry test now holds every city's
+  feed URLs against the proxy host and path allowlists, so a city the proxy
+  would refuse fails the suite instead of rendering an empty layer.
+
 - GBFS v3 station names use English translations when available, then the first
   usable translation or short name. Empty or malformed names no longer appear as
   `[object Object]` or interrupt station loading; legacy string names remain
