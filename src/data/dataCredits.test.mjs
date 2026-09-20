@@ -18,17 +18,14 @@ test('every credit carries a unique key and some markup to render', () => {
   }
 });
 
-test('adsbdb is credited, and keeps the wording its route data requires', () => {
+test('adsbdb is credited and carries its published route-data restriction', () => {
   const credit = DATA_CREDITS.find((entry) => entry.key === 'adsbdb');
   assert.ok(
     credit,
     'adsbdb supplies aircraft type and routes and must be credited',
   );
-  // Not a stylistic preference: adsbdb states that the route data "may not be
-  // copied, published, or incorporated into other databases without the
-  // explicit permission of David J Taylor, Edinburgh". The names and that
-  // restriction are the attribution, so they are pinned here rather than left
-  // to survive the next edit by luck.
+  // adsbdb publishes this restriction for its route data. Pin the provider's
+  // credits and restriction here so a later edit cannot silently remove them.
   assert.match(credit.html, /David Taylor, Edinburgh/);
   assert.match(credit.html, /Jim Mason, Glasgow/);
   assert.match(
@@ -37,5 +34,6 @@ test('adsbdb is credited, and keeps the wording its route data requires', () => 
   );
   assert.match(credit.html, /explicit permission of David J Taylor, Edinburgh/);
   assert.match(credit.html, /PlaneBase/);
+  assert.match(credit.html, /Guillaume Michel/);
   assert.match(credit.html, /href="https:\/\/www\.adsbdb\.com"/);
 });

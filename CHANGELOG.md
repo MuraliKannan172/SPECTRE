@@ -2,13 +2,11 @@
 
 - Credit adsbdb, which supplies the aircraft type, model name and registration
   on enriched flights and the airline and origin/destination pair behind the
-  tracked contact's route strip. `DATA_SOURCES.md` now records the terms adsbdb
-  publishes — aircraft data from PlaneBase, and route data that is the work of
-  David Taylor, Edinburgh, and Jim Mason, Glasgow, and may not be copied into
-  another database without his permission — along with the request bounds and
-  the gitignored 24-hour cache that keep the app inside them. A matching
-  `DATA_CREDITS` entry surfaces the credit in the in-app Data attribution
-  popover, and a test pins the wording the route data requires.
+  tracked contact's route strip. `DATA_SOURCES.md` now records adsbdb's
+  published credits and route-data restriction, along with the request bounds
+  and gitignored 24-hour local cache. A matching `DATA_CREDITS` entry surfaces
+  the credit in the in-app Data attribution popover, and a test protects it
+  against accidental removal.
 
 - Size the TomTom daily tile budget to the provider's real free allowance.
   `TOMTOM_DAILY_TILE_BUDGET` defaulted to 40,000/day against an allowance
