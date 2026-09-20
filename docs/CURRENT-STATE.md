@@ -3800,7 +3800,8 @@ easier to meet (detection is now on more often), but does not create it.
 - Traffic runs in `sim` mode (white dots, hardcoded speeds) unless `TOMTOM_API_KEY`
   is configured (env or Keychain `tomtom-api`/`api-key`), which enables `live` mode:
   TomTom flow vector tiles via the budget-governed `/api/tomtom` proxy
-  (`.gev-cache/tomtom/`, 120 s TTL, `TOMTOM_DAILY_TILE_BUDGET` default 40k/day),
+  (`.gev-cache/tomtom/`, 120 s TTL, `TOMTOM_DAILY_TILE_BUDGET` default 6k/day,
+  sized so a 31-day month stays inside TomTom's 200K/month free allowance),
   decoded client-side (`flowTiles.js`), matched onto Overpass roads
   (`flowMatch.js`), and rendered as green/amber/red dot color + speed/density
   scaling (`trafficFlowStyle.js`); closures spawn no dots; unmatched roads stay
