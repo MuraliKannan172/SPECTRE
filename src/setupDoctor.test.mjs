@@ -181,6 +181,32 @@ test('doctor retains OAuth capability wording for a complete client pair', () =>
   );
 });
 
+test('doctor reports Basic mode without inferring runtime auth from OAuth credentials', () => {
+  const oauthCredentials = {
+    OPENSKY_CLIENT_ID: { configured: true },
+    OPENSKY_CLIENT_SECRET: { configured: true },
+  };
+  for (const credentials of [{}, oauthCredentials]) {
+    assert.equal(
+      buildCapabilitySummary(credentials, { openSkyAuthMode: 'basic' }).flights,
+      'OpenSky Basic mode selected (credential presence and validity not verified)',
+    );
+  }
+});
+
+test('doctor reports auto mode without assuming its eventual credential choice', () => {
+  const oauthCredentials = {
+    OPENSKY_CLIENT_ID: { configured: true },
+    OPENSKY_CLIENT_SECRET: { configured: true },
+  };
+  for (const credentials of [{}, oauthCredentials]) {
+    assert.equal(
+      buildCapabilitySummary(credentials, { openSkyAuthMode: 'auto' }).flights,
+      'OpenSky auto mode selected (runtime credential choice and validity not verified)',
+    );
+  }
+});
+
 test('doctor describes the credential ladder without exposing values', () => {
   const credentials = {
     GOOGLE_MAPS_API_KEY: { configured: false },

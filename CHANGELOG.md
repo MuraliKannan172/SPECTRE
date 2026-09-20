@@ -268,9 +268,10 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 ### Fixed
 
 - Make `npm run doctor` report keyless anonymous OpenSky access for explicit
-  `OPENSKY_AUTH_MODE=anon` and missing OAuth client pairs while retaining the
-  existing OAuth-pair capability wording. OpenSky proxy authentication is
-  unchanged.
+  `OPENSKY_AUTH_MODE=anon` and OAuth mode without a client pair, retain the
+  existing OAuth-pair capability wording, and identify selected Basic or auto
+  modes without guessing their eventual credential choice. OpenSky proxy
+  authentication is unchanged.
 - Bikeshare stations load again. The extracted station source addressed the
   proxy as `/api/gbfs?url=`, but the proxy reads its upstream target from the
   path, so every request answered 400 and the layer reported a fetch error for

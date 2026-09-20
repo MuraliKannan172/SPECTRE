@@ -151,7 +151,19 @@ export function buildCapabilitySummary(
 ) {
   const configured = (name) => credentials[name]?.configured === true;
   const hasOAuthCredentials = configured('OPENSKY_CLIENT_ID') && configured('OPENSKY_CLIENT_SECRET');
-  const anonymousOpenSkyMode = String(openSkyAuthMode || '').trim().toLowerCase() === 'anon';
+  const requestedOpenSkyMode = String(openSkyAuthMode || '').trim().toLowerCase();
+  const openSkyMode = OPENSKY_AUTH_MODES.has(requestedOpenSkyMode)
+    ? requestedOpenSkyMode
+    : OPENSKY_AUTH_MODE_DEFAULT;
+  const flights = openSkyMode === 'anon'
+    ? 'OpenSky keyless anonymous access (rate-limited)'
+    : openSkyMode === 'basic'
+      ? 'OpenSky Basic mode selected (credential presence and validity not verified)'
+      : openSkyMode === 'auto'
+        ? 'OpenSky auto mode selected (runtime credential choice and validity not verified)'
+        : hasOAuthCredentials
+          ? 'OpenSky OAuth credentials present (runtime mode and validity not verified)'
+          : 'OpenSky keyless anonymous access (rate-limited)';
   const route = selectMapStartupRoute({
     googleApiKey: configured('GOOGLE_MAPS_API_KEY') ? 'configured' : '',
     cesiumToken: configured('CESIUM_ION_TOKEN') ? 'configured' : '',
@@ -162,9 +174,7 @@ export function buildCapabilitySummary(
       : route === 'google-ion'
         ? 'Google Photorealistic 3D Tiles through Cesium ion; Bing and world-terrain stacks available'
         : 'Esri World Imagery (keyless satellite basemap) with keyless terrain',
-    flights: hasOAuthCredentials && !anonymousOpenSkyMode
-      ? 'OpenSky OAuth credentials present (runtime mode and validity not verified)'
-      : 'OpenSky keyless anonymous access (rate-limited)',
+    flights,
     voice: configured('OPENAI_API_KEY') ? 'available' : 'off until an OpenAI key is added',
     vessels: configured('AISSTREAM_API_KEY') ? 'live AISStream feed' : 'off until an AISStream key is added',
     fires: configured('FIRMS_MAP_KEY') ? 'live NASA FIRMS feed' : 'off until a FIRMS key is added',
