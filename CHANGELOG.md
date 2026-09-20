@@ -1,5 +1,10 @@
 # Changelog
 
+- Render native `<select>` option lists in the dark UI palette. The closed
+  controls were already skinned, but the browser-painted popups fell back to the
+  platform light palette, leaving near-white option text on a white surface in
+  the HUD layout, Scenes, CCTV camera, Radio filter and Draw colour menus.
+
 - Credit adsbdb, which supplies the aircraft type, model name and registration
   on enriched flights and the airline and origin/destination pair behind the
   tracked contact's route strip. `DATA_SOURCES.md` now records adsbdb's
