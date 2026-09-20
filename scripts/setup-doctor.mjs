@@ -4,9 +4,10 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { projectRoot } from './project-root.mjs';
 import { selectMapStartupRoute } from '../src/mapStartup.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = projectRoot(import.meta.url);
 const OPENSKY_AUTH_MODE_DEFAULT = 'oauth';
 const OPENSKY_AUTH_MODES = new Set(['basic', 'oauth', 'auto', 'anon']);
 
@@ -174,7 +175,7 @@ export function buildCapabilitySummary(
   };
 }
 
-export function inspectSetup({ includeKeychain = true, authoritativeEnvironment = false } = {}) {
+export function inspectSetup({ includeKeychain = true, authoritativeEnvironment = false, rootDir = ROOT } = {}) {
   const node = classifyNodeVersion();
   const npm = npmProcessSpec();
   const npmResult = spawnSync(npm.command, ['--version'], {
@@ -183,9 +184,9 @@ export function inspectSetup({ includeKeychain = true, authoritativeEnvironment 
   });
   const credentials = Object.fromEntries(CREDENTIALS.map((spec) => [
     spec.name,
-    resolveCredential(spec, { includeKeychain, authoritativeEnvironment }),
+    resolveCredential(spec, { includeKeychain, authoritativeEnvironment, rootDir }),
   ]));
-  const dependenciesInstalled = hasRequiredDependencies();
+  const dependenciesInstalled = hasRequiredDependencies(rootDir);
   return {
     ready: node.level !== 'error' && npmResult.status === 0 && dependenciesInstalled,
     node: { version: process.versions.node, ...node },
@@ -195,7 +196,7 @@ export function inspectSetup({ includeKeychain = true, authoritativeEnvironment 
     dependenciesInstalled,
     credentials,
     capabilities: buildCapabilitySummary(credentials, {
-      openSkyAuthMode: resolveOpenSkyAuthMode({ authoritativeEnvironment }),
+      openSkyAuthMode: resolveOpenSkyAuthMode({ authoritativeEnvironment, rootDir }),
     }),
   };
 }
