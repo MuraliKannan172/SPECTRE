@@ -1,5 +1,13 @@
 # God's Eye View Current State
 
+AIS encodes speed over ground in 0.1-knot units and course over ground in
+0.1-degree units, reserving the top code of each field for "not available", so
+those reports arrive as 102.3 knots and 360 degrees. Both are stored as unknown,
+and vessel cards, the HUD and analyst queries show a missing measurement rather
+than a reading. Heading keeps its existing separate check for its own sentinel.
+Genuine readings are unchanged, including a stopped vessel's zero and the
+highest speed and course the fields can encode.
+
 Native `<select>` controls declare a dark colour scheme and explicit option
 colours, so the browser-painted option list matches the panel it drops out of.
 The scheme is declared on the controls rather than on the document root, so

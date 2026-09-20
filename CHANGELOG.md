@@ -1,5 +1,9 @@
 # Changelog
 
+- Report AIS speed and course that carry the standard "not available" code as
+  unknown instead of 102.3 knots and 360 degrees. Genuine readings, including a
+  stopped vessel's zero and the highest encodable values, are unchanged.
+
 - Render native `<select>` option lists in the dark UI palette. The closed
   controls were already skinned, but the browser-painted popups fell back to the
   platform light palette, leaving near-white option text on a white surface in
