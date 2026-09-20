@@ -1,5 +1,11 @@
 # God's Eye View Current State
 
+Vessel snapshot completeness is separate from freshness. A current snapshot with
+rejected or duplicate records shows PARTIAL with accepted/received counts; stale
+or unknown freshness and transport failures retain their warnings. Partial
+snapshots still retain missing contacts within the existing age and row limits.
+A complete successful snapshot clears the partial indicator.
+
 Director imports now open a non-mutating preview before Apply. EDIT DETAILS
 authors validated anchor, camera, pack and interaction drafts; SHARE SCENE exports
 a selected scene or a bounded bundle of explicitly chosen pack files. Bundled
@@ -3794,7 +3800,8 @@ easier to meet (detection is now on more often), but does not create it.
 - Traffic runs in `sim` mode (white dots, hardcoded speeds) unless `TOMTOM_API_KEY`
   is configured (env or Keychain `tomtom-api`/`api-key`), which enables `live` mode:
   TomTom flow vector tiles via the budget-governed `/api/tomtom` proxy
-  (`.gev-cache/tomtom/`, 120 s TTL, `TOMTOM_DAILY_TILE_BUDGET` default 40k/day),
+  (`.gev-cache/tomtom/`, 120 s TTL, `TOMTOM_DAILY_TILE_BUDGET` default 6k/day,
+  sized so a 31-day month stays inside TomTom's 200K/month free allowance),
   decoded client-side (`flowTiles.js`), matched onto Overpass roads
   (`flowMatch.js`), and rendered as green/amber/red dot color + speed/density
   scaling (`trafficFlowStyle.js`); closures spawn no dots; unmatched roads stay
