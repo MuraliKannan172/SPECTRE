@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import {
   mkdtempSync,
@@ -336,4 +337,100 @@ test('OpenAI routes answer generically when the upstream or the request fails', 
   assert.deepEqual(token.json(), { error: 'Failed to create Realtime token' });
   assert.equal(token.body.includes('api.openai.com'), false);
   assert.equal(token.body.includes('fixture-upstream-secret'), false);
+});
+
+test('the debug-log sink stays bounded, rate limited, and quiet about failures', async (t) => {
+  const sourceRoot = root(t);
+  const handler = install(openAiRealtimeProxy({ sourceRoot })).get(
+    '/api/realtime/debug-log',
+  );
+  const file = path.join(sourceRoot, '.gev-logs/realtime-conversations.jsonl');
+  const write = (record) =>
+    request(handler, { method: 'POST', body: JSON.stringify(record) });
+
+  // A malformed record is the caller's fault and a 400; neither answer carries
+  // the error text, which for a write failure is an errno and an absolute path.
+  const malformed = await request(handler, { method: 'POST', body: '{nope' });
+  assert.equal(malformed.status, 400);
+  assert.deepEqual(malformed.json(), {
+    error: 'Failed to write Realtime debug log',
+  });
+
+  // The limiter is always on, unlike the opt-in one the cost-bearing routes
+  // share: 120/min per IP, far above what a voice session writes.
+  let limited = null;
+  let accepted = 0;
+  for (let n = 0; n < 130 && !limited; n += 1) {
+    const response = await write({ n });
+    if (response.status === 429) limited = response;
+    else if (response.status === 204) accepted += 1;
+  }
+  assert.ok(limited, 'the sink refuses a caller past its per-minute ceiling');
+  assert.equal(limited.headers['retry-after'], '60');
+  assert.deepEqual(limited.json(), { error: 'Rate limit exceeded' });
+  // The limiter counts requests rather than successful writes, so the malformed
+  // record above already spent one of the 120 slots.
+  assert.equal(accepted, 119);
+
+  // Every accepted record is on disk and parses: the queue serializes appends,
+  // so none was lost or truncated by the ones beside it.
+  const lines = readFileSync(file, 'utf8').split('\n').filter(Boolean);
+  assert.equal(lines.length, accepted);
+  for (const line of lines) assert.doesNotThrow(() => JSON.parse(line));
+  assert.ok(lines.every((line) => JSON.parse(line).loggedAt));
+});
+
+test('an oversized debug-log request receives the fixed error response', async (t) => {
+  const handler = install(openAiRealtimeProxy({ sourceRoot: root(t) })).get(
+    '/api/realtime/debug-log',
+  );
+  const server = createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const response = await fetch(
+    `http://127.0.0.1:${server.address().port}/api/realtime/debug-log`,
+    { method: 'POST', body: 'x'.repeat(8 * 1024 * 1024 + 1) },
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: 'Failed to write Realtime debug log',
+  });
+});
+
+test('the debug log rotates instead of growing without bound', async (t) => {
+  const sourceRoot = root(t);
+  const handler = install(openAiRealtimeProxy({ sourceRoot })).get(
+    '/api/realtime/debug-log',
+  );
+  const file = path.join(sourceRoot, '.gev-logs/realtime-conversations.jsonl');
+
+  // 8 MB bounds one request body; nothing bounded the file until now, so a
+  // single page could grow it for as long as the dev server ran. Each record
+  // here is ~1 MB, well inside the body cap.
+  const pad = 'x'.repeat(1024 * 1024);
+  // Seventy-two records force two rotations. The second one replaces an
+  // existing `.1`, which requires an explicit removal on Windows.
+  for (let n = 0; n < 72; n += 1) {
+    assert.equal(
+      (
+        await request(handler, {
+          method: 'POST',
+          body: JSON.stringify({ n, pad }),
+        })
+      ).status,
+      204,
+    );
+  }
+
+  const live = statSync(file).size;
+  const previous = statSync(`${file}.1`).size;
+  assert.ok(live <= 32 * 1024 * 1024, `live log under the ceiling (${live})`);
+  assert.ok(
+    live + previous <= 64 * 1024 * 1024,
+    'both generations together stay within twice the ceiling',
+  );
+  // Unrotated, these records would be ~75 MB in one file.
+  assert.ok(live + previous < 64 * 1024 * 1024);
+  assert.ok(!existsSync(`${file}.2`), 'exactly one generation is retained');
 });
