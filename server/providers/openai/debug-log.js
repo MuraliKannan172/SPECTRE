@@ -46,6 +46,10 @@ function createDebugLogHandler({ sourceRoot = defaultSourceRoot } = {}) {
         () => 0,
       );
       if (size + Buffer.byteLength(line) > REALTIME_DEBUG_LOG_MAX_FILE_BYTES) {
+        // Node does not replace an existing destination on Windows. Remove the
+        // retained generation explicitly so every rotation behaves the same on
+        // supported platforms rather than failing after the first 64 MB.
+        await fsp.rm(`${logFile}.1`, { force: true });
         await fsp.rename(logFile, `${logFile}.1`);
       }
       await fsp.appendFile(logFile, line);
@@ -67,7 +71,7 @@ function createDebugLogHandler({ sourceRoot = defaultSourceRoot } = {}) {
     if (!allow(clientKey(req))) {
       res.writeHead(429, {
         'Content-Type': 'application/json',
-        'Retry-After': '5',
+        'Retry-After': '60',
       });
       res.end(JSON.stringify({ error: 'Rate limit exceeded' }));
       return;

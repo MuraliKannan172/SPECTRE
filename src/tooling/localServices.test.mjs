@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import {
   mkdtempSync,
@@ -365,7 +366,7 @@ test('the debug-log sink stays bounded, rate limited, and quiet about failures',
     else if (response.status === 204) accepted += 1;
   }
   assert.ok(limited, 'the sink refuses a caller past its per-minute ceiling');
-  assert.equal(limited.headers['retry-after'], '5');
+  assert.equal(limited.headers['retry-after'], '60');
   assert.deepEqual(limited.json(), { error: 'Rate limit exceeded' });
   // The limiter counts requests rather than successful writes, so the malformed
   // record above already spent one of the 120 slots.
@@ -379,6 +380,24 @@ test('the debug-log sink stays bounded, rate limited, and quiet about failures',
   assert.ok(lines.every((line) => JSON.parse(line).loggedAt));
 });
 
+test('an oversized debug-log request receives the fixed error response', async (t) => {
+  const handler = install(openAiRealtimeProxy({ sourceRoot: root(t) })).get(
+    '/api/realtime/debug-log',
+  );
+  const server = createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const response = await fetch(
+    `http://127.0.0.1:${server.address().port}/api/realtime/debug-log`,
+    { method: 'POST', body: 'x'.repeat(8 * 1024 * 1024 + 1) },
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: 'Failed to write Realtime debug log',
+  });
+});
+
 test('the debug log rotates instead of growing without bound', async (t) => {
   const sourceRoot = root(t);
   const handler = install(openAiRealtimeProxy({ sourceRoot })).get(
@@ -390,7 +409,9 @@ test('the debug log rotates instead of growing without bound', async (t) => {
   // single page could grow it for as long as the dev server ran. Each record
   // here is ~1 MB, well inside the body cap.
   const pad = 'x'.repeat(1024 * 1024);
-  for (let n = 0; n < 40; n += 1) {
+  // Seventy-two records force two rotations. The second one replaces an
+  // existing `.1`, which requires an explicit removal on Windows.
+  for (let n = 0; n < 72; n += 1) {
     assert.equal(
       (
         await request(handler, {
@@ -409,7 +430,7 @@ test('the debug log rotates instead of growing without bound', async (t) => {
     live + previous <= 64 * 1024 * 1024,
     'both generations together stay within twice the ceiling',
   );
-  // Unrotated, these records would be ~42 MB in one file.
-  assert.ok(live + previous < 42 * 1024 * 1024);
+  // Unrotated, these records would be ~75 MB in one file.
+  assert.ok(live + previous < 64 * 1024 * 1024);
   assert.ok(!existsSync(`${file}.2`), 'exactly one generation is retained');
 });
