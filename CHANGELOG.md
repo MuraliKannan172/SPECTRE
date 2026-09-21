@@ -1,5 +1,10 @@
 # Changelog
 
+- Enable responsive trackpad pinch zoom on the globe. Browser pixel-mode
+  `Ctrl+wheel` pinch gestures now reach Cesium with bounded amplification,
+  while ordinary wheel, line-mode and touch-pinch inputs retain their existing
+  behavior; the listener is removed with the application scene.
+
 - Report AIS speed and course that carry the standard "not available" code as
   unknown instead of 102.3 knots and 360 degrees. Genuine readings, including a
   stopped vessel's zero and the highest encodable values, are unchanged.
