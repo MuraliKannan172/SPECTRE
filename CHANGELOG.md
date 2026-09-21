@@ -1,5 +1,80 @@
 # Changelog
 
+- Report AIS speed and course that carry the standard "not available" code as
+  unknown instead of 102.3 knots and 360 degrees. Genuine readings, including a
+  stopped vessel's zero and the highest encodable values, are unchanged.
+
+- Render native `<select>` option lists in the dark UI palette. The closed
+  controls were already skinned, but the browser-painted popups fell back to the
+  platform light palette, leaving near-white option text on a white surface in
+  the HUD layout, Scenes, CCTV camera, Radio filter and Draw colour menus.
+
+- Credit adsbdb, which supplies the aircraft type, model name and registration
+  on enriched flights and the airline and origin/destination pair behind the
+  tracked contact's route strip. `DATA_SOURCES.md` now records adsbdb's
+  published credits and route-data restriction, along with the request bounds
+  and gitignored 24-hour local cache. A matching `DATA_CREDITS` entry surfaces
+  the credit in the in-app Data attribution popover, and a test protects it
+  against accidental removal.
+
+- Size the TomTom daily tile budget to the provider's real free allowance.
+  `TOMTOM_DAILY_TILE_BUDGET` defaulted to 40,000/day against an allowance
+  granted monthly (200,000 tile requests/month), exhausting a month in five
+  days and leaving the traffic layer dead for the rest of the period. The
+  default is now 6,000/day (186,000 over a 31-day month). Corrects the stale
+  "~50k/day" free-tier figure in the proxy, `.env.example` and
+  `DATA_SOURCES.md`. Still an application-side ceiling, not a billing cap.
+
+- Distinguish PARTIAL vessel snapshots from STALE data in the layer panel, with
+  accepted-record counts and unchanged retention, freshness and outage safeguards.
+
+- Keep Nepal provider media inside the Pinokio compatibility boundary: use
+  source-linked fallback cards instead of automatic embeds or hidden preloads
+  that launch an external browser. Ordinary browsers retain embedded playback.
+  Source-only timed shots use their authored card dwell and continue normally.
+  Media autoplay now requires a live Play Scene or Play Shot action; passive
+  loading, saved state and seeking do not grant playback authority.
+
+- Add Director import previews, validated scene/shot detail drafts and selected-scene
+  JSON or asset-bundle sharing. Preserve attribution; verify bounded bundle bytes
+  before admission and release staged work on cancellation or teardown.
+
+- Director scene documents now support bounded data-pack manifests, per-shot
+  selection and registered GeoJSON/PNG/media loaders with explicit placement,
+  visible attribution and cancellation/disposal on Stop or replacement.
+
+- Director version 4 adds named camera anchors and explicit pose-to-pose moves
+  with shared playback/seek interpolation, easing and holds. Navigation and
+  manual input cancel authored motion; older scene files retain existing flights.
+
+
+- Director validates bounded version-3 scene files before replacing a project,
+  preserves unreadable browser saves, migrates legacy bloom once and preserves
+  zero-pitch/low-altitude camera and scope/detection edits. Project normalization has a separate owner.
+
+
+- Separate Director timing, seek calculations, playback clocks and registered
+  scene-pack presentation rules. Preserve authored content and controls; Stop
+  releases pending hold timers and stale ticks cannot affect replacement playback.
+
+
+- Keep parked transit vehicles aligned to their world course during camera orbits, fall back to reported bearing, and keep vehicles with no course consistently screen-up.
+
+- Separate Realtime connection, response/tool, Radio, input/audio, cost, viewport
+  and diagnostic ownership while preserving voice controls and protocol behavior.
+  Revoke stale connection offers/capture callbacks and release failed or stopped audio
+  meters. Discard late action continuations after Stop or restart; add recorded
+  push-to-talk acceptance alongside click-start voice.
+
+- Separate application-shell responsibilities and state ownership while preserving
+  the layer, scene and voice API. Revoke pending globe-reset callbacks on disposal
+  and detach old Directions services when replacing a data manager.
+- Transit: keep the normal vehicle silhouettes under NVG, thermal and noir (opaque white, CRT sizing, a 2 px dark halo) instead of solid bodies; drape the selected vehicle's trail onto Google 3D tiles and terrain so retained history is actually visible, with the head clipped to the sprite and markers recovering as soon as the camera arrives; place Transit in the Movement panel between Street Traffic and Bike Share.
+
+- Extract a portable Director shot runner and connect existing scene playback to
+  it. Preserve authored content, project files, camera/layer behavior and source
+  attribution; document the planned timeline, scene-file and data-pack boundaries.
+
 - Separate map-feature acquisition from annotation/search selection. Move road and mapped-installation decoding into source adapters while preserving geometry policy, cancellation, retry outcomes and compatibility exports.
 
 - Cancel hidden Nepal provider preloads on Stop, event disable and replacement, and respect drawing-tool pointer ownership for fallback evidence cards. Preserve @manjunath22466’s Nepal scene contribution and source attribution.
@@ -80,13 +155,11 @@
 - Allow compatible endpoints and server-selected models through construction options.
 - Cancel pending token/SDP requests on Stop or teardown and reject expired secrets.
 
-
 ## Configurable geospatial services
 
 - Compose geocoding, place context and routes through independent providers.
 - Allow compatible endpoint configuration without changing voice tools or annotation behavior.
 - Isolate configured source caches and reject results after cancellation.
-
 
 ## ALPR camera locations
 
@@ -167,6 +240,9 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+- Add bounded Director feature actions with accessible controls, explicit camera/layer admission and cancellation; restore pack geometry on same-shot seek. Preserve existing scenes and content attribution.
+
+
 - Give application request services, terrain/floor caches and annotation lookup state explicit owners and cancellation; share them across controls, layers and voice.
 
 - Construct application layers from explicit sources, with standalone provider selection and catalog-owned aircraft classification; controls and voice queries use those instances.
@@ -193,6 +269,15 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Fixed
 
+- Keep traffic-road bounds crossing the antimeridian monotonic and inside the
+  longitude range accepted by the Overpass request path, preserving the small
+  wrapped span instead of producing an inverted or rejected box (#392 — thanks
+  @Ashfaqbs).
+- Make `npm run doctor` report keyless anonymous OpenSky access for explicit
+  `OPENSKY_AUTH_MODE=anon` and OAuth mode without a client pair, retain the
+  existing OAuth-pair capability wording, and identify selected Basic or auto
+  modes without guessing their eventual credential choice. OpenSky proxy
+  authentication is unchanged.
 - Bikeshare stations load again. The extracted station source addressed the
   proxy as `/api/gbfs?url=`, but the proxy reads its upstream target from the
   path, so every request answered 400 and the layer reported a fetch error for
@@ -317,7 +402,6 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 - Press backtick (`) to toggle a rendered-frame-rate readout beneath the logo.
   Typing fields retain the key; monitoring stops when hidden.
 
-
 - Extract vessel feed, store, rendering, selection, trail and card components with explicit source and scene services.
 - Bound contact retention for incomplete vessel observations, preserve source freshness and refresh history references in place.
 - Cancel pending vessel history during selection and layer teardown.
@@ -401,9 +485,7 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 - Bound CCTV media response headers to 15 seconds and cancel error bodies.
   Cap buffered snapshot downloads at 16 MiB while streaming.
 
-
 - Cancel the active location lookup when its controls are disposed.
-
 
 ### Fixed
 
@@ -455,7 +537,6 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 - GBFS rejects upstream redirects, caps streamed responses at 5 MiB, and keeps
   its deadline active through body reads. Rejected downloads are cancelled.
 
-
 - Split Overpass/installation search, regional briefing/weather, local voice
   handlers and standalone key setup into focused modules. Preserve routes,
   source behavior, tool schemas and credential restrictions.
@@ -484,7 +565,6 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 - Split aircraft and vessel server providers into focused modules for source
   fetching, AIS records/tracks and shared request helpers; preserve existing
   routes, local setup, fallback behavior and rendering.
-
 
 ### Added
 
@@ -528,7 +608,6 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   and local provider middleware. Preserve provider behavior and root named exports.
 - Rename standalone browser startup to `src/standalone/` and add a Node-only
   `gods-eye-view/build/vite` export with checked package ownership.
-
 
 ### Development
 
@@ -587,7 +666,6 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   explicitly selects its measured 2D billboard mode and keeps its mesh and terrain assertions; software runs are not real-GPU evidence.
   First-run QA now checks the existing attribution Escape-close/focus-return
   behavior while preserving the launcher-underneath regression checks.
-
 
 - Datacenter and dam factories are available through scoped package exports with
   explicit context, overlay and render callbacks. The standalone app uses the
@@ -751,6 +829,7 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 ## [0.1.0] — 2026-08-31 — One-click install, keyless boot, Provider Settings
 
 ### Added
+
 - **One-click install** via Pinokio. Keyless boot lands on a live Esri World
   Imagery satellite globe with keyless terrain; OSM takes over automatically if
   Esri is unreachable, and the globe continues without terrain if its source is
@@ -766,6 +845,7 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   test suite out of the box (#81 — thanks @ethanstoner).
 
 ### Changed
+
 - README rewritten keyless-first around the provider ladder: zero keys → free
   Cesium ion (eligible personal, non-commercial use) → billing-enabled Google
   Maps.
@@ -775,6 +855,7 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   and say so plainly when enrichment is unavailable instead of guessing.
 
 ### Security
+
 - Provider Settings answers only local, unproxied requests and disables itself
   entirely whenever the server is shared. Public datacenter and dam datasets
   omit contact-oriented fields (see the dataset READMEs).
