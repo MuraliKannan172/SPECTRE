@@ -139,19 +139,35 @@ function longitudeSpanDeg(west, east) {
   return raw >= 0 ? raw : raw + 360;
 }
 
+/** Keep a monotonic longitude range inside the traffic source's legal domain. */
+function boundedLongitudeRange(center, span) {
+  let west = center - span / 2;
+  let east = center + span / 2;
+  if (east > 180) {
+    west -= east - 180;
+    east = 180;
+  }
+  if (west < -180) {
+    east += -180 - west;
+    west = -180;
+  }
+  return { west, east };
+}
+
 /**
  * Clamp a bounding box's spans to `maxSpanDeg` and recenter it on `center`.
  *
  * Preserves the pre-C4 span semantics (each axis capped at 0.05° ≈ 5.5 km)
  * but centers the box on the derived look-at point instead of the view
- * rectangle's midpoint. Idempotent when `center` is the box's own midpoint.
+ * rectangle's midpoint. At the antimeridian the whole box shifts just far
+ * enough to remain inside [-180, 180], because the road source accepts one
+ * monotonic Overpass bounding box. Idempotent when `center` is the box's own
+ * midpoint.
  *
  * Longitude is handled as a cyclic axis for the span calculation, so the
- * input span wraps correctly across the antimeridian. The output west/east
- * are deliberately left unnormalized (may fall outside [-180, 180)) so that
- * `west <= east` always holds — callers such as `getBoundsCenter` and
- * `boundsOverlap` rely on that invariant and would silently misbehave on a
- * normalized-but-inverted box (see #392 review).
+ * input span wraps correctly across the antimeridian. Output remains
+ * monotonic because callers such as `getBoundsCenter` and `boundsOverlap`
+ * rely on `west <= east`.
  *
  * @param {{south:number, west:number, north:number, east:number}} bounds
  *   Source bounds (span donor).
@@ -161,11 +177,14 @@ function longitudeSpanDeg(west, east) {
  */
 export function clampBoundsAroundCenter(bounds, center, maxSpanDeg = 0.05) {
   const latSpan = Math.min(bounds.north - bounds.south, maxSpanDeg);
-  const lonSpan = Math.min(longitudeSpanDeg(bounds.west, bounds.east), maxSpanDeg);
+  const lonSpan = Math.min(
+    longitudeSpanDeg(bounds.west, bounds.east),
+    maxSpanDeg,
+  );
+  const longitude = boundedLongitudeRange(center.lon, lonSpan);
   return {
     south: center.lat - latSpan / 2,
     north: center.lat + latSpan / 2,
-    west: center.lon - lonSpan / 2,
-    east: center.lon + lonSpan / 2,
+    ...longitude,
   };
 }
