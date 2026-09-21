@@ -5,6 +5,16 @@
   while ordinary wheel, line-mode and touch-pinch inputs retain their existing
   behavior; the listener is removed with the application scene.
 
+- Release CCTV media streams whose upstream falls silent after answering. The
+  15-second media deadline covered only the wait for response headers, so a
+  camera that replied and then stopped sending held both the proxy connection
+  and its upstream socket open for as long as the camera host allowed; the
+  declared `Content-Length` ceiling was the only body bound, and a chunked or
+  length-less body had none. A 30-second idle deadline now bounds the gap
+  between upstream chunks and releases a body that has gone silent. It is
+  rescheduled while the response is still waiting to drain, so a viewer on a
+  slow link is not mistaken for a dead camera; live feeds are unaffected.
+
 - Report AIS speed and course that carry the standard "not available" code as
   unknown instead of 102.3 knots and 360 degrees. Genuine readings, including a
   stopped vessel's zero and the highest encodable values, are unchanged.
