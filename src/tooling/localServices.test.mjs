@@ -279,6 +279,7 @@ test('Realtime service configuration selects compatible endpoint/model without f
     url: '/?tier=arbitrary-model&model=other',
   });
   assert.equal(response.status, 200);
+  assert.deepEqual(response.json(), { value: 'short-lived-fixture' });
   assert.equal(response.headers['x-gev-voice-model'], 'configured-model');
   assert.equal(response.headers['cache-control'], 'no-store');
   assert.doesNotMatch(response.body, /server-fixture|voice\.example/);
@@ -302,6 +303,26 @@ test('OpenAI routes answer generically when the upstream or the request fails', 
   assert.equal(summary.json().error, 'OpenAI HUD summary request failed');
   assert.equal(summary.body.includes('req_fixture_1234'), false);
   assert.equal(summary.body.includes('fixture-upstream-secret'), false);
+
+  // An HTTP error from the client-secret endpoint carries the same upstream
+  // detail, while a successful response must still pass the ephemeral secret.
+  t.mock.restoreAll();
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ error: { message: leak } }, { status: 429 }),
+  );
+  const rejectedToken = await request(
+    install(openAiRealtimeProxy()).get('/api/realtime/token'),
+  );
+  assert.equal(rejectedToken.status, 429);
+  assert.equal(
+    rejectedToken.headers['content-type'],
+    'application/json; charset=utf-8',
+  );
+  assert.deepEqual(rejectedToken.json(), {
+    error: 'Failed to create Realtime token',
+  });
+  assert.equal(rejectedToken.body.includes('req_fixture_1234'), false);
+  assert.equal(rejectedToken.body.includes('fixture-upstream-secret'), false);
 
   // A network fault surfaced a resolver message naming the upstream host.
   t.mock.restoreAll();
