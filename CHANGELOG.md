@@ -267,6 +267,10 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Fixed
 
+- Keep traffic-road bounds crossing the antimeridian monotonic and inside the
+  longitude range accepted by the Overpass request path, preserving the small
+  wrapped span instead of producing an inverted or rejected box (#392 — thanks
+  @Ashfaqbs).
 - Make `npm run doctor` report keyless anonymous OpenSky access for explicit
   `OPENSKY_AUTH_MODE=anon` and OAuth mode without a client pair, retain the
   existing OAuth-pair capability wording, and identify selected Basic or auto
