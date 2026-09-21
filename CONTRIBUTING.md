@@ -44,29 +44,31 @@ dedicated headless gate under `scripts/qa-*.mjs` that drives the real app and
 asserts that feature's contract. **Run the gate covering whatever you touched**,
 and say which one you ran in the PR.
 
-The scripts are the canonical list, and each one documents itself:
+Feature gates and a few supporting modules live under the same filename pattern:
 
 ```bash
-ls scripts/qa-*.mjs            # every gate
-head -20 scripts/qa-radio.mjs  # what this gate proves, and how to run it
+ls scripts/qa-*.mjs            # gates and their supporting modules
+head -40 scripts/qa-radio.mjs  # what this runnable gate proves and how to run it
 ```
 
-Every gate opens with a comment naming what it asserts. Most take
-`--url http://localhost:<port>` and need a dev server up; some need a specific
-provider key or a particular port, and the header says which. Run them directly
-with `node scripts/qa-<name>.mjs`; only a couple (`qa:map-source-tray`,
-`qa:transit`) have an `npm run` alias.
+Runnable gate entrypoints document what they assert and how to invoke them.
+Most need a dev server; some also need a specific provider key or port. Follow
+the entrypoint's header rather than assuming every matching file accepts the
+same arguments. Only a couple (`qa:map-source-tray`, `qa:transit`) have an
+`npm run` alias.
 
 If you aren't sure which gate covers your change, search `docs/CURRENT-STATE.md`
 for the feature: it names the gate for many of them, and it's the authoritative
-runtime reference either way.
+runtime reference either way. `scripts/qa-l9-matrix.mjs` aggregates the broader
+release-candidate checks and selected harnesses; it does not replace the focused
+gate for the feature you changed.
 
 > **CI does not cover this for you.** The workflow runs the setup policy
 > checks, the formatting and package-boundary checks, the unit suite and the
 > production build, plus a Windows onboarding job. It runs neither
 > `npm run test:track` nor any `qa-*.mjs` gate — both need a live dev server
-> and a browser. For anything outside the unit suite, your local run
-> is the only check before it reaches `main`.
+> and a browser. Include the applicable local run in your PR's validation
+> evidence.
 
 ## Good first contributions
 
