@@ -103,6 +103,18 @@
 Add feed provenance to analyst/view answers and HUD context while retaining existing response fields and runner ownership (Matt Van Horn, #347).
 
 Analyst records for loaded satellites, datacenters and dams, with explicit bounded count/rank coverage (Matt Van Horn, #351).
+- Render on iPad and iPhone instead of stopping with "An error occurred while
+  rendering." Cesium's per-vertex model atmosphere binds shader `out`
+  parameters directly to varyings, which Apple's Metal/ANGLE backend cannot
+  link, so the program failed and the render loop was torn down. The stage is
+  now kept out of the pipeline on affected devices by clearing
+  `scene.fog.renderable`, which leaves `fog.enabled` — and the fog density that
+  drives 3D Tiles refinement — untouched. Detection is a WebGL2 link probe of
+  the same pattern, so a future driver fix restores the effect with no code
+  change, with iOS/iPadOS detection as a backstop. Sky atmosphere and the
+  ground-atmosphere fragment path route through locals and are unaffected.
+  `src/app/atmosphereCompat.test.mjs` pins the probe, the platform matrix and
+  the `renderable`-not-`enabled` choice.
 
 - Remove the spurious scrollbars that appeared on both panel stacks at narrow
   widths (720px and below) as soon as a panel was expanded. The stacks scroll
