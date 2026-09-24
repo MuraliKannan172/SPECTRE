@@ -210,6 +210,7 @@ export default {
   'cctv.summary.empty': 'No cameras available in catalog.',
   'cctv.summary.city': '{city} CCTV',
   'cctv.summary.hdg': 'HDG {value}°',
+  'cctv.summary.hdgEstimated': 'HDG {value}° (ESTIMATED)',
   'cctv.summary.fov': 'FOV {value}°',
   'cctv.summary.coverage': 'COVERAGE {value}km²',
   'cctv.summary.overlap': 'OVERLAP {count} cams',
@@ -415,8 +416,21 @@ export default {
   'firms.card.focusAria': 'Focus fire detection {title}, {details}',
 
   // src/data/traffic.js feed presentation (manager meta loadingLabel values).
-  'traffic.loadingSyncing': 'syncing LIVE traffic flow',
-  'traffic.liveCoverage': 'LIVE · TomTom flow · {percent}% cov',
+  'traffic.loadingSyncing':
+    'Syncing flow · Roads: OpenStreetMap · Flow: TomTom · Unmatched: simulated',
+  'traffic.liveCoverage':
+    'LIVE · Roads: OpenStreetMap · Flow: TomTom · {percent}% cov',
+  'traffic.liveCoverageUnmatched':
+    'LIVE · Roads: OpenStreetMap · Flow: TomTom · {percent}% cov · Unmatched: simulated',
+  'traffic.simulatedNoMatches':
+    'SIMULATED · Roads: OpenStreetMap · Flow: TomTom (no matches)',
+  'traffic.syncingRoads': 'Syncing flow · Roads: {source}',
+  'traffic.liveRoadsFlowHidden':
+    'LIVE · Roads: {source} · Roads without flow hidden',
+  'traffic.liveRoadsNoFlowInView':
+    'LIVE · Roads: {source} · No flow roads in view',
+  'traffic.roadsFlowLive': 'LIVE · Roads: {source} · Flow {percent}%',
+  'traffic.roadsFlowSimulated': 'SIMULATED · Roads: {source} · Flow {percent}%',
   'traffic.simUnavailable': 'SIMULATED — traffic service unreachable',
   'traffic.simKeyless': 'SIMULATED — add TomTom key for live',
 
@@ -470,6 +484,7 @@ export default {
   'awareness.cohort.vessels': 'AIS vessels',
   'awareness.cohort.installations': 'Mapped installations',
   'awareness.coverage.viewport': 'CURRENT VIEWPORT ONLY',
+  'awareness.coverage.within': 'WITHIN {km} KM',
   'awareness.hdg': 'HDG {value}°',
   'awareness.brg': 'BRG {value}°',
   'awareness.brgUnknown': 'BRG —',
