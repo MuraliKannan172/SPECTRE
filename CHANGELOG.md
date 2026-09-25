@@ -1,5 +1,11 @@
 # Changelog
 
+- Aircraft track backfill (`/api/opensky-track`, `/api/adsblol/trace`) now
+  answers 502 when the upstream body exceeds the 5 MB cap, instead of a 200
+  whose error body the client read as an empty track. The failure is cached
+  like other upstream errors, so retries inside the 60 s window do not spend
+  OpenSky credits (Raushankumar0720, #720, #722).
+
 - Saving a key from Provider Settings works again on Macs where Nix or
   Homebrew coreutils sit ahead of `/bin` on `PATH`. The credential hardener
   now spawns Apple's `/bin/chmod -N` by absolute path; GNU `chmod` has no `-N`,
