@@ -154,7 +154,19 @@ export function shouldDisableModelAtmosphere({
 } = {}) {
   const gl = createProbeContext();
   if (gl) {
-    if (probeOutParamVaryingLinkFailure(gl)) return true;
+    let linkFails;
+    try {
+      linkFails = probeOutParamVaryingLinkFailure(gl);
+    } finally {
+      // Browsers cap live WebGL contexts (Safari especially); release the
+      // throwaway probe context now rather than waiting for GC.
+      try {
+        gl.getExtension?.('WEBGL_lose_context')?.loseContext();
+      } catch {
+        // A context that cannot be released is left to GC.
+      }
+    }
+    if (linkFails) return true;
     // Probe ran and the driver accepted the pattern. Apple mobile is still
     // quarantined: the probe program is far simpler than Cesium's, and a
     // false negative there costs the entire scene.

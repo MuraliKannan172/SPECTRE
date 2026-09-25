@@ -207,3 +207,15 @@ test('tolerates a scene with no fog object', () => {
   assert.equal(applyModelAtmosphereWorkaround({}, {}), false);
   assert.equal(applyModelAtmosphereWorkaround(null, {}), false);
 });
+
+test('releases the throwaway probe context after probing', () => {
+  let lost = 0;
+  const gl = fakeGl({ linkOk: true });
+  gl.getExtension = (name) =>
+    name === 'WEBGL_lose_context' ? { loseContext: () => (lost += 1) } : null;
+  shouldDisableModelAtmosphere({
+    navigatorLike: LINUX_DESKTOP,
+    createProbeContext: () => gl,
+  });
+  assert.equal(lost, 1, 'probe context must not linger until GC');
+});
