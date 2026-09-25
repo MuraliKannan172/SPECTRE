@@ -55,9 +55,9 @@ export function trackBackfillProxies() {
     } else {
       body = text;
     }
-    if (!tooLarge) {
-      cachePut(key, { at: Date.now(), status, body });
-    }
+    // Cache the 502 like any upstream error: /tracks/all costs OpenSky
+    // credits, so a retry inside the window must not re-download the body.
+    cachePut(key, { at: Date.now(), status, body });
     res.statusCode = status;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
