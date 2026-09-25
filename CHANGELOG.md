@@ -1,5 +1,31 @@
 # Changelog
 
+- Saving a key from Provider Settings works again on Macs where Nix or
+  Homebrew coreutils sit ahead of `/bin` on `PATH`. The credential hardener
+  now spawns Apple's `/bin/chmod -N` by absolute path; GNU `chmod` has no `-N`,
+  so the ACL strip failed closed and every save was refused (Arthur Bogaart, #694).
+
+- Render on iPad and iPhone instead of stopping with "An error occurred while
+  rendering." Cesium's per-vertex model atmosphere binds shader `out`
+  parameters directly to varyings, which Apple's Metal/ANGLE backend cannot
+  link, so the program failed and the render loop was torn down. The stage is
+  now kept out of the pipeline on affected devices by clearing
+  `scene.fog.renderable`, which leaves `fog.enabled` — and the fog density that
+  drives 3D Tiles refinement — untouched. Detection is a WebGL2 link probe of
+  the same pattern, so a future driver fix restores the effect with no code
+  change, with iOS/iPadOS detection as a backstop. Sky atmosphere and the
+  ground-atmosphere fragment path route through locals and are unaffected;
+  affected devices lose distance fog on 3D tiles and on the globe basemaps.
+  `src/app/atmosphereCompat.test.mjs` pins the probe, the platform matrix and
+  the `renderable`-not-`enabled` choice (KnottyDyes, #705).
+
+- Region scopes in voice analyst queries ("in the Gulf of Mexico", "over
+  the Alps") work again in the dev server: the bundled Natural Earth and
+  neighborhood packs are fetched as JSON in the browser
+  (`src/data/bundledJson.js`). When a region is not in the bundled packs, the
+  geocode and admin-boundary fallback answers `region-timeout` after 3 s
+  instead of holding the reply.
+
 - Transit and Directions rows repaint as soon as their data lands again:
   `refreshLayerStats()` now lives on the layer lifecycle, not only on the
   compatibility facade. `scripts/qa-radio.mjs` uses it instead of a private
