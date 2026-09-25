@@ -1,5 +1,7 @@
 # Changelog
 
+- Bound the client terrain-height cache at 20 000 entries with least-recently-used eviction, so a long session no longer retains every coordinate it ever resolved. Consumer reads promote their entry and a batch still reports every point it resolved (Pedro Lobato, #594).
+
 - Release CCTV media streams whose upstream falls silent after answering. The
   15-second media deadline covered only the wait for response headers, so a
   camera that replied and then stopped sending held both the proxy connection
