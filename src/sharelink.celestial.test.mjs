@@ -1,3 +1,5 @@
+import { DisplayBindings } from './ui/displayBindings.js';
+import { LocationNavigation } from './ui/locationNavigation.js';
 import { VisualSettings } from './ui/visualSettings.js';
 import { readShellSource, shellMethod } from './testSupport/readShellSource.mjs';
 import { StyleManager } from './ui/applicationShell.js';
@@ -134,6 +136,35 @@ test('visual parameters, explicit empty layers, and panel state are v2-only', ()
   assert.equal(legacy.layerState, null);
   assert.equal(legacy.styleParams, null);
   assert.equal(legacy.panelState, null);
+});
+
+// The panel chrome shares every rail panel, so the link registry must know
+// each one: a collapsed Recent Imagery panel used to restore expanded because
+// the encoder had no token for it.
+test('a collapsed Recent Imagery panel survives the share-link round trip beside the older panels', () => {
+  const manager = makeManager();
+  manager.setPanelStateProvider(() => ({ specs: [
+    { id: 'cctv-panel', collapsed: false },
+    { id: 'recent-imagery-panel', collapsed: true },
+    { id: 'global-context-panel', collapsed: true },
+  ] }));
+  clearTimeout(manager._debounceTimer);
+  manager._updateHash();
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  assert.equal(params.get('ui'), 'v.c.0_i.c.1_g.c.1');
+  const restored = makeManager(`#v=2&lat=10&lon=20&ui=${params.get('ui')}`)
+    .parseInitialHash();
+  assert.deepEqual(restored.panelState, { specs: [
+    { id: 'cctv-panel', collapsed: false, pinned: null },
+    { id: 'recent-imagery-panel', collapsed: true, pinned: null },
+    { id: 'global-context-panel', collapsed: true, pinned: null },
+  ] });
+  // A link written before the token existed decodes exactly as it did.
+  const older = makeManager('#v=2&lat=10&lon=20&ui=v.c.1_g.c.0').parseInitialHash();
+  assert.deepEqual(older.panelState, { specs: [
+    { id: 'cctv-panel', collapsed: true, pinned: null },
+    { id: 'global-context-panel', collapsed: false, pinned: null },
+  ] });
 });
 
 test('camera-only, partial, and malformed panel shares remain valid incoming state', () => {
@@ -700,13 +731,15 @@ test('visual input listeners are revoked before asynchronous UI teardown', () =>
   const firstAwait = disposal.indexOf('await ');
   assert.ok(firstAwait > 0);
   const synchronous = disposal.slice(0, firstAwait);
-  assert.match(synchronous, /this\._applicationShortcuts\?\.destroy\(\)/);
+  assert.match(synchronous, /this\._displayBindings\.destroy\(\)/);
   assert.match(synchronous, /this\._visualSettings\.stop\(\)/);
   assert.match(synchronous, /this\._mapSourceControls\?\.destroy\(\)/);
   assert.match(synchronous, /this\._clearLayersControl\?\.destroy\(\)/);
-  assert.match(synchronous, /this\._locationControls\?\.destroy\(\)/);
-  assert.match(synchronous, /this\._locationLookup\?\.destroy\(\)/);
-  assert.match(synchronous, /this\._displayControls\?\.destroy\(\)/);
+  assert.match(synchronous, /this\._locationNavigation\.destroy\(\)/);
+  assert.match(LocationNavigation.prototype.destroy.toString(), /this\._locationControls\?\.destroy\(\)/);
+  assert.match(LocationNavigation.prototype.destroy.toString(), /this\._locationLookup\?\.destroy\(\)/);
+  assert.match(DisplayBindings.prototype.destroy.toString(), /this\._displayControls\?\.destroy\(\)/);
+  assert.match(DisplayBindings.prototype.destroy.toString(), /this\._applicationShortcuts\?\.destroy\(\)/);
   assert.match(VisualSettings.prototype.stop.toString(), /this\._styleParameters\?\.destroy\(\)/);
   assert.match(VisualSettings.prototype.stop.toString(), /this\._visualEffects\.stop\(\)/);
 });

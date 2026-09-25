@@ -32,10 +32,134 @@ import {
   shareCacheNeedsHeal,
   shareableDetectionState,
 } from '../contactsDetectionPolicy.js';
+import {
+  applyCyberSonarSettings,
+  isCyberSonarEnabled,
+  readCyberSonarSettings,
+  setCyberSonarEnabled,
+} from '../cyberSonar.js';
+import { cyberVisualDefaultsForHudTransition } from '../hudLayouts.js';
 const DETECTION_ALLOCATION_STORAGE_KEY = 'gev:detection-allocation:v1';
 
 /** Own visual preferences, detection overrides and display-control state. */
 export class VisualSettings {
+  async restoreShareState(state) {
+    const {
+      setScopeMaskEnabled,
+      setScopeMaskFeather,
+      setScopeTerminusOverride,
+      clampScopeTerminusPct,
+    } = this.services;
+    const {
+      style,
+      bloom,
+      sharpen,
+      bloomIntensity,
+      bloomVersion,
+      sharpenIntensity,
+      hudVariant,
+      hudVisible,
+      detectionMode,
+      detectionDensity,
+      detectionAllocation,
+      detectionFadePct,
+      detectionOutsideOpacityPct,
+      celestialRing,
+      scopeEnabled,
+      scopeFeatherPct,
+      scopeTerminusPct,
+      mapStack,
+      panelState,
+      styleParams,
+    } = state || {};
+    // Ignore the retired 'ai-edit' style from older share links.
+    if (style && style !== 'normal' && style !== 'ai-edit') {
+      this.setStyle(style, {
+        applyPreset: true,
+        revealParameters: false,
+        restore: true,
+      });
+    }
+    if (styleParams && style && this.stages[style] && STYLES[style]?.uniforms) {
+      for (const [uniformName, uniformValue] of Object.entries(styleParams)) {
+        if (!Object.hasOwn(STYLES[style].uniforms, uniformName)) continue;
+        this.stages[style].uniforms[uniformName] = uniformValue;
+      }
+      this._updateSliderPanel(style, { reveal: false });
+    }
+    if (typeof bloomIntensity === 'number' && this._bloomSlider) {
+      const intensity = decodeBloomIntensity(bloomIntensity, bloomVersion);
+      this._setBloomIntensity(intensity, { syncShare: false });
+    }
+    if (typeof sharpenIntensity === 'number' && this._sharpenSlider) {
+      const pct = Math.max(0, Math.min(100, Math.round(sharpenIntensity)));
+      this._sharpenSlider.value = String(pct);
+      this._sharpenSliderValue.textContent = `${pct}%`;
+      this._applySharpenIntensity(pct / 100);
+    }
+    if (typeof bloom === 'boolean') this._setBloomEnabled(bloom);
+    if (typeof sharpen === 'boolean') this._setSharpenEnabled(sharpen);
+    if (hudVariant) this._setHudVariant(hudVariant);
+    if (typeof hudVisible === 'boolean') {
+      this.hud.setMode(hudVisible ? 'on' : 'off');
+      this._updateHudButtonState();
+    }
+    if (typeof detectionDensity === 'number' && this._detectionDensitySlider) {
+      const pct = canonicalizeDensity(detectionDensity);
+      this._detectionDensitySlider.value = String(pct);
+      this._detectionDensityValue.textContent = `${pct}%`;
+      this._applyDetectionDensityFromUi();
+    }
+    if (detectionAllocation) {
+      this._setDetectionAllocation(detectionAllocation, {
+        syncShare: false,
+        persist: false,
+      });
+    }
+    if (typeof detectionFadePct === 'number' && this._detectionFadeSlider) {
+      this._detectionFadeSlider.value = String(detectionFadePct);
+    }
+    if (
+      typeof detectionOutsideOpacityPct === 'number' &&
+      this._detectionOpacitySlider
+    ) {
+      this._detectionOpacitySlider.value = String(detectionOutsideOpacityPct);
+    }
+    this._applyDetectionFadeFromUi();
+    if (detectionMode) this._setDetectionMode(detectionMode);
+    if (typeof celestialRing === 'boolean') {
+      this.setCelestialRingEnabled(celestialRing, {
+        syncShare: false,
+        focus: false,
+      });
+    }
+    if (typeof scopeEnabled === 'boolean') {
+      setScopeMaskEnabled(scopeEnabled);
+      this._scopeBtn?.classList.toggle('active', scopeEnabled);
+      this._scopeBtn?.setAttribute('aria-pressed', String(scopeEnabled));
+    }
+    if (typeof scopeFeatherPct === 'number' && this._scopeFeatherSlider) {
+      const pct = Math.max(0, Math.min(100, Math.round(scopeFeatherPct)));
+      this._scopeFeatherSlider.value = String(pct);
+      if (this._scopeFeatherValue)
+        this._scopeFeatherValue.textContent = `${pct}%`;
+      setScopeMaskFeather(pct / 100);
+    }
+    // null restores the altitude-adaptive ramp; a number pins the terminus
+    // (clamped to the supported 94..100 band, same as the `sce` hash key).
+    if (scopeTerminusPct === null) setScopeTerminusOverride(null);
+    else if (typeof scopeTerminusPct === 'number') {
+      const pinned = clampScopeTerminusPct(scopeTerminusPct);
+      setScopeTerminusOverride(pinned == null ? null : pinned / 100);
+    }
+    const mapStackRestore = mapStack
+      ? this._setMapStack(mapStack, { syncShare: false })
+      : Promise.resolve();
+    if (panelState) this._restorePanelState(panelState);
+    await mapStackRestore;
+    this._syncShareState();
+  }
+
   constructor({
     viewer,
     services,
@@ -485,17 +609,85 @@ export class VisualSettings {
     this._syncShareState();
   }
 
-  _setHudVariant(variantName) {
+  _setHudVariant(variantName, { applyVisualDefaults = false } = {}) {
     if (!variantName) return;
+    const previousVariant = this.hud.getVariant();
     this.hud.setVariant(variantName);
-    if (
-      this._hudLayoutSelect &&
-      this._hudLayoutSelect.value !== this.hud.getVariant()
-    ) {
-      this._hudLayoutSelect.value = this.hud.getVariant();
+    const nextVariant = this.hud.getVariant();
+    if (this._hudLayoutSelect && this._hudLayoutSelect.value !== nextVariant) {
+      this._hudLayoutSelect.value = nextVariant;
     }
+    const visualDefaults = cyberVisualDefaultsForHudTransition(
+      previousVariant,
+      nextVariant,
+      { explicit: applyVisualDefaults },
+    );
+    if (visualDefaults) this._applyCyberVisualDefaults(visualDefaults);
+    this._syncCyberSonarControl();
     this._syncShareState();
     this._scheduleAdaptivePanelLayout({ settle: true });
+  }
+
+  _applyCyberVisualDefaults({ style, ironbow }) {
+    this.setStyle(style, {
+      applyPreset: false,
+      revealParameters: false,
+    });
+    const thermalUniforms = this.stages?.thermal?.uniforms;
+    if (!thermalUniforms || thermalUniforms.palette === undefined) return;
+    thermalUniforms.palette = ironbow;
+    this._updateSliderPanel('thermal', { reveal: false });
+    this.services.governorRequestRender('cyber-visual-defaults');
+  }
+
+  _syncCyberSonarControl() {
+    if (!this._cyberSonarBtn) return;
+    const enabled = isCyberSonarEnabled();
+    const settings = applyCyberSonarSettings(readCyberSonarSettings());
+    this._cyberSonarBtn.classList.toggle('active', enabled);
+    this._cyberSonarBtn.setAttribute('aria-pressed', String(enabled));
+    this._cyberSonarBtn.textContent = enabled ? 'ON' : 'OFF';
+    for (const [input, output, value, suffix] of [
+      [this._cyberSonarRings, this._cyberSonarRingsValue, settings.rings, ''],
+      [this._cyberSonarRange, this._cyberSonarRangeValue, settings.range, '%'],
+      [
+        this._cyberSonarIntensity,
+        this._cyberSonarIntensityValue,
+        settings.intensity,
+        '%',
+      ],
+      [
+        this._cyberSonarOpacity,
+        this._cyberSonarOpacityValue,
+        settings.opacity,
+        '%',
+      ],
+      [
+        this._cyberSonarSector,
+        this._cyberSonarSectorValue,
+        settings.sector,
+        '°',
+      ],
+    ]) {
+      if (input) input.value = String(value);
+      if (output) output.textContent = `${value}${suffix}`;
+    }
+  }
+
+  _setCyberSonarEnabled(enabled = !isCyberSonarEnabled()) {
+    const next = setCyberSonarEnabled(!!enabled);
+    this._syncCyberSonarControl();
+    this.services.governorRequestRender('cyber-sonar-toggle');
+    return next;
+  }
+
+  _setCyberSonarSetting(name, value) {
+    const settings = readCyberSonarSettings();
+    if (!Object.hasOwn(settings, name)) return settings;
+    const next = applyCyberSonarSettings({ ...settings, [name]: value });
+    this._syncCyberSonarControl();
+    this.services.governorRequestRender(`cyber-sonar-${name}`);
+    return next;
   }
 
   _applyStylePresetDefaults(styleName) {
@@ -539,7 +731,9 @@ export class VisualSettings {
       this._setSharpenEnabled(sharpenInput.enabled);
     }
 
-    if (preset.hudVariant) {
+    // Cyber is an explicit shell choice, independent of the imagery filter.
+    // Scene/share restoration still applies its own HUD through _setHudVariant.
+    if (preset.hudVariant && this.hud.getVariant() !== 'cyber') {
       this._setHudVariant(preset.hudVariant);
     }
     if (typeof preset.hudVisible === 'boolean') {

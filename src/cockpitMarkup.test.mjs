@@ -342,11 +342,11 @@ test('Clear Selected Layers uses one adopted batch and discards Context restorat
 
 test('Cockpit Display portal retains both scroll owners across round trips', () => {
   const portal = CockpitDisplayPortal.toString();
-  assert.match(portal, /this\.standardScrollTop = standardPanel\?\.scrollTop \|\| 0/);
+  assert.match(portal, /this\.standardScrollTop =\s*displayPanelScroller\(standardPanel\)\?\.scrollTop \|\| 0/);
   assert.match(portal, /this\.cockpitScrollTop = cockpitPanel\?\.scrollTop \|\| 0/);
-  assert.match(portal, /if \(!this\.active\)[\s\S]*?this\.standardScrollTop = standardPanel\.scrollTop/);
+  assert.match(portal, /if \(!this\.active\)[\s\S]*?this\.standardScrollTop =\s*displayPanelScroller\(standardPanel\)\.scrollTop/);
   assert.match(portal, /if \(this\.active\)[\s\S]*?this\.cockpitScrollTop = cockpitPanel\.scrollTop/);
-  assert.match(portal, /this\.cockpitPanel\.scrollTop = this\.cockpitScrollTop[\s\S]*?this\.standardPanel\.scrollTop = this\.standardScrollTop/);
+  assert.match(portal, /this\.cockpitPanel\.scrollTop = this\.cockpitScrollTop[\s\S]*?displayPanelScroller\(this\.standardPanel\)\.scrollTop =\s*this\.standardScrollTop/);
 });
 
 test('Cockpit side surfaces behave as two single-expanded accordions', () => {
@@ -408,7 +408,8 @@ test('fresh Cockpit entry temporarily collapses map panels and exit restores the
     assert.match(entryPanels[1], new RegExp(`'${panelId}'`), `${panelId} must collapse on entry`);
   }
 
-  assert.match(ui, /onEntered: \(\) => this\._panelChrome\.enterCockpit\(\)/);
+  assert.match(ui, /onEntered: \(\) => this\.enterPanels\(\)/);
+  assert.match(ui, /enterPanels: \(\) => this\._panelChrome\.enterCockpit\(\)/);
   const callback = { 1: shellMethod('enterCockpit').toString() };
   assert.ok(callback, 'Cockpit onEntered callback is missing');
   assert.match(
@@ -438,7 +439,8 @@ test('fresh Cockpit entry temporarily collapses map panels and exit restores the
     'normal Context must not reopen over Cockpit',
   );
 
-  assert.match(ui, /onExited: \(\) => this\._panelChrome\.exitCockpit\(\)/);
+  assert.match(ui, /onExited: \(\) => this\.exitPanels\(\)/);
+  assert.match(ui, /exitPanels: \(\) => this\._panelChrome\.exitCockpit\(\)/);
   const exitCallback = { 1: shellMethod('exitCockpit').toString() };
   assert.ok(exitCallback, 'Cockpit onExited callback is missing');
   assert.match(
