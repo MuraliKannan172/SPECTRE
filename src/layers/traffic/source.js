@@ -60,13 +60,20 @@ export function roadRequestError(status) {
       ? 'Overpass rate-limited'
       : code === 504
         ? 'Overpass timed out'
-        : // A source is injected, so a caller's adapter may hand back a
-          // refusal with no status on it. "HTTP undefined" on a panel row is
-          // worse than not naming a number, so an unreadable code falls back
-          // to what `alpr` says when it cannot be more specific either.
-          code === null
-          ? 'Overpass temporarily unavailable'
-          : `Overpass refused the road query (HTTP ${code})`;
+        : // Our own proxy answers these, not a mirror: 502 when every mirror
+          // failed at the network level, 503 from its local concurrency
+          // limiter before any mirror was asked. Neither is a refusal.
+          code === 502
+          ? 'Overpass mirrors unreachable'
+          : code === 503
+            ? 'Overpass temporarily unavailable'
+            : // A source is injected, so a caller's adapter may hand back a
+              // refusal with no status on it. "HTTP undefined" on a panel row is
+              // worse than not naming a number, so an unreadable code falls back
+              // to what `alpr` says when it cannot be more specific either.
+              code === null
+              ? 'Overpass temporarily unavailable'
+              : `Overpass refused the road query (HTTP ${code})`;
   return new RoadRequestError(message, { status: code });
 }
 

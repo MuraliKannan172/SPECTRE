@@ -207,6 +207,15 @@ test('an Overpass refusal is named by status, and keeps the status beside the wo
     'Overpass refused the road query (HTTP 500)',
   );
 
+  // 502 and 503 come from the local proxy (mirrors unreachable, local
+  // limiter busy), so they must not read as a mirror refusing the query.
+  assert.equal(roadRequestError(502).message, 'Overpass mirrors unreachable');
+  assert.equal(
+    roadRequestError(503).message,
+    'Overpass temporarily unavailable',
+  );
+  assert.equal(roadRequestError(503).status, 503);
+
   // An injected source may refuse without a readable code; a row must never
   // print "HTTP undefined" at a reader.
   for (const missing of [undefined, null, NaN, 'four-oh-six']) {

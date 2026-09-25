@@ -5,7 +5,9 @@
   `Overpass refused the road query (HTTP 406)` instead of a general
   "Road data temporarily unavailable", so a reader is not sent to check a
   TomTom key when the public OpenStreetMap mirrors are the side that failed.
-  Failures the layer cannot classify keep the general line.
+  The proxy's own 502 (every mirror unreachable) and 503 (local limiter busy)
+  read `Overpass mirrors unreachable` and `Overpass temporarily unavailable`.
+  Failures the layer cannot classify keep the general line (daikaginza, #665).
 
 - Bound the client terrain-height cache at 20 000 entries with least-recently-used eviction, so a long session no longer retains every coordinate it ever resolved. Consumer reads promote their entry and a batch still reports every point it resolved (Pedro Lobato, #594).
 
