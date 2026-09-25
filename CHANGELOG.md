@@ -1,5 +1,10 @@
 # Changelog
 
+- Saving a key from Provider Settings works again on Macs where Nix or
+  Homebrew coreutils sit ahead of `/bin` on `PATH`. The credential hardener
+  now spawns Apple's `/bin/chmod -N` by absolute path; GNU `chmod` has no `-N`,
+  so the ACL strip failed closed and every save was refused (Arthur Bogaart, #694).
+
 - Render on iPad and iPhone instead of stopping with "An error occurred while
   rendering." Cesium's per-vertex model atmosphere binds shader `out`
   parameters directly to varyings, which Apple's Metal/ANGLE backend cannot
