@@ -12,6 +12,28 @@ import {
   PLACEHOLDER_REPAINT_MS,
 } from './policy.js';
 
+function fitToProjection(sourceW, sourceH) {
+  if (!sourceW || !sourceH)
+    return {
+      x: 0,
+      y: 0,
+      w: PROJECTION_CANVAS_WIDTH,
+      h: PROJECTION_CANVAS_HEIGHT,
+    };
+  const scale = Math.min(
+    PROJECTION_CANVAS_WIDTH / sourceW,
+    PROJECTION_CANVAS_HEIGHT / sourceH,
+  );
+  const w = Math.round(sourceW * scale);
+  const h = Math.round(sourceH * scale);
+  return {
+    x: Math.round((PROJECTION_CANVAS_WIDTH - w) / 2),
+    y: Math.round((PROJECTION_CANVAS_HEIGHT - h) / 2),
+    w,
+    h,
+  };
+}
+
 export function createFrames({ state: layerState, services, parts, source }) {
   /**
    * FNV-1a over the RGB channels of a downsampled frame. Pure (takes the raw
@@ -328,19 +350,18 @@ export function createFrames({ state: layerState, services, parts, source }) {
           return;
         }
         runtime.lastFrameSignature = signature;
-        runtime.ctx.clearRect(
+        runtime.ctx.fillStyle = '#01070c';
+        runtime.ctx.fillRect(
           0,
           0,
           PROJECTION_CANVAS_WIDTH,
           PROJECTION_CANVAS_HEIGHT,
         );
-        runtime.ctx.drawImage(
-          runtime.image,
-          0,
-          0,
-          PROJECTION_CANVAS_WIDTH,
-          PROJECTION_CANVAS_HEIGHT,
+        const fit = fitToProjection(
+          runtime.image.naturalWidth,
+          runtime.image.naturalHeight,
         );
+        runtime.ctx.drawImage(runtime.image, fit.x, fit.y, fit.w, fit.h);
         runtime.canvasStamp = (runtime.canvasStamp || 0) + 1;
         runtime.lastPlaceholderPaintAt = 0;
       }
