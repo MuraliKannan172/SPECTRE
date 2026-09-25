@@ -1,5 +1,11 @@
 # Changelog
 
+- CCTV cameras whose bearing is a guess now say so. Packs mark bearings derived
+  from a hash of the camera id as `headingConfidence: 'low'`, but nothing read the
+  flag, so roughly 70% of a default catalog rendered like surveyed facings. The HUD
+  now reads `HDG n° (ESTIMATED)` and the coverage wireframe draws dashed; manual
+  calibrations and curated poses are never marked estimated (bassem chagra, #643).
+
 - Report which upstream declined a Street Traffic road load. The layer row now
   reads `Overpass rate-limited`, `Overpass timed out`, or
   `Overpass refused the road query (HTTP 406)` instead of a general
