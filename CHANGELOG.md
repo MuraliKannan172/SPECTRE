@@ -1,5 +1,16 @@
 # Changelog
 
+- Release CCTV media streams whose upstream falls silent after answering. The
+  15-second media deadline covered only the wait for response headers, so a
+  camera that replied and then stopped sending held both the proxy connection
+  and its upstream socket open for as long as the camera host allowed; the
+  declared `Content-Length` ceiling was the only body bound, and a chunked or
+  length-less body had none. A 30-second idle deadline now bounds the gap
+  between upstream chunks and releases a body that has gone silent. It is
+  rescheduled while the response is still waiting to drain, so a viewer on a
+  slow link is not mistaken for a dead camera; live feeds are unaffected
+  (Ethan Stoner, #688).
+
 - Aircraft track backfill (`/api/opensky-track`, `/api/adsblol/trace`) now
   answers 502 when the upstream body exceeds the 5 MB cap, instead of a 200
   whose error body the client read as an empty track. The failure is cached
