@@ -4359,7 +4359,7 @@ silently demoting every later lookup for the session.
   ground clamp now lifts the cap _center_ only so the wireframe stays a true pyramid welded to
   the plane (was a flattened fan / the ~47.5 m divergence — RESOLVED), re-selecting the active
   camera is a no-op (killed a click-flash), and texture swaps gate on canvas content (killed a
-  periodic white flash). Coverage is now **metro-wide: 250 cameras** (`CCTV_AUSTIN_MAX_SOURCES`
+  periodic white flash). Camera icons are cyan for stills, violet for cameras with a live video feed, and amber for the active camera. Coverage is now **metro-wide: 250 cameras** (`CCTV_AUSTIN_MAX_SOURCES`
   default 36 → 250, hard bound 300), filtered to `camera_status === TURNED_ON` (~815 live of
   1,003 rows). City packs (2026-07-04): Caltrans (districts 4/7/11/3 — SF, LA, San Diego,
   Sacramento; cap 300) and TfL London JamCams (cap 250) join Austin (cap 250) as keyless default
