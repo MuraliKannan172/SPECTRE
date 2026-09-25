@@ -1,5 +1,7 @@
 # Changelog
 
+- Bound the client terrain-height cache at 20 000 entries with least-recently-used eviction, so a long session no longer retains every coordinate it ever resolved. Consumer reads promote their entry and a batch still reports every point it resolved (Pedro Lobato, #594).
+
 - Release CCTV media streams whose upstream falls silent after answering. The
   15-second media deadline covered only the wait for response headers, so a
   camera that replied and then stopped sending held both the proxy connection
@@ -332,8 +334,6 @@ Analyst records for loaded satellites, datacenters and dams, with explicit bound
 - Clamp the Nepal flood trail and surge marker to the active terrain or photoreal surface so refined 3D tiles cannot bury the path.
 
 - Preserve Nepal shot camera and map ownership through the public layer lifecycle; passive restoration does not start standalone playback.
-
-- Bound the client terrain-height cache at 20 000 entries with least-recently-used eviction, so a long session no longer retains every coordinate it ever resolved. Consumer reads promote their entry and a batch still reports every point it resolved.
 
 - Separate transit snapshot/history acquisition from the layer and expose its bounded request service independently of Vite. Preserve feed selection, playback, cache policy and compatibility exports.
 
