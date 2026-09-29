@@ -2639,6 +2639,23 @@ test('the recent-imagery split is share-link only: never stored locally, and a s
   );
 });
 
+test('GNSS interference uses digit 0 without colliding with other digit tokens', () => {
+  const decoded = decodeLayerStateParams(new URLSearchParams('v=2&l=0.2.1'));
+  assert.deepEqual(decoded.enabledLayerIds, [
+    'fire-perimeters',
+    'gnss-interference',
+    'recent-imagery',
+  ]);
+  assert.equal(
+    LAYER_STATE_REGISTRY.find(({ id }) => id === 'gnss-interference').token,
+    '0',
+  );
+  assert.deepEqual(
+    decodeLayerStateParams(new URLSearchParams(encode(decoded))),
+    decoded,
+  );
+});
+
 test('fire perimeters uses digit 2 without colliding with wind or recent imagery', () => {
   const decoded = decodeLayerStateParams(new URLSearchParams('v=2&l=2.k.1'));
   assert.deepEqual(decoded.enabledLayerIds, [

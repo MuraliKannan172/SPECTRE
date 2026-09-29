@@ -131,7 +131,7 @@ test('reservation ledger is complete, pinned, and rejects duplicate or malformed
   assert.equal(Object.keys(LAYER_STATE_TOKEN_RESERVATIONS).length, 29);
   assert.deepEqual(
     { ...LAYER_STATE_TOKEN_RESERVATIONS },
-    { ...LEGACY_LAYER_STATE_TOKENS, 'street-level': '0' },
+    { ...LEGACY_LAYER_STATE_TOKENS, 'street-level': '0', 'gnss-interference': '0' },
   );
   assert.throws(
     () => parseLayerStateTokenReservations(reservationRows.slice(1)),
