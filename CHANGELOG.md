@@ -32,6 +32,7 @@
 - Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
 
 - Director timeline seeks cross the dateline along the short longitude arc.
+- Recent Imagery refuses missing bounding-box edges instead of interpreting them as zero coordinates.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
