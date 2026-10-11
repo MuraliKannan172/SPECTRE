@@ -63,6 +63,7 @@ test('a numeric summary skips missing values', () => {
 
 test('the breakdown phrase names the three largest groups', () => {
   const result = {
+    unknown_count: 0,
     groups: [
       { value: 'A', count: 4 },
       { value: 'B', count: 3 },
@@ -74,5 +75,14 @@ test('the breakdown phrase names the three largest groups', () => {
     breakdownPhrase(result, 'type'),
     '; most by type: A (4), B (3), C (2)',
   );
-  assert.equal(breakdownPhrase({ groups: [] }, 'type'), '');
+  assert.equal(
+    breakdownPhrase({ ...result, unknown_count: 5 }, 'type'),
+    '; most by type: A (4), B (3), C (2); 5 unknown',
+  );
+  // A feed that never reports the field says so instead of staying silent.
+  assert.equal(
+    breakdownPhrase({ groups: [], unknown_count: 236 }, 'operator'),
+    '; no operator reported',
+  );
+  assert.equal(breakdownPhrase({ groups: [], unknown_count: 0 }, 'type'), '');
 });

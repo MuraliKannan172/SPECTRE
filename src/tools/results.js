@@ -78,13 +78,20 @@ export function numericSummary(rows, field) {
   };
 }
 
-/** "; most by operator: Delta (12), United (9), American (7)" or "". */
+/**
+ * "; most by operator: Delta (12), United (9), American (7); 4 unknown", or
+ * "; no operator reported" when no row carries the field.
+ */
 export function breakdownPhrase(result, label) {
-  if (!result.groups.length) return '';
+  if (!result.groups.length)
+    return result.unknown_count ? `; no ${label} reported` : '';
   const top = result.groups
     .slice(0, 3)
     .map((group) => `${group.value} (${group.count})`);
-  return `; most by ${label}: ${top.join(', ')}`;
+  const unknown = result.unknown_count
+    ? `; ${result.unknown_count} unknown`
+    : '';
+  return `; most by ${label}: ${top.join(', ')}${unknown}`;
 }
 
 function sum(values) {

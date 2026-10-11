@@ -105,7 +105,9 @@ export const aircraftInArea = defineTool({
       group_by: {
         type: 'string',
         enum: Object.keys(GROUP_LABELS),
-        description: 'Count matched aircraft by this field, largest first.',
+        description:
+          'Count matched aircraft by this field, largest first. Feeds that do not ' +
+          'report the field count those aircraft as unknown.',
       },
       stats: {
         type: 'boolean',

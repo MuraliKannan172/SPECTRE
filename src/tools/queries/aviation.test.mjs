@@ -409,7 +409,7 @@ test('aircraft in an area can be counted by operator over every match', async ()
   });
   assert.equal(
     result.summary,
-    '4 aircraft in 60 km around 37.600, -122.300; most by operator: United (2), Delta (1).',
+    '4 aircraft in 60 km around 37.600, -122.300; most by operator: United (2), Delta (1); 1 unknown.',
   );
   assert.equal(result.data.returned, 1);
   assert.deepEqual(result.data.breakdown, {

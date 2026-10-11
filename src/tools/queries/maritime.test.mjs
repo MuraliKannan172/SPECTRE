@@ -237,7 +237,7 @@ test('vessels in an area can be counted by destination with a speed summary', as
   });
   assert.equal(
     result.summary,
-    '2 vessels in 20 km around 37.780, -122.400; most by destination: OAKLAND (1).',
+    '2 vessels in 20 km around 37.780, -122.400; most by destination: OAKLAND (1); 1 unknown.',
   );
   assert.deepEqual(result.data.breakdown, {
     field: 'destination',
