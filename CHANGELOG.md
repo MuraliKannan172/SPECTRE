@@ -1,5 +1,10 @@
 # Changelog
 
+- `aircraft_in_area` and `vessels_in_area` take `group_by` and `stats`, so a
+  client can ask which operators or ship types dominate an area, or the average
+  altitude or speed, over every match instead of estimating from the returned
+  rows.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 
