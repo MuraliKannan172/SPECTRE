@@ -98,7 +98,8 @@ count every match by a field (`group_by`: operator, country or type for
 aircraft; type or destination for ships; the ten largest groups, then other and
 unknown counts; the summary says when a feed reports none of the field) and
 summarize airborne altitude and speed (`stats`: count, min, median, mean, max).
-Both cover all matches, not just the rows returned. Voice offers the same queries next to its app
+Both cover all matches, not just the rows returned; voice leaves these two
+tools out, so they reach MCP clients only. Voice offers the same queries next to its app
 actions: the session lists them, and the browser runs them through the same
 catalog, loaded on first use. See [tools and the MCP server](TOOLS.md).
 
