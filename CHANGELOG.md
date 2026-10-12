@@ -1,5 +1,10 @@
 # Changelog
 
+- Prevent a compact Radio disclosure from covering Space Missions when the
+  adaptive right rail restores Context without calling the panel owner.
+  Repeated Context-open calls and rail-driven expansion both close the mini,
+  with a regression for auto-collapse restoration (raysung-2026, #804).
+
 - CCTV cameras whose bearing is a guess now say so. Packs mark bearings derived
   from a hash of the camera id as `headingConfidence: 'low'`, but nothing read the
   flag, so roughly 70% of a default catalog rendered like surveyed facings. The HUD
