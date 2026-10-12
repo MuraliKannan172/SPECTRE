@@ -122,10 +122,7 @@ test('adaptive rail restore hides compact Radio before revealing Context', (t) =
   nextFrame();
 
   assert.equal(contextPanel.classList.contains('collapsed'), false);
-  assert.equal(
-    contextPanel.classList.contains('layout-auto-collapsed'),
-    false,
-  );
+  assert.equal(contextPanel.classList.contains('layout-auto-collapsed'), false);
   assert.equal(radioDock.classList.contains('disclosure-open'), false);
   assert.equal(radioMini.hidden, true);
   assert.deepEqual(calls, [
