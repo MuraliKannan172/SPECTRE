@@ -42,6 +42,8 @@ export const MAX_IMPORTED_FILES = 12;
 export const MAX_IMPORT_ENTITIES = 20_000;
 /** Most vertices (points of every line, ring and marker) in one file. */
 export const MAX_IMPORT_POSITIONS = 250_000;
+/** Most `<href>` and `<Style>` elements in one KML/KMZ document. */
+export const MAX_KML_LINKS = 2_000;
 /** Longest plain-text name kept from a file's features. */
 export const MAX_IMPORT_NAME_LENGTH = 120;
 /** What the file picker offers. */
@@ -207,6 +209,10 @@ export function countGeoJsonGeometry(
 
 /** The refusal for a file over a size limit, in the person's terms. */
 function overLimitError({ over, features, positions }) {
+  if (over === 'links')
+    return new GeoImportError(
+      `That file has more than ${MAX_KML_LINKS.toLocaleString()} styles and icon links (the limit).`,
+    );
   if (over === 'features')
     return new GeoImportError(
       `That file has more than ${MAX_IMPORT_ENTITIES.toLocaleString()} features (the limit).`,
@@ -415,6 +421,37 @@ const elementsNamed = (doc, localName) =>
   [...doc.getElementsByTagName('*')].filter((el) => el.localName === localName);
 
 /**
+ * A `resolveLocal` for `sanitizeKmlDocument`: the blob URL of an image packed
+ * in the KMZ, or null. Each entry gets one blob and one URL however many
+ * hrefs name it, so repeated icons don't copy (and decode) the image again.
+ * @param {Map<string, Uint8Array>} entries
+ * @param {string} main Path of the KMZ's KML document.
+ * @param {(url: string) => void} onUrl Called once per new URL (to revoke later).
+ * @param {(blob: Blob) => string} [createUrl]
+ * @returns {(href: string) => string|null}
+ */
+export function kmzImageResolver(
+  entries,
+  main,
+  onUrl,
+  createUrl = (blob) => URL.createObjectURL(blob),
+) {
+  const urls = new Map();
+  return (href) => {
+    const path = resolveKmzPath(href, main, entries);
+    const type = path && kmzImageType(path);
+    if (!type) return null;
+    let url = urls.get(path);
+    if (!url) {
+      url = createUrl(new Blob([entries.get(path)], { type }));
+      urls.set(path, url);
+      onUrl(url);
+    }
+    return url;
+  };
+}
+
+/**
  * Strip everything from a parsed KML document that would make the page reach
  * outside the file. `resolveLocal(href)` returns a URL for an image packed in
  * the same KMZ (or null); every other href is removed, so icons fall back to
@@ -467,25 +504,33 @@ const childText = (el, localName) =>
 
 /**
  * Count placemarks and vertices in a parsed KML document before Cesium reads
- * it: every `<coordinates>` tuple and every `gx:coord`.
+ * it: every `<coordinates>` tuple and every `gx:coord`, plus the `<href>`
+ * and `<Style>` elements (`links`), each of which can make Cesium load and
+ * decode an image.
  * @param {Document} doc
- * @returns {{features: number, positions: number, over: ''|'features'|'positions'}}
+ * @returns {{features: number, positions: number, links: number,
+ *   over: ''|'features'|'positions'|'links'}}
  */
 export function countKmlGeometry(
   doc,
   {
     maxFeatures = MAX_IMPORT_ENTITIES,
     maxPositions = MAX_IMPORT_POSITIONS,
+    maxLinks = MAX_KML_LINKS,
   } = {},
 ) {
   let features = 0;
   let positions = 0;
+  let links = 0;
+  const result = (over) => ({ features, positions, links, over });
   for (const el of doc.getElementsByTagName('*')) {
     const name = el.localName;
-    if (name === 'Placemark') {
+    if (name === 'href' || name === 'Style') {
+      links += 1;
+      if (links > maxLinks) return result('links');
+    } else if (name === 'Placemark') {
       features += 1;
-      if (features > maxFeatures)
-        return { features, positions, over: 'features' };
+      if (features > maxFeatures) return result('features');
     } else if (name === 'coordinates') {
       const text = el.textContent || '';
       // Tuples are separated by whitespace; count runs without splitting
@@ -495,18 +540,16 @@ export function countKmlGeometry(
         const space = text.charCodeAt(i) <= 32;
         if (!space && !inTuple) {
           positions += 1;
-          if (positions > maxPositions)
-            return { features, positions, over: 'positions' };
+          if (positions > maxPositions) return result('positions');
         }
         inTuple = !space;
       }
     } else if (name === 'coord') {
       positions += 1;
-      if (positions > maxPositions)
-        return { features, positions, over: 'positions' };
+      if (positions > maxPositions) return result('positions');
     }
   }
-  return { features, positions, over: '' };
+  return result('');
 }
 
 /**
@@ -767,16 +810,7 @@ export async function loadGeoFile(file, { viewer, color = '#39d0ff' }) {
         const main = kmzMainDocument(entries);
         if (!main) throw new GeoImportError('That KMZ holds no KML document.');
         text = new TextDecoder().decode(entries.get(main));
-        resolveLocal = (href) => {
-          const path = resolveKmzPath(href, main, entries);
-          const type = path && kmzImageType(path);
-          if (!type) return null;
-          const url = URL.createObjectURL(
-            new Blob([entries.get(path)], { type }),
-          );
-          urls.push(url);
-          return url;
-        };
+        resolveLocal = kmzImageResolver(entries, main, (url) => urls.push(url));
       } else {
         text = new TextDecoder().decode(bytes);
       }

@@ -14,6 +14,7 @@ import {
   stripGeoJsonStyleProperties,
   detectGeoFileFormat,
   importDisplayName,
+  kmzImageResolver,
   kmzImageType,
   kmzMainDocument,
   parseGeoJsonText,
@@ -406,10 +407,47 @@ test('KML placemarks and coordinate tuples are counted before loading', () => {
   assert.deepEqual(countKmlGeometry(doc), {
     features: 2,
     positions: 42,
+    links: 0,
     over: '',
   });
   assert.equal(countKmlGeometry(doc, { maxPositions: 41 }).over, 'positions');
   assert.equal(countKmlGeometry(doc, { maxFeatures: 1 }).over, 'features');
+});
+
+test('KML styles and icon links are counted against their own limit', () => {
+  const style = () =>
+    xmlEl('Style', {}, [
+      xmlEl('IconStyle', {}, [xmlEl('Icon', {}, [xmlEl('href', {}, 'a.png')])]),
+    ]);
+  const doc = xmlDoc(xmlEl('kml', {}, [style(), style(), style()]));
+  assert.equal(countKmlGeometry(doc).links, 6);
+  assert.equal(countKmlGeometry(doc, { maxLinks: 5 }).over, 'links');
+});
+
+test('a KMZ image gets one blob URL however many hrefs name it', () => {
+  const entries = new Map([
+    ['doc.kml', new Uint8Array(0)],
+    ['a.png', new Uint8Array(8)],
+    ['b.png', new Uint8Array(8)],
+  ]);
+  const made = [];
+  const kept = [];
+  const resolve = kmzImageResolver(
+    entries,
+    'doc.kml',
+    (url) => kept.push(url),
+    (blob) => {
+      made.push(blob);
+      return `blob:test/${made.length}`;
+    },
+  );
+  for (let i = 0; i < 1000; i++) assert.equal(resolve('a.png'), 'blob:test/1');
+  assert.equal(resolve('./b.png'), 'blob:test/2');
+  assert.equal(resolve('a.png'), 'blob:test/1');
+  assert.equal(resolve('https://example.com/a.png'), null);
+  assert.equal(resolve('doc.kml'), null);
+  assert.equal(made.length, 2);
+  assert.deepEqual(kept, ['blob:test/1', 'blob:test/2']);
 });
 
 test('simplestyle is dropped: no icon fetched, the row color is what draws', () => {
