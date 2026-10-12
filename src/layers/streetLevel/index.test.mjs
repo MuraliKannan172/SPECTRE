@@ -665,3 +665,17 @@ test('with no Mapillary token, the layer points at Street View, on Google 3D onl
   layer.setProviderEnabled('google', true);
   assert.equal(layer.getStats().keyRequired, false);
 });
+
+test('an empty provider composition enables and tears down without acquiring imagery', async (t) => {
+  const { layer, viewer } = await enabledLayer(t, []);
+  assert.deepEqual(layer.providerIds, []);
+  assert.deepEqual(layer.getUIState().providers, []);
+  assert.equal(layer.getUIState().keyRequired, false);
+  assert.match(
+    layer.getUIState().coverage.hint,
+    /No street-level imagery providers/,
+  );
+  layer.disable();
+  layer.enable(viewer);
+  assert.deepEqual(layer.getUIState().providers, []);
+});

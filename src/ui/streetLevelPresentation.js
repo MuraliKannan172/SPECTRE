@@ -184,6 +184,7 @@ function presentNearest(state) {
 }
 
 function presentMeta(state) {
+  if (state.providers.length === 0) return state.coverage.hint || '';
   if (!state.enabled) return 'Switch a provider on to draw its coverage.';
   // Key-gated with another source ready: say how to use it.
   if (state.keyRequired && state.keyAlternatives?.length)
@@ -215,7 +216,7 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
     enabled,
     keyRequired,
     status: presentStatus(state),
-    controlsDisabled: keyRequired,
+    controlsDisabled: keyRequired || state.providers.length === 0,
     providers: presentProviders(state),
     error: keyMissing
       ? null

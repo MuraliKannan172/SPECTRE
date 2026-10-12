@@ -444,6 +444,16 @@ export function createStreetLevelLayer({
     },
     /** Registered providers, in chip order. */
     providerIds: definitionsFrozen.map((def) => def.id),
+    getSourceAvailability() {
+      const available = definitionsFrozen.length > 0;
+      return {
+        available,
+        source: STREET_LEVEL_LAYER_ID,
+        reason: available
+          ? null
+          : 'No street-level imagery providers configured',
+      };
+    },
 
     init(viewer) {
       if (state.initialized)

@@ -632,11 +632,17 @@ async function main() {
         target,
         '.panel-collapse-btn[data-collapse-target="street-level-panel"]',
       );
-      await settle(
-        target,
-        () =>
-          getComputedStyle(document.getElementById('sl-body')).display ===
-          'flex',
+      assert.ok(
+        await settle(
+          target,
+          () =>
+            !document
+              .getElementById('street-level-panel')
+              .classList.contains('collapsed') &&
+            getComputedStyle(document.getElementById('sl-body')).display ===
+              'flex',
+        ),
+        'Street Level panel did not expand before the timeout',
       );
     };
     await expandStrip();
@@ -1797,7 +1803,8 @@ async function main() {
             credit: false,
             button: false,
           });
-          const option = `${STREET_LEVEL_TOKEN}.g.1`;
+          // Street View rides the shared provider-switch field (r).
+          const option = `${STREET_LEVEL_TOKEN}.r.google-1`;
           assert.ok(
             await settle(
               page,

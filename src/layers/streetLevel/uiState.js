@@ -27,7 +27,10 @@ export function summarizeCoverage(providers) {
   return {
     count: active.reduce((sum, p) => sum + (p.count || 0), 0),
     loading: active.some((p) => p.loading),
-    hint: [...new Set(active.map((p) => p.hint).filter(Boolean))].join(' · '),
+    hint:
+      providers.length === 0
+        ? 'No street-level imagery providers configured'
+        : [...new Set(active.map((p) => p.hint).filter(Boolean))].join(' · '),
     error: active.find((p) => p.error)?.error || null,
     keyRequired:
       active.length > 0 && active.every((p) => p.keyRequired === true),
