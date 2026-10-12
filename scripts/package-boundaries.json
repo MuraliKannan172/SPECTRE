@@ -1316,7 +1316,11 @@
       "src/layers/streetLevel/selection.js",
       "src/layers/streetLevel/providers/mapillary/viewer.js",
       "src/layers/streetLevel/providers/mapillary/source.js",
-      "scripts/qa-street-level.mjs"
+      "scripts/qa-street-level.mjs",
+      "src/i18n/index.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json"
     ],
     "external": ["cesium", "pbf", "@mapbox/vector-tile", "mapillary-js"]
   },

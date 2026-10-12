@@ -110,19 +110,19 @@ const PANEL_POSITIONS = new Map(
   PANEL_ORDER.map(({ id }, index) => [id, index]),
 );
 const PANEL_LABELS = {
-  'ais-live-vessels': 'Live Vessels',
-  bikeshare: 'Bike Share',
-  cctv: 'Cameras',
-  'street-level': 'Street Level',
-  'alpr-cameras': 'Mapped ALPR Cameras',
-  'local-datacenters': 'Data Centers',
-  'local-firms': 'Active Fires',
+  'ais-live-vessels': msg('Live Vessels'),
+  bikeshare: msg('Bike Share'),
+  cctv: msg('Cameras'),
+  'street-level': msg('Street Level'),
+  'alpr-cameras': msg('Mapped ALPR Cameras'),
+  'local-datacenters': msg('Data Centers'),
+  'local-firms': msg('Active Fires'),
 };
 
 function panelLabel(layer) {
   const key = LAYER_NAME_KEYS[layer.id];
   if (key) return t(key);
-  return PANEL_LABELS[layer.id] || layer.name;
+  return PANEL_LABELS[layer.id] ? t(PANEL_LABELS[layer.id]) : layer.name;
 }
 
 /**
