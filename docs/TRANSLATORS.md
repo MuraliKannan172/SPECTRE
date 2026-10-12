@@ -50,7 +50,7 @@ Edit `src/i18n/locales/<code>.json` and run `npm run i18n`. To see your change, 
 
 ## Rules
 
-- Keep every `{placeholder}` exactly as in the English; you may move it.
+- Keep every `{placeholder}` name exactly as in the English: do not rename, drop or add one. Its position inside the sentence follows the grammar of your language, e.g. `"{accepted} of {raw} records accepted"` → `"принято записей: {accepted} из {raw}"`.
 - UPPERCASE English stays UPPERCASE. Short labels, chips and HUD readouts should stay short; prefer an abbreviation over a wrapped line.
 - Keep the separators `·`, `—`, `→`, `↗`, `…`.
 - Leave product, provider and data names in their original form: Google Maps, Cesium ion, OpenAI, ChatGPT, NASA FIRMS, USGS, OpenSky, ADS-B, AIS, CCTV, HUD, TomTom, OpenStreetMap, Mapillary, and keyboard keys (Space, Esc, H, 1–9).
