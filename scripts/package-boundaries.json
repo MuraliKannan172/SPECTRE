@@ -421,6 +421,7 @@
       "src/localRequestGate.mjs",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -445,6 +446,7 @@
       "src/data/layerSnapshot.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -459,6 +461,7 @@
       "src/app/stateChannel.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -473,6 +476,7 @@
       "src/ui/radioTunerModel.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -489,6 +493,7 @@
       "src/ui/cctvPresentation.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -510,6 +515,7 @@
       "src/ui/panelRailGeometry.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -541,6 +547,7 @@
       "src/ui/panelRailGeometry.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -553,6 +560,7 @@
       "src/ui/scenePresentation.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -695,6 +703,7 @@
       "src/data/cameraArrival.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -804,6 +813,7 @@
       "src/data/cameraArrival.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -861,6 +871,7 @@
       "src/data/modelEligibility.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -903,6 +914,7 @@
       "src/data/modelEligibility.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -959,6 +971,7 @@
       "src/data/inputOwnership.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1008,6 +1021,7 @@
       "src/data/inputOwnership.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1037,6 +1051,7 @@
       "src/data/inputOwnership.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium", "satellite.js"]
@@ -1067,6 +1082,7 @@
       "src/data/inputOwnership.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1105,6 +1121,7 @@
       "src/data/infrastructureOverlayEntry.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium", "@mapbox/vector-tile", "pbf"]
@@ -1135,6 +1152,7 @@
       "src/ui/panelRailGeometry.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1179,6 +1197,7 @@
       "src/layers/traffic/roadModes.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium", "pbf", "@mapbox/vector-tile"]
@@ -1205,6 +1224,7 @@
       "src/data/cameraSensitivity.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1249,6 +1269,7 @@
       "src/layers/cctv/sourcePolicy.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["hls.js", "cesium"]
@@ -1347,6 +1368,7 @@
       "src/data/inputOwnership.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1367,6 +1389,7 @@
       "src/data/inputOwnership.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1419,6 +1442,7 @@
       "src/maps/imageryHost.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -1469,6 +1493,7 @@
       "src/voice/pointerReticle.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -2276,6 +2301,7 @@
       "src/app/embed.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": [
@@ -2801,6 +2827,7 @@
       "src/sources/infrastructureData.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": [
@@ -2906,6 +2933,7 @@
       "src/ui/uiLifetime.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -2937,6 +2965,7 @@
       "src/ui/visualSettings.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
@@ -2960,6 +2989,7 @@
       "src/ui/uiLifetime.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []
@@ -3086,6 +3116,7 @@
       "src/voice/pointerReticle.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json"
     ],
     "external": []

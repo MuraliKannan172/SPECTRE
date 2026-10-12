@@ -11,10 +11,14 @@ export const DEFAULT_LOCALE = 'en';
  * Shipped locales, in selector order. Adding one: locales/<code>.json, an
  * import in index.js, and an entry here (see docs/TRANSLATORS.md).
  */
-export const LOCALES = Object.freeze(['en', 'ru']);
+export const LOCALES = Object.freeze(['en', 'es', 'ru']);
 
 /** Each locale named in its own language, for the selector. */
-export const LOCALE_NAMES = Object.freeze({ en: 'English', ru: 'Русский' });
+export const LOCALE_NAMES = Object.freeze({
+  en: 'English',
+  es: 'Español',
+  ru: 'Русский',
+});
 
 /** Right-to-left locales. */
 const RTL_LOCALES = Object.freeze([]);

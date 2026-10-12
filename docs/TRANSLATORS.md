@@ -1,6 +1,6 @@
 # Translating God's Eye View
 
-Shipped languages: **English** (source and fallback) and **Russian** (`ru`).
+Shipped languages: **English** (source and fallback), **Spanish** (`es`) and **Russian** (`ru`).
 
 ## How it works
 
@@ -22,7 +22,7 @@ Every other language is one flat JSON file, `src/i18n/locales/<code>.json`, keye
 
 A `tn()` entry is keyed by the English plural form and holds one string per `Intl.PluralRules` category of that language. A missing entry falls back to English.
 
-The page picks its language from `?lang=`, then the choice stored by the EN/RU switch in the Visual Presets dock, then the browser languages, then English. Switching reloads the page.
+The page picks its language from `?lang=`, then the choice stored by the language switch in the Visual Presets dock, then the browser languages, then English. Switching reloads the page.
 
 ## The check
 
@@ -63,4 +63,4 @@ These are contracts, not copy: layer ids and registry keys, status enums and oth
 
 ## Language notes
 
-Each language keeps its glossary, plural forms, units and style in its own file, `docs/translations/<code>.md`: [Russian](./translations/ru.md). Read it before translating, and add a term there when you settle on one.
+Each language keeps its glossary, plural forms, units and style in its own file, `docs/translations/<code>.md`: [Spanish](./translations/es.md), [Russian](./translations/ru.md). Read it before translating, and add a term there when you settle on one.

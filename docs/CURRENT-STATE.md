@@ -3011,7 +3011,7 @@ test:track` 43 tracking invariants · headless QA harnesses under
 
 ### Interface localization (October 2026)
 
-Shipped locales: **en** (source and fallback) and **ru**. The code lives in
+Shipped locales: **en** (source and fallback), **es** and **ru**. The code lives in
 `src/i18n/`. How to mark UI text: [`docs/I18N.md`](./I18N.md); translator workflow:
 [`docs/TRANSLATORS.md`](./TRANSLATORS.md).
 
@@ -3022,7 +3022,7 @@ Shipped locales: **en** (source and fallback) and **ru**. The code lives in
   value). English has no catalog; every other locale is
   `src/i18n/locales/<code>.json`, and a missing entry falls back to English.
 - **Locale choice.** `?lang=` (one-shot) → stored choice (`gev:locale:v1`) →
-  `navigator.languages` → English. The EN/RU switch in the Visual Presets dock
+  `navigator.languages` → English. The language switch in the Visual Presets dock
   stores the choice and reloads, so nothing re-renders live.
 - **Gate.** `npm run i18n` (and `src/i18n/catalog.test.mjs` under `npm test`)
   extracts every message and fails on missing, unused, placeholder-mismatched or
