@@ -1059,7 +1059,7 @@ try {
     () => window.__godsEyeView.viewer.camera.positionCartographic.height,
   );
   check(
-    `ZOOM IN flies to ${Math.round(fitHeight / 1000)} km within ${ZOOM_TIMEOUT_MS / 1_000} s`,
+    `ZOOM IN reaches target within ${ZOOM_TIMEOUT_MS / 1_000} s`,
     zoomed,
     `height=${Math.round(zoomedHeight)} target=${Math.round(fitHeight)}`,
   );
@@ -1269,7 +1269,8 @@ try {
       );
       await wait(100);
     }
-    const tail = (key) => new Set(samples.slice(-HEIGHT_TAIL_SAMPLES).map((s) => s[key]));
+    const tail = (key) =>
+      new Set(samples.slice(-HEIGHT_TAIL_SAMPLES).map((s) => s[key]));
     return {
       settled: tail('imagery').size === 1 && tail('cctv').size === 1,
       detail: `imagery=${samples.map((s) => s.imagery).join(',')} cctv=${samples.map((s) => s.cctv).join(',')}`,
