@@ -3012,7 +3012,8 @@ test:track` 43 tracking invariants · headless QA harnesses under
 ### Interface localization (October 2026)
 
 Shipped locales: **en** (source and fallback) and **ru**. The code lives in
-`src/i18n/`; the contributor workflow is in [`docs/TRANSLATORS.md`](./TRANSLATORS.md).
+`src/i18n/`. How to mark UI text: [`docs/I18N.md`](./I18N.md); translator workflow:
+[`docs/TRANSLATORS.md`](./TRANSLATORS.md).
 
 - **Keys are the English text.** `t('Save keys')`, `tn(count, '{count} camera',
   '{count} cameras')`, and `msg('Live Flights')` for text stored in data and

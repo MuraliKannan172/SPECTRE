@@ -4,21 +4,7 @@ Shipped languages: **English** (source and fallback) and **Russian** (`ru`).
 
 ## How it works
 
-The English text is the key. There is no English catalog: the code is the source.
-
-```js
-t('Save keys'); // plain text
-t('Saved to {store}', { store }); // named placeholders
-tn(count, '{count} camera', '{count} cameras'); // count-dependent text
-msg('Live Flights'); // text kept in data, translated later by t()
-```
-
-```html
-<span data-i18n>Normal</span>
-<button title="Pin visual presets" data-i18n-title>…</button>
-```
-
-`data-i18n` translates the element's own text (put it on the element that holds the text, not on a parent with children). `data-i18n-title`, `data-i18n-aria-label` and `data-i18n-placeholder` translate that attribute's English value.
+The English text is the key: code calls `t('Save keys')`, and markup marks elements with `data-i18n`. How developers mark text is in [I18N.md](./I18N.md).
 
 Every other language is one flat JSON file, `src/i18n/locales/<code>.json`, keyed by the English text:
 

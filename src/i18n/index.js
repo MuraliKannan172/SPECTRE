@@ -9,7 +9,7 @@
 // English needs no catalog. Every other locale is one flat JSON file,
 // locales/<code>.json, keyed by the English text (for tn, by the English
 // plural form). A missing entry falls back to English.
-// `npm run i18n:check` keeps the catalogs in step with the code.
+// `npm run i18n` keeps the catalogs in step with the code. Guide: docs/I18N.md.
 import {
   DEFAULT_LOCALE,
   normalizeLocale,
