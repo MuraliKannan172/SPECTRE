@@ -6,6 +6,8 @@ import {
   extractMessages,
   readCatalog,
   shippedLocales,
+  unmarkedMarkup,
+  unmarkedScript,
 } from '../../scripts/i18n.mjs';
 import { LOCALES } from './locale.js';
 
@@ -54,4 +56,53 @@ test('checkCatalog reports missing, stale, placeholder and plural problems', () 
   assert.deepEqual(result.missing, ['Untranslated']);
   assert.deepEqual(result.stale, ['Removed']);
   assert.equal(result.errors.length, 2);
+});
+
+test('unmarkedMarkup finds text and attributes without data-i18n*', () => {
+  const texts = (html) => unmarkedMarkup('f.html', html).map((f) => f.text);
+  assert.deepEqual(texts('<span>Close</span>'), ['Close']);
+  assert.deepEqual(texts('<span data-i18n>Close</span>'), []);
+  assert.deepEqual(texts('<button title="Pin it">x</button>'), [
+    'title="Pin it"',
+  ]);
+  assert.deepEqual(
+    texts('<button title="Pin it" data-i18n-title>x</button>'),
+    [],
+  );
+  assert.deepEqual(
+    texts('<select translate="no"><option>0.9 dB</option></select>'),
+    [],
+  );
+  assert.deepEqual(texts('<b data-i18n-runtime><i>OFF</i></b>'), []);
+  assert.deepEqual(
+    texts('<span class="material-symbols-outlined">public</span>'),
+    [],
+  );
+  assert.deepEqual(texts('<!-- Note --><span>— 42 —</span>'), []);
+});
+
+test('unmarkedScript finds literals that reach the page without t/tn/msg', () => {
+  const texts = (js) => unmarkedScript('f.js', js).map((f) => f.text);
+  assert.deepEqual(texts("el.textContent = 'Saved';"), ['Saved']);
+  assert.deepEqual(texts("el.textContent = t('Saved');"), []);
+  assert.deepEqual(texts("el.textContent = on ? 'On air' : 'Off air';"), [
+    'On air',
+    'Off air',
+  ]);
+  assert.deepEqual(texts("el.setAttribute('aria-label', `Open ${name}`);"), [
+    'Open',
+  ]);
+  assert.deepEqual(
+    texts("const row = { label: msg('Wind'), id: 'wind' };"),
+    [],
+  );
+  assert.deepEqual(texts("const row = { label: 'Wind' };"), ['Wind']);
+  assert.deepEqual(texts("el.textContent = labelFor('flights');"), []);
+  assert.deepEqual(texts("el.className = 'is-active';"), []);
+  assert.deepEqual(texts("el.title = mode === 'Auto mode' ? a : b;"), []);
+  assert.deepEqual(texts("// el.textContent = 'Old copy';"), []);
+  assert.deepEqual(
+    texts("// i18n-ignore: product name\nel.textContent = 'OpenSky';"),
+    [],
+  );
 });
