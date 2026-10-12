@@ -859,5 +859,19 @@
   "LIVE · Roads: OpenStreetMap · Flow: TomTom · {percent}% cov · Unmatched: simulated": "EN VIVO · Vías: OpenStreetMap · Flujo: TomTom · {percent}% cob. · Sin coincidencia: simulado",
   "LIVE · Roads: OpenStreetMap · Flow: TomTom · {percent}% cov": "EN VIVO · Vías: OpenStreetMap · Flujo: TomTom · {percent}% cob.",
   "SIMULATED · Roads: OpenStreetMap · Flow: TomTom (no matches)": "SIMULADO · Vías: OpenStreetMap · Flujo: TomTom (sin coincidencias)",
-  "Data source unavailable": "Fuente de datos no disponible"
+  "Data source unavailable": "Fuente de datos no disponible",
+  "Saturation": "Saturación",
+  "Edge Thickness": "Grosor de bordes",
+  "Contrast": "Contraste",
+  "Grain": "Grano",
+  "Vignette": "Viñeta",
+  "Pixelation": "Pixelado",
+  "Distortion": "Distorsión",
+  "Instability": "Inestabilidad",
+  "Wind": "Viento",
+  "Gain": "Ganancia",
+  "Scanlines": "Líneas de barrido",
+  "Sensitivity": "Sensibilidad",
+  "WHOT/BHOT": "WHOT/BHOT",
+  "Ironbow": "Ironbow"
 }

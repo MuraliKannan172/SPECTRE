@@ -28,6 +28,6 @@ test('the first-run checkbox keeps its native visible label', () => {
 });
 
 test('generated style sliders use the visible parameter label as their name', () => {
-  assert.match(parameters, /label\.textContent\s*=\s*metadata\.label;/);
-  assert.match(parameters, /slider\.setAttribute\(['"]aria-label['"],\s*metadata\.label\)/);
+  assert.match(parameters, /label\.textContent\s*=\s*t\(metadata\.label\);/);
+  assert.match(parameters, /slider\.setAttribute\(['"]aria-label['"],\s*t\(metadata\.label\)\)/);
 });
