@@ -12,8 +12,10 @@
  * Run: start the app (`./scripts/dev-fresh.sh`) and
  *   node scripts/qa-recent-imagery.mjs
  * Env: QA_BASE_URL (default http://localhost:4173), QA_SHOT_DIR (default
- * qa-shots/recent-imagery), QA_HEADFUL=1. Every wait is bounded. Without
- * network access to NASA the run skips with exit code 0.
+ * qa-shots/recent-imagery), QA_HEADFUL=1.
+ * QA_RECENT_IMAGERY_SLOW_RENDER=1 permits loaded SwiftShader CI to use a
+ * 4 s ZOOM IN wait and 0.8 s height-stability tail (defaults: 2 s / 1.2 s).
+ * Every wait is bounded. Without NASA access the run skips with code 0.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +24,9 @@ import puppeteer from 'puppeteer';
 const BASE_URL = process.env.QA_BASE_URL || 'http://localhost:4173';
 const SHOT_DIR = process.env.QA_SHOT_DIR || 'qa-shots/recent-imagery';
 const HEADFUL = process.env.QA_HEADFUL === '1';
+const SLOW_RENDER = process.env.QA_RECENT_IMAGERY_SLOW_RENDER === '1';
+const ZOOM_TIMEOUT_MS = SLOW_RENDER ? 4_000 : 2_000;
+const HEIGHT_TAIL_SAMPLES = SLOW_RENDER ? 8 : 12;
 const STEP_TIMEOUT = 20_000;
 const AUSTIN = { lon: -97.74, lat: 30.27, height: 12_000 };
 const PANEL = '#recent-imagery-panel';
@@ -1048,13 +1053,13 @@ try {
       ) <=
       target * 0.01,
     fitHeight,
-    4_000,
+    ZOOM_TIMEOUT_MS,
   );
   const zoomedHeight = await page.evaluate(
     () => window.__godsEyeView.viewer.camera.positionCartographic.height,
   );
   check(
-    `ZOOM IN lands at ${Math.round(fitHeight / 1000)} km`,
+    `ZOOM IN flies to ${Math.round(fitHeight / 1000)} km within ${ZOOM_TIMEOUT_MS / 1_000} s`,
     zoomed,
     `height=${Math.round(zoomedHeight)} target=${Math.round(fitHeight)}`,
   );
@@ -1264,7 +1269,7 @@ try {
       );
       await wait(100);
     }
-    const tail = (key) => new Set(samples.slice(-8).map((s) => s[key]));
+    const tail = (key) => new Set(samples.slice(-HEIGHT_TAIL_SAMPLES).map((s) => s[key]));
     return {
       settled: tail('imagery').size === 1 && tail('cctv').size === 1,
       detail: `imagery=${samples.map((s) => s.imagery).join(',')} cctv=${samples.map((s) => s.cctv).join(',')}`,

@@ -31,6 +31,8 @@ jobs:
           cat /tmp/gev-dev.log
           exit 1
       - name: Recent Imagery live gate
+        env:
+          QA_RECENT_IMAGERY_SLOW_RENDER: '1'
         run: node scripts/qa-recent-imagery.mjs
       - name: Dev log on failure
         if: failure()
