@@ -1733,9 +1733,12 @@ export function cataloniaCameraName(carretera, municipi) {
  * Fetch Catalonia traffic cameras (Servei Català de Trànsit), keyless: one
  * WFS/GML XML list. The feed carries a `font` field naming the real
  * publisher per camera; only SCT's own highway cameras and the hotlinked
- * Barcelona (IMI) and Terrassa municipal cameras are kept, each confirmed to
- * return a real frame — frame URLs are checked against a host allowlist
- * (CATALONIA_IMAGE_HOSTS), so a row from any other publisher is dropped.
+ * Barcelona (IMI) and Terrassa municipal cameras are kept — the publishers
+ * whose frame links were confirmed to serve images. Frame URLs are checked
+ * against a host allowlist (CATALONIA_IMAGE_HOSTS), so a row from any other
+ * publisher is dropped. The feed carries no camera status, so a camera its
+ * publisher has taken offline still registers and serves that publisher's
+ * own "image unavailable" still.
  * Each non-SCT camera carries its publisher as a `credit` alongside the
  * shared `provider`. The feed carries no heading, so every camera takes the
  * id-hash fallback, low-confidence pose (same as TfL and Fintraffic).
