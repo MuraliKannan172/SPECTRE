@@ -46,7 +46,8 @@ Edit `src/i18n/locales/<code>.json` and run `npm run i18n`. To see your change, 
 2. Import it in `src/i18n/index.js` and add it to `CATALOGS`.
 3. Add the code to `LOCALES` and its own-language name to `LOCALE_NAMES` in `src/i18n/locale.js`. Right-to-left languages also go in `RTL_LOCALES`.
 4. Add `src/i18n/locales/<code>.json` next to `ru.json` in `scripts/package-boundaries.json`.
-5. Run `npm run i18n` and `npm test`, then check the panels in the app at narrow widths.
+5. Write `docs/translations/<code>.md`: glossary, plural forms, units and style (copy the structure of `ru.md`).
+6. Run `npm run i18n` and `npm test`, then check the panels in the app at narrow widths.
 
 ## Rules
 
@@ -54,27 +55,12 @@ Edit `src/i18n/locales/<code>.json` and run `npm run i18n`. To see your change, 
 - UPPERCASE English stays UPPERCASE. Short labels, chips and HUD readouts should stay short; prefer an abbreviation over a wrapped line.
 - Keep the separators `·`, `—`, `→`, `↗`, `…`.
 - Leave product, provider and data names in their original form: Google Maps, Cesium ion, OpenAI, ChatGPT, NASA FIRMS, USGS, OpenSky, ADS-B, AIS, CCTV, HUD, TomTom, OpenStreetMap, Mapillary, and keyboard keys (Space, Esc, H, 1–9).
-- Units follow the language's convention (Russian: км, м/с, уз, фт).
+- Units follow the language's convention; see the language notes.
 
 ## Never translated
 
 These are contracts, not copy: layer ids and registry keys, status enums and other machine values (translate only the label shown for them), share-link and hash parameters, `?lang=`, storage schemas, API fields, voice tool names and schemas, provider and dataset names, data from feeds (callsigns, vessel, satellite, station and place names, headlines), attribution, console diagnostics, and user-authored content.
 
-## Russian glossary
+## Language notes
 
-| English                         | Русский                            |
-| ------------------------------- | ---------------------------------- |
-| layer / data layer              | слой / слой данных                 |
-| feed                            | поток данных (short: поток)        |
-| source                          | источник                           |
-| LIVE (status) / live data       | ОНЛАЙН / в реальном времени        |
-| SIMULATED                       | СИМУЛЯЦИЯ                          |
-| stale / degraded / unavailable  | устарел / с перебоями / недоступен |
-| key (API key) / POWER UP        | ключ / ЗАПУСК                      |
-| aircraft / flight / vessel      | самолёт / рейс / судно             |
-| launch (rocket) / space mission | пуск / космическая миссия          |
-| contact / tracking              | контакт / отслеживание             |
-| installation                    | объект                             |
-| scene / shot / recipe           | сцена / кадр / рецепт              |
-| HDG / BRG / CRS / FOV / DEST    | КУРС / ПЕЛ. / ПУТЬ / ОБЗОР / НАЗН. |
-| PREV / NEXT                     | ПРЕД. / СЛЕД.                      |
+Each language keeps its glossary, plural forms, units and style in its own file, `docs/translations/<code>.md`: [Russian](./translations/ru.md). Read it before translating, and add a term there when you settle on one.
