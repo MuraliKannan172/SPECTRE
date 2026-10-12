@@ -24,8 +24,8 @@ export function createSelection({
     const stationLabel =
       stationName ||
       (record?.stationId
-        ? t('layers.bike.stationWithId', { id: record.stationId })
-        : t('layers.bike.stationFallback'));
+        ? t('Station {id}', { id: record.stationId })
+        : t('Station'));
     const bikes = Number.isFinite(record?.bikesAvailable)
       ? record.bikesAvailable
       : '?';
@@ -36,17 +36,18 @@ export function createSelection({
 
     const lines = [
       stationLabel,
-      t('layers.bike.card.capacity', { bikes, docks, capacity }),
+      t('🚲 {bikes} avail · {docks} docks · {capacity} cap', {
+        bikes,
+        docks,
+        capacity,
+      }),
     ];
 
     // Append warnings for stations that are offline or partially non-operational
     const abnormal = [];
-    if (record?.isInstalled === false)
-      abnormal.push(t('layers.bike.warning.notInstalled'));
-    if (record?.isRenting === false)
-      abnormal.push(t('layers.bike.warning.notRenting'));
-    if (record?.isReturning === false)
-      abnormal.push(t('layers.bike.warning.notReturning'));
+    if (record?.isInstalled === false) abnormal.push(t('⚠️ Not installed'));
+    if (record?.isRenting === false) abnormal.push(t('⚠️ Not renting'));
+    if (record?.isReturning === false) abnormal.push(t('⚠️ Not returning'));
     if (abnormal.length > 0) {
       lines.push(abnormal.join(' · '));
     }

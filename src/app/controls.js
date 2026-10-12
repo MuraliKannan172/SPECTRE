@@ -42,10 +42,10 @@ export function createApplicationControls({
 
   // If no share link state, do default fly-to Austin
   if (!styleManager.hasShareState) {
-    loaderStatus.textContent = t('shell.loading.status.flying');
+    loaderStatus.textContent = t('Flying to Austin, TX...');
     defer(flyToAustin(viewer));
   } else {
-    loaderStatus.textContent = t('shell.loading.status.restoring');
+    loaderStatus.textContent = t('Restoring shared view...');
   }
 
   return { styleManager, weatherEffects, cockpitCloudEffects };

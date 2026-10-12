@@ -9,7 +9,7 @@ import {
   reduceTrafficSyncFeedback,
 } from '../loadingFeedback.js';
 import { setSplitFlapText, disposeSplitFlap } from '../splitFlap.js';
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 
 // loadingFeedback.js composes the shared status copy inside the portable
 // node/browser graph (the server-side HUD summary reads the same modules), so
@@ -17,17 +17,17 @@ import { t } from '../i18n/index.js';
 // the closed label vocabulary to the catalog, and pass anything unrecognized
 // (a live provider error) through verbatim (docs/TRANSLATORS.md).
 const STATUS_LABEL_KEYS = Object.freeze({
-  'LOADING LIVE DATA': 'shell.status.loadingLiveData',
-  'LOAD COMPLETE': 'shell.status.loadComplete',
-  'LOAD CANCELLED': 'shell.status.loadCancelled',
-  'LOAD FAILED': 'shell.status.loadFailed',
-  'LIVE DATA OFF': 'shell.status.liveDataOff',
-  'MAPPED SITES LOADED': 'shell.status.mappedSitesLoaded',
-  'RETRYING MAPPED SITES': 'shell.status.retryingMappedSites',
-  'FETCHING MAPPED SITES': 'shell.status.fetchingMappedSites',
-  'TURNING OFF LIVE DATA': 'shell.status.turningOffLiveData',
-  'REFRESHING LIVE DATA': 'shell.status.refreshingLiveData',
-  'syncing road network': 'shell.status.trafficSyncing',
+  'LOADING LIVE DATA': msg('LOADING LIVE DATA'),
+  'LOAD COMPLETE': msg('LOAD COMPLETE'),
+  'LOAD CANCELLED': msg('LOAD CANCELLED'),
+  'LOAD FAILED': msg('LOAD FAILED'),
+  'LIVE DATA OFF': msg('LIVE DATA OFF'),
+  'MAPPED SITES LOADED': msg('MAPPED SITES LOADED'),
+  'RETRYING MAPPED SITES': msg('RETRYING MAPPED SITES'),
+  'FETCHING MAPPED SITES': msg('FETCHING MAPPED SITES'),
+  'TURNING OFF LIVE DATA': msg('TURNING OFF LIVE DATA'),
+  'REFRESHING LIVE DATA': msg('REFRESHING LIVE DATA'),
+  'syncing road network': msg('syncing road network'),
 });
 
 function localizeStatusLabel(label) {
@@ -41,8 +41,8 @@ const RETRY_DETAIL_RE = /^(?:ALPR cameras · )?retrying in (\d+)s$/;
 function localizeStatusDetail(detail) {
   if (typeof detail !== 'string' || !detail) return detail;
   const match = detail.match(RETRY_DETAIL_RE);
-  if (match) return t('shell.status.retryingIn', { seconds: match[1] });
-  if (detail.trim() === 'retry pending') return t('shell.status.retryPending');
+  if (match) return t('retrying in {seconds}s', { seconds: match[1] });
+  if (detail.trim() === 'retry pending') return t('retry pending');
   return detail;
 }
 

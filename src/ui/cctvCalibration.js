@@ -83,7 +83,7 @@ export function _resetCctvCalibration() {
     },
     { origin: 'user' },
   );
-  this.actions.showToast(t('cockpit.cctv.toastCalibrationReset'));
+  this.actions.showToast(t('CCTV calibration reset'));
 }
 
 export function _beginCctvCalValueEdit(chip) {
@@ -164,9 +164,7 @@ export function _syncCctvCalReadout(enabled, activeCamera) {
   if (this._cctvAdjustBtn) {
     const adjustOn = !!this._cctvState?.calibrationMode;
     this._cctvAdjustBtn.classList.toggle('active', adjustOn && canCalibrate);
-    this._cctvAdjustBtn.textContent = adjustOn
-      ? t('layers.cctv.adjustOn')
-      : t('layers.cctv.adjustLabel');
+    this._cctvAdjustBtn.textContent = adjustOn ? t('ADJUST ON') : t('ADJUST');
     this._cctvAdjustBtn.disabled = !canCalibrate;
   }
   if (this._cctvCalReadout) {

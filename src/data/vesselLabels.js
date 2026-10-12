@@ -4,7 +4,7 @@
  * after the vessel cards moved out of their dedicated canvas renderer.
  */
 
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 
 export const VESSEL_OVERLAY_SOURCE_ID = 'ais-live-vessels';
 /** Existing selector grid size; one ambient winner is retained per cell. */
@@ -70,25 +70,25 @@ const NUMERIC_TYPE_FAMILIES = {
 // machine values — TYPE_STYLES matches on them and tests pin them — so card
 // text translates only through this map at the presentation boundary.
 const TYPE_DISPLAY_KEYS = Object.freeze({
-  FISHING: 'layers.vessel.type.fishing',
-  TOWING: 'layers.vessel.type.towing',
-  DREDGER: 'layers.vessel.type.dredger',
-  'DIVE OPS': 'layers.vessel.type.diveOps',
-  MILITARY: 'layers.vessel.type.military',
-  SAILING: 'layers.vessel.type.sailing',
-  PLEASURE: 'layers.vessel.type.pleasure',
-  PILOT: 'layers.vessel.type.pilot',
-  SAR: 'layers.vessel.type.sar',
-  TUG: 'layers.vessel.type.tug',
-  'PORT TENDER': 'layers.vessel.type.portTender',
-  'ANTI-POLLUTION': 'layers.vessel.type.antiPollution',
-  'LAW ENFORCE': 'layers.vessel.type.lawEnforce',
-  MEDICAL: 'layers.vessel.type.medical',
-  'HIGH-SPEED': 'layers.vessel.type.highSpeed',
-  PASSENGER: 'layers.vessel.type.passenger',
-  CARGO: 'layers.vessel.type.cargo',
-  TANKER: 'layers.vessel.type.tanker',
-  OTHER: 'layers.vessel.type.other',
+  FISHING: msg('FISHING'),
+  TOWING: msg('TOWING'),
+  DREDGER: msg('DREDGER'),
+  'DIVE OPS': msg('DIVE OPS'),
+  MILITARY: msg('MILITARY'),
+  SAILING: msg('SAILING'),
+  PLEASURE: msg('PLEASURE'),
+  PILOT: msg('PILOT'),
+  SAR: msg('SAR'),
+  TUG: msg('TUG'),
+  'PORT TENDER': msg('PORT TENDER'),
+  'ANTI-POLLUTION': msg('ANTI-POLLUTION'),
+  'LAW ENFORCE': msg('LAW ENFORCE'),
+  MEDICAL: msg('MEDICAL'),
+  'HIGH-SPEED': msg('HIGH-SPEED'),
+  PASSENGER: msg('PASSENGER'),
+  CARGO: msg('CARGO'),
+  TANKER: msg('TANKER'),
+  OTHER: msg('OTHER'),
 });
 
 /**

@@ -20,10 +20,13 @@ export function createPresentation({
     const active = parts.selection.getActiveRecord();
     if (!active) {
       return layerState._records.length
-        ? t('layers.cctv.summary.standingBy', {
-            count: layerState._records.length,
-          })
-        : t('layers.cctv.summary.empty');
+        ? t(
+            '{count} CAMERAS STANDING BY · NO CAMERA SELECTED · CLICK A CAMERA TO ACTIVATE',
+            {
+              count: layerState._records.length,
+            },
+          )
+        : t('No cameras available in catalog.');
     }
 
     const area = parts.model.sectorAreaKm2(
@@ -37,37 +40,33 @@ export function createPresentation({
     const calBadge = parts.calibration.deriveCalBadge(active.camera);
 
     return [
-      t('layers.cctv.summary.city', {
+      t('{city} CCTV', {
         city: active.camera.city.toUpperCase(),
       }),
       `${active.camera.name.toUpperCase()}`,
       // A synthetic bearing (headingConfidence 'low', no human calibration)
       // is tagged so a hashed guess never reads as a surveyed facing (#639).
       headingHudToken(active.camera),
-      t('layers.cctv.summary.fov', {
+      t('FOV {value}°', {
         value: Math.round(active.camera.fovDeg),
       }),
-      t('layers.cctv.summary.coverage', { value: area.toFixed(2) }),
+      t('COVERAGE {value}km²', { value: area.toFixed(2) }),
       overlapCount > 0
-        ? t('layers.cctv.summary.overlap', { count: overlapCount })
-        : t('layers.cctv.summary.isolated'),
-      layerState._showProjection
-        ? t('layers.cctv.summary.projMonitor')
-        : t('layers.cctv.summary.projOff'),
-      layerState._coverageMode === 'viewshed'
-        ? t('layers.cctv.summary.viewshed')
-        : null,
-      t('layers.cctv.summary.cal', {
+        ? t('OVERLAP {count} cams', { count: overlapCount })
+        : t('ISOLATED VIEW'),
+      layerState._showProjection ? t('PROJ MONITOR') : t('PROJ OFF'),
+      layerState._coverageMode === 'viewshed' ? t('VIEWSHED') : null,
+      t('CAL {value}', {
         value: calBadge.replace('-', ' ').toUpperCase(),
       }),
       health?.sourceKind
-        ? t('layers.cctv.summary.src', {
+        ? t('SRC {value}', {
             value: String(health.sourceKind).toUpperCase(),
           })
-        : t('layers.cctv.summary.src', {
+        : t('SRC {value}', {
             value: String(active.camera.feedType || 'image').toUpperCase(),
           }),
-      t('layers.cctv.summary.context', { value: viewBand.toUpperCase() }),
+      t('{value} CONTEXT', { value: viewBand.toUpperCase() }),
     ]
       .filter(Boolean)
       .join(' · ');

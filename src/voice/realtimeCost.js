@@ -57,14 +57,17 @@ export class RealtimeCost {
       const pendingId = resolveVoiceModel(pendingTier).id;
       this.ui.tierButton.title =
         this.isActive() && state.modelId !== pendingId
-          ? t('setup.voice.tierNextSession', {
+          ? t('Next session: {pendingId} — this session stays on {modelId}', {
               pendingId,
               modelId: state.modelId,
             })
-          : t('setup.voice.tierSwitchHint', {
-              pendingId,
-              target: isMini ? 'standard' : 'mini',
-            });
+          : t(
+              'Voice model: {pendingId} — click to switch to {target}; applies next session',
+              {
+                pendingId,
+                target: isMini ? 'standard' : 'mini',
+              },
+            );
     }
     if (this.ui?.costValue) {
       const liveAuth = this.sessionCloudVoiceAuth || this.cloudVoiceAuth;
@@ -85,12 +88,15 @@ export class RealtimeCost {
       this.ui.costValue.textContent = state.display;
       this.ui.costValue.dataset.level = state.level;
       this.ui.costValue.title =
-        t('setup.voice.costTooltip', {
-          modelId: state.modelId,
-          responses: state.responses,
-          warn: formatCostUsd(state.warnUsd),
-          cap: formatCostUsd(state.capUsd),
-        }) + (state.note ? ` ${state.note}` : '');
+        t(
+          'Estimated session cost on {modelId} — {responses} response(s). Warns at {warn}, ends the session at {cap}.',
+          {
+            modelId: state.modelId,
+            responses: state.responses,
+            warn: formatCostUsd(state.warnUsd),
+            cap: formatCostUsd(state.capUsd),
+          },
+        ) + (state.note ? ` ${state.note}` : '');
     }
   }
 
@@ -133,7 +139,7 @@ export class RealtimeCost {
     if (this.isActive() && this.ui?.detail) {
       this.setStatus(
         this.status,
-        t('setup.voice.tier.appliesNextSession', {
+        t('{tier} applies next session', {
           tier: this.voiceTier.toUpperCase(),
         }),
       );
@@ -252,7 +258,7 @@ export class RealtimeCost {
     } finally {
       this.setStatus(
         'idle',
-        t('setup.voice.status.sessionCostCap', { cost: state.display }),
+        t('Session ended — cost cap {cost}', { cost: state.display }),
       );
       this.syncCostUi();
     }

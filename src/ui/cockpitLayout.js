@@ -1,5 +1,5 @@
 /** Measure Cockpit panels against visible HUD and viewport obstacles. */
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 import {
   resolveCockpitUtilityAnchor,
   resolveCockpitUtilityLayout,
@@ -45,16 +45,10 @@ export function setContextCollapsed(collapsed) {
     );
     this.contextToggle.setAttribute(
       'aria-label',
-      t(
-        expanded
-          ? 'cockpit.context.toggleExpandAriaLabel'
-          : 'cockpit.context.toggleAriaLabel',
-      ),
+      t(expanded ? msg('Expand Contact panel') : msg('Collapse Contact panel')),
     );
     this.contextToggle.title = t(
-      expanded
-        ? 'cockpit.context.toggleExpandTitle'
-        : 'cockpit.context.toggleTitle',
+      expanded ? msg('Expand contact panel') : msg('Collapse contact panel'),
     );
     const icon = this.contextToggle.querySelector('.material-symbols-outlined');
     if (icon) icon.textContent = expanded ? 'chevron_left' : 'chevron_right';
@@ -78,12 +72,12 @@ export function setSignalCollapsed(collapsed, { user = false } = {}) {
       'aria-label',
       t(
         expanded
-          ? 'cockpit.brief.collapseAriaLabel'
-          : 'cockpit.brief.expandAriaLabel',
+          ? msg('Collapse cockpit briefing panel')
+          : msg('Expand cockpit briefing panel'),
       ),
     );
     this.signalToggle.title = t(
-      expanded ? 'cockpit.brief.collapseTitle' : 'cockpit.brief.expandTitle',
+      expanded ? msg('Collapse briefing panel') : msg('Expand briefing panel'),
     );
     const icon = this.signalToggle.querySelector('.material-symbols-outlined');
     if (icon)

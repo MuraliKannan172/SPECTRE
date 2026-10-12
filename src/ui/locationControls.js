@@ -151,16 +151,12 @@ export class LocationControls {
     // localized static readout (resolved place names stay verbatim data).
     this.elements.statusCity.textContent =
       lines.city === LOCATION_MINI_EMPTY.city
-        ? t('cockpit.location.miniCityInitial')
+        ? t('📍 Location: --')
         : lines.city;
     if (lines.poi === LOCATION_MINI_EMPTY.poi) {
-      this.elements.statusPoi.textContent = t(
-        'cockpit.location.miniPoiInitial',
-      );
+      this.elements.statusPoi.textContent = t('Landmark: --');
     } else if (lines.poi === LOCATION_MINI_SEARCHED_PLACEHOLDER.poi) {
-      this.elements.statusPoi.textContent = t(
-        'cockpit.location.miniSearchedPlaceholder',
-      );
+      this.elements.statusPoi.textContent = t('Searched location');
     } else {
       this.elements.statusPoi.textContent = lines.poi;
     }
@@ -173,7 +169,7 @@ export class LocationControls {
       const icon = this.doc.createElement('span');
       icon.className = 'orbit-icon';
       icon.textContent = '↻';
-      this.orbitIndicator.append(icon, ` ${t('cockpit.location.orbitLabel')}`);
+      this.orbitIndicator.append(icon, ` ${t('ORBIT')}`);
       this.doc.body.appendChild(this.orbitIndicator);
     }
     return this.orbitIndicator;

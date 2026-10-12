@@ -259,7 +259,7 @@ export class RealtimeRadio {
     if (radioHandoff.result?.ok || radioHandoff.cancelled || !stillCurrent)
       return;
     if (this.dc?.readyState === 'open' && !this.userTurnPending) {
-      this.setStatus('listening', t('setup.voice.detail.radioDidNotStart'));
+      this.setStatus('listening', t('Radio did not start'));
       this.queueResponseCreate(
         'Say exactly one short correction: “The Radio station could not start. Voice is still on.”',
       );

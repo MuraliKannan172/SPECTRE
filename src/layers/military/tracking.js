@@ -220,7 +220,7 @@ export function createTracking({
   function _buildTrackedLabel(info, icao24) {
     const stale =
       flightState.records.missingPolls.get(icao24) || flightState.feed._backoff
-        ? ` · ${t('layers.status.stale')}`
+        ? ` · ${t('STALE')}`
         : '';
     const callsign =
       (parts.queries._toCleanText(info?.callsign) ||
@@ -230,14 +230,12 @@ export function createTracking({
     // what the Easter egg replaces the real type with.
     const type = tr3bTypeLabel(
       icao24,
-      parts.queries._toCleanText(info?.type) || t('layers.readout.typeUnknown'),
+      parts.queries._toCleanText(info?.type) || t('Type unknown'),
     );
     const registration =
-      parts.queries._toCleanText(info?.registration) ||
-      t('layers.readout.regUnknown');
+      parts.queries._toCleanText(info?.registration) || t('Reg unknown');
     const operator =
-      parts.queries._toCleanText(info?.operator) ||
-      t('layers.readout.operatorUnknown');
+      parts.queries._toCleanText(info?.operator) || t('Operator unknown');
     const altitude = parts.queries._formatAltitude(info?.altitudeFt);
     const speedKt = info?.speedMps ? Math.round(info.speedMps * 1.944) : null;
     const tail = speedKt ? `${altitude} · ${speedKt} kt` : altitude;

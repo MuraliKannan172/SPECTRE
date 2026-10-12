@@ -21,13 +21,13 @@ export function createCards({
     const stale = (record.missedRefreshes || 0) > 0;
     el.classList.add('active');
     el.textContent = [
-      t('layers.vessel.hudName', { name: trimHudValue(record.name, 32) }),
-      t('layers.vessel.hudTypeLine', {
-        type: trimHudValue(record.type || t('layers.vessel.fallback'), 24),
+      t('AIS: {name}', { name: trimHudValue(record.name, 32) }),
+      t('{type}  SPD: {speed}  HDG: {heading}', {
+        type: trimHudValue(record.type || t('VESSEL'), 24),
         speed: formatSpeed(record.speed),
         heading: formatHeading(record.heading ?? record.course),
       }),
-      `MMSI: ${record.mmsi || '--'}  ${formatPositionTime(record)}${stale ? `  · ${t('layers.status.stale')}` : ''}`,
+      `MMSI: ${record.mmsi || '--'}  ${formatPositionTime(record)}${stale ? `  · ${t('STALE')}` : ''}`,
     ].join('\n');
   }
 
@@ -35,7 +35,7 @@ export function createCards({
     const el = document.getElementById('hud-ais-vessel');
     if (!el) return;
     el.classList.remove('active');
-    el.textContent = t('layers.vessel.hudIdle');
+    el.textContent = t('AIS: --');
   }
 
   function trimHudValue(value, maxLength) {
@@ -90,7 +90,7 @@ export function createCards({
     const direction = record.heading ?? record.course;
     const details = [
       [
-        vesselTypeShort(record) || t('layers.vessel.fallback'),
+        vesselTypeShort(record) || t('VESSEL'),
         formatSpeed(record.speed),
         Number.isFinite(direction) ? `${Math.round(direction)}°` : '--°',
       ].join(' · '),
@@ -99,7 +99,7 @@ export function createCards({
     if (destination) details.push(`→ ${trimHudValue(destination, 24)}`);
     const stale = (record.missedRefreshes || 0) > 0;
     details.push(
-      `MMSI ${record.mmsi || '--'} · ${formatPositionTime(record)}${stale ? ` · ${t('layers.status.stale')}` : ''}`,
+      `MMSI ${record.mmsi || '--'} · ${formatPositionTime(record)}${stale ? ` · ${t('STALE')}` : ''}`,
     );
     return {
       id: vesselOverlayEntryId(record),
@@ -156,7 +156,7 @@ export function createCards({
   function displayVesselName(record) {
     const name = String(record.name || '').trim();
     if (name && name !== 'VESSEL' && name !== record.mmsi) return name;
-    return record.mmsi ? `MMSI ${record.mmsi}` : t('layers.vessel.fallback');
+    return record.mmsi ? `MMSI ${record.mmsi}` : t('VESSEL');
   }
 
   function formatSpeed(speed) {
@@ -168,10 +168,10 @@ export function createCards({
   }
 
   function formatPositionTime(record) {
-    if (!record.lastPositionUtc) return t('layers.vessel.posLive');
+    if (!record.lastPositionUtc) return t('POS: LIVE');
     const date = new Date(record.lastPositionUtc);
-    if (Number.isNaN(date.getTime())) return t('layers.vessel.posLive');
-    return t('layers.vessel.posAt', { time: date.toISOString().slice(11, 19) });
+    if (Number.isNaN(date.getTime())) return t('POS: LIVE');
+    return t('POS: {time}Z', { time: date.toISOString().slice(11, 19) });
   }
   return {
     updateSelectedVesselHud,

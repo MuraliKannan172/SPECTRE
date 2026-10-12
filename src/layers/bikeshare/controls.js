@@ -68,10 +68,10 @@ export function createControls({ state: layerState, services, parts, source }) {
       if (layerState._loading) {
         stats.loadingLabel =
           layerState._activeCityIds.size > 0
-            ? t('layers.bike.loadingSyncing', {
+            ? t('syncing {count} city feeds...', {
                 count: layerState._activeCityIds.size,
               })
-            : t('layers.bike.loadingScanning');
+            : t('scanning nearby systems...');
       }
       if (layerState._error) stats.error = layerState._error;
       return stats;

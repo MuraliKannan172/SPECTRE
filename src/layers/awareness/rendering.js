@@ -138,7 +138,7 @@ export function createRendering({
       '--compass-rotation',
       `${-headingDeg}deg`,
     );
-    layerState.compassHeading.textContent = t('layers.awareness.hdg', {
+    layerState.compassHeading.textContent = t('HDG {value}°', {
       value: String(headingDeg).padStart(3, '0'),
     });
     layerState.compassHeading.style.left = `${geometry.centerX}px`;
@@ -224,12 +224,12 @@ export function createRendering({
             )
           : null;
       const bearingText = Number.isFinite(bearing)
-        ? t('layers.awareness.brg', {
+        ? t('BRG {value}°', {
             value: String(Math.round(bearing)).padStart(3, '0'),
           })
-        : t('layers.awareness.brgUnknown');
+        : t('BRG —');
       const courseText = Number.isFinite(item.track)
-        ? ` · ${t('layers.awareness.crs', {
+        ? ` · ${t('CRS {value}°', {
             value: String(Math.round(item.track)).padStart(3, '0'),
           })}`
         : '';

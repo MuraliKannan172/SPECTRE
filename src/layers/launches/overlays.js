@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium';
-import { t } from '../../i18n/index.js';
+import { t, msg } from '../../i18n/index.js';
 import {
   createCyberSonarSampler,
   isCyberContactSonarActive as isCyberSonarActive,
@@ -120,10 +120,10 @@ export function createOverlays({ state: layerState, services, parts, source }) {
     const details = selected
       ? [
           siteName
-            ? t('layers.missions.launchSiteValue', {
+            ? t('LAUNCH SITE · {site}', {
                 site: shortMissionLabel(siteName, 20).toUpperCase(),
               })
-            : t('layers.missions.launchSite'),
+            : t('LAUNCH SITE'),
         ]
       : [];
     return {
@@ -589,38 +589,37 @@ export function createOverlays({ state: layerState, services, parts, source }) {
     const mission = shortMissionLabel(launch.name, 22).toUpperCase();
     const siteName = compactLaunchSiteName(launch.launchSite);
     const siteCallout = siteName
-      ? t('layers.missions.launchSiteValue', {
+      ? t('LAUNCH SITE · {site}', {
           site: shortMissionLabel(siteName, 20).toUpperCase(),
         })
-      : t('layers.missions.launchSite');
+      : t('LAUNCH SITE');
     let title = mission;
     let detail = siteCallout;
     if (mode === 'countdown') {
-      title = t('layers.missions.replay.countdown', {
+      title = t('T−{time} · {mission}', {
         time: String(state.countdownSeconds).padStart(2, '0'),
         mission,
       });
-      detail = `${t('layers.missions.replay.standbyDetail')}\n${siteCallout}`;
+      detail = `${t('LAUNCH STANDBY')}\n${siteCallout}`;
     } else if (mode === 'ascent') {
       title =
         state.elapsedSinceStart < 1
-          ? t('layers.missions.replay.liftoff', { mission })
+          ? t('LIFTOFF · {mission}', { mission })
           : t(
               launch.trajectory.length > 1
-                ? 'layers.missions.replay.ascentReplay'
-                : 'layers.missions.replay.ascentEstimate',
+                ? msg('ASCENT REPLAY · {mission}')
+                : msg('ASCENT ESTIMATE · {mission}'),
               { mission },
             );
       detail = parts.policyHelpers.formatMissionEventTime(state.eventTime);
     } else if (mode === 'recovery') {
-      title = t('layers.missions.replay.recovery', { mission });
+      title = t('STAGE RE-ENTRY / RECOVERY · {mission}', { mission });
       detail = parts.policyHelpers.formatMissionEventTime(state.eventTime);
     } else if (mode === 'orbit') {
-      title = t('layers.missions.replay.orbit', { mission });
+      title = t('ORBIT REPLAY · {mission}', { mission });
       detail = parts.policyHelpers.formatMissionEventTime(state.eventTime);
     }
-    if (layerState._replayPaused)
-      title = t('layers.missions.replay.pausedPrefix', { title });
+    if (layerState._replayPaused) title = t('PAUSED · {title}', { title });
     const nextText = `${title}\n${detail}`;
     if (nextText !== layerState._replayVehicleOverlayText) {
       layerState._replayVehicleOverlayText = nextText;

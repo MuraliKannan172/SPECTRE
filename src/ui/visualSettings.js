@@ -1191,8 +1191,8 @@ export class VisualSettings {
       this._celestialBtn.disabled = !styleSupported;
       this._celestialBtn.setAttribute('aria-disabled', String(!styleSupported));
       this._celestialBtn.title = styleSupported
-        ? t('cockpit.display.celestialToggleTitle')
-        : t('cockpit.display.celestialUnavailableTitle');
+        ? t('Celestial ring — reveal the full globe')
+        : t('Celestial ring — available in Normal style');
     }
     let cameraFocused = false;
     if (nextEnabled && focus) {
@@ -1649,31 +1649,23 @@ export class VisualSettings {
     btn.setAttribute(
       'aria-label',
       enabled
-        ? t('cockpit.display.detectionAriaTemplate', {
+        ? t('Detection overlay: {mode}', {
             mode: String(modeLabel).toLowerCase(),
           })
-        : t('cockpit.display.detectionAriaOff'),
+        : t('Detection overlay: off'),
     );
     btn.classList.remove('active', 'god', 'panoptic');
     if (modeLabel === 'SPARSE') {
-      btn.querySelector('.pp-label').textContent = t(
-        'cockpit.display.detectionLabelSparse',
-      );
+      btn.querySelector('.pp-label').textContent = t('SPARSE');
       btn.classList.add('active');
     } else if (modeLabel === 'BALANCED') {
-      btn.querySelector('.pp-label').textContent = t(
-        'cockpit.display.detectionLabelBalanced',
-      );
+      btn.querySelector('.pp-label').textContent = t('BALANCED');
       btn.classList.add('active');
     } else if (modeLabel === 'DENSE') {
-      btn.querySelector('.pp-label').textContent = t(
-        'cockpit.display.detectionLabelDense',
-      );
+      btn.querySelector('.pp-label').textContent = t('DENSE');
       btn.classList.add('active', 'panoptic');
     } else {
-      btn.querySelector('.pp-label').textContent = t(
-        'cockpit.display.detectionLabel',
-      );
+      btn.querySelector('.pp-label').textContent = t('DETECT');
     }
 
     if (this._detectionSliderRow) {

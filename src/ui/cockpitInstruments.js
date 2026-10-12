@@ -32,10 +32,7 @@ export function updateHud(
   const heading = normalizeHeading(this.heading ?? info.track ?? 0);
   if (this.callsign) {
     this.callsign.textContent =
-      info.callsign ||
-      info.registration ||
-      info.icao24 ||
-      t('cockpit.hud.fallbackCallsign');
+      info.callsign || info.registration || info.icao24 || t('AIRCRAFT');
   }
   const speedKt = Number.isFinite(info.velocityMps)
     ? info.velocityMps * 1.94384
@@ -133,19 +130,20 @@ export function updateHud(
     // State-sibling keys at the writer: each feed state translates
     // independently so no state can leak English under other locales.
     const feedState = this.surfaceAcquiring
-      ? t('cockpit.hud.metaFeedAcquiringSurface')
+      ? t('ACQUIRING SURFACE')
       : this.surfaceFallback
-        ? t('cockpit.hud.metaFeedSurfaceFallback')
+        ? t('SURFACE FALLBACK')
         : info.stale
-          ? t('cockpit.hud.metaFeedStale')
-          : t('cockpit.hud.metaFeedLive');
-    this.aircraftMeta.textContent = t('cockpit.hud.aircraftMetaTemplate', {
-      aircraftClass:
-        info.layerId === 'military'
-          ? t('cockpit.hud.metaClassMilitary')
-          : t('cockpit.hud.metaClassCommercial'),
-      feedState,
-    });
+          ? t('STALE FEED')
+          : t('LIVE TRACK');
+    this.aircraftMeta.textContent = t(
+      '{aircraftClass} · {feedState} · COURSE ALIGNED',
+      {
+        aircraftClass:
+          info.layerId === 'military' ? t('MILITARY') : t('COMMERCIAL'),
+        feedState,
+      },
+    );
   }
   this.updateRoute(info);
   if (
@@ -170,14 +168,13 @@ export function updateRoute(info) {
   const validDestination =
     Number.isFinite(destination?.lat) && Number.isFinite(destination?.lon);
   const routeLabel = (airport) =>
-    [airport?.code, airport?.name].filter(Boolean).join(' · ') ||
-    t('cockpit.route.unknownEndpoint');
+    [airport?.code, airport?.name].filter(Boolean).join(' · ') || t('UNKNOWN');
   if (this.routeFrom) this.routeFrom.textContent = routeLabel(origin);
   if (this.routeTo) this.routeTo.textContent = routeLabel(destination);
   if (this.routeStatus) {
     this.routeStatus.textContent = validDestination
-      ? t('cockpit.route.statusArrowEstimated')
-      : t('cockpit.route.statusUnavailable');
+      ? t('ARROW · ESTIMATED DIRECTION')
+      : t('ROUTE DATA UNAVAILABLE');
   }
   if (this.route) this.route.hidden = !origin && !destination;
   if (
@@ -211,7 +208,7 @@ export function updateRoute(info) {
     );
   }
   if (this.routeDirectionLabel) {
-    this.routeDirectionLabel.textContent = t('cockpit.route.directionLabel', {
+    this.routeDirectionLabel.textContent = t('DEST {bearing}', {
       bearing: `${String(Math.round(destinationBearing)).padStart(3, '0')}°`,
     });
   }
@@ -222,14 +219,12 @@ export function syncWeatherToggle(enabled) {
   const active = !!enabled;
   this.weatherToggle.setAttribute('aria-pressed', String(active));
   const weatherLabel = active
-    ? t('cockpit.context.weatherDisableAriaLabel')
-    : t('cockpit.context.weatherEnableAriaLabel');
+    ? t('Disable cockpit weather effects')
+    : t('Enable cockpit weather effects');
   this.weatherToggle.setAttribute('aria-label', weatherLabel);
   this.weatherToggle.title = weatherLabel;
   if (this.weatherState) {
-    this.weatherState.textContent = active
-      ? t('cockpit.context.weatherStateOn')
-      : t('cockpit.context.weatherStateOff');
+    this.weatherState.textContent = active ? t('ON') : t('OFF');
   }
 }
 
@@ -248,19 +243,21 @@ export function setVisionMode(mode, { revealParameters = false } = {}) {
   const names = {
     optical: 'Normal',
     crt: 'CRT',
-    nvg: t('cockpit.vision.styleNameNightVision'),
-    thermal: t('cockpit.vision.styleNameThermal'),
-    anime: t('cockpit.vision.styleNameAnime'),
-    noir: t('cockpit.vision.styleNameNoir'),
-    snow: t('cockpit.vision.styleNameSnow'),
+    nvg: t('Night vision'),
+    thermal: t('Thermal'),
+    anime: t('Anime'),
+    noir: t('Noir'),
+    snow: t('Snow'),
   };
   if (this.visionCurrent) {
     this.visionCurrent.dataset.cockpitVision = next;
     this.visionCurrent.setAttribute(
       'aria-label',
-      t('cockpit.vision.currentAriaTemplate', { style: names[next] }),
+      t('Current cockpit vision style: {style}. Activate for next style.', {
+        style: names[next],
+      }),
     );
-    this.visionCurrent.title = t('cockpit.vision.currentTitleTemplate', {
+    this.visionCurrent.title = t('Current style: {style} — click for next', {
       style: names[next],
     });
   }

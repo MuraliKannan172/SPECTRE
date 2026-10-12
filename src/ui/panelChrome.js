@@ -1,5 +1,5 @@
 import { UiLifetime } from './uiLifetime.js';
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 import { displayPanelScroller } from './displayPanelScroll.js';
 import { PanelPositionControls } from './panelPositionControls.js';
 import { PanelLayoutController } from './panelLayoutController.js';
@@ -311,26 +311,24 @@ export class PanelChrome {
         const panelName =
           panelEl
             .querySelector('.panel-title, .pp-header-label')
-            ?.textContent?.trim() || t('cockpit.panel.fallbackName');
+            ?.textContent?.trim() || t('panel');
         const titleKey = collapsed
-          ? 'cockpit.panel.expandTitle'
-          : 'cockpit.panel.collapseTitle';
+          ? msg('Expand {name}')
+          : msg('Collapse {name}');
         btn.title = t(titleKey, { name: panelName });
         btn.setAttribute('aria-label', t(titleKey, { name: panelName }));
         if (panelEl.id === 'radio-panel') {
           // Expand state reuses the layers.* keys seeded on the static button;
           // the collapse state is runtime-only, so it owns cockpit.* keys.
           btn.title = t(
-            collapsed
-              ? 'layers.radio.expandTitle'
-              : 'cockpit.panel.radioCollapseTitle',
+            collapsed ? msg('Expand Radio') : msg('Collapse Radio'),
           );
           btn.setAttribute(
             'aria-label',
             t(
               collapsed
-                ? 'layers.radio.expandAriaLabel'
-                : 'cockpit.panel.radioCollapseAria',
+                ? msg('Expand Radio section')
+                : msg('Collapse Radio section'),
             ),
           );
         }
@@ -342,10 +340,10 @@ export class PanelChrome {
       const panelName =
         panelEl
           .querySelector('.panel-title, .location-toolbar-label')
-          ?.textContent?.trim() || t('cockpit.panel.fallbackName');
+          ?.textContent?.trim() || t('panel');
       const titleKey = collapsed
-        ? 'cockpit.panel.expandTitle'
-        : 'cockpit.panel.collapseTitle';
+        ? msg('Expand {name}')
+        : msg('Collapse {name}');
       dockToggle.setAttribute('aria-expanded', String(!collapsed));
       dockToggle.setAttribute('aria-label', t(titleKey, { name: panelName }));
       dockToggle.title = t(titleKey, { name: panelName });

@@ -1,5 +1,5 @@
 /** Regional briefing requests, pages and rotation for the Cockpit controller. */
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 import {
   COCKPIT_BRIEF_ROTATE_MS,
   COCKPIT_BRIEF_CYCLE_OFF_HELP,
@@ -15,18 +15,18 @@ import {
 // so it returns stable English labels; localize them here, at the cockpit
 // presentation boundary (docs/TRANSLATORS.md).
 const WEATHER_CONDITION_KEYS = Object.freeze({
-  'CONDITIONS UNKNOWN': 'layers.weather.conditionsUnknown',
-  CLEAR: 'layers.weather.clear',
-  'PARTLY CLOUDY': 'layers.weather.partlyCloudy',
-  OVERCAST: 'layers.weather.overcast',
-  FOG: 'layers.weather.fog',
-  DRIZZLE: 'layers.weather.drizzle',
-  RAIN: 'layers.weather.rain',
-  SNOW: 'layers.weather.snow',
-  'RAIN SHOWERS': 'layers.weather.rainShowers',
-  'SNOW SHOWERS': 'layers.weather.snowShowers',
-  THUNDERSTORM: 'layers.weather.thunderstorm',
-  'MIXED CONDITIONS': 'layers.weather.mixed',
+  'CONDITIONS UNKNOWN': msg('CONDITIONS UNKNOWN'),
+  CLEAR: msg('CLEAR'),
+  'PARTLY CLOUDY': msg('PARTLY CLOUDY'),
+  OVERCAST: msg('OVERCAST'),
+  FOG: msg('FOG'),
+  DRIZZLE: msg('DRIZZLE'),
+  RAIN: msg('RAIN'),
+  SNOW: msg('SNOW'),
+  'RAIN SHOWERS': msg('RAIN SHOWERS'),
+  'SNOW SHOWERS': msg('SNOW SHOWERS'),
+  THUNDERSTORM: msg('THUNDERSTORM'),
+  'MIXED CONDITIONS': msg('MIXED CONDITIONS'),
 });
 
 export function showBriefPage(index, { manual = false } = {}) {
@@ -80,14 +80,18 @@ export function setBriefAutoRotate(enabled) {
     // these t() re-writes are same-value overrides that localize the toggle
     // under other locales (byte-identical under 'en').
     const labelKey = this.briefAutoRotateEnabled
-      ? 'cockpit.brief.autoOn'
-      : 'cockpit.brief.autoOff';
+      ? msg('CYCLE ON')
+      : msg('CYCLE OFF');
     this.briefAutoToggle.textContent = t(labelKey);
     this.briefAutoToggle.setAttribute('aria-label', t(labelKey));
     this.briefAutoToggle.title = t(
       this.briefAutoRotateEnabled
-        ? 'cockpit.brief.autoTitleOn'
-        : 'cockpit.brief.autoTitle',
+        ? msg(
+            'Stop automatic page cycling. Previous, Next, and the SIG/NEWS/LOCAL tabs stay available.',
+          )
+        : msg(
+            'Cycle briefing pages automatically every 9 seconds (Signals → News → Local). Pauses while you hover or focus the panel. Live signal data refreshes continuously either way.',
+          ),
     );
   }
   if (this.briefAutoRotateEnabled) this.startBriefRotation({ reset: true });
@@ -127,7 +131,7 @@ export function stopBriefRotation() {
 export function updateLocalPosition(info) {
   if (!this.localCoordinates) return;
   if (!Number.isFinite(info.latitude) || !Number.isFinite(info.longitude)) {
-    this.localCoordinates.textContent = t('cockpit.brief.positionUnavailable');
+    this.localCoordinates.textContent = t('POSITION UNAVAILABLE');
     return;
   }
   const lat = `${Math.abs(info.latitude).toFixed(3)}°${info.latitude >= 0 ? 'N' : 'S'}`;
@@ -208,14 +212,14 @@ export function renderRegionalBriefStatus(status, info) {
     this.newsStatus.dataset.state = status;
     this.newsStatus.textContent =
       status === 'loading'
-        ? t('cockpit.brief.newsAcquiring')
-        : t('cockpit.brief.newsUnavailable');
+        ? t('ACQUIRING REGIONAL NEWS')
+        : t('REGIONAL NEWS UNAVAILABLE');
   }
   if (status === 'unavailable') this.newsList?.replaceChildren();
   if (this.localPlace && status === 'loading')
-    this.localPlace.textContent = t('cockpit.brief.localResolving');
+    this.localPlace.textContent = t('RESOLVING REGION');
   if (this.localPlace && status === 'unavailable')
-    this.localPlace.textContent = t('cockpit.brief.regionUnavailable');
+    this.localPlace.textContent = t('REGION UNAVAILABLE');
   this.updateLocalPosition(info);
 }
 
@@ -226,8 +230,8 @@ export function renderRegionalBrief(payload, info) {
     this.newsStatus.dataset.state = payload?.newsStatus || 'unavailable';
     this.newsStatus.textContent =
       payload?.newsStatus === 'empty'
-        ? t('cockpit.brief.newsEmpty')
-        : t('cockpit.brief.newsUnavailable');
+        ? t('NO RECENT LOCATION MATCHES')
+        : t('REGIONAL NEWS UNAVAILABLE');
   }
   if (this.newsList) {
     this.newsList.replaceChildren(
@@ -240,8 +244,8 @@ export function renderRegionalBrief(payload, info) {
         const title = document.createElement('strong');
         title.textContent = article.title;
         const metadata = document.createElement('span');
-        metadata.textContent = t('cockpit.brief.articleMetaTemplate', {
-          domain: article.domain || t('cockpit.brief.metadataSourceFallback'),
+        metadata.textContent = t('{domain} · {age}', {
+          domain: article.domain || t('SOURCE'),
           age: formatCockpitBriefAge(article.publishedAt),
         });
         link.append(title, metadata);
@@ -252,9 +256,7 @@ export function renderRegionalBrief(payload, info) {
   }
 
   const placeLabel =
-    payload?.place?.label ||
-    payload?.place?.country ||
-    t('cockpit.brief.regionUnavailable');
+    payload?.place?.label || payload?.place?.country || t('REGION UNAVAILABLE');
   if (this.localPlace) this.localPlace.textContent = placeLabel.toUpperCase();
   this.updateLocalPosition(info);
   const weather = payload?.weather;
@@ -282,10 +284,10 @@ export function renderRegionalBrief(payload, info) {
   }
   if (this.localCloud) {
     this.localCloud.textContent = Number.isFinite(weather?.cloudCoverPct)
-      ? t('cockpit.brief.cloudTemplate', {
+      ? t('CLOUD {pct}%', {
           pct: Math.round(weather.cloudCoverPct),
         })
-      : t('cockpit.brief.cloudUnknown');
+      : t('CLOUD UNKNOWN');
   }
   if (this.localPrecipitation) {
     this.localPrecipitation.textContent = Number.isFinite(
@@ -297,10 +299,8 @@ export function renderRegionalBrief(payload, info) {
   if (this.signalStream)
     this.signalStream.dataset.regionalStatus = payload?.status || 'partial';
   if (this.briefPageIndex === 1 && this.briefSource) {
-    this.briefSource.textContent = t('cockpit.brief.newsSourceLine', {
-      source: String(
-        payload?.newsSource || t('cockpit.brief.kickerNews'),
-      ).toUpperCase(),
+    this.briefSource.textContent = t('{source} · LOCATION QUERY', {
+      source: String(payload?.newsSource || t('REGIONAL NEWS')).toUpperCase(),
     });
   }
   this.scheduleContextLayout();

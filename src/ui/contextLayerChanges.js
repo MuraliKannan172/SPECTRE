@@ -71,7 +71,7 @@ export function _handleContextLayerChange(change) {
             },
             {
               localizedMessage: t(
-                'cockpit.context.toastMissionsCancelRestoreFailed',
+                'Space Missions cancellation could not restore the previous layer state',
               ),
             },
           ),
@@ -94,18 +94,17 @@ export function _handleContextLayerChange(change) {
       !this._userFacingContextNotificationTokens.has(change.notificationToken)
     ) {
       this.showToast(
-        change.reason || t('cockpit.context.toastLayerUnavailable'),
+        change.reason ||
+          t('That layer is unavailable in the current Context mode'),
       );
     }
     this._syncContextModeButtons();
     return;
   }
   if (change?.type === 'visibility-failed') {
-    const failureMessage = t('cockpit.context.toastLayerLifecycleFailed', {
+    const failureMessage = t('{layerId} could not {action} cleanly', {
       layerId: change.layerId,
-      action: change.enabled
-        ? t('cockpit.context.actionStart')
-        : t('cockpit.context.actionStop'),
+      action: change.enabled ? t('start') : t('stop'),
     });
     // A failed direct Context-shell START has already had its siblings
     // cleared by the visibility guard. Wait outside the synchronous manager

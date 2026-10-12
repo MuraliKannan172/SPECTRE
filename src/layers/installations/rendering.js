@@ -271,7 +271,7 @@ export function createRendering({
       entity.gevTrackedId = `installations:${record.id}`;
       entity.gevDisplayPosition = () => displayPosition;
       entity.gevLabelModel = {
-        title: record.name || t('layers.installations.fallbackTitle'),
+        title: record.name || t('MAPPED INSTALLATION'),
         details: [
           String(record.class || 'installation')
             .replaceAll('_', ' ')

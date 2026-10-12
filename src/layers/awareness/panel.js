@@ -57,8 +57,8 @@ export function createPanel({ state: layerState, services, parts, source }) {
   function hidePanel() {
     if (layerState.panel) {
       const markup = `<div class="military-awareness-standby">
-      <strong>${layerState.enabled ? t('layers.awareness.standbyReady') : t('layers.awareness.standbyOff')}</strong>
-      <span>${layerState.enabled ? t('layers.awareness.standbySelect') : t('layers.awareness.standbyEnable')}</span>
+      <strong>${layerState.enabled ? t('CONTEXT READY') : t('GLOBAL CONTEXT OFF')}</strong>
+      <span>${layerState.enabled ? t('SELECT A FLIGHT, VESSEL, OR MAPPED INSTALLATION') : t('ENABLE TO LOAD OBSERVED / MAPPED PROXIMITY')}</span>
     </div>`;
       layerState.panel.hidden = false;
       if (layerState.panelMarkup !== markup) {
@@ -79,11 +79,10 @@ export function createPanel({ state: layerState, services, parts, source }) {
         const label = formatAwarenessLabel(item);
         const targetId = item.icao24 || item.mmsi || item.id;
         if (!targetId) {
-          return `<li><span class="military-awareness-target unavailable" aria-label="${t('layers.awareness.unavailableAria')}">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></span></li>`;
+          return `<li><span class="military-awareness-target unavailable" aria-label="${t('Unavailable')}">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></span></li>`;
         }
-        const accessibleLabel =
-          label === '—' ? t('layers.awareness.unavailableAria') : label;
-        return `<li><button type="button" class="military-awareness-target" data-awareness-layer="${escapeHtml(cohort.id)}" data-awareness-id="${escapeHtml(targetId)}" aria-label="${escapeHtml(t('layers.awareness.focusAria', { label: accessibleLabel }))}">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></button>${namedAreasHtml(item.memberNames)}</li>`;
+        const accessibleLabel = label === '—' ? t('Unavailable') : label;
+        return `<li><button type="button" class="military-awareness-target" data-awareness-layer="${escapeHtml(cohort.id)}" data-awareness-id="${escapeHtml(targetId)}" aria-label="${escapeHtml(t('Focus {label}', { label: accessibleLabel }))}">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></button>${namedAreasHtml(item.memberNames)}</li>`;
       })
       .join('');
     const pageCount = Math.max(
@@ -104,10 +103,10 @@ export function createPanel({ state: layerState, services, parts, source }) {
 
   function navigationControlsHtml() {
     const canPrevious = layerState.navigationIndex > 0;
-    return `<div class="military-awareness-controls" role="group" aria-label="${t('layers.awareness.controlsAria')}">
-    <button type="button" data-awareness-action="previous" title="${t('layers.awareness.previousTitle')}"${canPrevious ? '' : ' disabled'}>${t('layers.awareness.previous')}</button>
-    <button type="button" data-awareness-action="focus">${t('layers.awareness.focus')}</button>
-    <button type="button" data-awareness-action="next" title="${t('layers.awareness.nextTitle')}"${parts.navigation.canNavigateNext() ? '' : ' disabled'}>${t('layers.awareness.next')}</button>
+    return `<div class="military-awareness-controls" role="group" aria-label="${t('Global Context navigation')}">
+    <button type="button" data-awareness-action="previous" title="${t('Previous — prior visited contact in the 250 km window')}"${canPrevious ? '' : ' disabled'}>${t('PREVIOUS')}</button>
+    <button type="button" data-awareness-action="focus">${t('FOCUS')}</button>
+    <button type="button" data-awareness-action="next" title="${t('Next — nearest unvisited contact in the 250 km window')}"${parts.navigation.canNavigateNext() ? '' : ' disabled'}>${t('NEXT')}</button>
   </div>`;
   }
 
@@ -189,7 +188,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
     ${namedAreasHtml(subject.memberNames)}
     ${navigationControlsHtml()}
     ${cohorts.map(rowHtml).join('')}
-    <p class="military-awareness-note" tabindex="-1" data-awareness-focus-continuation>${t('layers.awareness.note')}</p>`;
+    <p class="military-awareness-note" tabindex="-1" data-awareness-focus-continuation>${t('Open-source mapped/observed context. Missing broadcasts, unloaded map areas, or unmapped sites are not evidence of absence.')}</p>`;
     panel.hidden = false;
     if (layerState.panelMarkup !== markup) {
       const focusSnapshot = captureAwarenessPanelFocus(panel);

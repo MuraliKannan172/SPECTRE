@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 import { bindRadioControls } from './radioBindings.js';
 import { renderRadioState } from './radioPresentation.js';
 
@@ -201,8 +201,8 @@ export class RadioControls {
     );
     const launcherLabel = t(
       compactOpen
-        ? 'cockpit.context.radioToggleCloseAriaLabel'
-        : 'cockpit.context.radioToggleAriaLabel',
+        ? msg('Close compact Radio controls')
+        : msg('Open compact Radio controls'),
     );
     this._contextRadioToggleBtn.setAttribute('aria-label', launcherLabel);
     this._contextRadioToggleBtn.title = launcherLabel;

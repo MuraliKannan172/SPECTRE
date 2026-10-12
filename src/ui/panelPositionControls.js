@@ -220,7 +220,9 @@ export class PanelPositionControls {
         key.startsWith('godsEyeView.v6.panelPos.'),
       );
       if (hadOldPositions) {
-        this._showToast(t('cockpit.panel.layoutResetToast'));
+        this._showToast(
+          t('Panel layout updated — positions reset to new defaults'),
+        );
       }
     } catch {
       // storage unavailable

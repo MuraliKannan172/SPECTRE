@@ -29,9 +29,7 @@ export function createMapSourceControls({
       statusElement.textContent =
         state.status === 'switching'
           ? '...'
-          : stack?.shortLabel ||
-            stack?.label ||
-            t('cockpit.presets.mapStackFallback');
+          : stack?.shortLabel || stack?.label || t('MAP');
       statusElement.classList.toggle('warn', !!state.lastError);
     }
   }

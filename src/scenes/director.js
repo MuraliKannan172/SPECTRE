@@ -26,7 +26,7 @@ import {
   getSceneAppendRecipeById,
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 import { createSceneDataPacks } from './dataPacks/controller.js';
 import { createSceneInteractions } from './interactions.js';
 import { createSceneSharing } from './sharing.js';
@@ -67,11 +67,11 @@ import {
 // boundary + persisted data); only the presentation of an UNRENAMED built-in
 // localizes, so an operator's renamed scene is never masked by the catalog.
 const RECIPE_TITLE_KEYS = Object.freeze({
-  'flights-radar': 'setup.scenes.recipe.flightsRadar',
-  'orbital-watch': 'setup.scenes.recipe.orbitalWatch',
-  'thermal-threats': 'setup.scenes.recipe.thermalThreats',
-  'city-overload': 'setup.scenes.recipe.cityOverload',
-  'omniscience-pullback': 'setup.scenes.recipe.omnisciencePullback',
+  'flights-radar': msg('Global Flights Radar'),
+  'orbital-watch': msg('Orbital Watch'),
+  'thermal-threats': msg('Thermal Threat Board'),
+  'city-overload': msg('City Overload'),
+  'omniscience-pullback': msg('Omniscience Pullback'),
 });
 
 /**
@@ -198,7 +198,7 @@ export class SceneDirector {
     this._presentation = {
       status: this._storageReadError
         ? 'Saved project could not be read; storage preserved. Import a valid file to resume saving.'
-        : t('setup.scenes.statusReady'),
+        : t('Ready'),
       progress: 0,
       runtime: '',
       playbackActive: false,
@@ -396,7 +396,7 @@ export class SceneDirector {
 
   _shotOutcome(type, scene, shot, index = scene.shots.indexOf(shot)) {
     if (type === 'shot-loaded')
-      this._presentation.status = t('setup.scenes.status.loaded', {
+      this._presentation.status = t('Loaded: {scene} / {shot}', {
         scene: scene.title,
         shot: shot.title,
       });
@@ -954,14 +954,14 @@ export class SceneDirector {
 
     const camera = this.styleManager.getCameraState();
     if (!camera) {
-      this._updateStatus(t('setup.scenes.status.captureCameraNotReady'));
+      this._updateStatus(t('Cannot capture shot: camera not ready'));
       return;
     }
 
     const shot = normalizeShot(
       {
         id: uid('shot'),
-        title: t('setup.scenes.status.shotTitleDefault', {
+        title: t('Shot {n}', {
           n: scene.shots.length + 1,
         }),
         durationSec: DEFAULT_SHOT_DURATION_SEC,
@@ -978,7 +978,7 @@ export class SceneDirector {
     this._saveProject();
     this._shotOutcome('shot-captured', scene, shot);
     this._updateStatus(
-      t('setup.scenes.status.captured', {
+      t('Captured: {scene} / {shot}', {
         scene: scene.title,
         shot: shot.title,
       }),
@@ -995,7 +995,7 @@ export class SceneDirector {
 
     const shot = scene.shots.find((item) => item.id === this._selectedShotId);
     if (!shot) {
-      this._updateStatus(t('setup.scenes.status.selectShotFirst'));
+      this._updateStatus(t('Select a shot first'));
       return;
     }
 
@@ -1011,7 +1011,7 @@ export class SceneDirector {
     this._saveProject();
     this._shotOutcome('shot-updated', scene, shot);
     this._updateStatus(
-      t('setup.scenes.status.updated', {
+      t('Updated: {scene} / {shot}', {
         scene: scene.title,
         shot: shot.title,
       }),
@@ -1610,7 +1610,7 @@ export class SceneDirector {
       this._claimingCamera = false;
     }
     if (claimed === false) {
-      this._updateStatus(t('setup.scenes.status.cameraUnavailable'));
+      this._updateStatus(t('Camera unavailable — exit cockpit first'));
       return false;
     }
     return true;
@@ -1745,7 +1745,7 @@ export class SceneDirector {
       if (!queue.length) return { started: false, reason: 'scene-complete' };
     }
     if (!queue.length) {
-      this._updateStatus(t('setup.scenes.status.noShotsToRun'));
+      this._updateStatus(t('No shots to run'));
       return { started: false, reason: 'no-shots' };
     }
 
@@ -1829,7 +1829,7 @@ export class SceneDirector {
       });
     } catch (error) {
       this._updateStatus(
-        t('setup.scenes.status.runError', {
+        t('Error: {message}', {
           message: error.message || 'run failed',
         }),
       );
@@ -2006,7 +2006,7 @@ export class SceneDirector {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    this._presentation.status = t('setup.scenes.status.projectExported');
+    this._presentation.status = t('Project exported');
     this._publish({ type: 'project-exported', project: this._project });
   }
 
@@ -2268,7 +2268,9 @@ export class SceneDirector {
         `[Scenes] Could not exit ${mode}:`,
         result.error || 'unknown reason',
       );
-      this._updateStatus(t('setup.scenes.status.contextExitFailed', { mode }));
+      this._updateStatus(
+        t('Could not exit {mode} — scene layers may be refused', { mode }),
+      );
       this._logEvent('context_mode_exit_failed', {
         mode,
         error: result.error || null,

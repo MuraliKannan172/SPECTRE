@@ -55,7 +55,7 @@ export function createQueries({
    */
 
   function _formatAltitude(altitudeFt) {
-    if (!Number.isFinite(altitudeFt)) return t('layers.readout.altUnknown');
+    if (!Number.isFinite(altitudeFt)) return t('Alt unknown');
     return `${Math.round(altitudeFt)} ft`;
   }
 

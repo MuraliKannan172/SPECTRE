@@ -33,7 +33,7 @@ export function _initGlobalContextPanel() {
     void this._runUserFacingContextAction(
       (notificationToken) =>
         this._selectContextMode(nextMode, { notificationToken }),
-      t('cockpit.context.toastTransitionFailedContacts'),
+      t('Contacts could not complete the requested transition; try again'),
     ).then((succeeded) => {
       if (
         !this.destroyed &&
@@ -62,7 +62,9 @@ export function _initGlobalContextPanel() {
     void this._runUserFacingContextAction(
       (notificationToken) =>
         this._selectContextMode(nextMode, { notificationToken }),
-      t('cockpit.context.toastTransitionFailedMissions'),
+      t(
+        'Space Missions could not complete the requested transition; try again',
+      ),
     ).then((succeeded) => {
       if (
         !this.destroyed &&
@@ -109,14 +111,16 @@ export function _initGlobalContextPanel() {
       this.showToast(
         stats?.statusMessage ||
           (stats?.status === 'zoom-in'
-            ? t('cockpit.context.toastZoomToSearch')
-            : t('cockpit.context.toastInstallationsRefreshed')),
+            ? t('Zoom in to search mapped installations')
+            : t('Nearby installations refreshed')),
       );
       return true;
-    }, t('cockpit.context.toastInstallationsRefreshFailed')).finally(() => {
-      if (this.destroyed) return;
-      button.setAttribute('aria-disabled', 'false');
-      button.setAttribute('aria-busy', 'false');
-    });
+    }, t('Nearby installations could not be refreshed; try again')).finally(
+      () => {
+        if (this.destroyed) return;
+        button.setAttribute('aria-disabled', 'false');
+        button.setAttribute('aria-busy', 'false');
+      },
+    );
   });
 }

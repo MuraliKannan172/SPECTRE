@@ -119,10 +119,7 @@ export class RealtimeInput {
           this.ui.root.dataset.pushToTalk = 'held';
           this.setMicrophoneEnabled(true);
           if (this.status === 'listening')
-            this.setStatus(
-              'listening',
-              t('setup.voice.detail.releaseSpaceSend'),
-            );
+            this.setStatus('listening', t('Release Space to send'));
         } else {
           this.start({ pushToTalk: true });
           // start() performs a controlled stop() before connecting. Restore the
@@ -198,7 +195,7 @@ export class RealtimeInput {
     if (!this.pushToTalkMode) return;
     this.setMicrophoneEnabled(false);
     if (this.status === 'listening')
-      this.setStatus('listening', t('setup.voice.detail.holdSpaceTalk'));
+      this.setStatus('listening', t('Hold Space to talk'));
     else this.updateVoiceButtonLabel();
   }
 

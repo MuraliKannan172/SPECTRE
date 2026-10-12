@@ -60,24 +60,24 @@ export function createQueries({
     getStats() {
       const now = Date.now();
       const staleText = layerState._lastUpdate
-        ? t('layers.firms.staleCached', {
+        ? t('STALE · cached {age}', {
             age:
               components.model.formatAge(now - layerState._lastUpdate) || '<1h',
           })
-        : t('layers.status.stale');
+        : t('STALE');
       let loadingLabel = '';
       if (layerState._loading) {
         loadingLabel = layerState._fires.length
-          ? t('layers.meta.refreshing')
-          : t('layers.meta.loading');
+          ? t('refreshing...')
+          : t('loading...');
       } else if (layerState._keyRequired) {
-        loadingLabel = t('layers.firms.keyRequired');
+        loadingLabel = t('KEY REQUIRED');
       } else if (layerState._stale) {
         loadingLabel = staleText;
       } else if (layerState._error) {
         loadingLabel = layerState._error;
       } else if (layerState._lastUpdate) {
-        loadingLabel = t('layers.firms.liveUpdated', {
+        loadingLabel = t('LIVE · updated {age}', {
           age: components.model.formatAgoMinutes(now - layerState._lastUpdate),
         });
       }
@@ -93,7 +93,7 @@ export function createQueries({
         // the operator can take.
         keyRequired: layerState._keyRequired,
         error: layerState._keyRequired
-          ? t('layers.firms.keyRequired')
+          ? t('KEY REQUIRED')
           : layerState._stale
             ? staleText
             : layerState._error,

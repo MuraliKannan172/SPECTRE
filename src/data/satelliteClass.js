@@ -17,7 +17,7 @@
  * for), then the constellations users can actually name, then the grab-bag.
  */
 
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 
 /**
  * Class registry. `label` is the card/legend token, `color` the point color,
@@ -84,24 +84,26 @@ export const SATELLITE_CLASS_ORDER = Object.freeze([
 // translate through these keys at the presentation boundary.
 const CLASS_DISPLAY_KEYS = Object.freeze({
   station: Object.freeze({
-    label: 'layers.satellites.class.station',
-    blurb: 'layers.satellites.class.stationBlurb',
+    label: msg('STATION'),
+    blurb: msg('Crewed stations and their visiting vehicles'),
   }),
   nav: Object.freeze({
-    label: 'layers.satellites.class.nav',
-    blurb: 'layers.satellites.class.navBlurb',
+    label: msg('NAV'),
+    blurb: msg('GNSS navigation — GPS, GLONASS, Galileo'),
   }),
   geo: Object.freeze({
-    label: 'layers.satellites.class.geo',
-    blurb: 'layers.satellites.class.geoBlurb',
+    label: msg('GEO'),
+    blurb: msg(
+      'Geostationary belt — comms and weather, fixed over the equator',
+    ),
   }),
   visual: Object.freeze({
-    label: 'layers.satellites.class.visual',
-    blurb: 'layers.satellites.class.visualBlurb',
+    label: msg('VISUAL'),
+    blurb: msg('Brightest naked-eye objects — CelesTrak visual group'),
   }),
   comms: Object.freeze({
-    label: 'layers.satellites.class.comms',
-    blurb: 'layers.satellites.class.commsBlurb',
+    label: msg('COMMS'),
+    blurb: msg('Broadband constellation shell — shown only in DENSE mode'),
   }),
 });
 

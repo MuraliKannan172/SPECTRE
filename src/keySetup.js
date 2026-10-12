@@ -20,7 +20,7 @@ import {
  * the chip and the dialog are removed outright.
  */
 
-import { t, hasMessage } from './i18n/index.js';
+import { t, msg, tn } from './i18n/index.js';
 
 /**
  * Chip label — pure, exported for tests. The exact English values are pinned
@@ -32,8 +32,12 @@ import { t, hasMessage } from './i18n/index.js';
 export function keySetupChipLabel(status) {
   const missing = Math.max(0, (status?.total || 0) - (status?.setCount || 0));
   return missing > 0
-    ? t('setup.keySetup.chipWaiting', { count: missing })
-    : t('setup.keySetup.chipReady');
+    ? tn(
+        missing,
+        'POWER UP · {count} KEY WAITING',
+        'POWER UP · {count} KEYS WAITING',
+      )
+    : t('POWERED UP');
 }
 
 /**
@@ -186,10 +190,7 @@ function buildRow(documentRef, key) {
 
   const unlocks = documentRef.createElement('p');
   unlocks.className = 'key-setup-unlocks';
-  // The registry `unlocks` text localizes per registry id; an id missing from
-  // the catalog falls back to the server-provided English copy.
-  const unlocksKey = `setup.keySetup.unlocks.${key.id}`;
-  unlocks.textContent = hasMessage(unlocksKey) ? t(unlocksKey) : key.unlocks;
+  unlocks.textContent = t(key.unlocks);
 
   row.append(head, unlocks);
   if (!external) {
@@ -214,8 +215,10 @@ function buildRow(documentRef, key) {
       remove.type = 'button';
       remove.className = 'key-setup-remove';
       remove.dataset.keySetupRemove = JSON.stringify(key.envVars);
-      remove.textContent = t('setup.keySetup.row.remove');
-      remove.title = t('setup.keySetup.row.removeTitle', { title: key.title });
+      remove.textContent = t('REMOVE');
+      remove.title = t("Remove {title} from this app's saved keys", {
+        title: key.title,
+      });
       fields.append(remove);
     }
     row.append(fields);
@@ -380,8 +383,8 @@ export async function initKeySetup({
 
   const storeLabel = () =>
     status?.store === 'pinokio-environment'
-      ? t('setup.keySetup.store.pinokio')
-      : t('setup.keySetup.store.env');
+      ? t('your app configuration')
+      : t('your local .env');
 
   // doneMessageKey names the whole saved/removed sentence; the storage
   // destination is interpolated so the {store} phrase stays one spelling.
@@ -392,7 +395,7 @@ export async function initKeySetup({
     )?.set;
     busy = true;
     applyButton?.setAttribute('aria-disabled', 'true');
-    say(t('setup.keySetup.status.saving'));
+    say(t('Saving…'));
     try {
       const response = await doFetch('/api/setup/keys', {
         method: 'POST',
@@ -406,7 +409,7 @@ export async function initKeySetup({
         // payload.error is a server-authored message (API value) — shown as-is.
         say(
           payload.error ||
-            t('setup.keySetup.status.saveFailed', { status: response.status }),
+            t('Save failed ({status}).', { status: response.status }),
         );
         return;
       }
@@ -440,7 +443,7 @@ export async function initKeySetup({
       say(t(doneMessageKey, { store: storeLabel() }));
     } catch (error) {
       say(
-        t('setup.keySetup.status.saveFailedDetail', {
+        t('Save failed: {detail}', {
           detail: error?.message || error,
         }),
       );
@@ -460,10 +463,13 @@ export async function initKeySetup({
       })),
     );
     if (!Object.keys(updates).length) {
-      say(t('setup.keySetup.status.pasteFirst'));
+      say(t('Paste at least one key first.'));
       return;
     }
-    await submitUpdates(updates, 'setup.keySetup.status.saved');
+    await submitUpdates(
+      updates,
+      msg('Saved to {store}. Restarting — this page reloads itself.'),
+    );
   };
 
   chip.addEventListener('click', openDialog);
@@ -579,11 +585,11 @@ export async function initKeySetup({
     // a deliberate two-step the lure cannot pre-satisfy.
     const ok =
       typeof globalThis.confirm !== 'function' ||
-      globalThis.confirm(t('setup.keySetup.confirm.remove'));
+      globalThis.confirm(t('Remove this key from your saved configuration?'));
     if (!ok) return;
     void submitUpdates(
       Object.fromEntries(envVars.map((name) => [name, null])),
-      'setup.keySetup.status.removed',
+      msg('Removed from {store}. Restarting — this page reloads itself.'),
     );
   });
 

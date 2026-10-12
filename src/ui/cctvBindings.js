@@ -145,7 +145,7 @@ export function _initCctvPanel() {
       },
       { origin: 'user' },
     );
-    this.actions.showToast(t('cockpit.cctv.toastCalibrationSaved'));
+    this.actions.showToast(t('CCTV calibration saved'));
   });
 
   this.listen(this._cctvCalibResetBtn, 'click', () => {

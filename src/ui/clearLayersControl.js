@@ -15,8 +15,8 @@ export function bindClearLayersControl(button, clear) {
       button.setAttribute(
         'aria-label',
         busy
-          ? t('cockpit.actions.clearLayersBusyAria')
-          : t('shell.actions.clearLayers.ariaLabel'),
+          ? t('Clearing selected data layers')
+          : t('Clear selected data layers'),
       );
     },
     destroy() {

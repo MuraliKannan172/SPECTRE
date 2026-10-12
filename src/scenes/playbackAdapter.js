@@ -16,7 +16,7 @@ export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
       director._renderSceneSelect();
       director._renderShotList();
       director._updateStatus(
-        t('setup.scenes.status.runningShot', {
+        t('Running {index}/{total}: {scene} / {shot}', {
           index: index + 1,
           total,
           scene: scene.title,
@@ -78,7 +78,7 @@ export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
     },
     complete() {
       director._setProgress(1);
-      director._updateStatus(t('setup.scenes.status.runComplete'));
+      director._updateStatus(t('Scene run complete'));
       director._logEvent('scene_run_complete', {});
     },
   };

@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.js';
+import { t, tn } from '../i18n/index.js';
 import {
   settleUserFacingContextAction,
   contextModeWord,
@@ -6,7 +6,7 @@ import {
 
 export async function _runUserFacingContextAction(
   operation,
-  message = t('cockpit.context.toastRestoreFailed'),
+  message = t('Context could not restore every layer; try again'),
   { falseIsFailure = true, localizedMessage = null } = {},
 ) {
   if (this.destroyed) return false;
@@ -223,25 +223,29 @@ export function clearSelectedLayers() {
   const operation = managerOperation
     .then((result) => {
       if (result.targetIds.length === 0) {
-        this.showToast(t('layers.clear.toast.noneSelected'));
+        this.showToast(t('No selected data layers'));
       } else if (result.notClearedIds.length > 0) {
         this.showToast(
-          t('layers.clear.toast.notCleared', {
-            count: result.notClearedIds.length,
-          }),
+          tn(
+            result.notClearedIds.length,
+            '{count} data layer could not be cleared',
+            '{count} data layers could not be cleared',
+          ),
         );
       } else {
         this.showToast(
-          t('layers.clear.toast.cleared', {
-            count: result.clearedIds.length,
-          }),
+          tn(
+            result.clearedIds.length,
+            'Cleared {count} data layer',
+            'Cleared {count} data layers',
+          ),
         );
       }
       return result;
     })
     .catch((error) => {
       console.warn('[Data] clear selected layers failed', error);
-      this.showToast(t('cockpit.actions.clearLayersFailedToast'));
+      this.showToast(t('Selected data layers could not be cleared'));
       return {
         targetIds: [],
         items: [],

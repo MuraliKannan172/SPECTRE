@@ -41,11 +41,11 @@ export function mapStackChipModel(stack, activeId) {
   // Stack labels are provider/dataset names (keep-English); the availability
   // sentence around them is copy and localizes here at the model boundary.
   const fallbackReason = requiresIon
-    ? t('setup.keySetup.requirement', {
+    ? t('Needs {envVars} — add it in Provider Settings', {
         envVars: keySetupRequirementEnvVars('cesium-ion'),
       })
-    : t('setup.mapStack.unavailableReason', {
-        label: label || t('setup.mapStack.fallbackName'),
+    : t('{label} is unavailable', {
+        label: label || t('This map stack'),
       });
   const unavailableHint = available
     ? ''
@@ -126,7 +126,7 @@ export function renderMapStackChips(
     if (!model.available) {
       chip.setAttribute(
         'aria-label',
-        t('setup.mapStack.unavailableAriaLabel', {
+        t('{label} unavailable: {hint}', {
           label: model.label,
           hint: model.unavailableHint,
         }),

@@ -1,93 +1,32 @@
-// God's Eye View i18n core (phase 1): catalog registry, translation, and
-// Intl-based formatting. English is the source/fallback catalog; a missing key
-// in another locale falls back to English with a development-only warning.
-// English is also the ONLY shipped catalog in this foundation change — each
-// additional locale lands as a stacked follow-up PR following the recipe in
-// docs/TRANSLATORS.md (catalog files + registration + CATALOG_LOCALES entry).
-// Every shipped catalog is built UNCONDITIONALLY — the build cost is trivial
-// and the registry stays declarative — but only locales in the configured pair
-// are offered/accepted (see locale.js resolveLocalePair).
+// God's Eye View i18n: the English source text is the message key.
 //
-// APPEND-ONLY NAMESPACE REGISTRATION
-// ─────────────────────────────────────────────────────────────────────────────
-// A worker adding a namespace creates locales/<locale>/<ns>.js (exporting
-// NAMESPACE plus a default message map of namespace-relative keys), then
-// appends ONE import line per locale and pushes the module into that locale's
-// array below. Nothing else changes, so concurrent workers merge trivially.
-// Namespace-relative keys are prefixed at registration time: shell.*,
-// cockpit.*, layers.*, setup.*.
+//   t('Save keys')                                   → 'Сохранить ключи'
+//   t('Cleared {name}', { name })                    → named interpolation
+//   tn(count, '{count} camera', '{count} cameras')   → plural by Intl.PluralRules
+//   msg('Live Flights')                              → marks a string kept in data
+//                                                      for a later t(); returns it as is
+//
+// English needs no catalog. Every other locale is one flat JSON file,
+// locales/<code>.json, keyed by the English text (for tn, by the English
+// plural form). A missing entry falls back to English.
+// `npm run i18n:check` keeps the catalogs in step with the code.
 import {
   DEFAULT_LOCALE,
   normalizeLocale,
   writeStoredLocale,
 } from './locale.js';
+import ru from './locales/ru.json' with { type: 'json' };
 
-import * as enShell from './locales/en/shell.js';
-import * as enCockpit from './locales/en/cockpit.js';
-import * as enLayers from './locales/en/layers.js';
-import * as enSetup from './locales/en/setup.js';
-
-// Append new namespace modules here (one import + one entry per locale).
-const EN_NAMESPACES = [enShell, enCockpit, enLayers, enSetup];
-
-/**
- * Prefix one namespace module's flat, namespace-relative keys with its
- * declared namespace: { 'title.subtitle': … } + NAMESPACE 'shell' becomes
- * 'shell.title.subtitle'.
- * @param {{NAMESPACE: string, default?: object}} namespaceModule
- * @returns {Record<string, string|object>} Frozen prefixed message map.
- */
-export function mergeNamespace(namespaceModule) {
-  const prefix =
-    typeof namespaceModule?.NAMESPACE === 'string'
-      ? namespaceModule.NAMESPACE.trim()
-      : '';
-  if (!/^[a-z][a-z0-9-]*$/.test(prefix)) {
-    throw new Error(
-      `i18n namespace module must export a lowercase NAMESPACE, got ${JSON.stringify(prefix)}`,
-    );
-  }
-  const merged = {};
-  for (const [key, value] of Object.entries(namespaceModule.default || {})) {
-    merged[`${prefix}.${key}`] = value;
-  }
-  return Object.freeze(merged);
-}
-
-/** Merge namespaces into one catalog, rejecting duplicate dot-prefixed keys. */
-function buildCatalog(namespaceModules) {
-  const catalog = {};
-  for (const namespaceModule of namespaceModules) {
-    for (const [key, value] of Object.entries(
-      mergeNamespace(namespaceModule),
-    )) {
-      if (Object.hasOwn(catalog, key)) {
-        throw new Error(`i18n duplicate catalog key: ${key}`);
-      }
-      catalog[key] = value;
-    }
-  }
-  return Object.freeze(catalog);
-}
-
-const CATALOGS = Object.freeze({
-  [DEFAULT_LOCALE]: buildCatalog(EN_NAMESPACES),
-});
-
-/**
- * The merged catalog for a locale (frozen; for coverage/parity tests and
- * tooling — runtime lookups go through t()).
- * @param {string} locale
- * @returns {Record<string, string|object>|null}
- */
-export function getCatalog(locale) {
-  const normalized = normalizeLocale(locale);
-  return (normalized && CATALOGS[normalized]) || null;
-}
+const CATALOGS = Object.freeze({ ru });
 
 let currentLocale = DEFAULT_LOCALE;
 
-/** Active locale (any catalog locale; pair-scoped by resolveLocale at boot). */
+/** The catalog for a locale; null for English and unknown codes. */
+export function getCatalog(locale) {
+  return CATALOGS[normalizeLocale(locale)] ?? null;
+}
+
+/** Active locale. */
 export function getLocale() {
   return currentLocale;
 }
@@ -106,44 +45,74 @@ export function setLocale(locale) {
   return currentLocale;
 }
 
-/** Development-only missing-key warning. Off under node:test and prod builds. */
-function warnMissingKey(key, detail) {
-  // Vite replaces import.meta.env at build time; under node:test it is absent,
-  // so warnings never fire in CI — only on the dev server.
+/** Development-only warning; silent under node:test and in production. */
+function warnMissing(text) {
   if (import.meta.env?.DEV !== true) return;
-  console.warn(`[i18n] missing key "${key}"${detail ? ` (${detail})` : ''}`);
+  console.warn(
+    `[i18n] no ${currentLocale} translation for ${JSON.stringify(text)}`,
+  );
+}
+
+const PLACEHOLDER_PATTERN = /\{([A-Za-z0-9_]+)\}/g;
+
+/** Named {placeholder} interpolation. Unknown names stay literal so a gap
+ * stays visible instead of silently vanishing. */
+function interpolate(pattern, values) {
+  if (!values) return pattern;
+  return pattern.replace(PLACEHOLDER_PATTERN, (literal, name) =>
+    Object.hasOwn(values, name) ? String(values[name]) : literal,
+  );
+}
+
+function lookup(text) {
+  const catalog = CATALOGS[currentLocale];
+  if (!catalog) return undefined;
+  if (Object.hasOwn(catalog, text)) return catalog[text];
+  warnMissing(text);
+  return undefined;
 }
 
 /**
- * Pure lookup shared by t() and the parity tests: the requested locale first,
- * then the English fallback catalog.
- * @param {Record<string, object>} catalogs Catalog map to read from.
- * @param {string} locale Locale to resolve within that map.
- * @param {string} key Dot-prefixed message key.
- * @returns {string|object|undefined} Raw entry, or undefined when nowhere.
+ * Translate English source text into the active locale.
+ * @param {string} text English text, e.g. 'Hold Space to talk'
+ * @param {object} [values] Named interpolation values
+ * @returns {string}
  */
-export function resolveMessage(catalogs, locale, key) {
-  const source = catalogs || CATALOGS;
-  const normalized = normalizeLocale(locale);
-  if (
-    normalized &&
-    source[normalized] &&
-    Object.hasOwn(source[normalized], key)
-  ) {
-    return source[normalized][key];
-  }
-  const fallback = source[DEFAULT_LOCALE];
-  return fallback && Object.hasOwn(fallback, key) ? fallback[key] : undefined;
+export function t(text, values) {
+  const entry = lookup(text);
+  return interpolate(typeof entry === 'string' ? entry : text, values);
 }
 
-/** Whether the key resolves in the active locale or the English fallback. */
-export function hasMessage(key) {
-  return resolveMessage(CATALOGS, currentLocale, key) !== undefined;
+/**
+ * Translate a count-dependent message. The catalog entry for `other` holds
+ * one form per Intl.PluralRules category of the locale ({ one, few, many, other }
+ * for Russian). `{count}` is always available to the pattern.
+ * @param {number} count
+ * @param {string} one English singular, e.g. '{count} camera'
+ * @param {string} other English plural, e.g. '{count} cameras'
+ * @param {object} [values] Extra interpolation values
+ * @returns {string}
+ */
+export function tn(count, one, other, values) {
+  const entry = lookup(other);
+  const category = pluralRules(currentLocale).select(count);
+  let pattern;
+  if (entry && typeof entry === 'object') {
+    pattern = entry[category] ?? entry.other ?? other;
+  } else {
+    pattern = pluralRules(DEFAULT_LOCALE).select(count) === 'one' ? one : other;
+  }
+  return interpolate(pattern, { ...values, count });
+}
+
+/** Mark English text that is stored in data and translated later by t(). */
+export function msg(text) {
+  return text;
 }
 
 const pluralRulesCache = new Map();
 
-function pluralRulesFor(locale) {
+function pluralRules(locale) {
   let rules = pluralRulesCache.get(locale);
   if (!rules) {
     rules = new Intl.PluralRules(locale);
@@ -152,60 +121,10 @@ function pluralRulesFor(locale) {
   return rules;
 }
 
-/** Select a plural variant via Intl.PluralRules for the ACTIVE locale;
- * an entry lacking the selected category degrades to entry.other. Exported
- * for tests: full-parity catalogs can no longer stage a partial entry, so
- * the fallback is pinned synthetically (i18n.test.mjs). */
-export function selectPluralPattern(entry, values, key) {
-  const count = values?.count;
-  if (typeof count !== 'number' || !Number.isFinite(count)) {
-    warnMissingKey(key, 'plural entry requires a finite {count} value');
-    return entry.other ?? entry.one;
-  }
-  const category = pluralRulesFor(currentLocale).select(count);
-  return entry[category] ?? entry.other;
-}
-
-const PLACEHOLDER_PATTERN = /\{([A-Za-z0-9_]+)\}/g;
-
-/** Named {placeholder} interpolation. Unprovided names stay literal so a gap
- * stays visible during development instead of silently vanishing. */
-function interpolate(pattern, values) {
-  if (!values || typeof pattern !== 'string') return pattern;
-  return pattern.replace(PLACEHOLDER_PATTERN, (literal, name) =>
-    Object.hasOwn(values, name) ? String(values[name]) : literal,
-  );
-}
-
-/**
- * Translate one dot-prefixed key in the active locale. Missing keys in a
- * non-English locale fall back to English; keys missing everywhere return the
- * key itself. Plural entries ({ one, other }) require a numeric `count` value.
- * @param {string} key e.g. 'layers.clear.toast.cleared'
- * @param {object} [values] Named interpolation values, e.g. { count: 3, detail: '…' }
- * @returns {string}
- */
-export function t(key, values) {
-  const entry = resolveMessage(CATALOGS, currentLocale, key);
-  if (entry === undefined) {
-    warnMissingKey(key, `not in ${currentLocale} or en catalog`);
-    return key;
-  }
-  if (
-    currentLocale !== DEFAULT_LOCALE &&
-    !Object.hasOwn(CATALOGS[currentLocale] || {}, key)
-  ) {
-    warnMissingKey(key, `missing in ${currentLocale}, using en fallback`);
-  }
-  const pattern =
-    typeof entry === 'string' ? entry : selectPluralPattern(entry, values, key);
-  return interpolate(pattern, values);
-}
-
 /*
  * Intl formatters are memoized per (kind, locale, options): the constructors
- * are expensive and stage-3 extraction will format numbers and dates on panel
- * refresh paths. The cache is cleared whenever the active locale changes.
+ * are expensive and panels format on refresh paths. The cache is cleared
+ * whenever the active locale changes.
  */
 const formatterCache = new Map();
 
@@ -230,12 +149,8 @@ export function formatDate(value, options) {
 }
 
 /**
- * Locale-aware relative time (Intl.RelativeTimeFormat). `value` is the signed
- * distance in `unit`, e.g. formatRelativeTime(-5, 'minute') →
- * '5 minutes ago' (en) / 'hace 5 minutos' (es).
- * @param {number} value Signed distance in `unit`.
- * @param {string} [unit] Intl unit ('second', 'minute', 'hour', 'day', …).
- * @param {object} [options] Intl.RelativeTimeFormat options (numeric, style).
+ * Locale-aware relative time (Intl.RelativeTimeFormat), e.g.
+ * formatRelativeTime(-5, 'minute') → '5 minutes ago' / '5 минут назад'.
  */
 export function formatRelativeTime(value, unit = 'second', options) {
   return cachedFormatter('relative', Intl.RelativeTimeFormat, {
@@ -244,54 +159,46 @@ export function formatRelativeTime(value, unit = 'second', options) {
   }).format(value, unit);
 }
 
-/** DOM write targets for applyDocumentTranslations: textContent plus the
- * three presentation attributes vision.md requires to agree with visible
- * labels. Never innerHTML — translation functions return text. */
+/** Collapse markup whitespace so a message reads the same in HTML and JS. */
+export function normalizeMarkupText(text) {
+  return String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Markup opt-in: the element's own English text or attribute is the source.
+ *   <span data-i18n>Normal</span>
+ *   <button title="Pin" data-i18n-title>…</button>
+ * Also data-i18n-aria-label and data-i18n-placeholder.
+ */
 const DOCUMENT_TRANSLATION_TARGETS = Object.freeze([
-  Object.freeze({
-    attribute: 'data-i18n',
-    apply(element, text) {
-      element.textContent = text;
-    },
-  }),
-  Object.freeze({
-    attribute: 'data-i18n-title',
-    apply(element, text) {
-      element.setAttribute('title', text);
-    },
-  }),
-  Object.freeze({
-    attribute: 'data-i18n-aria-label',
-    apply(element, text) {
-      element.setAttribute('aria-label', text);
-    },
-  }),
-  Object.freeze({
-    attribute: 'data-i18n-placeholder',
-    apply(element, text) {
-      element.setAttribute('placeholder', text);
-    },
-  }),
+  ['data-i18n', null],
+  ['data-i18n-title', 'title'],
+  ['data-i18n-aria-label', 'aria-label'],
+  ['data-i18n-placeholder', 'placeholder'],
 ]);
 
 /**
- * Apply catalog text to every element carrying an i18n attribute in `doc`.
- * Elements whose key resolves nowhere are left untouched (warned in dev).
- * @param {Document} doc
+ * Translate every opted-in element in `doc`. Runs once at boot; switching
+ * locale reloads the page.
+ * @param {Document|Element} doc
  * @returns {number} Count of element/attribute writes performed.
  */
 export function applyDocumentTranslations(doc) {
   if (typeof doc?.querySelectorAll !== 'function') return 0;
+  if (!CATALOGS[currentLocale]) return 0;
   let applied = 0;
-  for (const target of DOCUMENT_TRANSLATION_TARGETS) {
-    for (const element of doc.querySelectorAll(`[${target.attribute}]`)) {
-      const key = element.getAttribute?.(target.attribute);
-      if (!key) continue;
-      if (!hasMessage(key)) {
-        warnMissingKey(key, `attribute ${target.attribute}`);
-        continue;
-      }
-      target.apply(element, t(key));
+  for (const [marker, attribute] of DOCUMENT_TRANSLATION_TARGETS) {
+    for (const element of doc.querySelectorAll(`[${marker}]`)) {
+      const source = attribute
+        ? element.getAttribute(attribute)
+        : normalizeMarkupText(element.textContent);
+      if (!source) continue;
+      const text = t(source);
+      if (text === source) continue;
+      if (attribute) element.setAttribute(attribute, text);
+      else element.textContent = text;
       applied += 1;
     }
   }
@@ -300,13 +207,8 @@ export function applyDocumentTranslations(doc) {
 
 /**
  * Persist a locale choice, then reload preserving window.location.hash exactly
- * and stripping ?lang from the search string — the override is one-shot and
- * must never graduate into the stored URL. Storage is best-effort: where
- * storage is blocked (private mode) the preference simply will not survive.
- * @param {string} locale Locale the user chose (normalized here).
- * @param {object} [deps]
- * @param {{href: string, assign: Function}} [deps.location]
- * @param {object} [deps.storage] Injected localStorage-like store.
+ * and stripping ?lang from the search string, so the override is one-shot.
+ * Storage is best-effort: where it is blocked the choice will not survive.
  * @returns {boolean} true when a reload was triggered.
  */
 export function persistLocaleAndReload(
@@ -320,20 +222,16 @@ export function persistLocaleAndReload(
   const normalized = normalizeLocale(locale) || DEFAULT_LOCALE;
   writeStoredLocale(normalized, storage);
   if (!location || typeof location.assign !== 'function') return false;
-  const stripLang = () => {
-    try {
-      const url = new URL(location.href);
-      url.searchParams.delete('lang');
-      return url.href;
-    } catch {
-      return location.href;
-    }
-  };
-  // location.assign() to the byte-identical URL performs NO navigation in
-  // real browsers (the common case: no ?lang present, hash unchanged), so a
-  // stored locale change would never reload. Strip ?lang via replaceState
-  // (no extra history entry) and force a real reload instead.
-  const target = stripLang();
+  let target = location.href;
+  try {
+    const url = new URL(location.href);
+    url.searchParams.delete('lang');
+    target = url.href;
+  } catch {
+    // Keep the current href.
+  }
+  // location.assign() to the identical URL does not navigate, so strip ?lang
+  // in place and force a real reload instead.
   try {
     history?.replaceState?.(null, '', target);
   } catch {

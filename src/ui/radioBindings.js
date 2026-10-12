@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 import {
   radioTunerSlot,
   radioTunerCommitSlot,
@@ -53,14 +53,14 @@ export function bindRadioControls() {
         'aria-label',
         t(
           displayOpen
-            ? 'cockpit.utility.displayToggleCollapseAriaLabel'
-            : 'cockpit.utility.displayToggleAriaLabel',
+            ? msg('Collapse Cockpit display options')
+            : msg('Expand Cockpit display options'),
         ),
       );
       this._cockpitDisplayToggleBtn.title = t(
         displayOpen
-          ? 'cockpit.utility.displayToggleCollapseAriaLabel'
-          : 'cockpit.utility.displayToggleAriaLabel',
+          ? msg('Collapse Cockpit display options')
+          : msg('Expand Cockpit display options'),
       );
     }
     if (this._cockpitRadioToggleBtn) {
@@ -69,14 +69,14 @@ export function bindRadioControls() {
         'aria-label',
         t(
           radioOpen
-            ? 'cockpit.utility.radioToggleCollapseAriaLabel'
-            : 'cockpit.utility.radioToggleAriaLabel',
+            ? msg('Collapse Cockpit Radio controls')
+            : msg('Expand Cockpit Radio controls'),
         ),
       );
       this._cockpitRadioToggleBtn.title = t(
         radioOpen
-          ? 'cockpit.utility.radioToggleCollapseAriaLabel'
-          : 'cockpit.utility.radioToggleAriaLabel',
+          ? msg('Collapse Cockpit Radio controls')
+          : msg('Expand Cockpit Radio controls'),
       );
     }
     if (!expanded && returnFocus) {
@@ -155,21 +155,21 @@ export function bindRadioControls() {
     if (this._radioTunerValue) {
       this._radioTunerValue.textContent = station
         ? `CH ${String(slot.stationIndex + 1).padStart(2, '0')} / ${String(this._radioTunerStations.length).padStart(2, '0')}`
-        : t('cockpit.radio.tunerNoStations');
+        : t('NO STATIONS');
     }
     if (this._radioTunerStation)
       this._radioTunerStation.textContent =
-        station?.name || t('layers.radio.noStationAvailable');
+        station?.name || t('NO STATION AVAILABLE');
     if (this._radioTunerSlider) {
       this._radioTunerSlider.setAttribute(
         'aria-valuetext',
         station
-          ? t('cockpit.radio.tunerStationAria', {
+          ? t('{name}, station {index} of {total}', {
               name: station.name,
               index: slot.stationIndex + 1,
               total: this._radioTunerStations.length,
             })
-          : t('cockpit.radio.tunerNoStationAria'),
+          : t('No station available'),
       );
     }
     if (syncStatic)
@@ -320,11 +320,9 @@ export function bindRadioControls() {
       this._radioTunerBandPinnedForNavigation = false;
       if (result.reason === 'station-unavailable') {
         if (this._radioTunerValue)
-          this._radioTunerValue.textContent = t('cockpit.radio.tunerOffAir');
+          this._radioTunerValue.textContent = t('OFF AIR');
         if (this._radioTunerStation)
-          this._radioTunerStation.textContent = t(
-            'cockpit.radio.tunerStationUnavailable',
-          );
+          this._radioTunerStation.textContent = t('STATION UNAVAILABLE');
         this._radioTunerSlider?.setAttribute(
           'aria-valuetext',
           'Station unavailable after directory refresh',
@@ -367,10 +365,8 @@ export function bindRadioControls() {
         // (identical value under 'en').
         `Radio could not ${enabling ? 'start' : 'stop'} cleanly`,
         {
-          localizedMessage: t('cockpit.radio.toastLifecycleFailed', {
-            action: enabling
-              ? t('cockpit.context.actionStart')
-              : t('cockpit.context.actionStop'),
+          localizedMessage: t('Radio could not {action} cleanly', {
+            action: enabling ? t('start') : t('stop'),
           }),
         },
       );

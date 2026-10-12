@@ -70,20 +70,20 @@ export function createCategories({
   function buildRadioCategories(stations) {
     const rows = Array.isArray(stations) ? stations : [];
     const categories = [
-      { id: 'all', label: t('layers.radio.filterAll') },
-      { id: 'news', label: t('layers.radio.category.news') },
-      { id: 'talk', label: t('layers.radio.category.talk') },
-      { id: 'weather', label: t('layers.radio.category.weather') },
-      { id: 'public-safety', label: t('layers.radio.category.publicSafety') },
+      { id: 'all', label: t('All') },
+      { id: 'news', label: t('News') },
+      { id: 'talk', label: t('Talk') },
+      { id: 'weather', label: t('Weather / Emergency') },
+      { id: 'public-safety', label: t('Public Safety') },
       {
         id: 'aviation-marine',
-        label: t('layers.radio.category.aviationMarine'),
+        label: t('Aviation / Marine'),
       },
       {
         id: 'traffic-transit',
-        label: t('layers.radio.category.trafficTransit'),
+        label: t('Traffic / Transit'),
       },
-      { id: 'music', label: t('layers.radio.category.music') },
+      { id: 'music', label: t('Music') },
     ];
 
     for (const [genre, label] of MUSIC_GENRES) {
@@ -92,7 +92,7 @@ export function createCategories({
         categories.push({ id, label });
       }
     }
-    categories.push({ id: 'other', label: t('layers.radio.category.other') });
+    categories.push({ id: 'other', label: t('Other') });
     return categories.map((category) => ({
       ...category,
       color: parts.model.radioCategoryColor(category.id),

@@ -38,7 +38,7 @@ export function createLifecycle({
     state.feed.firstConnectStartedAt = startedAt;
     state.feed.firstConnectDeadline = startedAt + AIS_FIRST_CONNECT_GRACE_MS;
     state.feed.error = null;
-    state.feed.loadingLabel = t('layers.vessel.awaitingFirstPosition');
+    state.feed.loadingLabel = t('awaiting first AIS position…');
     scheduleFirstConnectExpiry(sessionId, AIS_FIRST_CONNECT_GRACE_MS);
   }
 
@@ -60,8 +60,8 @@ export function createLifecycle({
       state.feed.firstConnectPhase = 'unavailable';
       state.feed.loadingLabel = '';
       state.feed.error = state.feed.lastMessageAt
-        ? t('layers.vessel.awaitingPositions')
-        : t('layers.vessel.awaitingFirstMessage');
+        ? t('awaiting usable AIS positions…')
+        : t('awaiting first AIS message…');
       state.feed.stale = state.feed.count > 0;
     }, delayMs);
   }

@@ -1,14 +1,14 @@
 import * as Cesium from 'cesium';
-import { t } from '../../i18n/index.js';
+import { t, msg } from '../../i18n/index.js';
 
 // The vessels ingestion owner is a portable module graph (it also runs in the
 // server-side source builds), so it writes stable English feed labels into
 // state. Localize those known labels here, at the presentation read; anything
 // else (a bespoke manager label) passes through verbatim.
 const FEED_STATE_LABEL_KEYS = Object.freeze({
-  'refreshing...': 'layers.meta.refreshing',
-  'loading...': 'layers.meta.loading',
-  'awaiting first AIS position…': 'layers.vessel.awaitingFirstPosition',
+  'refreshing...': msg('refreshing...'),
+  'loading...': msg('loading...'),
+  'awaiting first AIS position…': msg('awaiting first AIS position…'),
 });
 
 function localizeFeedLabel(raw) {
@@ -98,8 +98,8 @@ export function createQueries({
     if (acceptedRowCount > 0) return null; // accepted rows may be stale while reconnecting, but remain usable
     if (AIS_HEALTHY_STATUSES.has(status)) {
       return payload?.lastMessageAt
-        ? t('layers.vessel.awaitingPositions')
-        : t('layers.vessel.awaitingFirstMessage');
+        ? t('awaiting usable AIS positions…')
+        : t('awaiting first AIS message…');
     }
     if (!status) return null;
     const detail =
@@ -158,9 +158,7 @@ export function createQueries({
       error: emptyCoverage
         ? null
         : deriveAisFeedError(payload, acceptedRowCount) ||
-          (acceptedRowCount === 0
-            ? t('layers.vessel.awaitingPositions')
-            : null),
+          (acceptedRowCount === 0 ? t('awaiting usable AIS positions…') : null),
     };
   }
 
@@ -532,7 +530,7 @@ export function createQueries({
         lastUpdate: state.feed.lastUpdate,
         loading: state.feed.loading || waitingForFirstPosition,
         loadingLabel: waitingForFirstPosition
-          ? t('layers.vessel.awaitingFirstPosition')
+          ? t('awaiting first AIS position…')
           : localizeFeedLabel(state.feed.loadingLabel),
         error: state.feed.error,
         stale: state.feed.stale,

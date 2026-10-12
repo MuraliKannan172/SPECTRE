@@ -21,7 +21,7 @@ import { createSurfaceKeyboard } from './ui/surfaceKeyboard.js';
 // Choosing a mission is deliberately NOT durable suppression: picking a mission
 // is enthusiasm, not "never show me this again".
 
-import { t } from './i18n/index.js';
+import { t, msg } from './i18n/index.js';
 
 /** Durable suppression. Written ONLY by the "Don't show this again" checkbox. */
 export const FIRST_RUN_STORAGE_KEY = 'gev:first-run-mission:v1';
@@ -39,9 +39,9 @@ export const ENVIRONMENTAL_LABEL_CHOICE = 'ENVIRONMENTAL';
 // Catalog keys per label choice. Resolved through t() at CALL time (init),
 // never at module load — the locale is not resolved until main.js's body runs.
 const ENVIRONMENTAL_LABEL_KEYS = Object.freeze({
-  ENVIRONMENTAL: 'setup.firstRun.environmentalTitle.environmental',
-  EARTH_WATCH: 'setup.firstRun.environmentalTitle.earthWatch',
-  ACTIVE_EVENTS: 'setup.firstRun.environmentalTitle.activeEvents',
+  ENVIRONMENTAL: msg('ENVIRONMENTAL'),
+  EARTH_WATCH: msg('EARTH WATCH'),
+  ACTIVE_EVENTS: msg('ACTIVE EVENTS'),
 });
 
 /**
@@ -98,12 +98,12 @@ export const FIRST_RUN_MISSIONS = Object.freeze({
   contacts: Object.freeze({
     kind: 'context',
     contextMode: 'contacts',
-    busyKey: 'setup.firstRun.busy.contacts',
+    busyKey: msg('Starting live contacts…'),
   }),
   'space-missions': Object.freeze({
     kind: 'context',
     contextMode: 'space-missions',
-    busyKey: 'setup.firstRun.busy.spaceMissions',
+    busyKey: msg('Opening space missions…'),
   }),
   environmental: Object.freeze({
     kind: 'globe',
@@ -121,7 +121,7 @@ export const FIRST_RUN_MISSIONS = Object.freeze({
     // before a launch. LEDGERED post-launch. Until it lands, keyless visitors
     // are judged on the layer row, which tells them the truth.
     layerIds: Object.freeze(['earthquakes', 'local-firms']),
-    busyKey: 'setup.firstRun.busy.environmental',
+    busyKey: msg('Scanning active events…'),
   }),
   explore: Object.freeze({ kind: 'none' }),
 });
@@ -375,9 +375,14 @@ export function initFirstRunExperience({
     '[data-first-run-environmental-title] + small',
   );
   if (environmentalSub)
-    environmentalSub.textContent = t('setup.firstRun.choice.environmentalSub');
+    environmentalSub.textContent = t(
+      'Live earthquakes and active fires, from USGS and NASA',
+    );
   const description = root.querySelector('#first-run-description');
-  if (description) description.textContent = t('setup.firstRun.description');
+  if (description)
+    description.textContent = t(
+      'It feels like a forbidden cockpit—then you realize the sources are public and the data is real.',
+    );
 
   const status = root.querySelector('[data-first-run-status]');
   const suppressBox = root.querySelector('[data-first-run-suppress]');
@@ -461,7 +466,7 @@ export function initFirstRunExperience({
     if (!status) return;
     if (next)
       status.textContent = t(
-        FIRST_RUN_MISSIONS[choice]?.busyKey || 'setup.firstRun.busy.working',
+        FIRST_RUN_MISSIONS[choice]?.busyKey || msg('Working…'),
       );
     else if (status.dataset.sticky !== 'true')
       status.textContent = defaultStatus;
@@ -512,7 +517,10 @@ export function initFirstRunExperience({
       Array.isArray(failed) && failed.length ? ` (${failed.join(', ')})` : '';
     if (status) {
       status.dataset.sticky = 'true';
-      status.textContent = t('setup.firstRun.status.failed', { detail });
+      status.textContent = t(
+        'Could not open that mission{detail}. Retry or explore manually.',
+        { detail },
+      );
     }
     setBusy(false);
   };
@@ -528,7 +536,9 @@ export function initFirstRunExperience({
     if (box) box.checked = !wanted;
     if (!status) return;
     status.dataset.sticky = 'true';
-    status.textContent = t('setup.firstRun.status.storageBlocked');
+    status.textContent = t(
+      'This browser is blocking storage, so that could not be saved.',
+    );
   };
 
   const keyboard = createSurfaceKeyboard({

@@ -125,12 +125,15 @@ export function connectContextManager(manager) {
                 restoreError,
               );
             }
-            return t('cockpit.context.toastStartBlocked', {
-              mode:
-                entryMode === 'space-missions'
-                  ? t('cockpit.context.modeSpaceMissions')
-                  : t('cockpit.context.modeContext'),
-            });
+            return t(
+              '{mode} could not start because another layer did not stop cleanly',
+              {
+                mode:
+                  entryMode === 'space-missions'
+                    ? t('Space Missions')
+                    : t('Context'),
+              },
+            );
           } finally {
             if (ownsNotificationToken) {
               this._userFacingContextNotificationTokens.delete(

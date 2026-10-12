@@ -16,5 +16,5 @@ export function photorealUnavailableReason(hasCredentials) {
   if (hasCredentials)
     return "Google 3D tiles unavailable — check the key's API restrictions, quota, or network";
   const envVars = keySetupRequirementEnvVars('google-maps');
-  return `${t('setup.keySetup.requirement', { envVars })} — or a Cesium ion token for the ion-hosted route`;
+  return `${t('Needs {envVars} — add it in Provider Settings', { envVars })} — or a Cesium ion token for the ion-hosted route`;
 }

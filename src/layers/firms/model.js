@@ -331,19 +331,17 @@ export function createModel({
 
   function buildSelectedFireCard(fire, nowMs) {
     const meta = [
-      t('layers.firms.card.confSuffix', {
+      t('{value} conf', {
         value: confidenceBucket(fire.confidence),
       }),
     ];
     if (fire.acqMs > 0) {
       const age = formatAge(nowMs - fire.acqMs);
-      if (age) meta.push(t('layers.firms.card.ageSuffix', { value: age }));
+      if (age) meta.push(t('{value} ago', { value: age }));
     }
     const sat = satelliteShortName(fire.satellite);
     meta.push(
-      sat
-        ? `${fire.sensor || 'VIIRS'} ${sat}`
-        : fire.sensor || t('layers.firms.card.sensorUnavailable'),
+      sat ? `${fire.sensor || 'VIIRS'} ${sat}` : fire.sensor || t('sensor n/a'),
     );
     return {
       id: `selected-fire:${fireDetectionKey(fire)}`,
@@ -353,11 +351,11 @@ export function createModel({
       cullPosition: fireCullPosition(fire),
       gapPx: frpPixelSize(fire.frp),
       accent: accentForSeverity(detectionColorStop(fire).name),
-      title: t('layers.firms.card.fire', { frp: formatFrp(fire.frp) }),
+      title: t('FIRE · {frp} MW', { frp: formatFrp(fire.frp) }),
       details: [
         meta.join(' · '),
         formatLatLon(fire.lat, fire.lon) +
-          (fire.night ? ` · ${t('layers.firms.card.night')}` : ''),
+          (fire.night ? ` · ${t('NIGHT')}` : ''),
       ],
       selected: true,
       priority: Number.MAX_SAFE_INTEGER,
@@ -390,7 +388,7 @@ export function createModel({
       cullPosition: candidate.cullPosition || candidate.position,
       gapPx: frpPixelSize(fire.frp),
       accent: accentForSeverity(detectionColorStop(fire).name),
-      title: t('layers.firms.card.ambient', { frp: formatFrp(fire.frp) }),
+      title: t('▲ {frp} MW', { frp: formatFrp(fire.frp) }),
       details: [meta.join(' · ')],
       selected: false,
       priority: Number(fire.frp) || 0,
@@ -408,16 +406,11 @@ export function createModel({
 
   function buildCellCard(candidate, nowMs) {
     const cell = candidate.cell;
-    const noun =
-      cell.count === 1
-        ? t('layers.firms.card.fireNoun')
-        : t('layers.firms.card.firesNoun');
-    const parts = [
-      t('layers.firms.card.maxFrp', { value: formatFrp(cell.maxFrp) }),
-    ];
+    const noun = cell.count === 1 ? t('FIRE') : t('FIRES');
+    const parts = [t('max {value} MW', { value: formatFrp(cell.maxFrp) })];
     if (cell.newestAcqMs > 0) {
       const age = formatAge(nowMs - cell.newestAcqMs);
-      if (age) parts.push(t('layers.firms.card.newAge', { value: age }));
+      if (age) parts.push(t('new {value}', { value: age }));
     }
     return {
       id: `cell:${cell.latCell ?? 'x'}:${cell.lonCell ?? 'x'}`,
@@ -503,12 +496,11 @@ export function createModel({
   /** Millisecond delta → "<1m ago" / "Xm ago" / "Xh ago" (fresh-feed readout). */
 
   function formatAgoMinutes(deltaMs) {
-    if (!Number.isFinite(deltaMs) || deltaMs < 0)
-      return t('layers.meta.justNow');
+    if (!Number.isFinite(deltaMs) || deltaMs < 0) return t('just now');
     const minutes = Math.floor(deltaMs / 60000);
-    if (minutes < 1) return t('layers.firms.underMinuteAgo');
-    if (minutes < 90) return t('layers.meta.minutesAgo', { count: minutes });
-    return t('layers.meta.hoursAgo', { count: Math.round(minutes / 60) });
+    if (minutes < 1) return t('<1m ago');
+    if (minutes < 90) return t('{count}m ago', { count: minutes });
+    return t('{count}h ago', { count: Math.round(minutes / 60) });
   }
 
   /** Normalized 0..1 confidence → low/nominal/high display bucket. */

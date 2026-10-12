@@ -77,14 +77,14 @@ export function createPolicyHelpers({
       : 0;
     return {
       orbit: orbitName
-        ? `${orbitAllowed ? '' : t('layers.missions.rows.plannedPrefix')}${orbitName}`
+        ? `${orbitAllowed ? '' : t('PLANNED · ')}${orbitName}`
         : null,
       ascent:
         suppliedTrajectoryPoints > 1
-          ? t('layers.missions.rows.suppliedTrajectory')
+          ? t('SUPPLIED TRAJECTORY POINTS')
           : replayAvailable
-            ? t('layers.missions.rows.reconstructedEstimate')
-            : t('layers.missions.rows.unavailable'),
+            ? t('RECONSTRUCTED ESTIMATE')
+            : t('UNAVAILABLE'),
       replayAvailable: Boolean(replayAvailable),
     };
   }
@@ -198,7 +198,7 @@ export function createPolicyHelpers({
   function formatMissionEventTime(launchTime) {
     const date = new Date(launchTime);
     if (!launchTime || !Number.isFinite(date.getTime()))
-      return t('layers.missions.rows.unavailable');
+      return t('UNAVAILABLE');
     return `${date.toISOString().slice(0, 10)}\n${date.toISOString().slice(11, 19)} UTC`;
   }
 

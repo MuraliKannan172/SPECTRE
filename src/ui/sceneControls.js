@@ -58,7 +58,7 @@ export class SceneControls {
       if (!this.destroyed) elements.file.value = '';
     });
     if (!subscribe) {
-      this.updateStatus(t('setup.scenes.statusReady'));
+      this.updateStatus(t('Ready'));
       this.setProgress(0);
       this.setButtons(false);
     }
@@ -124,7 +124,7 @@ export class SceneControls {
     const generation = ++this.actionGeneration;
     const failed = () => {
       if (!this.destroyed && generation === this.actionGeneration)
-        this.updateStatus(t('setup.scenes.status.actionFailed'));
+        this.updateStatus(t('Scene action failed'));
     };
     try {
       const result = this.actions[action](...args);
@@ -163,9 +163,7 @@ export class SceneControls {
     const shot = scene?.shots.find((item) => item.id === shotId);
     if (
       shot &&
-      window.confirm(
-        t('setup.scenes.status.deleteShotConfirm', { shot: shot.title }),
-      )
+      window.confirm(t('Delete shot "{shot}"?', { shot: shot.title }))
     )
       this.run('deleteShot', sceneId, shotId);
   }

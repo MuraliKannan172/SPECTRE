@@ -116,7 +116,7 @@ export function createCards({
         if (!card.interactive) return card;
         return {
           ...card,
-          accessibilityLabel: t('layers.firms.card.focusAria', {
+          accessibilityLabel: t('Focus fire detection {title}, {details}', {
             title: card.title,
             details: card.details.join(', '),
           }),

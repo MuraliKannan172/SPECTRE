@@ -59,8 +59,8 @@ export function syncTr3bToggle(info) {
   this.tr3bToggle.hidden = !icao24;
   this.tr3bToggle.setAttribute('aria-pressed', converted ? 'true' : 'false');
   this.tr3bToggle.title = converted
-    ? t('cockpit.context.tr3bRestoreTitle')
-    : t('cockpit.context.tr3bTitle');
+    ? t('Restore real aircraft')
+    : t('Reclassify as TR-3B');
 }
 
 export function syncEntry() {
@@ -184,20 +184,17 @@ export function enter() {
   this.showBriefPage(0);
   this.startBriefRotation();
   const trackLabel =
-    info.callsign ||
-    info.registration ||
-    info.icao24 ||
-    t('cockpit.hud.fallbackCallsign');
+    info.callsign || info.registration || info.icao24 || t('AIRCRAFT');
   const trackHeading = String(
     Math.round(normalizeHeading(info.track ?? 0)),
   ).padStart(3, '0');
   this.pushCockpitSignal(
     'track',
     'track',
-    t('cockpit.signal.trackAcquired'),
-    t('cockpit.signal.trackDetail', {
+    t('TRACK ACQUIRED'),
+    t('{label} · COURSE {heading}°', {
       label: trackLabel,
-      heading: `${trackHeading}°`,
+      heading: trackHeading,
     }),
   );
   this.updateHud(info, performance.now(), true);

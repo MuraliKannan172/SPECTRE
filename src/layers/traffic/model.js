@@ -261,12 +261,12 @@ export function createModel({ state: layerState, services, parts, source }) {
         mode,
         error: null,
         loadingLabel: fetching
-          ? t('layers.traffic.syncingRoads', { source: roadSource })
+          ? t('Syncing flow · Roads: {source}', { source: roadSource })
           : coveragePct > 0
-            ? t('layers.traffic.liveRoadsFlowHidden', {
+            ? t('LIVE · Roads: {source} · Roads without flow hidden', {
                 source: roadSource,
               })
-            : t('layers.traffic.liveRoadsNoFlowInView', {
+            : t('LIVE · Roads: {source} · No flow roads in view', {
                 source: roadSource,
               }),
       };
@@ -276,13 +276,13 @@ export function createModel({ state: layerState, services, parts, source }) {
         mode,
         error: null,
         loadingLabel: fetching
-          ? t('layers.traffic.syncingRoads', { source: roadSource })
+          ? t('Syncing flow · Roads: {source}', { source: roadSource })
           : coveragePct > 0
-            ? t('layers.traffic.roadsFlowLive', {
+            ? t('LIVE · Roads: {source} · Flow {percent}%', {
                 source: roadSource,
                 percent: coveragePct,
               })
-            : t('layers.traffic.roadsFlowSimulated', {
+            : t('SIMULATED · Roads: {source} · Flow {percent}%', {
                 source: roadSource,
                 percent: coveragePct,
               }),
@@ -293,16 +293,24 @@ export function createModel({ state: layerState, services, parts, source }) {
         mode,
         error: null,
         loadingLabel: fetching
-          ? t('layers.traffic.loadingSyncing')
+          ? t(
+              'Syncing flow · Roads: OpenStreetMap · Flow: TomTom · Unmatched: simulated',
+            )
           : coveragePct > 0
             ? coveragePct < 100
-              ? t('layers.traffic.liveCoverageUnmatched', {
-                  percent: coveragePct,
-                })
-              : t('layers.traffic.liveCoverage', {
-                  percent: coveragePct,
-                })
-            : t('layers.traffic.simulatedNoMatches'),
+              ? t(
+                  'LIVE · Roads: OpenStreetMap · Flow: TomTom · {percent}% cov · Unmatched: simulated',
+                  {
+                    percent: coveragePct,
+                  },
+                )
+              : t(
+                  'LIVE · Roads: OpenStreetMap · Flow: TomTom · {percent}% cov',
+                  {
+                    percent: coveragePct,
+                  },
+                )
+            : t('SIMULATED · Roads: OpenStreetMap · Flow: TomTom (no matches)'),
       };
     }
     // Keyless simulation — one terse line that names the mode and the remedy
@@ -312,8 +320,8 @@ export function createModel({ state: layerState, services, parts, source }) {
       mode,
       error: null,
       loadingLabel: statusUnavailable
-        ? t('layers.traffic.simUnavailable')
-        : t('layers.traffic.simKeyless'),
+        ? t('SIMULATED — traffic service unreachable')
+        : t('SIMULATED — add TomTom key for live'),
     };
   }
 

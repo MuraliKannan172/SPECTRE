@@ -48,6 +48,6 @@ export function headingHudToken(camera) {
   // The token copy lives in the layers catalog (en is byte-identical to the
   // literals these replace); presentation stays here, translation at read.
   return isHeadingEstimated(camera)
-    ? t('layers.cctv.summary.hdgEstimated', { value: hdg })
-    : t('layers.cctv.summary.hdg', { value: hdg });
+    ? t('HDG {value}° (ESTIMATED)', { value: hdg })
+    : t('HDG {value}°', { value: hdg });
 }

@@ -61,7 +61,7 @@ export class RealtimeConnection {
     this.input.pushToTalkKeyHeld = pushToTalkKeyHeld;
     this.input.spaceKeyHeld = spaceKeyHeld;
     if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) {
-      this.setStatus('error', t('setup.voice.detail.microphoneUnavailable'));
+      this.setStatus('error', t('WebRTC microphone support unavailable'));
       return;
     }
 
@@ -80,7 +80,7 @@ export class RealtimeConnection {
     // — this is what "applies next session" means.
     this.cost.prepareSession();
     this.syncCostUi();
-    this.setStatus('connecting', t('setup.voice.detail.requestingMicrophone'));
+    this.setStatus('connecting', t('Requesting microphone'));
     this.debugLog('session.starting', {
       epoch,
       tier: this.cost.voiceTier,
@@ -181,9 +181,9 @@ export class RealtimeConnection {
         if (!ownsChannel()) return;
         const detail = this.input.pushToTalkMode
           ? this.input.pushToTalkKeyHeld
-            ? t('setup.voice.detail.releaseSpaceSend')
-            : t('setup.voice.detail.holdSpaceTalk')
-          : t('setup.voice.detail.askOrCommand');
+            ? t('Release Space to send')
+            : t('Hold Space to talk')
+          : t('Ask or command');
         this.setStatus('listening', detail);
         this.debugLog('data_channel.open', {
           connection: this.connectionDiagnostics(dataChannel),

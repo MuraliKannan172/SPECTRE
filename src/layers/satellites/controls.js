@@ -494,22 +494,27 @@ export function createControls({ state: layerState, services, parts, source }) {
       const active =
         layerState._params.catalog === 'dense' &&
         layerState._denseStatus === 'ready';
-      let title = t('layers.satellites.denseTitleAdd');
-      if (loading) title = t('layers.satellites.denseTitleLoading');
+      let title = t(
+        'Add the full Starlink broadband shell (thousands of extra points)',
+      );
+      if (loading) title = t('Loading the Starlink shell…');
       else if (failed)
-        title = t('layers.satellites.denseTitleFailed', {
-          detail: layerState._denseError || t('layers.satellites.loadFailed'),
+        title = t('Starlink {detail} — click to retry', {
+          detail: layerState._denseError || t('load failed'),
         });
-      else if (active) title = t('layers.satellites.denseTitleActive');
+      else if (active)
+        title = t(
+          'Showing the full Starlink shell — click for the core catalog only',
+        );
       return {
         chips: [
           {
             id: 'catalog',
             label: loading
-              ? t('layers.satellites.denseChipLoading')
+              ? t('DENSE ···')
               : failed
-                ? t('layers.satellites.denseChipFailed')
-                : t('layers.satellites.denseChip'),
+                ? t('DENSE ✕')
+                : t('DENSE'),
             active,
             busy: loading,
             disabled: loading,

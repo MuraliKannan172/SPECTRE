@@ -1,6 +1,6 @@
 /** Contact readouts and nearby-signal presentation for the Cockpit controller. */
 import * as Cesium from 'cesium';
-import { t } from '../i18n/index.js';
+import { t, tn } from '../i18n/index.js';
 import {
   bearingBetweenCoordinates,
   formatCockpitContextScope,
@@ -21,8 +21,8 @@ export function updateContext(info, heading) {
     this.pushCockpitSignal(
       'context-status',
       'info',
-      t('cockpit.signal.contextStandby'),
-      t('cockpit.signal.contextStandbyHint'),
+      t('CONTEXT STANDBY'),
+      t('ENABLE GLOBAL CONTEXT FOR PROXIMITY PINGS'),
     );
     return;
   }
@@ -59,7 +59,7 @@ export function updateContext(info, heading) {
       this.contextUncertainty.textContent =
         'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR';
       this.contextUncertainty.textContent = t(
-        'cockpit.context.uncertaintyContactLost',
+        'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR',
       );
     }
     // The cue changes the footer's height; re-run layout once on the way in
@@ -68,10 +68,10 @@ export function updateContext(info, heading) {
     this.pushCockpitSignal(
       'context-status',
       'warning',
-      t('cockpit.signal.contactLostTitle', {
+      t('CONTACT LOST · {subject}', {
         subject: snapshot.subject.label || snapshot.subject.id || 'SUBJECT',
       }),
-      t('cockpit.signal.contactLostDetail'),
+      t('SUBJECT LEFT ITS FEED · READOUT HOLDING LAST KNOWN'),
     );
     return;
   }
@@ -92,15 +92,15 @@ export function updateContext(info, heading) {
   const closestLabel = this.services.formatAwarenessLabel(closest);
   if (this.contextNearestLabel) {
     this.contextNearestLabel.textContent = closest
-      ? t('cockpit.context.nearestTemplate', {
+      ? t('{cohort} · {contact}', {
           cohort: closest.cohort.label.toUpperCase(),
           contact: closestLabel,
         })
-      : t('cockpit.context.nearestEmpty');
+      : t('NO AVAILABLE EXAMPLE');
     this.contextNearestLabel.setAttribute(
       'aria-label',
       closest && closestLabel === '—'
-        ? t('cockpit.context.nearestUnavailableAria', {
+        ? t('{cohort}, Unavailable', {
             cohort: closest.cohort.label,
           })
         : this.contextNearestLabel.textContent,
@@ -153,24 +153,24 @@ export function updateContext(info, heading) {
     else if (Math.abs(relative) < 8) this.contextBearing.textContent = 'AHEAD';
     else
       this.contextBearing.textContent = `${relative < 0 ? 'L' : 'R'} ${String(Math.round(Math.abs(relative))).padStart(3, '0')}°`;
-    if (relative === null)
-      this.contextBearing.textContent = t('cockpit.context.bearingNone');
+    if (relative === null) this.contextBearing.textContent = t('BRG —');
     else if (Math.abs(relative) < 8)
-      this.contextBearing.textContent = t('cockpit.context.bearingAhead');
+      this.contextBearing.textContent = t('AHEAD');
     else {
-      this.contextBearing.textContent = t('cockpit.context.bearingSide', {
-        side:
-          relative < 0
-            ? t('cockpit.context.sideLeft')
-            : t('cockpit.context.sideRight'),
+      this.contextBearing.textContent = t('{side} {angle}', {
+        side: relative < 0 ? t('L') : t('R'),
         angle: `${String(Math.round(Math.abs(relative))).padStart(3, '0')}°`,
       });
     }
   }
   if (this.contextUncertainty) {
     this.contextUncertainty.textContent = unknownCount
-      ? t('cockpit.context.uncertaintyInputsUnknown', { count: unknownCount })
-      : t('cockpit.context.uncertaintyInputsCurrent');
+      ? tn(
+          unknownCount,
+          '{count} INPUT UNKNOWN · NOT AN ALL-CLEAR',
+          '{count} INPUTS UNKNOWN · NOT AN ALL-CLEAR',
+        )
+      : t('AVAILABLE INPUTS CURRENT · NOT AN ALL-CLEAR');
   }
   if (this.contextUpdated) {
     this.contextUpdated.textContent = Number.isFinite(snapshot.evaluatedAt)

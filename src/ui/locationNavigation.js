@@ -89,9 +89,8 @@ export class LocationNavigation {
       this._collapsePOIRow();
       this._updateLocationMiniStatus();
     } else if (change.type === 'missing')
-      this._showToast(t('cockpit.location.toastNotFound'));
-    else if (change.type === 'failed')
-      this._showToast(t('cockpit.location.toastSearchFailed'));
+      this._showToast(t('Location not found'));
+    else if (change.type === 'failed') this._showToast(t('Search failed'));
     else if (change.type === 'settled')
       this._settleLocationSearchUi(change.generation);
     else if (
@@ -280,7 +279,7 @@ export class LocationNavigation {
 
   _toggleOrbit() {
     if (!this._currentTarget) {
-      this._showToast(t('cockpit.location.toastFlyToPoiFirst'));
+      this._showToast(t('Fly to a POI first'));
       return;
     }
 
@@ -382,11 +381,11 @@ export class LocationNavigation {
       };
       this._resetGlobeBtn?.setAttribute(
         'aria-label',
-        t('cockpit.hud.resetGlobeAria'),
+        t('Reset to full globe view'),
       );
       this._cockpitResetGlobeBtn?.setAttribute(
         'aria-label',
-        t('cockpit.hud.resetGlobeCockpitAria'),
+        t('Reset cockpit to full globe view'),
       );
       this._globeResetPromise = null;
       this._cancelGlobeReset = null;
@@ -402,11 +401,11 @@ export class LocationNavigation {
     }, 4200);
     this._resetGlobeBtn?.setAttribute(
       'aria-label',
-      t('cockpit.hud.resettingGlobeAria'),
+      t('Resetting to full globe view'),
     );
     this._cockpitResetGlobeBtn?.setAttribute(
       'aria-label',
-      t('cockpit.hud.resettingGlobeCockpitAria'),
+      t('Resetting cockpit to full globe view'),
     );
     const target = flyToGlobeView(this.viewer, {
       onComplete: () => finish(false),

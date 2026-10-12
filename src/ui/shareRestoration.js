@@ -189,12 +189,10 @@ export class ShareRestoration {
     if (result.classification === 'pending') {
       this._shareTrackingNoticeGeneration += 1;
       this._shareTrackingAcquiringKey = trackingKey;
-      this.showStatus(t('cockpit.status.acquiring'), {
+      this.showStatus(t('ACQUIRING'), {
         state: 'acquiring',
-        detail: t('cockpit.status.sharedSubjectDetail', {
-          subject: String(
-            result.label || t('cockpit.status.subjectFallback'),
-          ).toUpperCase(),
+        detail: t('SHARED {subject}', {
+          subject: String(result.label || t('entity')).toUpperCase(),
         }),
         persistent: true,
       });
@@ -219,13 +217,15 @@ export class ShareRestoration {
     const noticeGeneration = ownsAcquiringNotice
       ? this._shareTrackingNoticeGeneration
       : ++this._shareTrackingNoticeGeneration;
-    const subject = result.label || t('cockpit.status.subjectFallback');
+    const subject = result.label || t('entity');
     const message =
       result.classification === 'expired'
-        ? t('cockpit.status.sharedFollowExpired', { subject })
+        ? t('Shared {subject} follow expired', { subject })
         : result.classification === 'source-unavailable'
-          ? t('cockpit.status.sharedRestoreFailed', { subject })
-          : t('cockpit.status.sharedUnavailable', { subject });
+          ? t('Shared {subject} could not be restored — feed unavailable', {
+              subject,
+            })
+          : t('Shared {subject} is unavailable', { subject });
     const showAfterStartupCover = () => {
       this._lifetime.frame(() => {
         if (

@@ -38,7 +38,7 @@ import { ShellFeedback } from './shellFeedback.js';
 import { runCctvLayerEnableTransition } from '../cctvFocusPolicy.js';
 
 import { getLocale, persistLocaleAndReload, t } from '../i18n/index.js';
-import { availableLocales } from '../i18n/locale.js';
+import { LOCALES, LOCALE_NAMES } from '../i18n/locale.js';
 
 /**
  * Central UI orchestrator for the God's Eye View application.
@@ -706,15 +706,9 @@ export class StyleManager extends ShellFacade {
   }
 
   /**
-   * Renders the command-dock locale switch (runtime-built since the
-   * configurable-pair stage): one button per locale availableLocales()
-   * yields — the configured GEV_DEFAULT_LOCALE / GEV_SECONDARY_LOCALE pair,
-   * already deduped against the always-shipped English fallback. Labels are
-   * uppercase locale codes (EN/ES/FR); aria-labels come from
-   * shell.locale.<code>.ariaLabel in the active catalog. Pressed state is
-   * synced from the resolved locale at boot; a click persists the choice and
-   * reloads the page, so no live re-apply of document translations is needed
-   * here (persistLocaleAndReload strips ?lang and keeps the hash).
+   * Renders the command-dock locale switch: one button per shipped locale,
+   * labelled with its code and named in its own language. A click stores the
+   * choice and reloads, so nothing re-renders live.
    * @returns {void}
    */
   _initLocaleSelector() {
@@ -723,13 +717,14 @@ export class StyleManager extends ShellFacade {
     );
     if (!container) return;
     const active = getLocale();
-    for (const locale of availableLocales()) {
+    for (const locale of LOCALES) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'dock-locale-btn';
       button.dataset.locale = locale;
       button.textContent = locale.toUpperCase();
-      button.setAttribute('aria-label', t(`shell.locale.${locale}.ariaLabel`));
+      button.setAttribute('aria-label', LOCALE_NAMES[locale]);
+      button.lang = locale;
       const isActive = locale === active;
       button.classList.toggle('active', isActive);
       button.setAttribute('aria-pressed', String(isActive));
@@ -770,15 +765,15 @@ export class StyleManager extends ShellFacade {
   _applyRuntimeStaticHeaderText() {
     this._setHeaderText(
       document.querySelector('#control-panel .panel-title'),
-      t('cockpit.presets.title'),
+      t('VISUAL PRESETS'),
     );
     this._setHeaderText(
       document.querySelector('#location-bar .location-toolbar-label'),
-      t('cockpit.location.toolbarLabel'),
+      t('LOCATION'),
     );
     this._setHeaderText(
       document.querySelector('#pp-toggles .pp-header-label'),
-      t('cockpit.display.title'),
+      t('DISPLAY'),
     );
     // The cockpit context kicker ('CONTACT') is visible on the map itself, and
     // the briefing kicker shares its element with the live-dot <i>; both are
@@ -786,7 +781,7 @@ export class StyleManager extends ShellFacade {
     // text node keeps renderBriefPage's leading-space convention.
     this._setHeaderText(
       document.querySelector('.cockpit-context-kicker'),
-      t('cockpit.context.kicker'),
+      t('CONTACT'),
     );
     // The phase-2 key-only standby description: one span holds BOTH mode
     // descriptions split by a literal <br>, so no attribute write was possible
@@ -797,14 +792,18 @@ export class StyleManager extends ShellFacade {
     );
     if (standbyDescription) {
       standbyDescription.replaceChildren(
-        document.createTextNode(t('cockpit.context.standbyContactsDesc')),
+        document.createTextNode(
+          t('CONTACTS — nearest planes · vessels · sites'),
+        ),
         document.createElement('br'),
-        document.createTextNode(t('cockpit.context.standbyMissionsDesc')),
+        document.createTextNode(
+          t('SPACE MISSIONS — launches & orbital assets'),
+        ),
       );
     }
     const briefKicker = document.querySelector('#cockpit-brief-kicker');
     if (briefKicker) {
-      this._setHeaderText(briefKicker, ` ${t('cockpit.brief.kicker')}`);
+      this._setHeaderText(briefKicker, ` ${t('LIVE SIGNALS')}`);
     }
   }
 
@@ -822,11 +821,8 @@ export class StyleManager extends ShellFacade {
     // runtime write instead. The locale resolves before UI init and never
     // changes without a reload, so an init-time write is sufficient.
     if (this._mapSourceLabel)
-      this._mapSourceLabel.textContent = t('cockpit.presets.mapSourceLabel');
-    this._mapStackChips.setAttribute(
-      'aria-label',
-      t('cockpit.presets.mapSourceChipsAriaLabel'),
-    );
+      this._mapSourceLabel.textContent = t('MAP SOURCE');
+    this._mapStackChips.setAttribute('aria-label', t('Map source'));
 
     this._mapSourceControls?.destroy();
     this._mapSourceControls = createMapSourceControls({
@@ -1149,7 +1145,7 @@ export class StyleManager extends ShellFacade {
     const { cctvLayer } = this.services;
     if (this._disposed) return false;
     if (!this._dataManager || !this._dataManager.layers?.has('cctv')) {
-      this._showToast(t('cockpit.cctv.toastLayerUnavailable'));
+      this._showToast(t('CCTV layer unavailable'));
       return false;
     }
     const enabled = this._dataManager.isEnabled('cctv');
@@ -1598,11 +1594,7 @@ export class StyleManager extends ShellFacade {
     this._lifetime.listen(this._shareBtn, 'click', async () => {
       const success = await this.shareLinkManager.copyLink();
       if (!this._disposed)
-        this._showToast(
-          success
-            ? t('cockpit.share.toastCopied')
-            : t('cockpit.share.toastCopyFailed'),
-        );
+        this._showToast(success ? t('Link copied!') : t('Copy failed'));
     });
   }
 

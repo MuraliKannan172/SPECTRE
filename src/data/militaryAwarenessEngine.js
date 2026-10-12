@@ -84,14 +84,14 @@ export function summarizeAwarenessCohort(
       relationship: AWARENESS_RELATIONSHIP.UNKNOWN,
       count: null,
       nearest: [],
-      reason: t('layers.awareness.reason.feedUnavailable'),
+      reason: t('feed unavailable'),
     };
   if (stale)
     return {
       relationship: AWARENESS_RELATIONSHIP.UNKNOWN,
       count: null,
       nearest: [],
-      reason: t('layers.awareness.reason.feedStale'),
+      reason: t('feed stale'),
     };
   const normalized = (Array.isArray(items) ? items : [])
     .filter(
@@ -108,8 +108,8 @@ export function summarizeAwarenessCohort(
     count: normalized.length,
     nearest: normalized.slice(0, limit),
     reason: normalized.length
-      ? t('layers.awareness.reason.nearby')
-      : t('layers.awareness.reason.none'),
+      ? t('observed or mapped nearby context')
+      : t('no observed or mapped objects in current feeds'),
   };
 }
 
