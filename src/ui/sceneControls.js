@@ -163,7 +163,9 @@ export class SceneControls {
     const shot = scene?.shots.find((item) => item.id === shotId);
     if (
       shot &&
-      window.confirm(t('Delete shot "{shot}"?', { shot: shot.title }))
+      window.confirm(
+        t('Delete shot "{shot}"?', { shot: shot.displayTitle || shot.title }),
+      )
     )
       this.run('deleteShot', sceneId, shotId);
   }

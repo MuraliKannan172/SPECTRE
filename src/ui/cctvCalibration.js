@@ -1,4 +1,5 @@
-import { t, msg } from '../i18n/index.js';
+import { formatNumber, t, msg } from '../i18n/index.js';
+import { formatQuantity } from './unitLabels.js';
 
 /** Shortest-wrap signed degrees, for heading offsets typed as absolute values. */
 const signedNormalizeDeg = (deg) => ((((deg + 180) % 360) + 360) % 360) - 180;
@@ -65,6 +66,21 @@ const CCTV_CAL_FIELDS = {
     toPatch: (value) => ({ offsetEastM: value }),
   },
 };
+
+/** Chip text for one pose value: locale decimals, translated metre unit. */
+function calValueText(field, value) {
+  const options = {
+    minimumFractionDigits: field.decimals,
+    maximumFractionDigits: field.decimals,
+  };
+  if (field.unit === 'm')
+    return `${t(field.label)} ${formatQuantity(Number(value), 'm', options)}`;
+  const number = formatNumber(Number(value), {
+    useGrouping: false,
+    ...options,
+  });
+  return `${t(field.label)} ${number}${field.unit}`;
+}
 
 export function _activeCctvCameraId() {
   return this._cctvState?.activeCameraId || this._cctvSelect?.value || '';
@@ -176,7 +192,7 @@ export function _syncCctvCalReadout(enabled, activeCamera) {
       if (!field) continue;
       const value = canCalibrate ? field.get(activeCamera) : null;
       chip.textContent = Number.isFinite(value)
-        ? `${t(field.label)} ${Number(value).toFixed(field.decimals)}${field.unit}`
+        ? calValueText(field, value)
         : `${t(field.label)} --`;
       chip.disabled = !canCalibrate;
     }

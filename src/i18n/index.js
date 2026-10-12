@@ -3,6 +3,7 @@
 //   t('Save keys')                                   → 'Сохранить ключи'
 //   t('Cleared {name}', { name })                    → named interpolation
 //   tn(count, '{count} camera', '{count} cameras')   → plural by Intl.PluralRules
+//   t('CLEAR', { context: 'action' })                → same English, own entry
 //   msg('Live Flights')                              → marks a string kept in data
 //                                                      for a later t(); returns it as is
 //
@@ -76,11 +77,13 @@ function lookup(text) {
 /**
  * Translate English source text into the active locale.
  * @param {string} text English text, e.g. 'Hold Space to talk'
- * @param {object} [values] Named interpolation values
+ * @param {object} [values] Named interpolation values. `context` tells
+ *   apart identical English with different meanings: t('CLEAR', { context:
+ *   'action' }) is the catalog entry "action|CLEAR"; English is unchanged.
  * @returns {string}
  */
 export function t(text, values) {
-  const entry = lookup(text);
+  const entry = lookup(values?.context ? `${values.context}|${text}` : text);
   return interpolate(typeof entry === 'string' ? entry : text, values);
 }
 

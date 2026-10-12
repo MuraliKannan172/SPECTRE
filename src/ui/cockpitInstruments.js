@@ -20,6 +20,8 @@ import {
 } from '../cockpitMath.js';
 import {
   COCKPIT_CONTEXT_UPDATE_MS,
+  compassPointLabel,
+  formatCockpitCoordinate,
   setCockpitRollingValue,
 } from './cockpitPresentation.js';
 
@@ -110,7 +112,7 @@ export function updateHud(
       this.compassTape.innerHTML = divisions
         .map((division, index) => {
           const slot = index - 3;
-          return `<span class="${slot === 0 ? 'active' : ''}" style="--slot:${slot};--depth:${Math.abs(slot)}">${formatCompassDivision(division)}</span>`;
+          return `<span class="${slot === 0 ? 'active' : ''}" style="--slot:${slot};--depth:${Math.abs(slot)}">${compassPointLabel(formatCompassDivision(division))}</span>`;
         })
         .join('');
     }
@@ -119,10 +121,10 @@ export function updateHud(
     this.clock.textContent = new Date().toISOString().slice(11, 19) + 'Z';
   if (this.position) {
     const lat = Number.isFinite(info.latitude)
-      ? `${Math.abs(info.latitude).toFixed(3)}°${info.latitude >= 0 ? 'N' : 'S'}`
+      ? formatCockpitCoordinate(info.latitude, 'N', 'S')
       : '--';
     const lon = Number.isFinite(info.longitude)
-      ? `${Math.abs(info.longitude).toFixed(3)}°${info.longitude >= 0 ? 'E' : 'W'}`
+      ? formatCockpitCoordinate(info.longitude, 'E', 'W')
       : '--';
     this.position.textContent = `${lat} · ${lon}`;
   }

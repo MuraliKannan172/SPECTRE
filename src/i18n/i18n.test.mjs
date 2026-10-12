@@ -130,6 +130,12 @@ test('tn() picks English and Russian plural forms', () => {
   assert.match(label(21), / 21 КЛЮЧ(?![А-ЯЁ])/);
 });
 
+test('t() context separates identical English with different meanings', () => {
+  assert.equal(t('CLEAR', { context: 'action' }), 'CLEAR');
+  setLocale('ru');
+  assert.notEqual(t('CLEAR', { context: 'action' }), t('CLEAR'));
+});
+
 test('msg() returns its text unchanged', () => {
   assert.equal(msg('Live Flights'), 'Live Flights');
 });

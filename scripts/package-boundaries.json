@@ -455,7 +455,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": []
   },
@@ -502,7 +503,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": []
   },
@@ -556,7 +558,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": ["cesium"]
   },
@@ -569,7 +572,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": []
   },
@@ -712,7 +716,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": ["cesium"]
   },
@@ -822,7 +827,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": ["cesium"]
   },
@@ -880,7 +886,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": ["cesium"]
   },
@@ -1007,7 +1014,9 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js",
+      "src/layers/recentImagery/display.js"
     ],
     "external": ["cesium"]
   },
@@ -2322,7 +2331,9 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js",
+      "src/layers/recentImagery/display.js"
     ],
     "external": [
       "hls.js",
@@ -2848,7 +2859,9 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js",
+      "src/layers/recentImagery/display.js"
     ],
     "external": [
       "hls.js",
@@ -3092,7 +3105,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": ["cesium"]
   },

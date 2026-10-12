@@ -127,17 +127,6 @@ export const RADIO_CATEGORY_COLORS = Object.freeze({
   other: '#9aa7b3',
 });
 
-export const RADIO_CLUSTER_LABELS = Object.freeze({
-  news: 'NEWS',
-  talk: 'TALK',
-  weather: 'WEATHER',
-  'public-safety': 'SAFETY',
-  'aviation-marine': 'AIR / SEA',
-  'traffic-transit': 'TRANSIT',
-  music: 'MUSIC',
-  other: 'OTHER',
-});
-
 export const RADIO_MARKER_CATEGORY_ORDER = Object.freeze([
   'news',
   'public-safety',

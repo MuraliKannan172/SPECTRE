@@ -8,20 +8,50 @@
  * strip and selection bar are this adapter's own keyed DOM. Source toggles
  * live on the data-panel row.
  */
-import { t, tn, msg } from '../i18n/index.js';
+import { t, tn, msg, formatNumber } from '../i18n/index.js';
 import { createRailCardBlocks } from './railCardBlocks.js';
 import { createRailCards } from './railCards.js';
 import { createImagerySplit } from './imagerySplit.js';
 import {
   PRODUCTS,
   hhmm,
-  shortDay,
   wvsSnapshotUrl,
 } from '../layers/recentImagery/model.js';
+import { displayDay, displayMetres } from '../layers/recentImagery/display.js';
+import { formatQuantity } from './unitLabels.js';
 
 const PANEL_ID = 'recent-imagery-panel';
 const OVERVIEW_MIN_BOX_KM = 25;
 const ESRI_NOTE = msg('Imagery on Esri · Google 3D returns when cleared');
+
+// The layer keeps its notices and box refusals in English (AI tools read the
+// same snapshot); translate the ones we write, show anything else as it came.
+const LAYER_NOTICES = new Set([
+  ESRI_NOTE,
+  msg('Box and images cleared'),
+  msg('Esri map unavailable · no swipe'),
+  msg('Swipe needs a globe map'),
+  msg('Imagery stays on Esri · CLEAR to use Google 3D'),
+]);
+const TOO_LARGE = /^(Box|View) is ([\d,]+) km wide · limit ([\d,]+) km$/;
+
+function localizeNotice(text) {
+  if (!text) return '';
+  if (LAYER_NOTICES.has(text)) return t(text);
+  const tooLarge = TOO_LARGE.exec(text);
+  if (!tooLarge) return text;
+  const values = {
+    size: formatQuantity(Number(tooLarge[2].replace(/,/g, '')), 'km', {
+      useGrouping: true,
+    }),
+    limit: formatQuantity(Number(tooLarge[3].replace(/,/g, '')), 'km', {
+      useGrouping: true,
+    }),
+  };
+  return tooLarge[1] === 'Box'
+    ? t('Box is {size} wide · limit {limit}', values)
+    : t('View is {size} wide · limit {limit}', values);
+}
 const MODE_LABELS = [
   ['image', msg('IMAGE')],
   ['basemap', msg('VS BASEMAP')],
@@ -56,17 +86,25 @@ const appearedDocuments = new WeakSet();
 
 const sensorLine = (product) =>
   PRODUCTS[product]
-    ? `${t(PRODUCTS[product].name)} · ${PRODUCTS[product].resolutionM} m`
+    ? `${t(PRODUCTS[product].name)} · ${displayMetres(PRODUCTS[product].resolutionM)}`
     : product || '';
 const utcTime = (iso) => (hhmm(iso) ? `${hhmm(iso)}Z` : '');
 const longerSideKm = (size) =>
   Math.max(Number(size?.width) || 0, Number(size?.height) || 0);
-const kmText = (km) =>
-  !Number.isFinite(km)
-    ? '?'
-    : km >= 100
-      ? Math.round(km).toLocaleString('en-US')
-      : km.toFixed(1);
+const kmText = (km) => {
+  if (!Number.isFinite(km)) return '?';
+  const digits = km >= 100 ? 0 : 1;
+  return formatNumber(km, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+};
+
+function coverageText(coverage) {
+  if (coverage === 'full') return t('full', { context: 'coverage' });
+  if (coverage === 'partial') return t('partial', { context: 'coverage' });
+  return t('unknown');
+}
 
 function cloudText(candidate) {
   if (candidate.thumbnail?.status === 'empty') return t('no imagery');
@@ -344,7 +382,7 @@ export function createRecentImageryPanel({
           },
           {
             id: 'clear',
-            label: t('CLEAR'),
+            label: t('CLEAR', { context: 'action' }),
             title: t('Forget the box and its images'),
             disabled: !snapshot.box && !snapshot.boxError,
             onClick: () => {
@@ -372,8 +410,9 @@ export function createRecentImageryPanel({
   // ---- notice -----------------------------------------------------------
   function renderNotice() {
     const warning = snapshot.boxError || snapshot.error || exportError;
-    const text =
-      warning || snapshot.notice || (snapshot.borrowedEsri ? t(ESRI_NOTE) : '');
+    const text = localizeNotice(
+      warning || snapshot.notice || (snapshot.borrowedEsri ? ESRI_NOTE : ''),
+    );
     set(noticeText, 'textContent', text);
     attribute(noticeText, 'title', text);
     toggle(notice, 'warn', Boolean(warning));
@@ -416,7 +455,7 @@ export function createRecentImageryPanel({
     const entry = cards.get(candidate.key);
     if (!entry) return;
     const { card } = entry;
-    const day = shortDay(candidate.day);
+    const day = displayDay(candidate.day);
     const ab = snapshot.mode === 'ab';
     set(card, 'id', `ri-card-${index}`);
     const focused = index === snapshot.focusIndex;
@@ -735,7 +774,7 @@ export function createRecentImageryPanel({
           }),
         );
       times.push(
-        t('Coverage {coverage}', { coverage: focus.coverage || t('unknown') }),
+        t('Coverage {coverage}', { coverage: coverageText(focus.coverage) }),
       );
       lines.push({ id: 'acquired', text: times.join(' · ') });
       (focus.granules || []).forEach((granule, index) => {

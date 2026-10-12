@@ -17,11 +17,9 @@
  */
 
 import * as Cesium from 'cesium';
-import {
-  formatRouteDistance,
-  formatRouteDuration,
-} from '../../data/routeSteps.js';
-import { t, msg } from '../../i18n/index.js';
+import { roadLabel } from '../../data/routeSteps.js';
+import { t, msg, formatNumber } from '../../i18n/index.js';
+import { formatQuantity } from '../../ui/unitLabels.js';
 
 export const DIRECTIONS_STEP_OVERLAY_SOURCE_ID = 'directions-step';
 export const DIRECTIONS_STEP_OVERLAY_SOURCE_OPTIONS = Object.freeze({
@@ -68,6 +66,219 @@ export const STEP_ANCHOR_SLOW_RETRY_MS = 2000;
 export const STEP_ANCHOR_FAST_ATTEMPTS = 5;
 /** How often the row repaints the highlighted step while FLY is running (ms). */
 export const FLIGHT_PROGRESS_MS = 250;
+
+// ---------------------------------------------------------------------------
+// Display text: distances, durations and maneuvers in the page's language.
+// The proxy's English `instruction` stays the machine value; the row and the
+// cards phrase each step from its OSRM type/modifier/road instead.
+// ---------------------------------------------------------------------------
+
+/**
+ * Localized "850 m", "1.2 km", "21 km" (the rounding of `formatRouteDistance`
+ * in src/data/routeSteps.js); number and unit never break apart.
+ * @param {number} meters
+ * @returns {string}
+ */
+export function routeDistanceText(meters) {
+  if (!Number.isFinite(meters) || meters < 0) return '';
+  if (meters < 100) return formatQuantity(Math.round(meters), 'm');
+  if (meters < 1000) return formatQuantity(Math.round(meters / 10) * 10, 'm');
+  const km = meters / 1000;
+  return km < 10
+    ? formatQuantity(km, 'km', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })
+    : formatQuantity(Math.round(km), 'km');
+}
+
+/**
+ * Localized "40 s", "12 min", "1 h 5 min" (the rounding of
+ * `formatRouteDuration` in src/data/routeSteps.js); never broken apart.
+ * @param {number} seconds
+ * @returns {string}
+ */
+export function routeDurationText(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '';
+  if (seconds < 60) return formatQuantity(Math.round(seconds), 's');
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return formatQuantity(minutes, 'min');
+  const hours = formatQuantity(Math.floor(minutes / 60), 'h');
+  const rest = minutes % 60;
+  return rest ? `${hours}\u00a0${formatQuantity(rest, 'min')}` : hours;
+}
+
+/** "left", "slightly right", … as it reads inside a maneuver sentence. */
+function directionWord(modifier) {
+  switch (modifier) {
+    case 'left':
+      return t('left', { context: 'direction' });
+    case 'right':
+      return t('right', { context: 'direction' });
+    case 'slight left':
+      return t('slightly left', { context: 'direction' });
+    case 'slight right':
+      return t('slightly right', { context: 'direction' });
+    case 'sharp left':
+      return t('sharply left', { context: 'direction' });
+    case 'sharp right':
+      return t('sharply right', { context: 'direction' });
+    case 'straight':
+      return t('straight', { context: 'direction' });
+    case 'uturn':
+      return t('around', { context: 'direction' });
+    default:
+      return modifier;
+  }
+}
+
+/** "1st", "2nd", … for a roundabout exit. */
+function exitOrdinal(exit) {
+  const number = formatNumber(exit);
+  switch (new Intl.PluralRules('en', { type: 'ordinal' }).select(exit)) {
+    case 'one':
+      return t('{number}st', { context: 'ordinal', number });
+    case 'two':
+      return t('{number}nd', { context: 'ordinal', number });
+    case 'few':
+      return t('{number}rd', { context: 'ordinal', number });
+    default:
+      return t('{number}th', { context: 'ordinal', number });
+  }
+}
+
+/**
+ * One maneuver in the page's language, from the step's OSRM type, modifier,
+ * exit and road. English matches `instructionFor` in src/data/routeSteps.js
+ * word for word. A step without a type (an older payload) keeps the proxy's
+ * English instruction.
+ * @param {{type?:string, modifier?:string|null, exit?:number|null, name?:string, ref?:string|null, instruction?:string}} step
+ * @returns {string}
+ */
+export function directionsInstruction(step) {
+  const type =
+    typeof step?.type === 'string' ? step.type.trim().toLowerCase() : '';
+  if (!type)
+    return typeof step?.instruction === 'string' ? step.instruction : '';
+  const modifier =
+    typeof step.modifier === 'string' ? step.modifier.trim().toLowerCase() : '';
+  const road = roadLabel(step);
+  const direction = directionWord(modifier);
+  const values = { road, direction };
+  switch (type) {
+    case 'depart':
+      return road ? t('Head out on {road}', values) : t('Head out');
+    case 'arrive':
+      if (modifier === 'left')
+        return t('Arrive at your destination, on the left');
+      if (modifier === 'right')
+        return t('Arrive at your destination, on the right');
+      return t('Arrive at your destination');
+    case 'turn':
+      if (modifier === 'uturn')
+        return road
+          ? t('Make a U-turn onto {road}', values)
+          : t('Make a U-turn');
+      if (modifier === 'straight')
+        return road
+          ? t('Continue straight onto {road}', values)
+          : t('Continue straight');
+      if (direction)
+        return road
+          ? t('Turn {direction} onto {road}', values)
+          : t('Turn {direction}', values);
+      return road
+        ? t('Turn onto {road}', values)
+        : t('Turn', { context: 'maneuver' });
+    case 'continue':
+      if (modifier === 'uturn')
+        return road
+          ? t('Make a U-turn onto {road}', values)
+          : t('Make a U-turn');
+      if (direction && modifier !== 'straight')
+        return road
+          ? t('Continue {direction} onto {road}', values)
+          : t('Continue {direction}', values);
+      return road
+        ? t('Continue straight onto {road}', values)
+        : t('Continue straight');
+    case 'end of road':
+      if (direction)
+        return road
+          ? t('At the end of the road, turn {direction} onto {road}', values)
+          : t('At the end of the road, turn {direction}', values);
+      return road
+        ? t('At the end of the road, continue onto {road}', values)
+        : t('At the end of the road, continue');
+    case 'fork':
+      if (direction)
+        return road
+          ? t('Keep {direction} at the fork onto {road}', values)
+          : t('Keep {direction} at the fork', values);
+      return road
+        ? t('Continue at the fork onto {road}', values)
+        : t('Continue at the fork');
+    case 'merge':
+      if (direction)
+        return road
+          ? t('Merge {direction} onto {road}', values)
+          : t('Merge {direction}', values);
+      return road
+        ? t('Merge onto {road}', values)
+        : t('Merge', { context: 'maneuver' });
+    case 'on ramp':
+      if (direction)
+        return road
+          ? t('Take the ramp on the {direction} onto {road}', values)
+          : t('Take the ramp on the {direction}', values);
+      return road ? t('Take the ramp onto {road}', values) : t('Take the ramp');
+    case 'off ramp':
+      if (direction)
+        return road
+          ? t('Take the exit on the {direction} onto {road}', values)
+          : t('Take the exit on the {direction}', values);
+      return road ? t('Take the exit onto {road}', values) : t('Take the exit');
+    case 'roundabout':
+    case 'rotary':
+      if (Number.isInteger(step.exit) && step.exit >= 1) {
+        const exit = exitOrdinal(step.exit);
+        return road
+          ? t('At the roundabout, take the {exit} exit onto {road}', {
+              exit,
+              road,
+            })
+          : t('At the roundabout, take the {exit} exit', { exit });
+      }
+      return road
+        ? t('Enter the roundabout onto {road}', values)
+        : t('Enter the roundabout');
+    case 'roundabout turn':
+      if (direction)
+        return road
+          ? t('At the roundabout, turn {direction} onto {road}', values)
+          : t('At the roundabout, turn {direction}', values);
+      return road
+        ? t('At the roundabout, continue onto {road}', values)
+        : t('At the roundabout, continue');
+    case 'exit roundabout':
+    case 'exit rotary':
+      return road
+        ? t('Exit the roundabout onto {road}', values)
+        : t('Exit the roundabout');
+    case 'use lane':
+      if (direction)
+        return road
+          ? t('Use the {direction} lane onto {road}', values)
+          : t('Use the {direction} lane', values);
+      return road
+        ? t('Continue onto {road}', values)
+        : t('Continue', { context: 'maneuver' });
+    default:
+      return road
+        ? t('Continue onto {road}', values)
+        : t('Continue', { context: 'maneuver' });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -162,7 +373,7 @@ export function directionsRowControls(state) {
   });
   chips.push({
     id: 'clear',
-    label: t('CLEAR'),
+    label: t('CLEAR', { context: 'action' }),
     disabled: !a && !b && !route,
     state: 'idle',
     title: t('Remove the route and both markers'),
@@ -285,8 +496,8 @@ export function directionsStepList({
   const items = steps.map((step, index) => ({
     id: `step-${index}`,
     ordinal: index + 1,
-    lead: formatRouteDistance(step.distanceM) || '—',
-    text: step.instruction,
+    lead: routeDistanceText(step.distanceM) || '—',
+    text: directionsInstruction(step),
     active: index === active,
     current: Number.isInteger(flightStep) && index === flightStep,
     params: { step: index },
@@ -382,8 +593,8 @@ export function directionsStats(state) {
     const spec = DIRECTIONS_MODES[mode];
     const word = spec ? t(spec.word) : mode;
     const values = {
-      distance: formatRouteDistance(route.distanceM),
-      duration: formatRouteDuration(route.durationS),
+      distance: routeDistanceText(route.distanceM),
+      duration: routeDurationText(route.durationS),
       mode: word,
       count: route.steps.length,
     };
@@ -428,8 +639,8 @@ export function directionsStepCopy(steps, index) {
   const step = steps[index];
   const details = [];
   const leg = [];
-  if (step.distanceM > 0) leg.push(formatRouteDistance(step.distanceM));
-  if (step.durationS > 0) leg.push(formatRouteDuration(step.durationS));
+  if (step.distanceM > 0) leg.push(routeDistanceText(step.distanceM));
+  if (step.durationS > 0) leg.push(routeDurationText(step.durationS));
   const position = { step: index + 1, total: steps.length };
   details.push(
     leg.length
@@ -441,8 +652,10 @@ export function directionsStepCopy(steps, index) {
   );
   const next = steps[index + 1];
   if (next)
-    details.push(t('Then: {instruction}', { instruction: next.instruction }));
-  return { title: step.instruction, details };
+    details.push(
+      t('Then: {instruction}', { instruction: directionsInstruction(next) }),
+    );
+  return { title: directionsInstruction(step), details };
 }
 
 /**

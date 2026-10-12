@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
-import { t } from '../../i18n/index.js';
+import { formatNumber, t } from '../../i18n/index.js';
+import { unitLabel } from '../../ui/unitLabels.js';
 import { nextCockpitNearContacts } from '../../data/cockpitAirLod.js';
 import { trackedModelZoomActive } from '../../data/trackedModelRegime.js';
 import {
@@ -752,8 +753,15 @@ export function createTracking({
     // the tail number rather than raw hex.
     const cs = parts.queries._contactLabel(icao24, info);
     const altFt = Math.round((info.altitude || 0) * 3.28084);
-    const fl = altFt >= 18000 ? `FL${Math.round(altFt / 100)}` : `${altFt} ft`;
-    const spd = info.velocity ? `${Math.round(info.velocity * 1.944)} kts` : '';
+    // Flight levels are an aviation code; feet and knots read in the active
+    // language ("0 фт · 1 уз").
+    const quantity = (value, unit) =>
+      `${formatNumber(value, { useGrouping: false })} ${unitLabel(unit)}`;
+    const fl =
+      altFt >= 18000 ? `FL${Math.round(altFt / 100)}` : quantity(altFt, 'ft');
+    const spd = info.velocity
+      ? quantity(Math.round(info.velocity * 1.944), 'kts')
+      : '';
     const stale =
       flightState.records.missingPolls.get(icao24) || flightState.feed._backoff
         ? t('STALE')

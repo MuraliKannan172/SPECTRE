@@ -4,6 +4,31 @@ import { t } from '../i18n/index.js';
 // The assistant's name on its card. i18n-ignore: product name
 const ASSISTANT_NAME = 'GEV';
 
+/**
+ * The short state label in the voice heading. The heading is a few characters
+ * wide next to the cost readout, so these carry their own `voice` context and
+ * languages can pick shorter words than the shared CONNECTING / OFF labels.
+ * Unknown states show as they are, upper-cased.
+ * @param {string} status machine state (dataset.status)
+ * @returns {string}
+ */
+export function voiceStatusLabel(status) {
+  switch (status) {
+    case 'idle':
+      return t('OFF', { context: 'voice' });
+    case 'connecting':
+      return t('CONNECTING', { context: 'voice' });
+    case 'listening':
+      return t('LISTENING', { context: 'voice' });
+    case 'executing':
+      return t('EXECUTING', { context: 'voice' });
+    case 'error':
+      return t('ERROR', { context: 'voice' });
+    default:
+      return String(status || '').toUpperCase();
+  }
+}
+
 export function createVoiceControl({ reset = false } = {}) {
   let root = document.getElementById('gev-voice-control');
   if (root && reset) {
@@ -18,7 +43,7 @@ export function createVoiceControl({ reset = false } = {}) {
     root.innerHTML = `
       <div class="gev-voice-heading">
         <div class="gev-voice-kicker">${t('AI AGENT')}</div>
-        <div id="gev-voice-status">${t('OFF')}</div>
+        <div id="gev-voice-status">${voiceStatusLabel('idle')}</div>
         <div class="gev-voice-cost">
           <button id="gev-voice-tier" class="gev-voice-tier-btn" type="button" aria-pressed="false" title="${t('Voice model tier — applies next session')}">${t('STD')}</button>
           <span id="gev-voice-cost-value" class="gev-voice-cost-value" data-level="ok" title="${t('Estimated session cost')}">~$0.00</span>

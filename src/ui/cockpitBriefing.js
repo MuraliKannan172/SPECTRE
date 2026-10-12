@@ -8,6 +8,7 @@ import {
   COCKPIT_REGIONAL_REFRESH_DISTANCE_M,
   COCKPIT_BRIEF_PAGES,
   formatCockpitBriefAge,
+  formatCockpitCoordinate,
   formatCockpitWindDirection,
 } from './cockpitPresentation.js';
 
@@ -54,7 +55,9 @@ export function showBriefPage(index, { manual = false } = {}) {
   if (this.briefPosition)
     this.briefPosition.textContent = `${this.briefPageIndex + 1} / ${count}`;
   if (this.briefSource)
-    this.briefSource.textContent = t(page.sourceKey ?? page.source);
+    this.briefSource.textContent = page.sourceKey
+      ? t(page.sourceKey, { source: page.sourceName })
+      : page.source;
   if (this.signalStream) this.signalStream.dataset.briefPage = page.id;
   if (manual && this.briefAutoRotateEnabled)
     this.startBriefRotation({ reset: true });
@@ -134,8 +137,8 @@ export function updateLocalPosition(info) {
     this.localCoordinates.textContent = t('POSITION UNAVAILABLE');
     return;
   }
-  const lat = `${Math.abs(info.latitude).toFixed(3)}°${info.latitude >= 0 ? 'N' : 'S'}`;
-  const lon = `${Math.abs(info.longitude).toFixed(3)}°${info.longitude >= 0 ? 'E' : 'W'}`;
+  const lat = formatCockpitCoordinate(info.latitude, 'N', 'S');
+  const lon = formatCockpitCoordinate(info.longitude, 'E', 'W');
   this.localCoordinates.textContent = `${lat} · ${lon}`;
 }
 

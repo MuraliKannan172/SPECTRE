@@ -28,12 +28,12 @@ import {
   parseCandidateKey,
   quantizeBox,
   rankLatest,
-  shortDay,
   utcDay,
   validateBox,
   viewTooLargeMessage,
 } from './model.js';
-import { t } from '../../i18n/index.js';
+import { msg, t } from '../../i18n/index.js';
+import { READOUT_WORDS, displayDay, displayMetres } from './display.js';
 
 /**
  * Quiet time after the last arrow key before the focused day previews, so a
@@ -48,9 +48,10 @@ export const SPLIT_PUBLISH_MS = 400;
 export const MODES = Object.freeze(['image', 'basemap', 'ab']);
 
 const COMPARISON_IN_USE = 'Comparison in use by another scene';
-const COMPARISON_UNAVAILABLE = 'Esri map unavailable · no swipe';
-const COMPARISON_NEEDS_GLOBE = 'Swipe needs a globe map';
-const ESRI_KEPT = 'Imagery stays on Esri · CLEAR to use Google 3D';
+// Kept English in the snapshot (AI tools read it); the card translates them.
+const COMPARISON_UNAVAILABLE = msg('Esri map unavailable · no swipe');
+const COMPARISON_NEEDS_GLOBE = msg('Swipe needs a globe map');
+const ESRI_KEPT = msg('Imagery stays on Esri · CLEAR to use Google 3D');
 /** ZOOM IN's flight time, in seconds. */
 const ZOOM_FIT_SECONDS = 1.2;
 const DEFAULT_SPLIT = 0.5;
@@ -774,7 +775,7 @@ export function createRecentImageryLayer({
       key: key || null,
       candidate: candidateFor(key),
       label: parsed
-        ? `${shortDay(parsed.day)} · ${t(PRODUCTS[parsed.product].name)} · ${PRODUCTS[parsed.product].resolutionM} m`
+        ? `${displayDay(parsed.day)} · ${t(PRODUCTS[parsed.product].name)} · ${displayMetres(PRODUCTS[parsed.product].resolutionM)}`
         : null,
       sourceOff,
       drapable: drapable(candidateFor(key)),
@@ -1234,7 +1235,7 @@ export function createRecentImageryLayer({
         _alpha = 1;
         for (const slotId of SLOT_IDS) renderer.setAlpha(slotId, 1);
       }
-      _notice = 'Box and images cleared';
+      _notice = msg('Box and images cleared');
       syncRender();
       publish([...BOX_EDGES, 'a', 'b', 'split']);
       notify();
@@ -1283,7 +1284,9 @@ export function createRecentImageryLayer({
         candidates,
         focusIndex,
         focus,
-        readout: focus ? formatCandidateReadout(focus, now()) : '',
+        readout: focus
+          ? formatCandidateReadout(focus, now(), READOUT_WORDS)
+          : '',
         recommended: ranked.candidate
           ? { key: ranked.candidate.key, reason: ranked.reason }
           : null,

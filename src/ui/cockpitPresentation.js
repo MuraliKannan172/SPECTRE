@@ -1,5 +1,5 @@
 /** Pure formatting and fixed presentation constants used by Cockpit components. */
-import { t, msg } from '../i18n/index.js';
+import { formatNumber, t, msg } from '../i18n/index.js';
 
 export const COCKPIT_HEADING_SLEW_DPS = 28;
 
@@ -54,8 +54,9 @@ export const COCKPIT_BRIEF_PAGES = [
     id: 'news',
     kickerKey: msg('REGIONAL NEWS'),
     subtitleKey: msg('LATEST LOCATION-MATCHED REPORTING'),
-    // RSS provider attribution is a keep-English boundary string.
-    source: 'GOOGLE NEWS RSS · LOCATION QUERY · RECENT',
+    // The RSS provider name stays English; the rest of the line translates.
+    sourceKey: msg('{source} · LOCATION QUERY · RECENT'),
+    sourceName: 'GOOGLE NEWS RSS', // i18n-ignore: provider name
   },
   {
     id: 'local',
@@ -93,11 +94,43 @@ export function formatCockpitBriefAge(value) {
     : t('{count}D AGO', { count: Math.round(hours / 24) });
 }
 
+/** Compass point codes in display order and the label shown for each. */
+const COMPASS_POINT_LABELS = Object.freeze({
+  N: msg('N'),
+  NE: msg('NE'),
+  E: msg('E'),
+  SE: msg('SE'),
+  S: msg('S'),
+  SW: msg('SW'),
+  W: msg('W'),
+  NW: msg('NW'),
+});
+
+/**
+ * The shown label for a compass point code (`N`, `SW`…): С, ЮЗ… in Russian.
+ * Anything else (a degree reading such as `030`) passes through unchanged.
+ */
+export function compassPointLabel(code) {
+  return Object.hasOwn(COMPASS_POINT_LABELS, code)
+    ? t(COMPASS_POINT_LABELS[code])
+    : code;
+}
+
+/** `30.203°N` in the active language: `30,203°С`. */
+export function formatCockpitCoordinate(value, positive, negative) {
+  const amount = formatNumber(Math.abs(value), {
+    useGrouping: false,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+  return `${amount}°${compassPointLabel(value >= 0 ? positive : negative)}`;
+}
+
 export function formatCockpitWindDirection(value) {
   if (!Number.isFinite(value)) return t('DIR UNKNOWN');
-  const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const labels = Object.keys(COMPASS_POINT_LABELS);
   const normalized = ((value % 360) + 360) % 360;
-  return `${labels[Math.round(normalized / 45) % labels.length]} · ${Math.round(normalized)}°`;
+  return `${compassPointLabel(labels[Math.round(normalized / 45) % labels.length])} · ${Math.round(normalized)}°`;
 }
 
 export function setCockpitRollingValue(

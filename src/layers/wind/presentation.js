@@ -1,5 +1,6 @@
 import { formatWindSpeed, WIND_UNITS } from './inspection.js';
 import { t } from '../../i18n/index.js';
+import { formatQuantity, unitLabel } from '../../ui/unitLabels.js';
 
 /** Reformat a captured sample; changing units never samples the map again. */
 export function formatWindReading(reading, units) {
@@ -20,11 +21,33 @@ export function formatWindReading(reading, units) {
 export function windUnitChips(units) {
   return Object.keys(WIND_UNITS).map((value) => ({
     id: `units-${value}`,
-    label: value,
+    label: unitLabel(value),
     active: units === value,
     params: { units: value },
     title: t('Wind speed units'),
   }));
+}
+
+/** formatWindSpeed's value in the active language: "22,0 км/ч". */
+function displaySpeed(speed, units) {
+  const unit = Object.hasOwn(WIND_UNITS, units) ? units : 'km/h';
+  return formatQuantity(speed * WIND_UNITS[unit], unit, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}
+
+/** "1012.4 hPa" / "-3.0 °C" from the English reading, in the active language. */
+function displayScalar(reading) {
+  if (reading.scalarKind === 'speed' && Number.isFinite(reading.speed))
+    return displaySpeed(reading.speed, reading.units);
+  const match = /^(-?\d+(?:\.\d+)?) (°C|hPa)$/.exec(reading.scalarValue);
+  if (!match) return reading.scalarValue;
+  const decimals = match[1].split('.')[1]?.length || 0;
+  return formatQuantity(Number(match[1]), match[2], {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 }
 
 /** The wind line in the active language; the reading itself stays English. */
@@ -33,7 +56,7 @@ function windText(reading) {
     return reading.wind === 'Aim the map center at Earth'
       ? t('Aim the map center at Earth')
       : reading.wind;
-  const speed = formatWindSpeed(reading.speed, reading.units);
+  const speed = displaySpeed(reading.speed, reading.units);
   return reading.from === 'Calm'
     ? `${speed}${t(' · calm')}`
     : `${speed}${t(' from {direction}', { direction: t(reading.from) })}`;
@@ -64,7 +87,7 @@ export function windReadingResult(reading) {
         ? [
             {
               id: 'scalar',
-              text: `${t(reading.scalarLabel)} · ${reading.scalarValue}`,
+              text: `${t(reading.scalarLabel)} · ${displayScalar(reading)}`,
             },
           ]
         : []),

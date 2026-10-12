@@ -19,12 +19,13 @@ import {
   SOURCE_PATH_BEAT_IDS,
 } from './bhoteKoshiShotPaths.js';
 import {
+  bhoteEventText,
   createBhoteKoshiEmbeddedMedia,
   resolveEmbeddedMediaSource,
 } from './bhoteKoshiEmbeddedMedia.js';
 import { acquireImageryComparison } from '../maps/imageryComparison.js';
 import { createImagerySplit } from '../ui/imagerySplit.js';
-import { t, tn, msg } from '../i18n/index.js';
+import { formatDate, t, tn, msg } from '../i18n/index.js';
 
 export const BHOTE_KOSHI_LAYER_ID = 'bhote-koshi-2026';
 export const BHOTE_KOSHI_OVERLAY_SOURCE_ID = 'bhote-koshi-witnesses';
@@ -404,6 +405,58 @@ function evidencePhaseLabel(phase) {
   return phase ? String(phase).toUpperCase() : t('EVIDENCE');
 }
 
+// Imagery endpoint names from the event pack ("2021 HISTORICAL REFERENCE ·
+// 16 OCT 2021"); unknown names and unparseable dates show as authored.
+const IMAGERY_LABEL_NAMES = Object.freeze([
+  [/^(\d{4}) HISTORICAL REFERENCE$/, msg('{year} HISTORICAL REFERENCE')],
+  [/^(\d{4}) POST-EVENT$/, msg('{year} POST-EVENT')],
+]);
+
+/** Day, short month and year in the active language: 16 OCT 2021, 16 ОКТ. 2021. */
+function imageryDateText(observedAt) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(observedAt || ''));
+  if (!match) return '';
+  const date = new Date(Date.UTC(+match[1], +match[2] - 1, +match[3]));
+  if (Number.isNaN(date.getTime())) return '';
+  const part = (options) => formatDate(date, { timeZone: 'UTC', ...options });
+  return `${part({ day: 'numeric' })} ${part({ month: 'short' })} ${part({ year: 'numeric' })}`.toUpperCase();
+}
+
+/**
+ * Localized name and date of an imagery endpoint for display.
+ * @param {{label?: string, observedAt?: string}} entry
+ * @returns {{name: string, date: string}}
+ */
+export function imageryEndpointLabel(entry) {
+  const label = String(entry?.label || '');
+  const split = label.lastIndexOf(' · ');
+  const authoredName = split >= 0 ? label.slice(0, split) : label;
+  const authoredDate = split >= 0 ? label.slice(split + 3) : '';
+  let name = authoredName;
+  for (const [pattern, message] of IMAGERY_LABEL_NAMES) {
+    const match = pattern.exec(authoredName);
+    if (match) name = t(message, { year: match[1] });
+  }
+  return { name, date: imageryDateText(entry?.observedAt) || authoredDate };
+}
+
+function imageryEndpointText(entry) {
+  const { name, date } = imageryEndpointLabel(entry);
+  return [name, date].filter(Boolean).join(' · ');
+}
+
+/** Name, then the date kept on one line so the year never wraps alone. */
+function renderImageryEndpoint(element, entry) {
+  if (!element) return;
+  const { name, date } = imageryEndpointLabel(entry);
+  element.textContent = date ? `${name} · ` : name;
+  if (!date) return;
+  const dateElement = document.createElement('span');
+  dateElement.className = 'bhote-event-date';
+  dateElement.textContent = date;
+  element.appendChild(dateElement);
+}
+
 /** Compact, source-bounded disclosure for multi-source geolocation beats. */
 export function evidenceCorroborationLabel(observation) {
   const count = Math.max(
@@ -730,7 +783,7 @@ export function updateEvidenceFrame(
   ctx.font = scaledOverlayFont(WORLD_OVERLAY_STYLE.fontTitle);
   ctx.fillText(
     ellipsizeEvidenceText(
-      observation.shortTitle || observation.title,
+      bhoteEventText(observation.shortTitle || observation.title),
       layout.titleChars,
     ).toUpperCase(),
     16,
@@ -916,10 +969,10 @@ function createPanel(event, handlers) {
   `;
 
   const refs = collectPanelReferences(panel);
-  refs.beforeDate.textContent = event.imagery.before.label;
-  refs.afterDate.textContent = event.imagery.after.label;
+  renderImageryEndpoint(refs.beforeDate, event.imagery.before);
+  renderImageryEndpoint(refs.afterDate, event.imagery.after);
   refs.time.textContent = `~0:00 / ${elapsedLabel(1, event.reconstruction.elapsedSeconds)}`;
-  refs.caveat.textContent = event.reconstruction.caveat;
+  refs.caveat.textContent = bhoteEventText(event.reconstruction.caveat);
 
   for (const report of event.fieldReports) {
     const button = document.createElement('button');
@@ -927,8 +980,8 @@ function createPanel(event, handlers) {
     const status = document.createElement('small');
     button.type = 'button';
     button.className = 'bhote-event-report';
-    label.textContent = report.label;
-    status.textContent = report.status;
+    label.textContent = bhoteEventText(report.label);
+    status.textContent = bhoteEventText(report.status);
     button.append(label, status);
     button.addEventListener('click', () => openExternal(report.url));
     refs.reportList.appendChild(button);
@@ -2362,7 +2415,7 @@ export function createBhoteKoshiEventLayer({
         interactive: true,
         accessibilityLabel: t(
           'Open original source for {source}; capture time unverified',
-          { source: observation.title },
+          { source: bhoteEventText(observation.title) },
         ),
         activate: () => openExternal(observation.media.sourceUrl),
         minDistance: 0,
@@ -2396,7 +2449,7 @@ export function createBhoteKoshiEventLayer({
         position: evidencePositionGetter(index, true),
         cullPosition: anchor,
         variant: 'label',
-        title: `${String(observation.sequence).padStart(2, '0')} · ${observation.shortTitle || observation.title}`,
+        title: `${String(observation.sequence).padStart(2, '0')} · ${bhoteEventText(observation.shortTitle || observation.title)}`,
         details: [],
         accent: WORLD_OVERLAY_STYLE.accent,
         priority: 80_000 - index,
@@ -2602,8 +2655,8 @@ export function createBhoteKoshiEventLayer({
       id: 'bhote-koshi-split-line',
       handleClass: 'bhote-koshi-split-handle',
       cssProperty: '--bhote-koshi-split',
-      beforeTitle: event.imagery.before.label,
-      afterTitle: event.imagery.after.label,
+      beforeTitle: imageryEndpointText(event.imagery.before),
+      afterTitle: imageryEndpointText(event.imagery.after),
       ariaLabel: t('Historical reference and post-event image divider'),
       formatValueText: (beforePercent, afterPercent) =>
         t(
@@ -3058,7 +3111,10 @@ export function createBhoteKoshiEventLayer({
       _panelRefs.playSceneButton,
       'aria-label',
       t('Continue {scene} from next shot', {
-        scene: _sceneContext?.sceneTitle || t('current scene'),
+        scene:
+          _sceneContext?.sceneDisplayTitle ||
+          _sceneContext?.sceneTitle ||
+          t('current scene'),
       }),
     );
     setElementProperty(
@@ -3095,8 +3151,12 @@ export function createBhoteKoshiEventLayer({
       _panelRefs.beatTitle,
       'textContent',
       sceneDirected
-        ? _sceneContext?.shotTitle || t('SCENE SHOT')
-        : observation?.shortTitle || observation?.title || t('EVIDENCE'),
+        ? _sceneContext?.shotDisplayTitle ||
+            _sceneContext?.shotTitle ||
+            t('SCENE SHOT')
+        : observation?.shortTitle || observation?.title
+          ? bhoteEventText(observation.shortTitle || observation.title)
+          : t('EVIDENCE'),
     );
     const sourceCount = Math.max(
       0,
@@ -3120,7 +3180,9 @@ export function createBhoteKoshiEventLayer({
       sceneDirected
         ? t('{scene} / AUTHORED SHOT', {
             scene: String(
-              _sceneContext?.sceneTitle || t('NEPAL FLOOD INCIDENT'),
+              _sceneContext?.sceneDisplayTitle ||
+                _sceneContext?.sceneTitle ||
+                t('NEPAL FLOOD INCIDENT'),
             ).toUpperCase(),
           })
         : beatMeta,
@@ -3150,7 +3212,10 @@ export function createBhoteKoshiEventLayer({
       'aria-label',
       sceneDirected
         ? t('Play {shot}', {
-            shot: _sceneContext?.shotTitle || t('current scene shot'),
+            shot:
+              _sceneContext?.shotDisplayTitle ||
+              _sceneContext?.shotTitle ||
+              t('current scene shot'),
           })
         : t('Play reconstruction'),
     );
@@ -3211,7 +3276,7 @@ export function createBhoteKoshiEventLayer({
     if (_afterLayer) _afterLayer.show = imageryAvailable;
     if (_panelRefs?.caveat) {
       _panelRefs.caveat.textContent = imageryAvailable
-        ? _event?.reconstruction?.caveat || ''
+        ? bhoteEventText(_event?.reconstruction?.caveat || '')
         : t('SCHEMATIC CORRIDOR, NOT MODELED ARRIVAL TIME.');
     }
     if (_panelRefs?.imageryCloudNote)

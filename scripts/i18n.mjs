@@ -17,7 +17,7 @@ const LOCALES_DIR = path.join(ROOT, 'src/i18n/locales');
 
 const STRING = String.raw`'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|\`(?:\\.|[^\`\\$])*\``;
 const CALL = new RegExp(
-  String.raw`\b(t|msg)\(\s*(${STRING})|\btn\(\s*[^,]+?,\s*(${STRING})\s*,\s*(${STRING})`,
+  String.raw`\bt\(\s*(${STRING})\s*,\s*\{\s*context:\s*(${STRING})|\b(t|msg)\(\s*(${STRING})|\btn\(\s*[^,]+?,\s*(${STRING})\s*,\s*(${STRING})`,
   'g',
 );
 
@@ -100,11 +100,13 @@ export function extractMessages() {
     for (const match of source.matchAll(CALL)) {
       const line = source.slice(0, match.index).split('\n').length;
       const where = `${file}:${line}`;
-      if (match[2]) {
-        if (match[2][0] === '`' && match[2].includes('${')) continue;
-        add(unquote(match[2]), where);
+      if (match[1]) {
+        add(`${unquote(match[2])}|${unquote(match[1])}`, where);
+      } else if (match[4]) {
+        if (match[4][0] === '`' && match[4].includes('${')) continue;
+        add(unquote(match[4]), where);
       } else {
-        add(unquote(match[4]), where, { one: unquote(match[3]) });
+        add(unquote(match[6]), where, { one: unquote(match[5]) });
       }
     }
   }

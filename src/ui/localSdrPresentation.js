@@ -1,5 +1,6 @@
 import { localReceiverFeedName } from '../layers/localAdsb/feedNames.js';
 import { msg, t, tn } from '../i18n/index.js';
+import { formatQuantity } from './unitLabels.js';
 
 /**
  * Pure presentation of the Local RTL-SDR card in the Radio panel. Receives the
@@ -19,6 +20,19 @@ const STATUS_LABELS = Object.freeze({
 function statusLabel(status) {
   const key = String(status || 'idle');
   return STATUS_LABELS[key] ? t(STATUS_LABELS[key]) : key.toUpperCase();
+}
+
+/**
+ * Text for a numeric gain option: the option value stays the machine value
+ * ("28.0"); only the label follows the locale ("28,0 дБ").
+ */
+export function localSdrGainOptionLabel(value) {
+  const gain = Number(value);
+  if (!Number.isFinite(gain)) return String(value);
+  return formatQuantity(gain, 'dB', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 }
 
 function formatGain(gain) {

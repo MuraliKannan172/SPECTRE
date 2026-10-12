@@ -12,6 +12,7 @@ import {
   WIND_UNITS,
 } from './inspection.js';
 import { t } from '../../i18n/index.js';
+import { unitLabel } from '../../ui/unitLabels.js';
 
 /** Format a forecast timestamp explicitly in UTC. */
 export function formatWindValidTime(value) {
@@ -358,7 +359,7 @@ export function createWindLayer({
             : []
           ).map((value) => ({
             id: `units-${value}`,
-            label: value,
+            label: unitLabel(value),
             active: units === value,
             params: { units: value },
             title: t('Wind speed units'),
@@ -382,7 +383,7 @@ export function createWindLayer({
         info: `${t('{model} forecast · {field} ({unit})', {
           model: model === 'ifs' ? 'ECMWF IFS' : 'GFS',
           field: label,
-          unit: legendUnit,
+          unit: unitLabel(legendUnit),
         })}${historyStatus ? `\n${historyStatus}` : ''}\n${t('Valid: {time}', { time: valid || t('Unavailable') })}${loading ? ` · ${t('loading')}` : preparing ? ` · ${t('preparing')}` : ''}\n${t('Issued: {time}', { time: run || t('Unavailable') })}${manifest?.stale ? ' · STALE' : ''}${error ? '\n' + error : ''}${scalarMissing ? `\n${t('Selected field unavailable · wind remains visible')}` : ''}${imageryError && !scalarMissing ? `\n${t('{error} · wind remains visible', { error: imageryError })}` : ''}`,
         infoTitle: t(
           'Surface wind at 10 m. Approximately 1° global grid. Curves follow the 10 m wind field, lifted 12 km for visibility; display height is not weather altitude. View lighting is for readability. Animation shows flow through one fixed forecast; it does not advance time. Color fields drape the globe basemap or the active photorealistic 3D Tiles.',

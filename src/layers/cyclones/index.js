@@ -15,9 +15,13 @@ import {
   cycloneStormIdFromEntryId,
 } from './labels.js';
 import { t, tn, msg } from '../../i18n/index.js';
+import { formatQuantity } from '../../ui/unitLabels.js';
 
+// "10-12 15:00 UTC" never breaks across lines.
 const utc = (value) =>
-  value ? `${value.slice(5, 16).replace('T', ' ')} UTC` : t('Unavailable');
+  value
+    ? `${value.slice(5, 16).replace('T', '\u00a0')}\u00a0UTC`
+    : t('Unavailable');
 const COVERAGE = msg(
   'Atlantic and eastern/central North Pacific; not worldwide cyclone coverage.',
 );
@@ -34,7 +38,7 @@ const classificationName = (code) =>
     ? t(CLASSIFICATION_NAMES[code])
     : code;
 const number = (value, unit) =>
-  value === null ? t('Unavailable') : `${value} ${unit}`;
+  value === null ? t('Unavailable') : formatQuantity(value, unit);
 
 /** Advisory status and coherent forecast geometry; selected through the shared row list. */
 export function createCyclonesLayer({
@@ -411,7 +415,7 @@ export function createCyclonesLayer({
             id: item.id,
             ordinal: index + 1,
             lead: item.basin,
-            text: `${item.name} · ${classificationName(item.classification)} · ${item.windKt === null ? t('Wind unavailable') : `${item.windKt} kt`}`,
+            text: `${item.name} · ${classificationName(item.classification)} · ${item.windKt === null ? t('Wind unavailable') : formatQuantity(item.windKt, 'kt')}`,
             active: item.id === selectedId,
             params: { stormId: item.id, focus: true },
           })),

@@ -4,7 +4,7 @@
  */
 
 import { expandNepalEvidencePack } from './nepalEvidencePack.js';
-import { msg } from '../i18n/index.js';
+import { msg, t } from '../i18n/index.js';
 
 const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
   id: 'bhote-koshi-nepal-evidence-pack',
@@ -1010,4 +1010,54 @@ export function getSceneRecipeById(id) {
 
 export function getSceneAppendRecipeById(id) {
   return SCENE_APPEND_RECIPES.find((recipe) => recipe.id === id) || null;
+}
+
+// Built-in shot titles stay English in recipes and saved projects (upgrades
+// and bindings match them verbatim). These are their display names; a title
+// the user typed shows as typed. Place names inside them stay Latin.
+const BUILTIN_SHOT_TITLES = new Set([
+  msg('Global Incident Context'),
+  msg('Nepal-Focused Globe Rotation'),
+  msg('Bhote Koshi Regional Approach'),
+  msg('Bhote Koshi Nearby Cities'),
+  msg('Bhote Koshi Incident Corridor'),
+  msg('Bhote Koshi Flood Path'),
+  msg('Bhote Koshi Corridor Overview'),
+  msg('Bhote Koshi Upper Valley'),
+  msg('Upper Valley Collapse'),
+  msg('Debris-Dammed Lake'),
+  msg('Nepal-China Border Gate'),
+  msg('Timure Evidence Cluster'),
+  msg('Syabru Besi Passage'),
+  msg('Bidur / Trishuli Consequence'),
+  msg('Second landslide'),
+  msg('Mailung / Upper Trishuli bridge'),
+  msg('Dandagaun viewpoint restaurant'),
+  msg('Devighat / Taadi Khola Bridge'),
+  msg('Final view'),
+]);
+
+/**
+ * Display title for a scene: the localized recipe name while the stored title
+ * still matches the built-in verbatim, the stored title otherwise.
+ * @param {{id?: string, title?: string}} scene
+ * @returns {string}
+ */
+export function displaySceneTitle(scene) {
+  const builtin = SCENE_RECIPES.find((recipe) => recipe.id === scene?.id);
+  if (!builtin?.title) return scene?.title || '';
+  return scene.title === builtin.title ? t(builtin.title) : scene.title;
+}
+
+/**
+ * Display title for a shot: built-in titles and the numbered "Shot N"
+ * fallback localize; any other title shows as stored.
+ * @param {string} title
+ * @returns {string}
+ */
+export function displayShotTitle(title) {
+  const text = typeof title === 'string' ? title : '';
+  if (BUILTIN_SHOT_TITLES.has(text)) return t(text);
+  const numbered = /^Shot (\d+)$/.exec(text);
+  return numbered ? t('Shot {n}', { n: Number(numbered[1]) }) : text;
 }

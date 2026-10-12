@@ -10,6 +10,7 @@ import {
 } from '../loadingFeedback.js';
 import { setSplitFlapText, disposeSplitFlap } from '../splitFlap.js';
 import { t, msg } from '../i18n/index.js';
+import { localizeLayerName } from './layerPanel.js';
 
 // loadingFeedback.js composes the shared status copy inside the portable
 // node/browser graph (the server-side HUD summary reads the same modules), so
@@ -46,7 +47,21 @@ function localizeStatusDetail(detail) {
   const match = detail.match(RETRY_DETAIL_RE);
   if (match) return t('retrying in {seconds}s', { seconds: match[1] });
   if (detail.trim() === 'retry pending') return t('retry pending');
-  return detail;
+  return localizeLayerRoster(detail);
+}
+
+// The loading detail is the active layers' English names joined by " · ",
+// with " +N" when more are loading. Translate each known layer name; anything
+// else (a provider such as "OpenStreetMap · Overpass") passes through.
+function localizeLayerRoster(detail) {
+  const [, names, suffix = ''] = detail.match(/^(.*?)( \+\d+)?$/s) || [];
+  if (!names) return detail;
+  return (
+    names
+      .split(' · ')
+      .map((name) => localizeLayerName(name))
+      .join(' · ') + suffix
+  );
 }
 
 function localizeLoadingPresentation(presentation) {

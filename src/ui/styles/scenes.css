@@ -158,9 +158,21 @@
   border-radius: 7px;
   color: var(--text-primary);
   padding: 6px 8px;
-  font-family: var(--font-sans);
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   outline: none;
+}
+
+/* A translated action longer than its button wraps inside the button instead
+   of running past it. English labels fit on one line, so the English layout
+   is unchanged. */
+#scene-panel .scene-controls .scene-btn {
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .scene-btn {

@@ -565,7 +565,8 @@ test('advisory selection uses accessible row descriptors and shared camera hando
     1,
   );
   assert.equal(controls.summary.status, 'Track/cone awaiting advisory 10');
-  assert.match(controls.info, /09-16 03:00 UTC/);
+  assert.match(controls.info, /09-16\u00a003:00\u00a0UTC/);
+  assert.match(controls.info, /: 25\u00a0kt · .*: 1006\u00a0hPa/);
   assert.match(controls.infoTitle, /not storm size/);
   assert.match(controls.infoTitle, /follows the surface/);
   assert.equal(controls.list.items[1].params.focus, true);

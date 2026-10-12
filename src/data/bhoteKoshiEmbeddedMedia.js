@@ -40,6 +40,57 @@ const MEDIA_PRECONNECT_ORIGINS = Object.freeze({
   facebook: Object.freeze(['https://www.facebook.com']),
 });
 
+// Authored English in public/events/bhote-koshi-2026/event.json. The pack is
+// data and stays English; these known strings translate at display. Anything
+// else (a newer pack, a credit, a source's own title) shows as authored. A
+// string that is not known whole translates by its " · " parts.
+const EVENT_PACK_TEXT = new Set([
+  // Field reports: our labels (credits after " · " stay) and their statuses.
+  msg('Rasuwagadhi witness video'),
+  msg('Bhote Koshi valley footage'),
+  msg('Flood footage'),
+  msg('Compilation and casualty claims'),
+  msg('SOURCE GEOCONFIRMED · WORLD-PINNED'),
+  msg('SOURCE CREDITED · LOCATION UNRESOLVED'),
+  msg('REFERENCE ONLY · CLAIMS UNVERIFIED'),
+  msg('SOURCE GEOCONFIRMED'),
+  // Reconstruction caveat.
+  msg(
+    '2021 historical reference versus 2026 post-event imagery; changes are cumulative and include the July 2025 Rasuwagadhi flood. Schematic downstream progression, not modeled arrival time; not an official hazard model.',
+  ),
+  // Evidence titles that are more than a place name.
+  msg('Immediate collapse viewpoint'),
+  msg('Collapse viewpoint'),
+  msg('Debris-dammed lake'),
+  msg('Dammed lake'),
+  msg('Second landslide'),
+  msg('Gyirong border gate'),
+  msg('Border gate'),
+  msg('Timure evidence cluster'),
+  msg('Mailung / Upper Trishuli bridge'),
+  msg('Dandagaun viewpoint restaurant'),
+  msg('Dandagaun viewpoint'),
+  msg('Bidur - Trishuli bridge'),
+  msg('Bidur bridge'),
+  msg('Devighat / Taadi Khola Bridge'),
+  msg('Devighat bridge'),
+]);
+
+/**
+ * Display text for an authored event-pack string.
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function bhoteEventText(value) {
+  const text = value == null ? '' : String(value);
+  if (EVENT_PACK_TEXT.has(text)) return t(text);
+  if (!text.includes(' · ')) return text;
+  return text
+    .split(' · ')
+    .map((part) => (EVENT_PACK_TEXT.has(part) ? t(part) : part))
+    .join(' · ');
+}
+
 let _xWidgetsPromise = null;
 let _facebookSdkPromise = null;
 let _facebookEmbedSequence = 0;
@@ -991,7 +1042,9 @@ export function createBhoteKoshiEmbeddedMedia({
       'aria-label',
       t('Embedded {provider} media for {source}', {
         provider: providerLabel(source.provider),
-        source: observation?.title || t('witness source'),
+        source: observation?.title
+          ? bhoteEventText(observation.title)
+          : t('witness source'),
       }),
     );
     const leader = documentRef.createElementNS(
@@ -1006,7 +1059,7 @@ export function createBhoteKoshiEmbeddedMedia({
     player.className = 'bhote-embedded-callout-player';
     const footer = documentRef.createElement('footer');
     const title = documentRef.createElement('strong');
-    title.textContent = String(
+    title.textContent = bhoteEventText(
       observation?.shortTitle || observation?.title || t('Witness source'),
     ).toUpperCase();
     const status = documentRef.createElement('small');
@@ -1060,7 +1113,9 @@ export function createBhoteKoshiEmbeddedMedia({
       }
       iframe.title = t('{provider} media: {source}', {
         provider: providerLabel(source.provider),
-        source: observation?.title || t('witness source'),
+        source: observation?.title
+          ? bhoteEventText(observation.title)
+          : t('witness source'),
       });
       iframe.allow =
         'autoplay; encrypted-media; picture-in-picture; fullscreen';

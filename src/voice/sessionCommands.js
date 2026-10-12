@@ -1,18 +1,8 @@
-import { createVoiceControl } from './control.js';
+import { createVoiceControl, voiceStatusLabel } from './control.js';
 import { createVoiceSession } from './session.js';
 import { VoiceCardControls } from './voiceCard.js';
 import { PointerReticle } from './pointerReticle.js';
-import { t, msg } from '../i18n/index.js';
-
-// Session states are machine values (dataset.status); only the label shown for
-// them is translated. Unknown states show as they are, upper-cased.
-const SESSION_STATE_LABELS = Object.freeze({
-  idle: msg('OFF'),
-  connecting: msg('CONNECTING'),
-  listening: msg('LISTENING'),
-  executing: msg('EXECUTING'),
-  error: msg('ERROR'),
-});
+import { t } from '../i18n/index.js';
 
 function createDefaultReticle(pointer) {
   const element = pointer?.element;
@@ -73,9 +63,9 @@ export function createVoiceCommands({
   const updateStatus = session.subscribe((event) => {
     if (event.type !== 'state') return;
     ui.root.dataset.status = event.state;
-    ui.status.textContent = SESSION_STATE_LABELS[event.state]
-      ? t(SESSION_STATE_LABELS[event.state])
-      : event.state.toUpperCase();
+    // Session states are machine values (dataset.status); only the label
+    // shown for them is translated. Unknown states show as they are.
+    ui.status.textContent = voiceStatusLabel(event.state);
     // The session reports 'Voice off' in English: it is portable and has no
     // locale, so that detail shows as the idle label. Other details are
     // provider messages and show as they arrive.

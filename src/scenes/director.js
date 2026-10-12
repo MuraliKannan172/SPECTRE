@@ -23,6 +23,8 @@ import * as Cesium from 'cesium';
 import {
   SCENE_APPEND_RECIPES,
   SCENE_RECIPES,
+  displaySceneTitle,
+  displayShotTitle,
   getSceneAppendRecipeById,
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
@@ -66,19 +68,7 @@ import {
 // project titles, and voice-matching titles all stay English (keep-English
 // boundary + persisted data); only the presentation of an UNRENAMED built-in
 // localizes, so an operator's renamed scene is never masked by the catalog.
-// Recipe titles are marked with msg() in recipes.js.
-
-/**
- * Display title for a scene: the localized recipe name while the stored title
- * still matches the built-in verbatim, the stored title otherwise.
- * @param {{id?: string, title?: string}} scene
- * @returns {string}
- */
-function displaySceneTitle(scene) {
-  const builtin = SCENE_RECIPES.find((recipe) => recipe.id === scene?.id);
-  if (!builtin?.title) return scene?.title || '';
-  return scene.title === builtin.title ? t(builtin.title) : scene.title;
-}
+// Recipe and built-in shot titles are marked with msg() in recipes.js.
 
 /** @constant {string} localStorage key for the serialized project */
 const STORAGE_KEY = 'godsEyeView.sceneProject.v2';
@@ -390,8 +380,8 @@ export class SceneDirector {
   _shotOutcome(type, scene, shot, index = scene.shots.indexOf(shot)) {
     if (type === 'shot-loaded')
       this._presentation.status = t('Loaded: {scene} / {shot}', {
-        scene: scene.title,
-        shot: shot.title,
+        scene: displaySceneTitle(scene),
+        shot: displayShotTitle(shot.title),
       });
     this._publish({
       type,
@@ -412,10 +402,15 @@ export class SceneDirector {
       subscribe: (listener) => this.subscribe(listener),
       read: () => ({
         // Scene titles surface in the panel through SceneControls; built-in
-        // recipe titles display their localized name until renamed by the user.
+        // recipe and shot titles display their localized name until renamed
+        // by the user. Shots keep the stored title for editing and matching.
         scenes: this._project.scenes.map((scene) => ({
           ...scene,
           title: displaySceneTitle(scene),
+          shots: scene.shots.map((shot) => ({
+            ...shot,
+            displayTitle: displayShotTitle(shot.title),
+          })),
         })),
         selectedSceneId: this._selectedSceneId,
         selectedShotId: this._selectedShotId,
@@ -990,8 +985,8 @@ export class SceneDirector {
     this._shotOutcome('shot-captured', scene, shot);
     this._updateStatus(
       t('Captured: {scene} / {shot}', {
-        scene: scene.title,
-        shot: shot.title,
+        scene: displaySceneTitle(scene),
+        shot: displayShotTitle(shot.title),
       }),
     );
   }
@@ -1023,8 +1018,8 @@ export class SceneDirector {
     this._shotOutcome('shot-updated', scene, shot);
     this._updateStatus(
       t('Updated: {scene} / {shot}', {
-        scene: scene.title,
-        shot: shot.title,
+        scene: displaySceneTitle(scene),
+        shot: displayShotTitle(shot.title),
       }),
     );
   }
@@ -1134,7 +1129,7 @@ export class SceneDirector {
         if (!token.cancelled)
           this._updateStatus(
             t('Could not leave scene: {scene}', {
-              scene: previousScene.title,
+              scene: displaySceneTitle(previousScene),
             }),
           );
         return;
@@ -1187,7 +1182,10 @@ export class SceneDirector {
       });
       if (this._loadAbort === controller) this._loadAbort = null;
       this._updateStatus(
-        t('Seeked: {scene} / {shot}', { scene: scene.title, shot: shot.title }),
+        t('Seeked: {scene} / {shot}', {
+          scene: displaySceneTitle(scene),
+          shot: displayShotTitle(shot.title),
+        }),
       );
       this._activateInteractions(scene, shot);
       return { started: true, shotId };
@@ -1551,7 +1549,10 @@ export class SceneDirector {
       seeking: true,
     });
     this._updateStatus(
-      t('Seeked: {scene} / {shot}', { scene: scene.title, shot: shot.title }),
+      t('Seeked: {scene} / {shot}', {
+        scene: displaySceneTitle(scene),
+        shot: displayShotTitle(shot.title),
+      }),
     );
     return true;
   }

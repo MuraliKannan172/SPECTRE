@@ -8,6 +8,7 @@ import {
   LIGHTNING_MAX_GAP_MS,
 } from './clock.js';
 import { t } from '../../i18n/index.js';
+import { formatScaleLabel } from '../../ui/unitLabels.js';
 
 const STOPS = [
   [10, '#00ecec'],
@@ -692,9 +693,11 @@ export function createWeatherLayer({
                 color,
                 blurb: lightning
                   ? t('{value} strikes/km²/min ×10³ (15-minute density)', {
-                      value: label,
+                      value: formatScaleLabel(label),
                     })
-                  : t('{value} dBZ radar reflectivity', { value: label }),
+                  : t('{value} dBZ radar reflectivity', {
+                      value: formatScaleLabel(label),
+                    }),
               }))
             : [],
         info: hostHidden

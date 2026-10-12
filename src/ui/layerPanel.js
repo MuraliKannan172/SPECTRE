@@ -135,6 +135,52 @@ function panelLabel(layer) {
   return PANEL_LABELS[layer.id] ? t(PANEL_LABELS[layer.id]) : layer.name;
 }
 
+// English module names (layer.name) that other surfaces print, such as the
+// loading chip's layer roster. Looked up by the English text so that surface
+// keeps its English output and only the presentation translates.
+const MODULE_NAME_KEYS = new Map(
+  [
+    ...Object.values(LAYER_NAME_KEYS),
+    ...Object.values(PANEL_LABELS),
+    msg('ALPR Cameras'),
+  ].map((key) => [key, key]),
+);
+
+/**
+ * Translate a layer's English module name for display; any other text
+ * (a provider name, an unknown layer) is returned unchanged.
+ * @param {string} name English `layer.name`.
+ * @returns {string}
+ */
+export function localizeLayerName(name) {
+  const key = MODULE_NAME_KEYS.get(String(name ?? '').trim());
+  return key ? t(key) : name;
+}
+
+// Layer-declared source names stay English in layer state, share links and AI
+// tool output; only the row's source line translates them. Provider names
+// (USGS, CelesTrak, GTFS-RT…) are not listed and pass through unchanged.
+const SOURCE_LABEL_KEYS = new Map(
+  [
+    msg('Flights'),
+    msg('Military aircraft'),
+    msg('Vessels'),
+    msg('CCTV + Street View fallback'),
+    msg('OpenStreetMap + optional Google Maps Places'),
+    msg('GFS / ECMWF IFS · FORECAST'),
+    msg('NOAA nowCOAST · OBSERVED'),
+    msg('NASA FIRMS · LIVE'),
+    msg('OSM routing'),
+  ].map((key) => [key, key]),
+);
+
+function sourceLabel(source) {
+  if (typeof source !== 'string') return source;
+  if (source === 'Local') return t('Local', { context: 'data source' });
+  const key = SOURCE_LABEL_KEYS.get(source);
+  return key ? t(key) : source;
+}
+
 /**
  * Guidance for a control a missing provider key is holding back.
  *
@@ -580,7 +626,7 @@ export class LayerPanel {
     const stats = layer.stats || {};
     const feedState = layerFeedState(stats);
     const stateLabel = t(FEED_STATE_LABEL_KEYS[feedState]);
-    const source = stats.source || layer.source;
+    const source = sourceLabel(stats.source || layer.source);
     const lifecycleState =
       layer.lifecycleState || (layer.enabled ? 'enabled' : 'disabled');
     if (lifecycleState === 'enabling' || lifecycleState === 'disabling') {

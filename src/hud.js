@@ -35,7 +35,8 @@ import {
   DEFAULT_HUD_LAYOUT,
   normalizeHudLayout,
 } from './hudLayouts.js';
-import { t } from './i18n/index.js';
+import { formatNumber, msg, t } from './i18n/index.js';
+import { unitLabel } from './ui/unitLabels.js';
 
 /** Color palettes keyed by shader mode; applied as CSS custom properties. */
 const HUD_COLORS = {
@@ -60,6 +61,81 @@ const HUD_COLORS = {
     border: 'rgba(0, 255, 255, 0.15)',
   },
 };
+
+/**
+ * Mode names shown for each style. Same English as STYLE_STATUS_LABELS in
+ * ui/visualPresets.js, so the top-left mode and the dock's active style
+ * translate alike.
+ */
+const MODE_LABELS = Object.freeze({
+  normal: msg('NORMAL'),
+  retro: msg('CRT'),
+  surveillance: msg('NVG'),
+  thermal: msg('FLIR'),
+  anime: msg('ANIME'),
+  noir: msg('NOIR'),
+  snow: msg('SNOW'),
+});
+
+/** Region ids from _regionLabel() and the name shown for each. */
+const REGION_LABELS = Object.freeze({
+  ARCTIC: msg('ARCTIC'),
+  ANTARCTIC: msg('ANTARCTIC'),
+  'NORTH AMERICA': msg('NORTH AMERICA'),
+  'SOUTH AMERICA': msg('SOUTH AMERICA'),
+  EUROPE: msg('EUROPE'),
+  AFRICA: msg('AFRICA'),
+  ASIA: msg('ASIA'),
+  OCEANIA: msg('OCEANIA'),
+  'NORTHERN OCEANIC GRID': msg('NORTHERN OCEANIC GRID'),
+  'SOUTHERN OCEANIC GRID': msg('SOUTHERN OCEANIC GRID'),
+});
+
+/** The name shown for a _viewBand() id. */
+function viewBandLabel(band) {
+  switch (band) {
+    case 'STREET':
+      return t('STREET', { context: 'view band' });
+    case 'CITY':
+      return t('CITY', { context: 'view band' });
+    case 'METRO':
+      return t('METRO', { context: 'view band' });
+    case 'REGIONAL':
+      return t('REGIONAL', { context: 'view band' });
+    default:
+      return t('GLOBAL', { context: 'view band' });
+  }
+}
+
+/** An upper-case HUD quantity such as `13KM` / `13КМ`, in the active language. */
+function hudQuantity(value, unit, digits = 0) {
+  const number = formatNumber(value, {
+    useGrouping: false,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  return `${number}${unitLabel(unit).toUpperCase()}`;
+}
+
+/** One hemisphere-tagged coordinate, e.g. `21.33N` / `21,33С`. */
+function hudCoordinate(value, positive, negative) {
+  return `${hudQuantity(Math.abs(value), '', 2)}${value >= 0 ? positive : negative}`;
+}
+
+/** The summary's locality line in the active language (see hudLocality.js). */
+const LOCALIZED_LOCALITY = Object.freeze({
+  near: ({ poi, city, distKm }) =>
+    t('NEAR {poi} ({city}) {distance}', {
+      poi,
+      city,
+      distance: hudQuantity(Math.round(distKm), 'km'),
+    }),
+  sector: ({ latDeg, lonDeg }) =>
+    t('SECTOR {lat} {lon}', {
+      lat: hudCoordinate(latDeg, t('N'), t('S')),
+      lon: hudCoordinate(lonDeg, t('E'), t('W')),
+    }),
+});
 
 /** Shader modes that automatically show the HUD overlay. */
 const MILITARY_STYLES = new Set(['retro', 'surveillance', 'thermal']);
@@ -201,7 +277,7 @@ export class IntelHUD {
         <div class="hud-content">
           <div class="hud-classification">TOP SECRET // SI-TK // NOFORN</div>
           <div class="hud-system">${this._missionId}  ${this._sensorId}</div>
-          <div class="hud-mode" id="hud-mode">NORMAL</div>
+          <div class="hud-mode" id="hud-mode">${t(MODE_LABELS.normal)}</div>
           <div class="hud-summary-wrap">
             <div class="hud-summary-label">${t('SUMMARY')}</div>
             <div class="hud-summary" id="hud-summary">${t('Awaiting telemetry...')}</div>
@@ -646,7 +722,7 @@ export class IntelHUD {
     if (!m) return t('Awaiting telemetry...');
 
     const modeEl = document.getElementById('hud-mode');
-    const modeLabel = modeEl?.textContent || 'NORMAL';
+    const modeLabel = modeEl?.textContent || t(MODE_LABELS.normal);
     const region = this._regionLabel(m.latDeg, m.lonDeg);
     const nearest = this._nearestKnownPoint(m.latDeg, m.lonDeg);
     const band = this._viewBand(m.altM);
@@ -658,20 +734,41 @@ export class IntelHUD {
     // together, so they must never disagree. The view band above deliberately
     // keeps the ellipsoidal height: its thresholds were tuned against it.
     const altDisplayM = Number.isFinite(m.altMslM) ? m.altMslM : m.altM;
+    // Display only: the AI summary request carries its own context, so this
+    // line is built in the active language.
     const altTag =
       altDisplayM >= 1000
-        ? `${(altDisplayM / 1000).toFixed(1)}KM`
-        : `${Math.round(altDisplayM)}M`;
+        ? hudQuantity(altDisplayM / 1000, 'km', 1)
+        : hudQuantity(Math.round(altDisplayM), 'm');
     const winTag = window
-      ? `${Math.max(1, Math.round(window.widthKm))}x${Math.max(1, Math.round(window.heightKm))}KM`
-      : 'N/A';
+      ? `${hudQuantity(Math.max(1, Math.round(window.widthKm)), '')}x${hudQuantity(Math.max(1, Math.round(window.heightKm)), 'km')}`
+      : t('N/A');
     // NEAR the nearest catalogued POI at metro range; otherwise the lat/lon sector.
-    const localityTag = composeLocalityTag(nearest, m.latDeg, m.lonDeg);
+    const localityTag = composeLocalityTag(
+      nearest,
+      m.latDeg,
+      m.lonDeg,
+      LOCALIZED_LOCALITY,
+    );
 
     const provenance = hudTelemetryProvenanceTag(
       this._dataManager?.getAll?.() || [],
     );
-    const line = `${modeLabel} ${band} ${localityTag} | ${region} | ALT ${altTag} | WINDOW ${winTag} | SUN ${m.sunEl.toFixed(0)}° | ONA ${m.ona.toFixed(0)}° | ${localTag}`;
+    // ALT, SUN and ONA are sensor codes, as in the corner readouts.
+    const line = t(
+      '{mode} {band} {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}',
+      {
+        mode: modeLabel,
+        band: viewBandLabel(band),
+        locality: localityTag,
+        region: REGION_LABELS[region] ? t(REGION_LABELS[region]) : region,
+        alt: altTag,
+        window: winTag,
+        sun: formatNumber(Math.round(m.sunEl)),
+        ona: formatNumber(Math.round(m.ona)),
+        zone: localTag,
+      },
+    );
     return provenance ? `${line} | ${provenance}` : line;
   }
 
@@ -827,8 +924,9 @@ export class IntelHUD {
     // Update mode label
     const modeEl = document.getElementById('hud-mode');
     if (modeEl) {
-      const modeNames = { surveillance: 'NVG', thermal: 'FLIR', retro: 'CRT' };
-      modeEl.textContent = modeNames[styleName] || styleName.toUpperCase();
+      modeEl.textContent = MODE_LABELS[styleName]
+        ? t(MODE_LABELS[styleName])
+        : styleName.toUpperCase();
     }
     // Update color scheme
     const colors = HUD_COLORS[styleName] || HUD_COLORS._default;

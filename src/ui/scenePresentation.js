@@ -1,5 +1,6 @@
 /** Scene panel elements and text-only project presentation. */
 import { msg, t } from '../i18n/index.js';
+import { formatQuantity } from './unitLabels.js';
 
 // Labels for what a shot stores; anything else shows as stored. Style names
 // match STYLE_STATUS_LABELS in visualPresets.js, which this package cannot
@@ -76,6 +77,9 @@ export function renderSceneShots(
     return;
   }
   for (const shot of scene.shots) {
+    // Built-in titles arrive localized as displayTitle; the stored title
+    // stays English, so a rename happens only when the shown text changes.
+    const shownTitle = shot.displayTitle || shot.title;
     const row = document.createElement('div');
     row.className = 'scene-shot-row';
     row.dataset.sceneShotId = shot.id;
@@ -84,7 +88,7 @@ export function renderSceneShots(
     top.className = 'scene-shot-top';
     const label = document.createElement('div');
     label.className = 'scene-shot-label';
-    label.textContent = shot.title;
+    label.textContent = shownTitle;
     label.title = t('Double-click to rename');
     listen(label, 'click', () => select(shot.id));
     listen(label, 'dblclick', () => {
@@ -93,14 +97,14 @@ export function renderSceneShots(
       input.type = 'text';
       input.className = 'scene-shot-rename';
       input.setAttribute('aria-label', t('Shot name'));
-      input.value = shot.title;
+      input.value = shownTitle;
       let finished = false;
       const finish = (save) => {
         if (finished) return;
         finished = true;
         const title = input.value.trim();
-        label.textContent = shot.title;
-        if (save && title && title !== shot.title)
+        label.textContent = shownTitle;
+        if (save && title && title !== shownTitle)
           rename(scene.id, shot.id, title);
       };
       listen(input, 'keydown', (event) => {
@@ -140,7 +144,12 @@ export function renderSceneShots(
     const modeLabel = DETECTION_MODE_LABELS[mode]
       ? t(DETECTION_MODE_LABELS[mode])
       : mode;
-    meta.textContent = `${styleLabel} · ${modeLabel} · ${shot.durationSec.toFixed(1)}s + ${shot.holdSec.toFixed(1)}s`;
+    const seconds = (value) =>
+      formatQuantity(value, 's', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      });
+    meta.textContent = `${styleLabel} · ${modeLabel} · ${seconds(shot.durationSec)} + ${seconds(shot.holdSec)}`;
     row.appendChild(top);
     row.appendChild(meta);
     element.appendChild(row);
