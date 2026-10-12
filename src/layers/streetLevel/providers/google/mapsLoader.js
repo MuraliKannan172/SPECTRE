@@ -7,6 +7,11 @@
 
 const SCRIPT_ORIGIN = 'https://maps.googleapis.com';
 const READY_CALLBACK = '__gevGoogleMapsReady';
+/**
+ * The page's one script load, kept on the page: every loader on it (two
+ * application instances, say) waits on the same script and callback.
+ */
+const PAGE_LOAD = Symbol.for('gev.googleMapsLoad');
 
 /**
  * @param {{getApiKey: () => string|null|undefined, document?: Document, global?: object}} options
@@ -16,8 +21,6 @@ export function createMapsLoader({
   document = globalThis.document,
   global = globalThis,
 }) {
-  /** The script load in flight or done; cleared when it fails, so a retry can. */
-  let loading = null;
   let authFailed = false;
   let authHandlerInstalled = false;
   const authListeners = new Set();
@@ -41,14 +44,15 @@ export function createMapsLoader({
   }
 
   function load() {
-    if (loading) return loading;
     const key = getApiKey?.();
     if (!key)
       return Promise.reject(new Error('GOOGLE_MAPS_API_KEY is not set'));
-    if (global.google?.maps?.importLibrary)
-      return (loading = Promise.resolve(global.google.maps));
     installAuthHandler();
-    loading = new Promise((resolve, reject) => {
+    if (global[PAGE_LOAD]) return global[PAGE_LOAD];
+    if (global.google?.maps?.importLibrary)
+      return Promise.resolve(global.google.maps);
+    // Cleared when the script fails, so a retry (from any loader) can.
+    const loading = new Promise((resolve, reject) => {
       global[READY_CALLBACK] = () => {
         delete global[READY_CALLBACK];
         resolve(global.google.maps);
@@ -62,13 +66,14 @@ export function createMapsLoader({
         callback: READY_CALLBACK,
       })}`;
       script.onerror = () => {
-        loading = null;
+        if (global[PAGE_LOAD] === loading) delete global[PAGE_LOAD];
         script.remove();
         delete global[READY_CALLBACK];
         reject(new Error('The Google Maps JavaScript API could not load'));
       };
       document.head.append(script);
     });
+    global[PAGE_LOAD] = loading;
     return loading;
   }
 

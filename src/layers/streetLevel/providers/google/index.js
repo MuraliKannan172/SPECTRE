@@ -155,9 +155,13 @@ export function createGoogleProvider({
           signal?.throwIfAborted();
           const filter = context.getFilter();
           if (filter.pano === 'flat') return null;
+          // Set once the caller has its answer (aborted, timed out, refused):
+          // a lookup still waiting on Google's script then asks nothing.
+          let settled = false;
           const lookup = (async () => {
             const lib = await loader.importLibrary('streetView');
             await getService();
+            if (settled) return null;
             const { GOOGLE, OUTDOOR } = lib.StreetViewSource;
             try {
               const { data } = await service.getPanorama({
@@ -177,6 +181,8 @@ export function createGoogleProvider({
             ms: NEAREST_TIMEOUT_MS,
             signal,
             loader,
+          }).finally(() => {
+            settled = true;
           });
           const panoId = data?.location?.pano;
           if (!panoId) return null;

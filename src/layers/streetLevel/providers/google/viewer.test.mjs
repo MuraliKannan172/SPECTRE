@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createGoogleViewer } from './viewer.js';
-import { DETAILS_RETRY_COOLDOWN_MS } from './policy.js';
+import { DETAILS_RETRY_COOLDOWN_MS, DETAILS_TIMEOUT_MS } from './policy.js';
 import {
   fakeHost,
   fakeMapsLoader,
@@ -48,6 +48,7 @@ test('opening a panorama shows it and emits a provider-neutral pose', async () =
 
   await viewer.open('pano-a');
   assert.equal(panorama.visible, true);
+  await settle(); // the pose is dated once its lookup answers
   const pose = poses.at(-1);
   assert.deepEqual(
     {
@@ -207,6 +208,7 @@ test('an open never waits on the date lookup', async () => {
     new Promise(() => {}); // the metadata never answers
   await viewer.open('pano-a');
   assert.equal(poses.at(-1).imageId, 'pano-a');
+  viewer.unmount();
 });
 
 test('closing while a panorama loads settles the open and drops its listeners', async () => {
@@ -328,4 +330,76 @@ test('a failed panorama does not delay details for another panorama', async (t) 
     ['pano-a', 'pano-b'],
     'returning respects the pause',
   );
+});
+
+test('a retry after a failed open is not failed by the old panorama\u2019s status', async () => {
+  const { viewer, poses, host } = setup();
+  await viewer.mount(host);
+  await assert.rejects(viewer.open('gone'), /no imagery/);
+  // The new panorama moves first; its OK status follows.
+  await viewer.open('pano-a');
+  assert.equal(poses.at(-1).imageId, 'pano-a');
+});
+
+test('a details lookup that never answers times out, cools down and retries', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_000 });
+  const flush = async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  };
+  const { fake, viewer, poses, host } = setup();
+  await viewer.mount(host);
+  const getPanorama = fake.library.StreetViewService.prototype.getPanorama;
+  const requests = [];
+  let hang = true;
+  fake.library.StreetViewService.prototype.getPanorama = function (request) {
+    requests.push(request.pano);
+    return hang ? new Promise(() => {}) : getPanorama.call(this, request);
+  };
+  const opening = viewer.open('pano-a');
+  await flush();
+  await opening;
+  assert.deepEqual(requests, ['pano-a']);
+  fake.built[0].setPov({ heading: 5, pitch: 0 });
+  await flush();
+  assert.deepEqual(requests, ['pano-a'], 'one lookup in flight at a time');
+  t.mock.timers.tick(DETAILS_TIMEOUT_MS);
+  await flush();
+  hang = false;
+  fake.built[0].setPov({ heading: 6, pitch: 0 });
+  await flush();
+  assert.deepEqual(requests, ['pano-a'], 'the cooldown follows a timeout');
+  t.mock.timers.tick(DETAILS_RETRY_COOLDOWN_MS);
+  fake.built[0].setPov({ heading: 7, pitch: 0 });
+  await flush();
+  assert.deepEqual(requests, ['pano-a', 'pano-a']);
+  assert.equal(poses.at(-1).capturedAt, Date.UTC(2024, 4, 1));
+  assert.equal(poses.at(-1).bearing, 7);
+});
+
+test('a remount looks up again a panorama whose lookup hung', async () => {
+  const { fake, viewer, poses, host } = setup();
+  await viewer.mount(host);
+  const getPanorama = fake.library.StreetViewService.prototype.getPanorama;
+  const requests = [];
+  let answerHung;
+  fake.library.StreetViewService.prototype.getPanorama = function (request) {
+    requests.push(request.pano);
+    if (requests.length === 1)
+      return new Promise((resolve) => {
+        answerHung = () => resolve(getPanorama.call(this, request));
+      });
+    return getPanorama.call(this, request);
+  };
+  await viewer.open('pano-b');
+  viewer.unmount();
+  await viewer.mount(host);
+  await viewer.open('pano-b');
+  await settle();
+  assert.deepEqual(requests, ['pano-b', 'pano-b']);
+  assert.equal(poses.at(-1).creator, 'Ada');
+  // The hung answer arriving now is for a viewer that is gone: dropped.
+  const count = poses.length;
+  answerHung();
+  await settle();
+  assert.equal(poses.length, count);
 });

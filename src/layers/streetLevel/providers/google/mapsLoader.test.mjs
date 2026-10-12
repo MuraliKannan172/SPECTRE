@@ -53,6 +53,37 @@ test('the API loads once, with the key, asynchronously, and hands out libraries'
   assert.equal(page.global[callback], undefined, 'the callback is cleaned up');
 });
 
+test('two loaders on one page share one script and both get the API', async () => {
+  const page = fakePage();
+  const first = createMapsLoader({ getApiKey: () => 'k', ...page });
+  const second = createMapsLoader({ getApiKey: () => 'k', ...page });
+  const one = first.importLibrary('streetView');
+  const two = second.importLibrary('streetView');
+  await settle();
+  assert.equal(page.scripts.length, 1, 'one script for the page');
+  page.loadScript();
+  assert.equal((await one).name, 'streetView');
+  assert.equal((await two).name, 'streetView');
+  assert.equal((await first.importLibrary('streetView')).name, 'streetView');
+});
+
+test('after a failed script, either loader on the page can retry it', async () => {
+  const page = fakePage();
+  const first = createMapsLoader({ getApiKey: () => 'k', ...page });
+  const second = createMapsLoader({ getApiKey: () => 'k', ...page });
+  const failed = first.importLibrary('streetView');
+  await settle();
+  page.scripts[0].onerror();
+  await assert.rejects(failed, /could not load/);
+  const retry = second.importLibrary('streetView');
+  const again = first.importLibrary('streetView');
+  await settle();
+  assert.equal(page.scripts.length, 1);
+  page.loadScript();
+  assert.equal((await retry).name, 'streetView');
+  assert.equal((await again).name, 'streetView');
+});
+
 test('without a key nothing loads', async () => {
   const page = fakePage();
   const loader = createMapsLoader({ getApiKey: () => null, ...page });

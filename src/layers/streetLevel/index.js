@@ -22,6 +22,7 @@ import { createMeshSampler } from './meshSampler.js';
 /** Above this camera height the ground under the camera is not worth fetching. */
 const SURFACE_WARM_BELOW_M = 6000;
 import {
+  AIM_AT_GROUND_MESSAGE,
   FOLLOW_MAP_STACK_ID,
   NEAREST_RADIUS_M,
   POSITION_PICK_ID,
@@ -298,11 +299,15 @@ export function createStreetLevelLayer({
     nearestLookup = null;
   }
 
-  /** The ground under the middle of the screen, or null (no scenePick, sky). */
+  /**
+   * The ground under the middle of the screen; null when the middle is sky;
+   * undefined when nothing can aim (no scenePick, or a canvas with no size).
+   */
   function screenCentreGround() {
     const canvas = state.viewer?.scene?.canvas;
     const pick = state.services.scenePick?.pickGroundPosition;
-    if (!pick || !canvas?.clientWidth || !canvas?.clientHeight) return null;
+    if (!pick || !canvas?.clientWidth || !canvas?.clientHeight)
+      return undefined;
     const position = pick(state.viewer, {
       x: canvas.clientWidth / 2,
       y: canvas.clientHeight / 2,
@@ -608,16 +613,25 @@ export function createStreetLevelLayer({
     /**
      * Open the nearest image any active provider (or only `providerIds`)
      * has around a point; without one, around the view centre, or with
-     * `aim: 'screen-centre'` the ground under the middle of the screen.
+     * `aim: 'screen-centre'` the ground under the middle of the screen. An
+     * aim at the sky opens nothing rather than somewhere else.
      */
     async openNearest(
       point,
       { providerIds = null, frame = true, aim = 'view' } = {},
     ) {
-      const view =
-        point ||
-        (aim === 'screen-centre' && screenCentreGround()) ||
-        viewCentre(state.viewer);
+      let view = point;
+      if (!view && aim === 'screen-centre') {
+        view = screenCentreGround();
+        if (view === null) {
+          abortNearest();
+          state.street.loading = false;
+          state.street.error = AIM_AT_GROUND_MESSAGE;
+          notify();
+          return false;
+        }
+      }
+      view ||= viewCentre(state.viewer);
       if (!Number.isFinite(view?.lat) || !Number.isFinite(view?.lon))
         return false;
       abortNearest();

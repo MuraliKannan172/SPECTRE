@@ -42,3 +42,7 @@ export const FOLLOW_EYE_HEIGHT_M = 2.4;
  * (Google Street View) only from this close: from higher up it is a misclick.
  */
 export const GROUND_CLICK_MAX_HEIGHT_M = 3_000;
+
+/** OPEN STREET VIEW aimed at the sky: it opens what the user aims at, or nothing. */
+export const AIM_AT_GROUND_MESSAGE =
+  'Aim the middle of the view at a street to look for imagery there';

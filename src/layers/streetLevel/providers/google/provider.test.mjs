@@ -206,6 +206,46 @@ test('aborting a lookup in flight gives up at once', async () => {
   await assert.rejects(lookup, { name: 'AbortError' });
 });
 
+test('a lookup cancelled while Google\u2019s script loads asks Google nothing', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { NEAREST_TIMEOUT_MS } = await import('./policy.js');
+  const fake = fakeStreetViewLibrary({
+    panoramas: PANORAMAS,
+    nearest: () => 'fresh',
+  });
+  const loader = fakeMapsLoader(fake.library, { deferred: true });
+  const instance = createGoogleProvider({
+    getApiKey: () => 'browser-key',
+    loader,
+  }).create({
+    services: {},
+    getFilter: () => ({ pano: 'all', sinceMs: null }),
+    isActive: () => true,
+    notify() {},
+    actions: { reportError() {} },
+  });
+  const flush = async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  };
+  // Aborted, then timed out, while the script still loads.
+  const controller = new AbortController();
+  const aborted = instance.nearestImage(
+    { lat: 0, lon: 0 },
+    { signal: controller.signal },
+  );
+  controller.abort();
+  await assert.rejects(aborted, { name: 'AbortError' });
+  const expired = instance.nearestImage({ lat: 0, lon: 0 });
+  t.mock.timers.tick(NEAREST_TIMEOUT_MS);
+  await assert.rejects(expired, /did not answer/);
+  // The script arrives: a current lookup still gets its answer.
+  const current = instance.nearestImage({ lat: 0, lon: 0 });
+  loader.release();
+  await flush();
+  assert.equal(await current, 'fresh');
+  assert.equal(fake.lookups.length, 1, 'only the current lookup asked Google');
+});
+
 test('a Google outage is an error, not "no imagery here"', async () => {
   const { instance, fake } = setup();
   fake.library.StreetViewService.prototype.getPanorama = () =>

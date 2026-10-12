@@ -1,5 +1,6 @@
 import {
   DETAILS_RETRY_COOLDOWN_MS,
+  DETAILS_TIMEOUT_MS,
   GOOGLE_PROVIDER_ID,
   KEY_REJECTED_MESSAGE,
   NO_ANSWER_MESSAGE,
@@ -49,8 +50,11 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
   let subscriptions = [];
   /** Panorama id → its {capturedAt, creator, title}. */
   const described = new Map();
-  /** Panorama ids whose lookup is in flight. */
-  const lookingUp = new Set();
+  /**
+   * Panorama id → its lookup in flight ({timer}). A late answer to a lookup
+   * no longer here (timed out, or unmounted) is dropped.
+   */
+  const lookingUp = new Map();
   /** Panorama id → earliest retry time after a failed details lookup. */
   const retryAfter = new Map();
   const listeners = new Set();
@@ -84,27 +88,47 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
 
   /**
    * Look up a panorama's date, photographer and address once; the pose
-   * already out is sent again with them. After a failure, view events can
-   * retry once the cooldown expires.
+   * already out is sent again with them. A lookup that fails or takes longer
+   * than DETAILS_TIMEOUT_MS lets view events retry once the cooldown expires.
    */
   async function describe(panoId) {
     if (described.has(panoId) || lookingUp.has(panoId)) return;
     if (Date.now() < (retryAfter.get(panoId) ?? 0)) return;
-    lookingUp.add(panoId);
+    const lookup = { timer: null };
+    lookingUp.set(panoId, lookup);
+    const current = () => lookingUp.get(panoId) === lookup;
     try {
-      service ||= getService
-        ? await getService()
-        : new (await ensureLibrary()).StreetViewService();
-      const { data } = await service.getPanorama({ pano: panoId });
+      const { data } = await new Promise((resolve, reject) => {
+        lookup.timer = setTimeout(
+          () => reject(new Error(NO_ANSWER_MESSAGE)),
+          DETAILS_TIMEOUT_MS,
+        );
+        (async () => {
+          service ||= getService
+            ? await getService()
+            : new (await ensureLibrary()).StreetViewService();
+          return service.getPanorama({ pano: panoId });
+        })().then(resolve, reject);
+      });
+      // Released by an unmount: the viewer it was for is gone.
+      if (!current()) return;
       described.set(panoId, metaFrom(data));
       retryAfter.delete(panoId);
     } catch {
-      retryAfter.set(panoId, Date.now() + DETAILS_RETRY_COOLDOWN_MS);
+      if (current())
+        retryAfter.set(panoId, Date.now() + DETAILS_RETRY_COOLDOWN_MS);
       return;
     } finally {
-      lookingUp.delete(panoId);
+      clearTimeout(lookup.timer);
+      if (current()) lookingUp.delete(panoId);
     }
     publishPose();
+  }
+
+  /** Drop every lookup in flight: a remount looks again. */
+  function releaseLookups() {
+    for (const lookup of lookingUp.values()) clearTimeout(lookup.timer);
+    lookingUp.clear();
   }
 
   /** Emit the pose on screen now, dated once its lookup has answered. */
@@ -189,7 +213,9 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
         finish(reject, new Error(KEY_REJECTED_MESSAGE)),
       );
       cancelShown = () => finish(resolve);
-      const check = () => {
+      // Only a status event can fail the open: at a position event the
+      // status may still be the previous panorama's failure.
+      const onStatus = () => {
         if (pendingOpen !== panoId) return finish(resolve);
         const status = instance.getStatus();
         if (status === 'OK') finish(resolve);
@@ -199,9 +225,14 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
             new Error('Street View has no imagery for this place'),
           );
       };
-      const subscriptions = ['status_changed', 'position_changed'].map((name) =>
-        instance.addListener(name, check),
-      );
+      const onPosition = () => {
+        if (pendingOpen !== panoId || instance.getStatus() === 'OK')
+          finish(resolve);
+      };
+      const subscriptions = [
+        instance.addListener('status_changed', onStatus),
+        instance.addListener('position_changed', onPosition),
+      ];
       function finish(settle, value) {
         cancelShown = null;
         clearTimeout(timer);
@@ -247,6 +278,7 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
     unmount() {
       pendingOpen = null;
       cancelShown?.();
+      releaseLookups();
       generation++;
       destroyPanorama();
     },

@@ -649,6 +649,47 @@ test('the button’s “centre of the view” is the ground under the middle of 
   assert.ok(Math.abs(lookups[0].lon - -121.4937) < 1e-9);
 });
 
+test('the button aimed at the sky opens nothing, and says to aim at a street', async (t) => {
+  const { createStreetLevelLayer: create } = await import('./index.js');
+  const scenePick = await import('../../data/scenePick.js');
+  const lookups = [];
+  const provider = fakeProvider({
+    nearestImage: async (point) => {
+      lookups.push(point);
+      return null;
+    },
+  });
+  const saved = globalThis.document;
+  const drawing = new Proxy({}, { get: () => () => ({ addColorStop() {} }) });
+  globalThis.document = Object.assign(new EventTarget(), {
+    createElement: () => ({ getContext: () => drawing }),
+  });
+  const viewer = fakeViewer();
+  // Every ground pick misses: the middle of the screen is sky.
+  Object.assign(viewer.scene, {
+    pickPositionSupported: true,
+    pickPosition: () => undefined,
+  });
+  viewer.camera.pickEllipsoid = () => undefined;
+  viewer.scene.canvas.clientWidth = 1000;
+  viewer.scene.canvas.clientHeight = 600;
+  const layer = create({ providers: [provider], services: { scenePick } });
+  layer.init(viewer);
+  layer.enable(viewer);
+  t.after(() => {
+    layer.destroy();
+    globalThis.document = saved;
+  });
+  assert.equal(
+    await layer.openNearest(undefined, { aim: 'screen-centre' }),
+    false,
+  );
+  assert.deepEqual(lookups, [], 'no lookup at the view centre instead');
+  const { street } = layer.getUIState();
+  assert.match(street.error, /Aim the middle of the view at a street/);
+  assert.equal(street.loading, false);
+});
+
 test('with no Mapillary token, the layer points at Street View, on Google 3D only', async (t) => {
   const { layer, stack } = await withStreetView(t, { mapillaryKeyless: true });
   await settle();
