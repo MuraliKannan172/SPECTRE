@@ -40,6 +40,16 @@ const LAYER_NAME_KEYS = Object.freeze({
   'local-dams': msg('Dams'),
   'telegeography-submarine-cables': msg('Submarine Cables'),
   'local-firms': msg('FIRMS Active Fires'),
+  'local-adsb': msg('Local ADS-B'),
+  transit: msg('Transit'),
+  'recent-imagery': msg('Recent Imagery'),
+  'fire-perimeters': msg('Fire Perimeters'),
+  wind: msg('Wind'),
+  'weather-radar': msg('Rain radar'),
+  'weather-satellite': msg('Satellite clouds'),
+  'weather-lightning': msg('Lightning density'),
+  'weather-cyclones': msg('Cyclone advisories'),
+  directions: msg('Directions'),
 });
 
 function lifecycleStateLabel(lifecycleState) {
@@ -58,7 +68,7 @@ const FEED_STATE_LABELS = Object.freeze({
 // Presentation order is independent of catalog registration and startup order.
 const PANEL_GROUPS = [
   {
-    label: 'Movement',
+    label: msg('Movement'),
     ids: [
       'satellites',
       'flights',
@@ -71,11 +81,11 @@ const PANEL_GROUPS = [
     ],
   },
   {
-    label: 'Cameras',
+    label: msg('Cameras'),
     ids: ['cctv', 'recent-imagery', 'street-level'],
   },
   {
-    label: 'Infrastructure',
+    label: msg('Infrastructure'),
     ids: [
       'alpr-cameras',
       'military-installations',
@@ -85,11 +95,11 @@ const PANEL_GROUPS = [
     ],
   },
   {
-    label: 'Events',
+    label: msg('Events'),
     ids: ['rocket-launches', 'earthquakes', 'local-firms', 'fire-perimeters'],
   },
   {
-    label: 'Weather',
+    label: msg('Weather'),
     ids: [
       'wind',
       'weather-radar',
@@ -99,7 +109,7 @@ const PANEL_GROUPS = [
     ],
   },
   {
-    label: 'Utilities',
+    label: msg('Utilities'),
     ids: ['directions', 'radio'],
   },
 ];
@@ -251,11 +261,12 @@ export class LayerPanel {
     for (const layer of layers) {
       if (!layer.showInTogglePanel) continue;
       const group =
-        PANEL_ORDER[PANEL_POSITIONS.get(layer.id)]?.label ?? 'Other layers';
+        PANEL_ORDER[PANEL_POSITIONS.get(layer.id)]?.label ??
+        msg('Other layers');
       if (group && group !== previousGroup) {
         const heading = document.createElement('h3');
         heading.className = 'data-layer-group-heading';
-        heading.textContent = group;
+        heading.textContent = t(group);
         this._toggleContainer.appendChild(heading);
       }
       previousGroup = group;

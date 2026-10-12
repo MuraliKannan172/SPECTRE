@@ -53,11 +53,6 @@ export function updateContext(info, heading) {
     const enteringLost = this.context.dataset.state !== 'lost';
     this.context.dataset.state = 'lost';
     if (this.contextUncertainty) {
-      // The English literal write is pinned verbatim by cockpitMarkup.test.mjs
-      // ('CONTACT LOST' must appear in this method body); the t() re-write
-      // below is a same-value override that localizes it under other locales.
-      this.contextUncertainty.textContent =
-        'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR';
       this.contextUncertainty.textContent = t(
         'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR',
       );
@@ -109,13 +104,18 @@ export function updateContext(info, heading) {
   if (this.contextDistance) {
     const distanceM = closest?.distanceM;
     this.contextDistance.textContent = Number.isFinite(distanceM)
-      ? `${distanceM < 10000 ? (distanceM / 1000).toFixed(1) : Math.round(distanceM / 1000)} KM`
+      ? t('{value} KM', {
+          value:
+            distanceM < 10000
+              ? (distanceM / 1000).toFixed(1)
+              : Math.round(distanceM / 1000),
+        })
       : '—';
     this.contextDistance.setAttribute(
       'aria-label',
       Number.isFinite(distanceM)
         ? this.contextDistance.textContent
-        : 'Unavailable',
+        : t('Unavailable'),
     );
   }
 
@@ -147,12 +147,6 @@ export function updateContext(info, heading) {
     this.contextDirection.classList.toggle('unknown', relative === null);
   }
   if (this.contextBearing) {
-    // The 'BRG —' literal is pinned verbatim by cockpitMarkup.test.mjs; the
-    // t() re-write below is a same-value override that localizes it.
-    if (relative === null) this.contextBearing.textContent = 'BRG —';
-    else if (Math.abs(relative) < 8) this.contextBearing.textContent = 'AHEAD';
-    else
-      this.contextBearing.textContent = `${relative < 0 ? 'L' : 'R'} ${String(Math.round(Math.abs(relative))).padStart(3, '0')}°`;
     if (relative === null) this.contextBearing.textContent = t('BRG —');
     else if (Math.abs(relative) < 8)
       this.contextBearing.textContent = t('AHEAD');

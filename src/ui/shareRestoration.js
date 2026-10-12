@@ -192,7 +192,9 @@ export class ShareRestoration {
       this.showStatus(t('ACQUIRING'), {
         state: 'acquiring',
         detail: t('SHARED {subject}', {
-          subject: String(result.label || t('entity')).toUpperCase(),
+          subject: String(
+            result.label ? t(result.label) : t('entity'),
+          ).toUpperCase(),
         }),
         persistent: true,
       });
@@ -217,7 +219,7 @@ export class ShareRestoration {
     const noticeGeneration = ownsAcquiringNotice
       ? this._shareTrackingNoticeGeneration
       : ++this._shareTrackingNoticeGeneration;
-    const subject = result.label || t('entity');
+    const subject = result.label ? t(result.label) : t('entity');
     const message =
       result.classification === 'expired'
         ? t('Shared {subject} follow expired', { subject })

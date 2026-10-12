@@ -364,6 +364,7 @@ export class RealtimeInput {
    */
   updateVoiceButtonLabel() {
     if (!this.ui.buttonLabel) return;
+    // i18n-ignore: the GEV MIC button's name; translated tips refer to it as MIC
     this.ui.buttonLabel.textContent = 'MIC';
     if (this.ui.helpDetail) {
       this.ui.helpDetail.textContent = resolveVoiceControlHint(

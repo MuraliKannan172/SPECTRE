@@ -1,3 +1,7 @@
+// Marks text for i18n extraction; the UI translates it with t(). Kept local
+// because AI tool services import this module outside the browser.
+const msg = (text) => text;
+
 /**
  * Pure domain model for the Recent Imagery layer: products, the selection box,
  * per-day candidates, ranking and the keyless URL builders. No DOM, no Cesium,
@@ -29,8 +33,8 @@ const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
  */
 export const PRODUCTS = Object.freeze({
   S30: Object.freeze({
-    label: 'HLS S30',
-    name: 'Sentinel-2',
+    label: 'HLS S30', // i18n-ignore: product code
+    name: msg('Sentinel-2'),
     source: 'hls',
     sensor: 'Sentinel-2 via HLS',
     resolutionM: 30,
@@ -41,8 +45,8 @@ export const PRODUCTS = Object.freeze({
     overview: false,
   }),
   L30: Object.freeze({
-    label: 'HLS L30',
-    name: 'Landsat 8/9',
+    label: 'HLS L30', // i18n-ignore: product code
+    name: msg('Landsat 8/9'),
     source: 'hls',
     sensor: 'Landsat 8/9 via HLS',
     resolutionM: 30,
@@ -53,8 +57,8 @@ export const PRODUCTS = Object.freeze({
     overview: false,
   }),
   VIIRS: Object.freeze({
-    label: 'VIIRS',
-    name: 'Daily overview',
+    label: 'VIIRS', // i18n-ignore: product code
+    name: msg('Daily overview'),
     source: 'viirs',
     sensor: 'VIIRS NOAA-21',
     resolutionM: 250,

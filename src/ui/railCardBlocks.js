@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 import { syncChipGroup } from './chipGroup.js';
 import { syncRowList } from './rowList.js';
 
@@ -98,8 +99,8 @@ export function createRailCardBlocks({ container, cardId, onParams }) {
             block.clear.type = 'button';
             block.clear.dataset.actionId = 'clear';
             block.clear.textContent = '×';
-            block.clear.setAttribute('aria-label', 'Clear reading');
-            block.clear.title = 'Clear reading';
+            block.clear.setAttribute('aria-label', t('Clear reading'));
+            block.clear.title = t('Clear reading');
             bind((event) => {
               if (event.target === block.clear) dispatch(block.props.clear);
             });

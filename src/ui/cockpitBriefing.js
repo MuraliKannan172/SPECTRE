@@ -267,7 +267,7 @@ export function renderRegionalBrief(payload, info) {
   }
   if (this.localWind) {
     this.localWind.textContent = Number.isFinite(weather?.windKph)
-      ? `${Math.round(weather.windKph)} KM/H`
+      ? t('{value} KM/H', { value: Math.round(weather.windKph) })
       : '—';
   }
   if (this.localWindDirection) {

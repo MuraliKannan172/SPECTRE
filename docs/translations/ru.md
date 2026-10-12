@@ -21,7 +21,7 @@ A `tn()` entry needs four forms. `Intl.PluralRules('ru')` picks:
 | `many`  | 0, 5–20, 25–30, 111–114… | 5 камер    |
 | `other` | fractions: 1.5, 2.25…    | 1,5 камеры |
 
-When a word next to a number cannot agree in every form, move the number after a colon instead: «доступно {bikes}», «ответов: {responses}».
+When a word next to a number cannot agree in every form, move the number after a colon instead: «доступно {bikes}», «ответов: {responses}». The same trick keeps place names and tool names out of a preposition's case: «откуда: {origin}», «Активно: {name}».
 
 ## Glossary
 
@@ -53,4 +53,9 @@ When a word next to a number cannot agree in every form, move the number after a
 | HDG / BRG / CRS / FOV / DEST / SPD / RANGE | КУРС / ПЕЛ. / ПУТЬ / ОБЗОР / НАЗН. / СКОР / ДАЛЬН. |
 | PREV / NEXT                                | ПРЕД. / СЛЕД.                                      |
 | Previous / Next (button text)              | Назад / Далее                                      |
+| anchor / data pack / bundle (scene)        | якорь / пакет данных / архив                       |
+| basemap / box (Recent Imagery area)        | подложка / область                                 |
+| camera move                                | перелёт                                            |
+| SIG / NEWS / LOCAL (briefing tabs)         | СИГН. / НОВОСТИ / МЕСТН.                           |
+| compass points (N, NNE, …)                 | С, ССВ, …                                          |
 | L / R (relative bearing)                   | Л / П                                              |

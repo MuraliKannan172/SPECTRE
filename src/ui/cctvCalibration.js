@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.js';
+import { t, msg } from '../i18n/index.js';
 
 /** Shortest-wrap signed degrees, for heading offsets typed as absolute values. */
 const signedNormalizeDeg = (deg) => ((((deg + 180) % 360) + 360) % 360) - 180;
@@ -12,7 +12,7 @@ const signedNormalizeDeg = (deg) => ((((deg + 180) % 360) + 360) % 360) - 180;
  */
 const CCTV_CAL_FIELDS = {
   heading: {
-    label: 'HDG',
+    label: msg('HDG'),
     unit: '°',
     decimals: 1,
     get: (cam) => cam.headingDeg,
@@ -21,21 +21,21 @@ const CCTV_CAL_FIELDS = {
     }),
   },
   pitch: {
-    label: 'PITCH',
+    label: msg('PITCH'),
     unit: '°',
     decimals: 1,
     get: (cam) => cam.pitchDeg,
     toPatch: (value, base) => ({ pitchDeg: value - base.pitchDeg }),
   },
   fov: {
-    label: 'FOV',
+    label: msg('FOV'),
     unit: '°',
     decimals: 0,
     get: (cam) => cam.fovDeg,
     toPatch: (value, base) => ({ fovDeg: value - base.fovDeg }),
   },
   range: {
-    label: 'RANGE',
+    label: msg('RANGE'),
     unit: 'm',
     decimals: 0,
     get: (cam) => cam.rangeM,
@@ -44,21 +44,21 @@ const CCTV_CAL_FIELDS = {
     }),
   },
   height: {
-    label: 'HGT',
+    label: msg('HGT'),
     unit: 'm',
     decimals: 0,
     get: (cam) => cam.mountHeightM,
     toPatch: (value, base) => ({ heightM: value - base.mountHeightM }),
   },
   north: {
-    label: 'ΔN',
+    label: msg('ΔN'),
     unit: 'm',
     decimals: 1,
     get: (cam) => cam.calibration?.offsetNorthM || 0,
     toPatch: (value) => ({ offsetNorthM: value }),
   },
   east: {
-    label: 'ΔE',
+    label: msg('ΔE'),
     unit: 'm',
     decimals: 1,
     get: (cam) => cam.calibration?.offsetEastM || 0,
@@ -101,7 +101,7 @@ export function _beginCctvCalValueEdit(chip) {
   input.step = field.decimals > 0 ? '0.1' : '1';
   input.value = Number(startValue).toFixed(field.decimals);
   input.className = 'cctv-cal-input';
-  chip.textContent = `${field.label} `;
+  chip.textContent = `${t(field.label)} `;
   chip.appendChild(input);
   input.focus();
   input.select();
@@ -176,8 +176,8 @@ export function _syncCctvCalReadout(enabled, activeCamera) {
       if (!field) continue;
       const value = canCalibrate ? field.get(activeCamera) : null;
       chip.textContent = Number.isFinite(value)
-        ? `${field.label} ${Number(value).toFixed(field.decimals)}${field.unit}`
-        : `${field.label} --`;
+        ? `${t(field.label)} ${Number(value).toFixed(field.decimals)}${field.unit}`
+        : `${t(field.label)} --`;
       chip.disabled = !canCalibrate;
     }
   }

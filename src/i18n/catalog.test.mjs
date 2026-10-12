@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   checkCatalog,
   extractMessages,
+  findUnmarked,
   readCatalog,
   shippedLocales,
   unmarkedMarkup,
@@ -33,6 +34,13 @@ for (const locale of shippedLocales()) {
     );
   });
 }
+
+test('every UI string is marked for translation or kept on purpose (npm run i18n)', () => {
+  assert.deepEqual(
+    findUnmarked().map(({ where, text }) => `${where}  ${text}`),
+    [],
+  );
+});
 
 test('checkCatalog reports missing, stale, placeholder and plural problems', () => {
   const fixture = new Map([

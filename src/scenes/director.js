@@ -26,7 +26,7 @@ import {
   getSceneAppendRecipeById,
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
-import { t, msg } from '../i18n/index.js';
+import { t, tn } from '../i18n/index.js';
 import { createSceneDataPacks } from './dataPacks/controller.js';
 import { createSceneInteractions } from './interactions.js';
 import { createSceneSharing } from './sharing.js';
@@ -66,13 +66,7 @@ import {
 // project titles, and voice-matching titles all stay English (keep-English
 // boundary + persisted data); only the presentation of an UNRENAMED built-in
 // localizes, so an operator's renamed scene is never masked by the catalog.
-const RECIPE_TITLE_KEYS = Object.freeze({
-  'flights-radar': msg('Global Flights Radar'),
-  'orbital-watch': msg('Orbital Watch'),
-  'thermal-threats': msg('Thermal Threat Board'),
-  'city-overload': msg('City Overload'),
-  'omniscience-pullback': msg('Omniscience Pullback'),
-});
+// Recipe titles are marked with msg() in recipes.js.
 
 /**
  * Display title for a scene: the localized recipe name while the stored title
@@ -81,10 +75,9 @@ const RECIPE_TITLE_KEYS = Object.freeze({
  * @returns {string}
  */
 function displaySceneTitle(scene) {
-  const key = RECIPE_TITLE_KEYS[scene?.id];
-  if (!key) return scene?.title || '';
-  const builtin = SCENE_RECIPES.find((recipe) => recipe.id === scene.id);
-  return scene.title === builtin?.title ? t(key) : scene.title;
+  const builtin = SCENE_RECIPES.find((recipe) => recipe.id === scene?.id);
+  if (!builtin?.title) return scene?.title || '';
+  return scene.title === builtin.title ? t(builtin.title) : scene.title;
 }
 
 /** @constant {string} localStorage key for the serialized project */
@@ -519,7 +512,9 @@ export class SceneDirector {
 
     const scene = {
       id: uid('scene'),
-      title: sceneName.trim() || `Scene ${this._project.scenes.length + 1}`,
+      title:
+        sceneName.trim() ||
+        t('Scene {n}', { n: this._project.scenes.length + 1 }),
       shots: [],
     };
 
@@ -797,7 +792,9 @@ export class SceneDirector {
             ));
       if (!inventoryMatches) {
         this._updateStatus(
-          `Cannot update ${recipe.title}: shot inventory changed`,
+          t('Cannot update {scene}: shot inventory changed', {
+            scene: t(recipe.title),
+          }),
         );
         return {
           appended: false,
@@ -828,7 +825,9 @@ export class SceneDirector {
         );
       if (!sourcePackMatches) {
         this._updateStatus(
-          `Cannot update ${recipe.title}: evidence beats changed`,
+          t('Cannot update {scene}: evidence beats changed', {
+            scene: t(recipe.title),
+          }),
         );
         return {
           appended: false,
@@ -851,7 +850,9 @@ export class SceneDirector {
     }));
     if (resolvedPatches.some(({ shot }) => !shot)) {
       this._updateStatus(
-        `Cannot update ${recipe.title}: shot bindings are incomplete`,
+        t('Cannot update {scene}: shot bindings are incomplete', {
+          scene: t(recipe.title),
+        }),
       );
       return {
         appended: false,
@@ -931,8 +932,18 @@ export class SceneDirector {
     if (announce) {
       this._updateStatus(
         marker
-          ? `Updated ${patchedShotCount} ${patchedShotCount === 1 ? 'shot' : 'shots'}: ${recipe.title}`
-          : `Appended ${appendedShots.length} shots: ${recipe.title}`,
+          ? tn(
+              patchedShotCount,
+              'Updated {count} shot: {scene}',
+              'Updated {count} shots: {scene}',
+              { scene: t(recipe.title) },
+            )
+          : tn(
+              appendedShots.length,
+              'Appended {count} shot: {scene}',
+              'Appended {count} shots: {scene}',
+              { scene: t(recipe.title) },
+            ),
       );
     }
     return {
@@ -1121,7 +1132,11 @@ export class SceneDirector {
       const released = await this._releaseSceneLayers(previousScene, token);
       if (!released || token.cancelled) {
         if (!token.cancelled)
-          this._updateStatus(`Could not leave scene: ${previousScene.title}`);
+          this._updateStatus(
+            t('Could not leave scene: {scene}', {
+              scene: previousScene.title,
+            }),
+          );
         return;
       }
       this._loadedSceneId = null;
@@ -1171,7 +1186,9 @@ export class SceneDirector {
         seeking: true,
       });
       if (this._loadAbort === controller) this._loadAbort = null;
-      this._updateStatus(`Seeked: ${scene.title} / ${shot.title}`);
+      this._updateStatus(
+        t('Seeked: {scene} / {shot}', { scene: scene.title, shot: shot.title }),
+      );
       this._activateInteractions(scene, shot);
       return { started: true, shotId };
     }
@@ -1533,7 +1550,9 @@ export class SceneDirector {
       running: false,
       seeking: true,
     });
-    this._updateStatus(`Seeked: ${scene.title} / ${shot.title}`);
+    this._updateStatus(
+      t('Seeked: {scene} / {shot}', { scene: scene.title, shot: shot.title }),
+    );
     return true;
   }
 
@@ -1807,6 +1826,7 @@ export class SceneDirector {
     // Initialize telemetry accumulator for this run
     this._activeRun = {
       recipeId: `project-${PROJECT_VERSION}`,
+      // i18n-ignore: run telemetry record, downloaded as JSON
       title: 'Editable Scene Run',
       startedAt: new Date().toISOString(),
       estimatedDurationSec,
@@ -1950,7 +1970,7 @@ export class SceneDirector {
     if (action.type === 'shot') {
       if (this._interactionTransitions >= 64) {
         this._updateStatus(
-          'Scene transition limit reached — load a shot to reset',
+          t('Scene transition limit reached — load a shot to reset'),
         );
         return false;
       }
@@ -1993,7 +2013,7 @@ export class SceneDirector {
     try {
       payload = stringifySceneDocument(this._project);
     } catch (error) {
-      this._updateStatus(`Export failed: ${error.message}`);
+      this._updateStatus(t('Export failed: {error}', { error: error.message }));
       return;
     }
     // Trigger a browser download via a temporary anchor element
@@ -2066,7 +2086,7 @@ export class SceneDirector {
       this._loadedSceneId = null;
       this._saveProject();
       this._publish({ type: 'project-imported', project });
-      this._updateStatus(`Imported ${file.name}`);
+      this._updateStatus(t('Imported {file}', { file: file.name }));
       return true;
     } catch (error) {
       if (
@@ -2077,8 +2097,8 @@ export class SceneDirector {
         return false;
       this._updateStatus(
         error instanceof SceneDocumentError
-          ? `Import failed: ${error.message}`
-          : 'Import failed (could not read JSON file)',
+          ? t('Import failed: {error}', { error: error.message })
+          : t('Import failed (could not read JSON file)'),
       );
     }
   }
@@ -2178,7 +2198,9 @@ export class SceneDirector {
     }
 
     if (refused.length) {
-      this._updateStatus(`Layers refused: ${refused.join(', ')}`);
+      this._updateStatus(
+        t('Layers refused: {layers}', { layers: refused.join(', ') }),
+      );
       this._logEvent('shot_layers_refused', { layerIds: [...refused] });
     }
     return { applied, refused, cancelled: false };

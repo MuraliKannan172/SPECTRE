@@ -232,17 +232,17 @@ export function setVisionMode(mode, { revealParameters = false } = {}) {
   const next = normalizeCockpitVisionMode(mode);
   this.visionMode = next;
   const labels = {
-    optical: 'NORMAL',
-    crt: 'CRT',
-    nvg: 'NVG',
-    thermal: 'FLIR',
-    anime: 'ANIME',
-    noir: 'NOIR',
-    snow: 'SNOW',
+    optical: t('NORMAL'),
+    crt: t('CRT'),
+    nvg: t('NVG'),
+    thermal: t('FLIR'),
+    anime: t('ANIME'),
+    noir: t('NOIR'),
+    snow: t('SNOW'),
   };
   const names = {
-    optical: 'Normal',
-    crt: 'CRT',
+    optical: t('Normal'),
+    crt: t('CRT'),
     nvg: t('Night vision'),
     thermal: t('Thermal'),
     anime: t('Anime'),

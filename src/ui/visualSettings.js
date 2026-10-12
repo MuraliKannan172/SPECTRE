@@ -672,7 +672,7 @@ export class VisualSettings {
     const settings = applyCyberSonarSettings(readCyberSonarSettings());
     this._cyberSonarBtn.classList.toggle('active', enabled);
     this._cyberSonarBtn.setAttribute('aria-pressed', String(enabled));
-    this._cyberSonarBtn.textContent = enabled ? 'ON' : 'OFF';
+    this._cyberSonarBtn.textContent = enabled ? t('ON') : t('OFF');
     for (const [input, output, value, suffix] of [
       [this._cyberSonarRings, this._cyberSonarRingsValue, settings.rings, ''],
       [this._cyberSonarRange, this._cyberSonarRangeValue, settings.range, '%'],
@@ -1595,9 +1595,9 @@ export class VisualSettings {
     });
 
     // Update style indicator
-    const displayNames = { surveillance: 'NVG', thermal: 'FLIR', retro: 'CRT' };
-    this._styleIndicator.textContent =
-      displayNames[styleName] || styleName.toUpperCase();
+    this._styleIndicator.textContent = STYLE_STATUS_LABELS[styleName]
+      ? t(STYLE_STATUS_LABELS[styleName])
+      : styleName.toUpperCase();
     this._updateStyleMiniStatus(styleName);
 
     // Update parameter sliders
@@ -1629,9 +1629,9 @@ export class VisualSettings {
 
   _updateStyleMiniStatus(styleName = this.activeStyle) {
     if (!this._styleMiniValue) return;
-    this._styleMiniValue.textContent =
-      STYLE_STATUS_LABELS[styleName] ||
-      String(styleName || 'normal').toUpperCase();
+    this._styleMiniValue.textContent = STYLE_STATUS_LABELS[styleName]
+      ? t(STYLE_STATUS_LABELS[styleName])
+      : String(styleName || 'normal').toUpperCase();
   }
 
   _updateHudButtonState() {

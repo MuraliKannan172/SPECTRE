@@ -761,7 +761,9 @@ export class PanelPositionControls {
       handle.dataset.dir = dir;
       handle.setAttribute('aria-hidden', 'true');
       if (dir === 'se') {
-        handle.title = 'Drag to resize · double-click the header to snap back';
+        handle.title = t(
+          'Drag to resize · double-click the header to snap back',
+        );
       }
       panelEl.appendChild(handle);
       this._resizeHandles.push(handle);

@@ -13,7 +13,9 @@ test('panel presentation places Transit between Street Traffic and Bike Share in
     source.indexOf('const PANEL_POSITIONS ='),
   );
   const order = JSON.parse(
-    runInNewContext(`${declarations}\nJSON.stringify(PANEL_ORDER)`),
+    runInNewContext(
+      `const msg = (text) => text;\n${declarations}\nJSON.stringify(PANEL_ORDER)`,
+    ),
   );
   assert.deepEqual(
     order.filter(({ label }) => label === 'Movement').map(({ id }) => id),

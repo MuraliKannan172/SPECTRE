@@ -1003,7 +1003,11 @@
       "src/layers/recentImagery/catalog.js",
       "src/layers/recentImagery/rendering.js",
       "src/layers/recentImagery/thumbnails.js",
-      "src/maps/imageryHost.js"
+      "src/maps/imageryHost.js",
+      "src/i18n/index.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
   },
@@ -1342,7 +1346,11 @@
       "src/sources/httpBody.js",
       "src/sources/vectorTiles.js",
       "src/sources/phaseTiming.js",
-      "src/layers/alpr/floors.js"
+      "src/layers/alpr/floors.js",
+      "src/i18n/index.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json"
     ],
     "external": ["cesium", "@mapbox/vector-tile", "pbf"]
   },
@@ -3080,7 +3088,11 @@
     "modules": [
       "src/layers/directions/index.js",
       "src/layers/directions/source.js",
-      "src/data/routeSteps.js"
+      "src/data/routeSteps.js",
+      "src/i18n/index.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
   },
@@ -3358,7 +3370,11 @@
       "src/sources/overpassFeaturesRecords.js",
       "src/sources/overpassFeatures.js",
       "src/sources/featureSource.js",
-      "src/sources/capability.js"
+      "src/sources/capability.js",
+      "src/i18n/index.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json"
     ],
     "external": ["cesium", "egm96-universal", "pbf"]
   },
@@ -3440,7 +3456,11 @@
       "src/layers/perimeters/source.js",
       "src/layers/perimeters/records.js",
       "src/layers/perimeters/cards.js",
-      "src/layers/perimeters/inciweb.js"
+      "src/layers/perimeters/inciweb.js",
+      "src/i18n/index.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json"
     ],
     "external": ["cesium"]
   },

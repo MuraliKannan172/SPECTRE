@@ -3030,8 +3030,11 @@ Shipped locales: **en** (source and fallback), **es** and **ru**. The code lives
 - **Not translated by design:** layer ids, share-link and hash parameters, API
   fields, voice tool schemas, provider names, feed data (callsigns, vessel and
   station names) and attribution.
-- **Gaps.** Strings added after #601's extraction (for example the Street Level
-  panel) are still raw English; there is no lint for unmarked UI text yet.
+- **Unmarked text.** The same check lists UI text that is not marked at all
+  (markup without `data-i18n*`, literals reaching the page without `t`/`tn`/`msg`)
+  and fails on it. Text kept on purpose says why: `translate="no"`,
+  `data-i18n-runtime`, or `// i18n-ignore: <reason>`. `src/tools/` is skipped:
+  it writes for AI clients, not the page.
 
 ## Canonical Docs Order
 

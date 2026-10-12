@@ -1642,15 +1642,20 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
   throw new Error(`Unknown CCTV action: ${args.action || 'missing'}`);
 }
 
+// Labels are place names returned to the voice model as tool data.
 const RADIO_COUNTRY_CENTERS = new Map([
+  // i18n-ignore: place name in tool data
   ['us', { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' }],
+  // i18n-ignore: place name in tool data
   ['usa', { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' }],
   [
     'united states',
+    // i18n-ignore: place name in tool data
     { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' },
   ],
   [
     'united states of america',
+    // i18n-ignore: place name in tool data
     { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' },
   ],
 ]);
@@ -2251,6 +2256,7 @@ async function trackEntity(
           action: 'track_entity',
           kind: 'fire',
           layerId: 'local-firms',
+          // i18n-ignore: entity name in a tool result for the voice model
           label: strongest.label || 'Strongest fire',
           latitude: strongest.latitude,
           longitude: strongest.longitude,

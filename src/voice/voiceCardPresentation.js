@@ -2,6 +2,7 @@ import { planStepLabel, progressStepLabel, spokenLabel } from './speech.js';
 import { presentResult } from './resultDisplay.js';
 import { MAX_DISPLAYED_REFERENTS, normalizeReferents } from './referents.js';
 
+import { t } from '../i18n/index.js';
 /**
  * Pure presentation of the voice card nested in the voice control: captions,
  * the current plan, the latest result and its numbered referents.
@@ -244,7 +245,9 @@ export function voiceCardView(state) {
   const display = state.result?.display || null;
   const allNotes = [
     ...(display?.notes || []),
-    ...(display?.sources || []).map((source) => `Source: ${source.label}`),
+    ...(display?.sources || []).map((source) =>
+      t('Source: {label}', { label: source.label }),
+    ),
   ];
   // Analyst notes carry count/scope/provenance qualifications. Preserve their
   // full sanitized text in at most six existing rows, joining overflow into
@@ -274,7 +277,7 @@ export function voiceCardView(state) {
     },
     pointer: {
       visible: Boolean(state.pointer),
-      kind: state.pointer?.kind === 'here' ? 'HERE' : 'THIS',
+      kind: state.pointer?.kind === 'here' ? t('HERE') : t('THIS'),
       text: spokenLabel(state.pointer?.label || '', 32),
     },
     assistant: {

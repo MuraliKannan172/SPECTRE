@@ -33,6 +33,7 @@ import {
   validateBox,
   viewTooLargeMessage,
 } from './model.js';
+import { t } from '../../i18n/index.js';
 
 /**
  * Quiet time after the last arrow key before the focused day previews, so a
@@ -748,15 +749,21 @@ export function createRecentImageryLayer({
 
   function notes() {
     const out = [];
-    if (_truncated) out.push('Catalog truncated · a newer clear day may exist');
+    if (_truncated)
+      out.push(t('Catalog truncated · a newer clear day may exist'));
     for (const error of _catalogErrors) {
       const label = PRODUCTS[error.product]?.label || error.product;
-      out.push(`${label} catalog unavailable · ${error.message}`);
+      out.push(
+        t('{label} catalog unavailable · {detail}', {
+          label,
+          detail: error.message,
+        }),
+      );
     }
     const today = utcDay(now());
     const viirsToday = candidateFor(`VIIRS:${today}`);
     if (viirsToday?.availability === 'unknown' && _sources.viirs)
-      out.push('Daily overview for today may still be empty until the pass');
+      out.push(t('Daily overview for today may still be empty until the pass'));
     return out;
   }
 
@@ -767,7 +774,7 @@ export function createRecentImageryLayer({
       key: key || null,
       candidate: candidateFor(key),
       label: parsed
-        ? `${shortDay(parsed.day)} · ${PRODUCTS[parsed.product].name} · ${PRODUCTS[parsed.product].resolutionM} m`
+        ? `${shortDay(parsed.day)} · ${t(PRODUCTS[parsed.product].name)} · ${PRODUCTS[parsed.product].resolutionM} m`
         : null,
       sourceOff,
       drapable: drapable(candidateFor(key)),
@@ -1329,17 +1336,18 @@ export function createRecentImageryLayer({
         chips: [
           {
             id: 'hls',
-            label: 'MORE DETAIL · 30 m',
+            label: t('MORE DETAIL · 30 m'),
             active: _sources.hls,
-            title: 'Sentinel-2 and Landsat via HLS, 30 m, every 2–6 days',
+            title: t('Sentinel-2 and Landsat via HLS, 30 m, every 2–6 days'),
             params: { hls: !_sources.hls },
           },
           {
             id: 'viirs',
-            label: 'DAILY OVERVIEW · 250 m',
+            label: t('DAILY OVERVIEW · 250 m'),
             active: _sources.viirs,
-            title:
+            title: t(
               'VIIRS daily mosaic, 250 m, follows broad changes; little detail under 25 km',
+            ),
             params: { viirs: !_sources.viirs },
           },
         ],

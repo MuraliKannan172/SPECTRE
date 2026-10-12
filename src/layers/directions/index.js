@@ -21,6 +21,7 @@ import {
   formatRouteDistance,
   formatRouteDuration,
 } from '../../data/routeSteps.js';
+import { t, msg } from '../../i18n/index.js';
 
 export const DIRECTIONS_STEP_OVERLAY_SOURCE_ID = 'directions-step';
 export const DIRECTIONS_STEP_OVERLAY_SOURCE_OPTIONS = Object.freeze({
@@ -31,9 +32,9 @@ export const DIRECTIONS_STEP_OVERLAY_SOURCE_OPTIONS = Object.freeze({
 
 /** Travel modes, keyed by the `/api/route` profile name. */
 export const DIRECTIONS_MODES = Object.freeze({
-  car: Object.freeze({ chip: 'DRIVE', word: 'Drive', icon: '🚗' }),
-  foot: Object.freeze({ chip: 'WALK', word: 'Walk', icon: '🚶' }),
-  bike: Object.freeze({ chip: 'BIKE', word: 'Bike', icon: '🚲' }),
+  car: Object.freeze({ chip: msg('DRIVE'), word: msg('Drive'), icon: '🚗' }),
+  foot: Object.freeze({ chip: msg('WALK'), word: msg('Walk'), icon: '🚶' }),
+  bike: Object.freeze({ chip: msg('BIKE'), word: msg('Bike'), icon: '🚲' }),
 });
 export const DEFAULT_DIRECTIONS_MODE = 'car';
 
@@ -107,32 +108,35 @@ export function directionsRowControls(state) {
   const routing = status === 'routing';
   const chips = Object.entries(DIRECTIONS_MODES).map(([id, spec]) => ({
     id: `mode-${id}`,
-    label: spec.chip,
+    label: t(spec.chip),
     active: mode === id,
     state: mode === id ? 'active' : 'idle',
-    title: `${spec.word} — reroute for ${spec.word.toLowerCase()}`,
+    title: t('{mode} — reroute for {modeLower}', {
+      mode: t(spec.word),
+      modeLower: t(spec.word).toLowerCase(),
+    }),
     params: { mode: id },
   }));
   chips.push({
     id: 'set-a',
-    label: armed === 'a' ? 'CLICK MAP' : a ? 'A ✓' : 'SET A',
+    label: armed === 'a' ? t('CLICK MAP') : a ? 'A ✓' : t('SET A'),
     active: armed === 'a',
     state: armed === 'a' ? 'active' : 'idle',
     title:
       armed === 'a'
-        ? 'Click a spot on the globe to place A (click again to cancel)'
-        : 'Then click the globe to place the start',
+        ? t('Click a spot on the globe to place A (click again to cancel)')
+        : t('Then click the globe to place the start'),
     params: { arm: armed === 'a' ? null : 'a' },
   });
   chips.push({
     id: 'set-b',
-    label: armed === 'b' ? 'CLICK MAP' : b ? 'B ✓' : 'SET B',
+    label: armed === 'b' ? t('CLICK MAP') : b ? 'B ✓' : t('SET B'),
     active: armed === 'b',
     state: armed === 'b' ? 'active' : 'idle',
     title:
       armed === 'b'
-        ? 'Click a spot on the globe to place B (click again to cancel)'
-        : 'Then click the globe to place the destination',
+        ? t('Click a spot on the globe to place B (click again to cancel)')
+        : t('Then click the globe to place the destination'),
     params: { arm: armed === 'b' ? null : 'b' },
   });
   chips.push({
@@ -140,26 +144,28 @@ export function directionsRowControls(state) {
     label: '⇄',
     disabled: !(a && b) || routing,
     state: 'idle',
-    title: 'Swap A and B',
+    title: t('Swap A and B'),
     params: { swap: true },
   });
   const flying = Number.isInteger(flightStep);
   chips.push({
     id: 'fly',
-    label: routing ? 'FLY ···' : flying ? 'FLYING' : 'FLY',
+    label: routing ? t('FLY ···') : flying ? t('FLYING') : t('FLY'),
     disabled: !route || routing,
     busy: routing || flying,
     active: flying,
     state: routing || flying ? 'loading' : 'idle',
-    title: route ? 'Fly the camera along the route' : 'Place A and B first',
+    title: route
+      ? t('Fly the camera along the route')
+      : t('Place A and B first'),
     params: { fly: true },
   });
   chips.push({
     id: 'clear',
-    label: 'CLEAR',
+    label: t('CLEAR'),
     disabled: !a && !b && !route,
     state: 'idle',
-    title: 'Remove the route and both markers',
+    title: t('Remove the route and both markers'),
     params: { clear: true },
   });
   return {
@@ -179,8 +185,8 @@ export function directionsRowControls(state) {
  */
 export const POINTER_TOOL_EXITS = Object.freeze({
   draw: Object.freeze({
-    name: 'Draw',
-    leave: 'press Escape twice to leave Draw',
+    name: msg('Draw'),
+    leave: msg('press Escape twice to leave Draw'),
   }),
 });
 
@@ -201,9 +207,16 @@ export function pointerBlockedMessage(owner, which) {
   if (!id || id === DIRECTIONS_POINTER_OWNER) return null;
   const endpoint = which === 'b' ? 'B' : 'A';
   const known = POINTER_TOOL_EXITS[id];
-  const name = known?.name || id;
-  const leave = known?.leave || `turn ${name} off`;
-  return `${name} is active — ${leave}, then set ${endpoint}`;
+  if (!known)
+    return t('{name} is active — turn {name} off, then set {endpoint}', {
+      name: id,
+      endpoint,
+    });
+  return t('{name} is active — {leave}, then set {endpoint}', {
+    name: t(known.name),
+    leave: t(known.leave),
+    endpoint,
+  });
 }
 
 /**
@@ -285,13 +298,15 @@ export function directionsStepList({
       id: 'step-truncated',
       ordinal: items.length + 1,
       lead: '',
-      text: `Only the first ${steps.length} turns of this route are shown`,
+      text: t('Only the first {count} turns of this route are shown', {
+        count: steps.length,
+      }),
       active: false,
       current: false,
       disabled: true,
     });
   }
-  return { ariaLabel: 'Turn-by-turn directions', items };
+  return { ariaLabel: t('Turn-by-turn directions'), items };
 }
 
 /**
@@ -331,12 +346,12 @@ export function directionsStats(state) {
     armed,
     pointerBlocked,
   } = state;
-  const source = 'OSM routing';
+  const source = t('OSM routing');
   if (pointerBlocked) {
     return {
       count: route?.steps.length || 0,
       lastUpdate,
-      error: 'Another map tool is using clicks — close it, then SET A again',
+      error: t('Another map tool is using clicks — close it, then SET A again'),
       status: 'empty',
       source,
     };
@@ -347,7 +362,7 @@ export function directionsStats(state) {
       lastUpdate,
       error: null,
       loading: true,
-      loadingLabel: 'Routing…',
+      loadingLabel: t('Routing…'),
       source,
     };
   }
@@ -355,7 +370,7 @@ export function directionsStats(state) {
     return {
       count: 0,
       lastUpdate,
-      error: error || 'No route found',
+      error: error || t('No route found'),
       status: 'empty',
       source,
     };
@@ -364,10 +379,17 @@ export function directionsStats(state) {
   // set (not only while loading), so the route summary and the placement
   // guidance ride on it; `coverage` carries the same text for stats readers.
   if (route) {
-    const word = DIRECTIONS_MODES[mode]?.word || mode;
-    const summary =
-      `${formatRouteDistance(route.distanceM)} · ${formatRouteDuration(route.durationS)} · ${word}` +
-      (route.stepsTruncated ? ` · first ${route.steps.length} turns` : '');
+    const spec = DIRECTIONS_MODES[mode];
+    const word = spec ? t(spec.word) : mode;
+    const values = {
+      distance: formatRouteDistance(route.distanceM),
+      duration: formatRouteDuration(route.durationS),
+      mode: word,
+      count: route.steps.length,
+    };
+    const summary = route.stepsTruncated
+      ? t('{distance} · {duration} · {mode} · first {count} turns', values)
+      : t('{distance} · {duration} · {mode}', values);
     return {
       count: route.steps.length,
       lastUpdate,
@@ -378,10 +400,13 @@ export function directionsStats(state) {
     };
   }
   let coverage;
-  if (armed) coverage = `Click the globe to place ${armed.toUpperCase()}`;
-  else if (a && !b) coverage = 'SET B, then click the globe';
-  else if (!a && b) coverage = 'SET A, then click the globe';
-  else coverage = 'SET A, then click the globe';
+  if (armed)
+    coverage = t('Click the globe to place {endpoint}', {
+      endpoint: armed.toUpperCase(),
+    });
+  else if (a && !b) coverage = t('SET B, then click the globe');
+  else if (!a && b) coverage = t('SET A, then click the globe');
+  else coverage = t('SET A, then click the globe');
   return {
     count: 0,
     lastUpdate,
@@ -405,11 +430,18 @@ export function directionsStepCopy(steps, index) {
   const leg = [];
   if (step.distanceM > 0) leg.push(formatRouteDistance(step.distanceM));
   if (step.durationS > 0) leg.push(formatRouteDuration(step.durationS));
+  const position = { step: index + 1, total: steps.length };
   details.push(
-    `Step ${index + 1} of ${steps.length}${leg.length ? ` · then ${leg.join(' · ')}` : ''}`,
+    leg.length
+      ? t('Step {step} of {total} · then {leg}', {
+          ...position,
+          leg: leg.join(' · '),
+        })
+      : t('Step {step} of {total}', position),
   );
   const next = steps[index + 1];
-  if (next) details.push(`Then: ${next.instruction}`);
+  if (next)
+    details.push(t('Then: {instruction}', { instruction: next.instruction }));
   return { title: step.instruction, details };
 }
 
@@ -840,10 +872,10 @@ export function createDirectionsLayer({ services, source }) {
         _status = 'error';
         _error =
           payload?.error === 'no route found'
-            ? 'No route found between A and B'
+            ? t('No route found between A and B')
             : payload?.error
-              ? `Routing failed: ${payload.error}`
-              : 'No route found between A and B';
+              ? t('Routing failed: {error}', { error: payload.error })
+              : t('No route found between A and B');
         return;
       }
       _route = route;
@@ -860,10 +892,10 @@ export function createDirectionsLayer({ services, source }) {
       // happened instead.
       _error =
         error?.name === 'AbortError'
-          ? 'Routing timed out'
+          ? t('Routing timed out')
           : error?.name === 'TypeError'
-            ? 'Routing unavailable — no response from the routing service'
-            : error?.message || 'Routing unavailable';
+            ? t('Routing unavailable — no response from the routing service')
+            : error?.message || t('Routing unavailable');
     } finally {
       clearTimeout(timer);
       if (_routeAbort === controller) _routeAbort = null;
@@ -1058,7 +1090,7 @@ export function createDirectionsLayer({ services, source }) {
       [
         {
           type: 'route',
-          label: 'Directions',
+          label: t('Directions'),
           path: _route.geometry.map(([lon, lat]) => ({ lon, lat, height: 0 })),
         },
       ],

@@ -113,7 +113,7 @@
     <div class="cockpit-topline">
       <div>
         <span class="cockpit-kicker" data-i18n>FIRST PERSON</span>
-        <strong id="cockpit-callsign">AIRCRAFT</strong>
+        <strong id="cockpit-callsign" data-i18n>AIRCRAFT</strong>
         <span id="cockpit-aircraft-meta" class="cockpit-aircraft-meta" data-i18n>LIVE TRACK · COURSE ALIGNED</span>
       </div>
       <div class="cockpit-vision-controls" role="group" aria-label="Cockpit vision style" data-i18n-aria-label>
@@ -123,7 +123,7 @@
         </button>
         <button id="cockpit-vision-current" class="cockpit-vision-current" type="button" data-cockpit-vision="optical" aria-label="Current cockpit vision style: NORMAL. Activate for next style." title="Current style: NORMAL — click for next" data-i18n-aria-label data-i18n-title>
           <small data-i18n>CURRENT</small>
-          <strong id="cockpit-vision-current-label" aria-live="polite">NORMAL</strong>
+          <strong id="cockpit-vision-current-label" aria-live="polite" data-i18n>NORMAL</strong>
         </button>
         <button id="cockpit-vision-next" class="cockpit-vision-nav" type="button" aria-label="Next cockpit vision style" title="Next vision style" data-i18n-aria-label data-i18n-title>
           <small data-i18n>NEXT</small>
@@ -137,13 +137,13 @@
         <div class="cockpit-readout cockpit-speed">
           <span class="cockpit-readout-label" data-i18n>GROUND SPEED</span>
           <strong id="cockpit-speed-value">---</strong>
-          <span class="cockpit-readout-unit">KTS</span>
+          <span class="cockpit-readout-unit" data-i18n>KTS</span>
         </div>
         <div class="cockpit-heading-value"><span id="cockpit-heading-value">---</span><small>°</small></div>
         <div class="cockpit-readout cockpit-altitude">
           <span class="cockpit-readout-label" data-i18n>ALTITUDE</span>
           <strong id="cockpit-altitude-value">-----</strong>
-          <span class="cockpit-readout-unit">FT</span>
+          <span class="cockpit-readout-unit" data-i18n>FT</span>
         </div>
       </div>
       <span class="cockpit-heading-caret material-symbols-outlined" aria-hidden="true">arrow_drop_down</span>
@@ -156,7 +156,7 @@
     <aside id="cockpit-context" class="cockpit-context-window" aria-label="Contact cockpit summary" hidden data-i18n-aria-label>
       <header class="cockpit-context-header">
         <div>
-          <span class="cockpit-context-kicker">CONTACT</span>
+          <span data-i18n class="cockpit-context-kicker">CONTACT</span>
           <strong id="cockpit-context-subject" data-i18n>CONTACTS · 250 KM</strong>
         </div>
         <nav class="cockpit-context-actions" aria-label="Contact navigation" data-i18n-aria-label>
@@ -173,10 +173,10 @@
         <span class="cockpit-context-qualifier" data-i18n>CONTEXT ONLY</span>
       </header>
       <div class="cockpit-context-cohorts" role="list" aria-label="Nearby cohort counts" data-i18n-aria-label>
-        <div role="listitem" data-context-cohort="flights"><span>FLT</span><strong>—</strong><small>OpenSky</small></div>
-        <div role="listitem" data-context-cohort="military"><span>MIL</span><strong>—</strong><small>adsb.lol</small></div>
-        <div role="listitem" data-context-cohort="ais-live-vessels"><span>AIS</span><strong>—</strong><small>AISStream</small></div>
-        <div role="listitem" data-context-cohort="military-installations"><span>SITE</span><strong>—</strong><small>OpenStreetMap</small></div>
+        <div role="listitem" data-context-cohort="flights"><span data-i18n>FLT</span><strong>—</strong><small translate="no">OpenSky</small></div>
+        <div role="listitem" data-context-cohort="military"><span data-i18n>MIL</span><strong>—</strong><small translate="no">adsb.lol</small></div>
+        <div role="listitem" data-context-cohort="ais-live-vessels"><span translate="no">AIS</span><strong>—</strong><small translate="no">AISStream</small></div>
+        <div role="listitem" data-context-cohort="military-installations"><span data-i18n>SITE</span><strong>—</strong><small translate="no">OpenStreetMap</small></div>
       </div>
       <div class="cockpit-context-nearest">
         <span id="cockpit-context-direction" class="material-symbols-outlined" aria-hidden="true">navigation</span>
@@ -197,8 +197,8 @@
           aria-pressed="false"
           title="Enable cockpit weather effects" data-i18n-aria-label data-i18n-title
         >
-          <span>WX</span>
-          <strong id="cockpit-weather-state">OFF</strong>
+          <span data-i18n>WX</span>
+          <strong data-i18n id="cockpit-weather-state">OFF</strong>
         </button>
         <time id="cockpit-context-updated">--:--:--Z</time>
       </footer>
@@ -223,7 +223,7 @@
       </section>
       <header class="cockpit-signal-header">
         <div class="cockpit-brief-heading">
-          <span id="cockpit-brief-kicker" class="cockpit-signal-kicker"><i aria-hidden="true"></i> LIVE SIGNALS</span>
+          <span id="cockpit-brief-kicker" class="cockpit-signal-kicker" data-i18n-runtime><i aria-hidden="true"></i> LIVE SIGNALS</span>
           <strong id="cockpit-brief-subtitle" data-i18n>OBSERVED / MAPPED PINGS</strong>
         </div>
         <nav class="cockpit-brief-actions" aria-label="Cockpit briefing controls" data-i18n-aria-label>
@@ -239,7 +239,7 @@
             type="button"
             aria-label="CYCLE OFF"
             aria-pressed="false"
-            title="Cycle briefing pages automatically every 9 seconds (Signals → News → Local). Pauses while you hover or focus the panel. Live signal data refreshes continuously either way." data-i18n-title
+            title="Cycle briefing pages automatically every 9 seconds (Signals → News → Local). Pauses while you hover or focus the panel. Live signal data refreshes continuously either way." data-i18n-title data-i18n-aria-label data-i18n
           >CYCLE OFF</button>
           <button id="cockpit-signal-toggle" type="button" aria-label="Collapse cockpit briefing panel" aria-expanded="true" title="Collapse briefing panel" data-i18n-aria-label data-i18n-title>
             <span class="material-symbols-outlined" aria-hidden="true">right_panel_close</span>
@@ -260,20 +260,20 @@
             <small id="cockpit-local-coordinates">--</small>
           </div>
           <div class="cockpit-local-grid">
-            <div><span data-i18n>TEMP</span><strong id="cockpit-local-temperature">—</strong><small>OPEN-METEO</small></div>
+            <div><span data-i18n>TEMP</span><strong id="cockpit-local-temperature">—</strong><small translate="no">OPEN-METEO</small></div>
             <div><span data-i18n>WIND</span><strong id="cockpit-local-wind">—</strong><small id="cockpit-local-wind-direction">—</small></div>
-            <div><span data-i18n>SKY</span><strong id="cockpit-local-condition">UNKNOWN</strong><small id="cockpit-local-cloud">—</small></div>
-            <div><span data-i18n>PRECIP</span><strong id="cockpit-local-precipitation">—</strong><small>MM</small></div>
+            <div><span data-i18n>SKY</span><strong id="cockpit-local-condition" data-i18n>UNKNOWN</strong><small id="cockpit-local-cloud">—</small></div>
+            <div><span data-i18n>PRECIP</span><strong id="cockpit-local-precipitation">—</strong><small data-i18n>MM</small></div>
           </div>
-          <a class="cockpit-weather-credit" href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a>
+          <a class="cockpit-weather-credit" href="https://open-meteo.com/" target="_blank" rel="noopener" data-i18n>Weather data by Open-Meteo.com</a>
         </section>
       </div>
       <footer class="cockpit-signal-footer">
         <span id="cockpit-brief-source" data-i18n>SOURCE-BACKED EVENTS · NO SYNTHETIC NEWS</span>
-        <nav class="cockpit-brief-tabs" aria-label="Cockpit briefing pages">
-          <button type="button" data-cockpit-brief-index="0" aria-label="Show Live Signals" aria-current="true" data-i18n-aria-label>SIG</button>
-          <button type="button" data-cockpit-brief-index="1" aria-label="Show Regional News" data-i18n-aria-label>NEWS</button>
-          <button type="button" data-cockpit-brief-index="2" aria-label="Show Local Info" data-i18n-aria-label>LOCAL</button>
+        <nav class="cockpit-brief-tabs" aria-label="Cockpit briefing pages" data-i18n-aria-label>
+          <button type="button" data-cockpit-brief-index="0" aria-label="Show Live Signals" aria-current="true" data-i18n-aria-label data-i18n>SIG</button>
+          <button type="button" data-cockpit-brief-index="1" aria-label="Show Regional News" data-i18n-aria-label data-i18n>NEWS</button>
+          <button type="button" data-cockpit-brief-index="2" aria-label="Show Local Info" data-i18n-aria-label data-i18n>LOCAL</button>
         </nav>
       </footer>
     </aside>
@@ -313,7 +313,7 @@
         </div>
       </div>
     </aside>
-    <div class="cockpit-help">ESC EXIT <span>·</span> C TOGGLE</div>
+    <div class="cockpit-help"><bdi data-i18n>ESC EXIT</bdi> <span>·</span> <bdi data-i18n>C TOGGLE</bdi></div>
   </section>
 
   <nav id="view-switcher" aria-label="View switcher" data-i18n-aria-label>

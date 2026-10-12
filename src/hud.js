@@ -186,6 +186,7 @@ export class IntelHUD {
     this._el = document.getElementById('intel-hud');
     if (!this._el) return;
 
+    // i18n-ignore: sensor readout codes (MGRS, GSD, NIIRS, ONA, BAND…) and a classification banner; translated parts use t()
     this._el.innerHTML = `
       <div class="hud-sonar" aria-hidden="true"></div>
 
@@ -228,7 +229,7 @@ export class IntelHUD {
         <div class="hud-content" style="text-align:right">
           <div id="hud-gsd">GSD: --m  NIIRS: --</div>
           <div id="hud-alt">ALT: --m   SUN: --° EL</div>
-          <div id="hud-ais-vessel" class="hud-ais-vessel">AIS: --</div>
+          <div id="hud-ais-vessel" class="hud-ais-vessel">${t('AIS: --')}</div>
         </div>
         <div class="hud-bracket">┘</div>
       </div>
@@ -356,9 +357,11 @@ export class IntelHUD {
       const formatted = this._formatMGRS(mgrsStr);
       mgrsLabel = formatted;
       const el = document.getElementById('hud-mgrs');
+      // i18n-ignore: sensor readout codes, same in every language
       if (el) el.textContent = `MGRS: ${formatted}`;
     } catch {
       const el = document.getElementById('hud-mgrs');
+      // i18n-ignore: sensor readout codes, same in every language
       if (el) el.textContent = 'MGRS: ---';
     }
 
@@ -367,6 +370,7 @@ export class IntelHUD {
     if (llEl) llEl.textContent = `${latDMS} ${lonDMS}`;
     const bottomEl = document.getElementById('hud-bottom-line');
     if (bottomEl) {
+      // i18n-ignore: sensor readout codes, same in every language
       bottomEl.textContent = `MGRS: ${mgrsLabel}  LAT: ${latDMS}  LON: ${lonDMS}`;
     }
 
@@ -382,6 +386,7 @@ export class IntelHUD {
     );
     const gsdEl = document.getElementById('hud-gsd');
     if (gsdEl)
+      // i18n-ignore: sensor readout codes, same in every language
       gsdEl.textContent = `GSD: ${gsd.toFixed(2)}m  NIIRS: ${niirs.toFixed(1)}`;
 
     // Altitude — reported as height above MEAN SEA LEVEL. `altM` is the raw
@@ -394,6 +399,7 @@ export class IntelHUD {
     const altMslM = ellipsoidalToMslDisplayM(altM, geoidN);
     const sunEl = this._estimateSunElevation(latDeg, lonDeg);
     if (altEl)
+      // i18n-ignore: sensor readout codes, same in every language
       altEl.textContent = `ALT: ${Math.round(altMslM)}m   SUN: ${sunEl.toFixed(1)}° EL`;
 
     // Collection timestamp
@@ -403,6 +409,7 @@ export class IntelHUD {
       const h = String(now.getUTCHours()).padStart(2, '0');
       const m = String(now.getUTCMinutes()).padStart(2, '0');
       const s = String(now.getUTCSeconds()).padStart(2, '0');
+      // i18n-ignore: sensor readout codes, same in every language
       collEl.textContent = `COLL: ${h}:${m}:${s}Z`;
     }
 
@@ -411,6 +418,7 @@ export class IntelHUD {
     const pitchDeg = Cesium.Math.toDegrees(camera.pitch);
     const ona = Math.max(0, 90 + pitchDeg);
     const onaEl = document.getElementById('hud-ona');
+    // i18n-ignore: sensor readout codes, same in every language
     if (onaEl) onaEl.textContent = `ONA: ${ona.toFixed(1)}°`;
 
     // `altM` stays the raw ellipsoidal camera height the sensor model reads

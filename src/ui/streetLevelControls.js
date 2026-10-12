@@ -123,7 +123,7 @@ export class StreetLevelControls {
     const sinceDays = () =>
       SINCE_STOPS[Number(el.sinceRange?.value) || 0]?.days ?? 0;
     this.listen(el.sinceRange, 'input', () => {
-      const label = SINCE_STOPS[Number(el.sinceRange.value) || 0].label;
+      const label = t(SINCE_STOPS[Number(el.sinceRange.value) || 0].label);
       if (el.sinceLabel) el.sinceLabel.textContent = label;
       el.sinceRange.setAttribute('aria-valuetext', label);
     });

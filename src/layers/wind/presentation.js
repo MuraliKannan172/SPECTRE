@@ -1,4 +1,5 @@
 import { formatWindSpeed, WIND_UNITS } from './inspection.js';
+import { t } from '../../i18n/index.js';
 
 /** Reformat a captured sample; changing units never samples the map again. */
 export function formatWindReading(reading, units) {
@@ -22,33 +23,52 @@ export function windUnitChips(units) {
     label: value,
     active: units === value,
     params: { units: value },
-    title: 'Wind speed units',
+    title: t('Wind speed units'),
   }));
+}
+
+/** The wind line in the active language; the reading itself stays English. */
+function windText(reading) {
+  if (!Number.isFinite(reading.speed))
+    return reading.wind === 'Aim the map center at Earth'
+      ? t('Aim the map center at Earth')
+      : reading.wind;
+  const speed = formatWindSpeed(reading.speed, reading.units);
+  return reading.from === 'Calm'
+    ? `${speed}${t(' · calm')}`
+    : `${speed}${t(' from {direction}', { direction: t(reading.from) })}`;
 }
 
 /** Portable result block consumed by the WEATHER card. */
 export function windReadingResult(reading) {
+  const coordinates =
+    reading.coordinates === 'No surface reading'
+      ? t('No surface reading')
+      : reading.coordinates.replace(' · ', ' ');
   return {
     id: 'reading',
-    label: `WIND AT ${reading.coordinates.replace(' · ', ' ')}`,
+    label: t('WIND AT {coordinates}', { coordinates }),
     lines: [
       {
         id: 'wind',
-        text: reading.wind,
+        text: windText(reading),
       },
       {
         id: 'meta',
-        text: `${reading.model} · valid ${reading.validTime?.replace(/^\d{4}-/, '')}`,
+        text: t('{model} · valid {time}', {
+          model: reading.model,
+          time: reading.validTime?.replace(/^\d{4}-/, ''),
+        }),
       },
       ...(reading.scalarValue
         ? [
             {
               id: 'scalar',
-              text: `${reading.scalarLabel} · ${reading.scalarValue}`,
+              text: `${t(reading.scalarLabel)} · ${reading.scalarValue}`,
             },
           ]
         : []),
-      { id: 'explanation', text: reading.explanation },
+      { id: 'explanation', text: t(reading.explanation) },
     ],
     clear: { params: { inspect: false } },
   };

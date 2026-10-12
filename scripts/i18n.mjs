@@ -207,7 +207,7 @@ const JS_SINKS = [
   /\b(?:createTextNode|insertAdjacentText)\(\s*(?:['"][a-z]+['"]\s*,\s*)?/g,
   /\binsertAdjacentHTML\(\s*['"][a-z]+['"]\s*,\s*/g,
   /\b(?:showToast|toast|setHint|announce)\(\s*/g,
-  /(?:^|[{,\s])(?:label|title|tooltip|placeholder|hint|ariaLabel|caption|subtitle|kicker|emptyText)\s*:\s*/gm,
+  /(?:^|[{,\s])(?:label|title|tooltip|placeholder|hint|ariaLabel|caption|subtitle|kicker|emptyText|blurb|countLabel)\s*:\s*/gm,
 ];
 const MARKERS = /\b(?:t|tn|msg)\(/y;
 
@@ -300,11 +300,11 @@ function visibleText(literal, html) {
     const attrs = [
       ...body.matchAll(/\s(?:title|aria-label|placeholder|alt)="([^"]*)"/g),
     ].map((m) => m[1]);
-    body = [body.replace(/<[^>]*>/g, ' '), ...attrs].join(' ');
+    body = decodeHtml([body.replace(/<[^>]*>/g, ' '), ...attrs].join(' '));
   }
   const text = normalize(body);
   if (!hasWords(text)) return null;
-  if (/[{};]/.test(text) && /:\s*[^\s]/.test(text)) return null; // CSS
+  if (/\{[^{}]*:[^{}]*\}|^[\w-]+\s*:\s*[^;]+;/.test(text)) return null; // CSS
   if (/^(?:rgba?|hsla?)\(|\b\d+px\b/.test(text)) return null; // colours, fonts
   if (/^[a-z0-9_.:/-]+$/.test(text) || /^https?:/.test(text)) return null;
   return text;
