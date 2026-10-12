@@ -4143,6 +4143,8 @@ and unreachable upstream (502/504) separately from road geometry.
 
 ### Place-search providers
 
+Coordinate input requires exactly two nonempty components; extra comma or semicolon separators decline to geocoding rather than silently choosing a location.
+
 Location search/fly-to, annotations and Radio location lookup receive one
 `placeSearch.geocode(query, { bias, signal })` service. `src/standalone` composes
 two offline providers first — a strict decimal-degree coordinate reader and an
@@ -5127,8 +5129,3 @@ datacenters, dams and the Nepal locator retain that shared credit while displaye
 
 Military fragments stitch by source identity. Different mapped parcels merge only
 when their footprints touch or contain one another, never across a seam tolerance gap.
-
-
-### fix(search): refuse empty coordinate components instead of silently dropping them
-
-Require exactly two nonempty components while preserving comma, semicolon and whitespace pairs. Malformed separator input falls through to geocoding.
