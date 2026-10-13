@@ -189,7 +189,10 @@
   are navigation-integrity anomalies; suspected GNSS interference is a
   secondary, unvalidated interpretation. The layer and the proxy expose
   machine-readable provenance (`provenance`, `classifier: gev-nic-nacp-v1`).
-  Keyless, worldwide wherever adsb.lol has receivers; reads
+  Automatically refreshes after camera pan/zoom without toggling, coalesces
+  nearby views, and uses the Earth point under the screen centre at globe scale.
+  Keyless regional sampling wherever adsb.lol has receivers; the row labels
+  the 250 nm radius, which remains regional when zoomed out. Reads
   a capped 250 nm snapshot around the camera through `/api/gnss-integrity`,
   which returns integrity fields only and serves the last snapshot (with its
   original observation time and `ageMs`, for at most 30 minutes) when the

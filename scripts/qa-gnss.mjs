@@ -243,11 +243,13 @@ async function stubRoute(page, { ageMs = 0 } = {}) {
   await page.evaluateOnNewDocument(
     (payload, age) => {
       window.__gnssQaAgeMs = age;
+      window.__gnssQaRequests = [];
       const realFetch = window.fetch.bind(window);
       window.__gnssQaMode = 'fixture';
       window.fetch = (input, init) => {
         const url = typeof input === 'string' ? input : input?.url || '';
         if (!url.includes('/api/gnss-integrity')) return realFetch(input, init);
+        window.__gnssQaRequests.push(url);
         const ok = window.__gnssQaMode === 'fixture';
         const body = ok
           ? {
@@ -480,6 +482,86 @@ async function main() {
     );
     await shoot(page, 'synthetic-bands');
 
+    console.log('\nCAMERA — automatic regional refresh without toggling...');
+    const beforeMove = await page.evaluate(
+      () => window.__gnssQaRequests.length,
+    );
+    await page.evaluate(() => {
+      const { viewer } = window.__godsEyeView;
+      viewer.camera.setView({
+        destination: viewer.scene.globe.ellipsoid.cartographicToCartesian({
+          longitude: (139.7 * Math.PI) / 180,
+          latitude: (35.7 * Math.PI) / 180,
+          height: 1_100_000,
+        }),
+        orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
+      });
+      viewer.scene.requestRender();
+    });
+    await page.waitForFunction(
+      () => {
+        const url = window.__gnssQaRequests.at(-1);
+        return (
+          url &&
+          Math.abs(
+            Number(new URL(url, location.origin).searchParams.get('lon')) -
+              139.7,
+          ) < 1
+        );
+      },
+      { timeout: 15000 },
+    );
+    await sleep(3500);
+    const moved = await page.evaluate(
+      (id) => ({
+        requests: window.__gnssQaRequests.length,
+        enabled: window.__godsEyeView.dataManager.isEnabled(id),
+        coverage: window.__godsEyeView.dataManager.layers
+          .get(id)
+          .module.getStats().coverage,
+        info: document.querySelector(
+          `[data-layer-id="${id}"] .data-toggle-controls-info`,
+        )?.textContent,
+      }),
+      LAYER_ID,
+    );
+    record(
+      'CAMERA: moving to Tokyo automatically refreshes the new region and updates the row',
+      moved.enabled &&
+        moved.requests > beforeMove &&
+        moved.requests <= beforeMove + 2 &&
+        moved.coverage?.longitude === 140 &&
+        /Regional sample.*250 nm radius/.test(moved.info),
+      JSON.stringify(moved),
+    );
+    await shoot(page, 'camera-refresh');
+    await page.evaluate(() => {
+      const { viewer } = window.__godsEyeView;
+      viewer.camera.setView({
+        destination: viewer.scene.globe.ellipsoid.cartographicToCartesian({
+          longitude: (18.6 * Math.PI) / 180,
+          latitude: (54.6 * Math.PI) / 180,
+          height: 450_000,
+        }),
+        orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
+      });
+      viewer.scene.requestRender();
+    });
+    await page.waitForFunction(
+      () => {
+        const url = window.__gnssQaRequests.at(-1);
+        return (
+          url &&
+          Math.abs(
+            Number(new URL(url, location.origin).searchParams.get('lon')) -
+              18.6,
+          ) < 1
+        );
+      },
+      { timeout: 15000 },
+    );
+    await sleep(3500);
+
     // ── (iii) FAILURE ─────────────────────────────────────────────────────
     console.log('\n(iii) FAILURE — /api/gnss-integrity stubbed to 502...');
     await page.evaluate(() => {
@@ -550,6 +632,8 @@ async function main() {
         rowRight: Math.round(rect.right),
         overflow: row.scrollWidth - row.clientWidth,
         legendItems: legend.length,
+        coverageInfo: row.querySelector('.data-toggle-controls-info')
+          ?.textContent,
         legendInside: legend.every((item) => {
           const r = item.getBoundingClientRect();
           return (
@@ -564,6 +648,7 @@ async function main() {
         fit.rowRight <= fit.width &&
         fit.overflow <= 0 &&
         fit.legendItems === 3 &&
+        /Regional sample.*250 nm radius/.test(fit.coverageInfo) &&
         fit.legendInside,
       JSON.stringify(fit),
     );

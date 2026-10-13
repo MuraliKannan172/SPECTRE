@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createGnssIntegrityLayer } from './index.js';
+import * as Cesium from 'cesium';
+import { createGnssIntegrityLayer, defaultGnssViewAnchor } from './index.js';
+import { LayerLifecycle } from '../../data/lifecycle.js';
 
 const row = (hex, lat, degraded) => ({
   hex,
@@ -14,11 +16,15 @@ const row = (hex, lat, degraded) => ({
 
 function harness(
   getSnapshot,
-  { anchor: initialAnchor = { latitude: 50, longitude: 30 } } = {},
+  {
+    anchor: initialAnchor = { latitude: 50, longitude: 30 },
+    initialize = true,
+  } = {},
 ) {
   let anchor = initialAnchor;
   const sources = [];
   const viewer = {
+    camera: { moveEnd: new Cesium.Event(), changed: new Cesium.Event() },
     dataSources: {
       add(value) {
         sources.push(value);
@@ -44,11 +50,12 @@ function harness(
     },
     now: () => clock,
   });
-  layer.init(viewer);
+  if (initialize) layer.init(viewer);
   return {
     layer,
     sources,
     anchors,
+    viewer,
     advance(ms) {
       clock += ms;
     },
@@ -65,6 +72,114 @@ const threeHealthy = () => [
   row('a2', 1.2, false),
   row('a3', 1.3, false),
 ];
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+test('a globe-wide rectangle uses the visible screen centre as the query anchor', () => {
+  const anchor = defaultGnssViewAnchor({
+    scene: {
+      canvas: { clientWidth: 1000, clientHeight: 800 },
+      globe: { ellipsoid: Cesium.Ellipsoid.WGS84 },
+    },
+    camera: {
+      pickEllipsoid(pixel) {
+        assert.deepEqual(pixel, new Cesium.Cartesian2(500, 400));
+        return Cesium.Cartesian3.fromDegrees(-97, 30);
+      },
+      computeViewRectangle: () => Cesium.Rectangle.MAX_VALUE,
+    },
+  });
+  assert.ok(Math.abs(anchor.latitude - 30) < 1e-8);
+  assert.ok(Math.abs(anchor.longitude + 97) < 1e-8);
+});
+
+test('pan and zoom refresh through the manager without toggling; nearby changes are coalesced', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  let calls = 0;
+  const h = harness(
+    async () => {
+      calls++;
+      return { rows: threeHealthy() };
+    },
+    { initialize: false },
+  );
+  const manager = new LayerLifecycle(h.viewer);
+  manager.register(h.layer);
+  h.layer.attachDataManager(manager);
+  const changes = [];
+  manager.subscribe((change) => changes.push(change.type));
+  await manager.setEnabled(h.layer.id, true);
+  h.setAnchor({ latitude: 54, longitude: 19 });
+  h.viewer.camera.changed.raiseEvent();
+  h.setAnchor({ latitude: 55, longitude: 20 });
+  h.viewer.camera.moveEnd.raiseEvent();
+  h.advance(2500);
+  t.mock.timers.tick(2500);
+  await flush();
+  assert.equal(calls, 2, 'one initial read and one read for the latest view');
+  assert.deepEqual(h.anchors.at(-1), { latitude: 55, longitude: 20 });
+  assert.ok(changes.includes('refresh-transition'));
+  assert.ok(changes.includes('refresh'));
+  assert.equal(manager.isEnabled(h.layer.id), true);
+  assert.deepEqual(h.layer.getStats().coverage, {
+    kind: 'regional',
+    latitude: 55,
+    longitude: 20,
+    radiusNm: 250,
+  });
+  assert.match(h.layer.getRowControls().info, /Regional sample.*250 nm radius/);
+  h.setAnchor({ latitude: 55.1, longitude: 20.1 });
+  h.viewer.camera.changed.raiseEvent();
+  h.advance(5000);
+  t.mock.timers.tick(5000);
+  await flush();
+  assert.equal(calls, 2, 'nearby views reuse the same query region');
+  await manager.destroyAll();
+  assert.equal(h.viewer.camera.moveEnd.numberOfListeners, 0);
+  assert.equal(h.viewer.camera.changed.numberOfListeners, 0);
+});
+
+test('movement during a pending refresh follows up at the newest view; disable cancels queued work', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls = [];
+  let resolvePending;
+  const h = harness((anchor) => {
+    calls.push(anchor);
+    if (calls.length === 2)
+      return new Promise((resolve) => {
+        resolvePending = resolve;
+      });
+    return { rows: threeHealthy() };
+  });
+  h.layer.enable();
+  await h.layer.update();
+  h.setAnchor({ latitude: 54, longitude: 19 });
+  h.viewer.camera.moveEnd.raiseEvent();
+  h.advance(2500);
+  t.mock.timers.tick(2500);
+  await flush();
+  h.setAnchor({ latitude: 35, longitude: 140 });
+  h.viewer.camera.changed.raiseEvent();
+  h.advance(2500);
+  t.mock.timers.tick(2500);
+  await flush();
+  assert.equal(calls.length, 2, 'only one camera request in flight');
+  resolvePending({ rows: threeHealthy() });
+  await flush();
+  h.advance(600);
+  t.mock.timers.tick(600);
+  await flush();
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.at(-1), { latitude: 35, longitude: 140 });
+  h.setAnchor({ latitude: 10, longitude: 10 });
+  h.viewer.camera.moveEnd.raiseEvent();
+  h.layer.disable();
+  h.advance(5000);
+  t.mock.timers.tick(5000);
+  await flush();
+  assert.equal(calls.length, 3, 'disable drains the camera timer');
+  h.layer.destroy();
+});
 
 test('the layer requires a snapshot source and cannot be initialized twice', () => {
   assert.throws(() => createGnssIntegrityLayer({}), TypeError);

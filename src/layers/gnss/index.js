@@ -23,12 +23,23 @@ const LEVEL_LABELS = Object.freeze({
 
 /** Degrees at the centre of the current view, or null before the camera settles. */
 export function defaultGnssViewAnchor(viewer) {
-  const rectangle = viewer?.camera?.computeViewRectangle?.(
-    viewer.scene?.globe?.ellipsoid,
-  );
-  const carto = rectangle
-    ? Cesium.Rectangle.center(rectangle)
-    : viewer?.camera?.positionCartographic;
+  const canvas = viewer?.scene?.canvas;
+  const ellipsoid = viewer?.scene?.globe?.ellipsoid;
+  // At globe scale the visible rectangle can be the whole world, whose
+  // midpoint is unrelated to the place under the screen centre.
+  const centre =
+    canvas?.clientWidth > 0 &&
+    canvas.clientHeight > 0 &&
+    viewer.camera?.pickEllipsoid?.(
+      new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2),
+      ellipsoid,
+    );
+  const rectangle = viewer?.camera?.computeViewRectangle?.(ellipsoid);
+  const carto = centre
+    ? (ellipsoid || Cesium.Ellipsoid.WGS84).cartesianToCartographic(centre)
+    : rectangle
+      ? Cesium.Rectangle.center(rectangle)
+      : viewer?.camera?.positionCartographic;
   if (!carto) return null;
   const latitude = Cesium.Math.toDegrees(carto.latitude);
   const longitude = Cesium.Math.toDegrees(carto.longitude);
@@ -60,8 +71,59 @@ export function createGnssIntegrityLayer({
   let _lastUpdate = null;
   let _lastError = null;
   let _stale = false;
+  let _manager = null;
+  let _cameraTimer = null;
+  let _cameraRefresh = null;
+  let _lastQueryKey = null;
+  let _lastRequestAt = -Infinity;
+  let _removeCameraEnd = null;
+  let _removeCameraChanged = null;
+  let _coverage = null;
   const _observations = new Map();
   const provenance = gnssProvenance({ windowMs });
+
+  const queryKey = (anchor) =>
+    anchor
+      ? `${Math.round(anchor.latitude)},${Math.round(anchor.longitude)}`
+      : null;
+
+  function scheduleCameraRefresh() {
+    if (!_enabled || !_dataSource) return;
+    const key = queryKey(viewAnchor(_viewer));
+    if (!key || key === _lastQueryKey) return;
+    clearTimeout(_cameraTimer);
+    // Debounce drags and bound moving/follow cameras to at most 24 requests
+    // per minute. Nearby views share the proxy's whole-degree cache key.
+    _cameraTimer = setTimeout(
+      async () => {
+        _cameraTimer = null;
+        if (!_enabled || _cameraRefresh) return;
+        const key = queryKey(viewAnchor(_viewer));
+        if (!key || key === _lastQueryKey) return;
+        const controller = new AbortController();
+        _cameraRefresh = controller;
+        try {
+          if (_manager) {
+            // Use the normal refresh lane so counts, loading/errors and render
+            // demand settle together; wait out an older periodic request.
+            await _manager.refreshLayer(layer.id, {
+              signal: controller.signal,
+            });
+          } else {
+            await layer.update(undefined, { signal: controller.signal });
+          }
+        } finally {
+          if (_cameraRefresh === controller) {
+            _cameraRefresh = null;
+            // Movement during an in-flight request is folded into one update
+            // for the latest view, rather than lost until the minute tick.
+            scheduleCameraRefresh();
+          }
+        }
+      },
+      Math.max(600, 2500 - (now() - _lastRequestAt)),
+    );
+  }
 
   /** Age the store without new evidence, so expired cells leave the globe. */
   function expire() {
@@ -100,6 +162,7 @@ export function createGnssIntegrityLayer({
         }),
       );
     }
+    _viewer?.scene?.requestRender?.();
   }
 
   const layer = {
@@ -111,6 +174,10 @@ export function createGnssIntegrityLayer({
     provenance,
     updateInterval: 60000,
 
+    attachDataManager(manager) {
+      _manager = manager;
+    },
+
     init(viewer) {
       if (_viewer)
         throw new Error('GNSS integrity layer is already initialized');
@@ -118,6 +185,12 @@ export function createGnssIntegrityLayer({
       _dataSource = new Cesium.CustomDataSource('gnss-interference');
       _dataSource.show = false;
       viewer.dataSources.add(_dataSource);
+      _removeCameraEnd = viewer.camera?.moveEnd?.addEventListener(
+        scheduleCameraRefresh,
+      );
+      _removeCameraChanged = viewer.camera?.changed?.addEventListener(
+        scheduleCameraRefresh,
+      );
     },
 
     enable() {
@@ -130,14 +203,18 @@ export function createGnssIntegrityLayer({
     },
 
     disable() {
+      clearTimeout(_cameraTimer);
+      _cameraTimer = null;
+      _cameraRefresh?.abort();
+      _cameraRefresh = null;
       _request?.abort();
       _request = null;
       _enabled = false;
       if (_dataSource) _dataSource.show = false;
     },
 
-    async update() {
-      if (!_enabled || !_dataSource) return false;
+    async update(_viewerArg, { signal } = {}) {
+      if (!_enabled || !_dataSource || signal?.aborted) return false;
       const anchor = viewAnchor(_viewer);
       // No anchor yet (camera still settling) is not a failure: returning
       // false would make the manager reject the enable. The next interval
@@ -149,6 +226,16 @@ export function createGnssIntegrityLayer({
       _request?.abort();
       const request = new AbortController();
       _request = request;
+      const onAbort = () => request.abort(signal.reason);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      _lastQueryKey = queryKey(anchor);
+      _lastRequestAt = now();
+      _coverage = {
+        kind: 'regional',
+        latitude: Math.round(anchor.latitude),
+        longitude: Math.round(anchor.longitude),
+        radiusNm: 250,
+      };
       try {
         const snapshot = await source.getSnapshot(anchor, {
           signal: request.signal,
@@ -178,11 +265,18 @@ export function createGnssIntegrityLayer({
         expire();
         return false;
       } finally {
+        signal?.removeEventListener('abort', onAbort);
         if (_request === request) _request = null;
+        scheduleCameraRefresh();
       }
     },
 
     destroy(viewer = _viewer) {
+      layer.disable();
+      _removeCameraEnd?.();
+      _removeCameraChanged?.();
+      _removeCameraEnd = null;
+      _removeCameraChanged = null;
       _request?.abort();
       _request = null;
       _enabled = false;
@@ -197,11 +291,17 @@ export function createGnssIntegrityLayer({
       _lastUpdate = null;
       _lastError = null;
       _stale = false;
+      _coverage = null;
+      _lastQueryKey = null;
+      _manager = null;
     },
 
     getRowControls() {
       return {
         chips: [],
+        info: 'Regional sample · 250 nm radius · pan to sample another area',
+        infoTitle:
+          'Updates automatically after pan or zoom and once a minute. The public feed covers a 250-nautical-mile circle around the view centre; zooming out does not make it a worldwide snapshot. Blank cells have insufficient observations.',
         legend: ['high', 'medium', 'low'].map((level, index) => ({
           label: LEVEL_LABELS[level],
           color: GNSS_LEVEL_COLORS[level],
@@ -222,6 +322,7 @@ export function createGnssIntegrityLayer({
         error: _lastError,
         stale: _stale,
         provenance,
+        coverage: _coverage,
         // Load-bearing: without an explicit boolean, layerFeedState reads the
         // adsb.lol source name as a flights fallback (src/data/feedState.js).
         fallback: false,
