@@ -153,10 +153,7 @@ function presentViewer(state) {
   };
 }
 
-/**
- * A button for the providers with no coverage to click (Street View): opens
- * their nearest image at the view centre, so they need no pointer.
- */
+/** OPEN STREET VIEW: the keyboard path to providers with no coverage to click. */
 function presentNearest(state) {
   const targets = (state.providers || []).filter(
     (provider) =>
@@ -222,7 +219,6 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
       ? null
       : state.street.error || state.coverage.error || null,
     filter: { pano: filter.pano, sinceDays: Number(filter.sinceDays) || 0 },
-    // Only the filters a lit provider honours (none for Street View alone).
     filterControls: {
       pano: state.filterControls?.pano !== false,
       since: state.filterControls?.since !== false,

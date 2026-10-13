@@ -16,11 +16,7 @@ import {
   PICK_PREFIX,
 } from './policy.js';
 
-/**
- * `promise`, unless `ms` pass first (NO_ANSWER_MESSAGE), `signal` aborts, or
- * Google refuses the key: a lookup Google never answers must not keep the
- * panel loading.
- */
+/** `promise`, unless it times out, `signal` aborts or Google refuses the key. */
 function settleWithin(promise, { ms, signal, loader }) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -46,10 +42,8 @@ function settleWithin(promise, { ms, signal, loader }) {
 }
 
 /**
- * Google Street View Street Level provider: Google's own panorama viewer and
- * nearest-panorama lookups. Google offers no coverage layer for other maps,
- * so it draws none; a click on a street opens the panorama there.
- * `getApiKey` returns the browser Maps key; `loader` is ./mapsLoader.js or a stand-in.
+ * Google Street View provider: Google's panorama viewer and nearest-panorama
+ * lookups. It draws no coverage; a click on a street opens the panorama.
  * @returns {import('../../registry.js').StreetLevelProvider}
  */
 export function createGoogleProvider({
@@ -70,19 +64,16 @@ export function createGoogleProvider({
     groundClick: true,
     // Google's terms forbid Street View beside non-Google maps.
     requiresMapStack: FOLLOW_MAP_STACK_ID,
-    // Every panorama is billed to the Maps key: the user lights the chip.
+    // Every panorama is billed to the Maps key.
     defaultOn: false,
-    // Every panorama is 360°, and with no coverage drawn there is nothing
-    // for a date filter to thin: the user picks the place by clicking it.
+    // All 360°, and no coverage for a date filter to thin.
     filters: [],
-    // Google Maps' own look for where a panorama stands and looks.
     marker: Object.freeze({ kind: 'view-cone', color: COLORS.coverage }),
 
     create(context) {
       let keyRequired = !getApiKey();
       let active = false;
       let service = null;
-      /** The one StreetViewService the lookups and the viewer share. */
       async function getService() {
         const lib = await loader.importLibrary('streetView');
         service ||= new lib.StreetViewService();
@@ -94,7 +85,7 @@ export function createGoogleProvider({
         render: context.services?.render,
       });
       const stopAuthWatch = loader.onAuthFailure(() => {
-        // Switched off since: its chip says so; no error over another photo.
+        // Switched off: its chip says so.
         if (context.isActive?.())
           context.actions.reportError(KEY_REJECTED_MESSAGE);
         context.notify();

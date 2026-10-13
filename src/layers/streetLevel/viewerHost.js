@@ -75,8 +75,7 @@ export function createViewerHost({ state, parts }) {
       active.adapter.unmount();
       active = null;
     }
-    // Another provider's prewarmed viewer shares the host: it would sit
-    // under this one, holding its WebGL context.
+    // A prewarmed viewer would sit under this one, holding its WebGL context.
     for (const [id, warm] of warmed) {
       if (id === entry.def.id) continue;
       warmed.delete(id);
@@ -208,8 +207,7 @@ export function createViewerHost({ state, parts }) {
       }
       if (active?.id === entry.def.id || mounting?.id === entry.def.id)
         continue;
-      // Switched off while it loaded, or another provider's viewer took the
-      // host meanwhile: release it now rather than keep it under that one.
+      // Switched off, or another viewer took the host meanwhile.
       if (!state.enabled || !entry.on || active || mounting) adapter.unmount();
       else warmed.set(entry.def.id, adapter);
     }

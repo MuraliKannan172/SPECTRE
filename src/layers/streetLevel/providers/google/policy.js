@@ -2,14 +2,12 @@ import { COLORS as SHARED_COLORS, PROVIDER_COLORS } from '../../policy.js';
 
 export { NEAREST_RADIUS_M } from '../../policy.js';
 
-/** Identity of the Google Street View street-level provider. */
 export const GOOGLE_PROVIDER_ID = 'google';
 export const GOOGLE_NAME = 'Google Street View';
 export const GOOGLE_LABEL = 'GOOGLE STREET VIEW';
 /** The browser Maps key; Street View also needs the Maps JavaScript API on it. */
 export const GOOGLE_KEY_ID = 'google-maps';
 
-/** Every primitive id this provider creates starts with it. */
 export const PICK_PREFIX = Object.freeze({ root: 'gsv:' });
 
 export const COLORS = Object.freeze({
@@ -20,27 +18,20 @@ export const COLORS = Object.freeze({
 export const GOOGLE_CREDIT_HTML =
   'Street View imagery © <a href="https://www.google.com/streetview/" target="_blank" rel="noopener">Google</a>';
 
-/**
- * Shown when Google refuses the key (gm_authFailure): the Maps JavaScript API
- * is not enabled for it, this site is not an allowed referrer, or billing is off.
- */
+/** Shown when Google refuses the key (gm_authFailure). */
 export const KEY_REJECTED_MESSAGE =
   'Google refused GOOGLE_MAPS_API_KEY for Street View — check that the Maps JavaScript API is enabled for it and this site is an allowed referrer';
 
-/** A nearest-panorama lookup that takes longer has failed. */
+/** Past these, a nearest lookup, an open or a details lookup has failed. */
 export const NEAREST_TIMEOUT_MS = 10_000;
-/** A panorama that has not shown by then has failed to open. */
 export const OPEN_TIMEOUT_MS = 20_000;
-/** A panorama-details lookup that takes longer has failed (and can retry). */
 export const DETAILS_TIMEOUT_MS = 10_000;
-/** Minimum pause after a failed panorama-details lookup before a view can retry. */
+/** Pause after a failed details lookup before a view event can retry. */
 export const DETAILS_RETRY_COOLDOWN_MS = 5_000;
 
-/** Google answered nothing: the network, or a key Google ignores. */
 export const NO_ANSWER_MESSAGE =
   'Street View did not answer — check the network, and that the Maps JavaScript API is enabled for GOOGLE_MAPS_API_KEY';
 
-/** Shown while the provider is on, in place of coverage lines it does not have. */
 export const GROUND_CLICK_HINT = 'click a street to open Street View';
 
 /** Deep link to a panorama on Google Maps (Maps URLs). */

@@ -1,16 +1,11 @@
 /**
- * Loads the Google Maps JavaScript API once per page, on first use, and hands
- * out its libraries. Google calls `gm_authFailure` when it refuses the key
- * (an unknown key, a referrer it does not allow, or the Maps JavaScript API
- * not enabled for it); that reaches every `onAuthFailure` listener.
+ * Loads the Google Maps JavaScript API once per page, on first use. Google's
+ * `gm_authFailure` (key refused) reaches every `onAuthFailure` listener.
  */
 
 const SCRIPT_ORIGIN = 'https://maps.googleapis.com';
 const READY_CALLBACK = '__gevGoogleMapsReady';
-/**
- * The page's one script load, kept on the page: every loader on it (two
- * application instances, say) waits on the same script and callback.
- */
+/** The page's one script load, shared by every loader on it. */
 const PAGE_LOAD = Symbol.for('gev.googleMapsLoad');
 
 /**
@@ -25,7 +20,7 @@ export function createMapsLoader({
   let authHandlerInstalled = false;
   const authListeners = new Set();
 
-  /** Once per loader: a retried load must not wrap its own handler again. */
+  /** Once per loader: a retry must not wrap its own handler. */
   function installAuthHandler() {
     if (authHandlerInstalled) return;
     authHandlerInstalled = true;
@@ -51,7 +46,6 @@ export function createMapsLoader({
     if (global[PAGE_LOAD]) return global[PAGE_LOAD];
     if (global.google?.maps?.importLibrary)
       return Promise.resolve(global.google.maps);
-    // Cleared when the script fails, so a retry (from any loader) can.
     const loading = new Promise((resolve, reject) => {
       global[READY_CALLBACK] = () => {
         delete global[READY_CALLBACK];
@@ -78,12 +72,10 @@ export function createMapsLoader({
   }
 
   return {
-    /** A Maps library ('streetView', …), loading the API first. */
     async importLibrary(name) {
       const maps = await load();
       return maps.importLibrary(name);
     },
-    /** Whether Google has refused the key on this page. */
     authFailed: () => authFailed,
     onAuthFailure(listener) {
       authListeners.add(listener);

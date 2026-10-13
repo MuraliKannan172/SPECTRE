@@ -6,7 +6,6 @@ import { createHorizonCull } from './view.js';
 
 const SPRITE_ID = 'street-level:marker';
 
-/** The billboard look for a marker style: GEV's pin, or a provider's view cone. */
 function markerLook(style) {
   if (style?.kind === 'view-cone') {
     const color = style.color || COLORS.position;
@@ -75,11 +74,7 @@ export function createMarker({ state, parts }) {
       set(last.position, last.bearing, last.style);
   });
 
-  /**
-   * Move (or create) the marker; a null position removes it. `style` is the
-   * open image's provider marker ({kind: 'view-cone', color}); GEV's pin
-   * without one.
-   */
+  /** Move (or create) the marker; null removes it. `style`: the provider's `marker`. */
   function set(position, bearing, style = null) {
     const collection = state.marker.collection;
     if (!collection) return;
@@ -102,7 +97,6 @@ export function createMarker({ state, parts }) {
         ? Cesium.HeightReference.CLAMP_TO_GROUND
         : Cesium.HeightReference.NONE;
     const look = markerLook(style);
-    // Another provider's photo: the marker changes its look.
     if (state.marker.billboard && state.marker.look !== look.key) {
       collection.remove?.(state.marker.billboard);
       state.marker.billboard = null;

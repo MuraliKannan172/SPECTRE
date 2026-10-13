@@ -106,18 +106,11 @@ export class StreetLevelControls {
     this.listen(el.providerChips, 'click', (event) => {
       const button = event.target?.closest?.('.data-toggle-chip');
       if (!button || button.disabled) return;
-      // A chip without a usable key stays focusable for its tooltip; a click
-      // that would light it, or switch the layer off through it, says the
-      // same thing instead. Other chips still switch (a refused Street View
-      // key cannot lock Mapillary out), and it darkens beside a lit one.
-      const providers = this._view?.providers || [];
-      const chip = providers.find(
+      // A keyless chip shows its tooltip instead of switching; others switch.
+      const chip = this._view?.providers.find(
         (entry) => entry.id === button.dataset.chipId,
       );
-      const othersLit = providers.some(
-        (entry) => entry.id !== chip?.id && entry.active,
-      );
-      if (chip?.state === 'error' && (!chip.active || !othersLit)) {
+      if (chip?.state === 'error') {
         if (button.title) this.actions.showToast?.(button.title);
         return;
       }
@@ -141,8 +134,6 @@ export class StreetLevelControls {
     this.listen(el.sinceRange, 'change', () =>
       this._setParams({ sinceDays: sinceDays() }),
     );
-    // The keyboard path to Street View: its nearest image at the view centre,
-    // without moving the camera.
     this.listen(el.nearestBtn, 'click', () => {
       const nearest = this._view?.nearest;
       if (!nearest?.visible || nearest.disabled) return;
@@ -261,22 +252,21 @@ export class StreetLevelControls {
   }
 
   /**
-   * Lighting a chip turns the layer on; darkening the last lit one turns the
-   * layer off but keeps the provider on, so the layer comes back with it.
+   * Lighting a chip turns the layer on and darkens the others (one source at
+   * a time); darkening the lit one turns the layer off, keeping the provider.
    */
   async _toggleProvider(providerId) {
     const chip = this._view?.providers.find((entry) => entry.id === providerId);
     if (!chip) return;
     if (!chip.active) {
-      this._setParams({ [providerId]: true });
+      // Every registered provider in one update (those hidden on this map
+      // too), so the share link records the swap.
+      const ids =
+        this.layer.providerIds || this._view.providers.map((entry) => entry.id);
+      this._setParams(
+        Object.fromEntries(ids.map((id) => [id, id === providerId])),
+      );
       await this._ensureEnabled();
-      return;
-    }
-    const othersLit = this._view.providers.some(
-      (entry) => entry.id !== providerId && entry.active,
-    );
-    if (othersLit) {
-      this._setParams({ [providerId]: false });
       return;
     }
     try {

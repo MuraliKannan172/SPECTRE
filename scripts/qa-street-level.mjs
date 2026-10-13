@@ -1840,8 +1840,14 @@ async function main() {
               'the Google credit shows on Google 3D',
             );
           }
-          // Back off, as the next steps expect.
-          await setStreetView(false);
+          // Back to Mapillary (one source at a time), as the next steps expect.
+          await page.evaluate(() =>
+            window.__godsEyeView.dataManager.setLayerParams(
+              'street-level',
+              { mapillary: true, google: false },
+              { origin: 'user' },
+            ),
+          );
           await stacks.set(original);
           await uiUntil(
             (u) => u.providers.find((p) => p.id === 'google')?.on !== true,

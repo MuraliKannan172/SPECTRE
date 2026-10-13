@@ -15,8 +15,8 @@ import { COLORS } from './policy.js';
  * @property {string} hint
  * @property {string|null} error
  * @property {string} color   The source's one colour.
- * @property {boolean} [groundClick]   Draws no coverage: opens where the user clicks.
- * @property {Array<'pano'|'since'>} [filters]   Imagery filters it honours.
+ * @property {boolean} [groundClick]
+ * @property {Array<'pano'|'since'>} [filters]
  */
 
 /**
@@ -45,8 +45,7 @@ export function summarizeCoverage(providers) {
 
 /**
  * Switched-off providers that would draw with a key already set, offered
- * while the switched-on ones lack theirs (Street View beside a Mapillary
- * layer with no token).
+ * while the switched-on ones lack theirs.
  * @param {Array<ProviderSnapshot>} providers
  * @returns {Array<{id: string, label: string, requiresKeyId: string|null}>}
  */
@@ -58,8 +57,7 @@ export function keyAlternatives(providers) {
 }
 
 /**
- * Which filter controls mean anything: those a switched-on provider honours.
- * With none switched on, both show (they apply once one is).
+ * The filter controls a switched-on provider honours (both when none is on).
  * @param {Array<ProviderSnapshot>} providers
  */
 export function filterControls(providers) {
@@ -72,8 +70,7 @@ export function filterControls(providers) {
 
 /**
  * The panel snapshot from core state and provider snapshots. The legend has
- * one swatch per active source that draws coverage lines, then the shared
- * selection colour; a source that only opens where the user clicks has none.
+ * one swatch per active source that draws coverage lines, then Selected.
  * @param {{enabled: boolean, filter: object, providers: Array<ProviderSnapshot>, street: object, sequence: object}} input
  */
 export function composeUIState({
@@ -99,7 +96,6 @@ export function composeUIState({
     legend.push({ key: 'selected', label: 'Selected', color: COLORS.selected });
   return {
     enabled,
-    /** The camera is at street zoom: a ground-click provider can open here. */
     groundClickReady: groundClickReady === true,
     keyRequired,
     keyAlternatives: keyAlternatives(providers),

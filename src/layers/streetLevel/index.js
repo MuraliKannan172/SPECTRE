@@ -128,11 +128,13 @@ export function createStreetLevelLayer({
     });
   }
 
+  // One source at a time: the first provider that defaults on.
+  const startsOn = definitionsFrozen.find((def) => def.defaultOn !== false);
   for (const def of definitionsFrozen) {
     const entry = {
       def,
       instance: null,
-      on: def.defaultOn !== false,
+      on: def === startsOn,
       status: null,
       /** The error this provider last reported, until it withdraws it. */
       reportedError: null,
@@ -153,19 +155,13 @@ export function createStreetLevelLayer({
     notify();
   }
 
-  /**
-   * A provider that names a map stack (Google Street View: Google's terms
-   * forbid its imagery beside non-Google maps) is usable only on that stack.
-   */
+  /** Usable only on its map stack (Google's terms: Street View on Google 3D only). */
   function providerAvailable(entry) {
     const required = entry.def.requiresMapStack;
     return !required || mapStack?.getActiveId?.() === required;
   }
 
-  /**
-   * A provider appears only on its map stack: leaving it closes the image it
-   * shows, releases its viewer and takes its credit off the globe.
-   */
+  /** Leaving a provider's map stack closes its image, viewer and credit. */
   function syncProviderAvailability() {
     const owner = state.providers.get(state.street.providerId);
     if (state.street.open && owner && !providerAvailable(owner))
@@ -276,10 +272,9 @@ export function createStreetLevelLayer({
     if (!state.viewer) return;
     entry.instance.activate(state.viewer);
     if (!entry.status) refreshStatus(entry);
-    // Off its map stack a provider shows nothing: no credit, no viewer load.
     if (!providerAvailable(entry)) return;
     parts.credits.show(state.viewer, entry.def);
-    // Checked again when it runs: the map may have changed meanwhile.
+    // The map may have changed by then.
     whenIdle(() => {
       if (providerAvailable(entry)) parts.viewerHost.prewarm([entry]);
     }, 1500);
@@ -299,10 +294,7 @@ export function createStreetLevelLayer({
     nearestLookup = null;
   }
 
-  /**
-   * The ground under the middle of the screen; null when the middle is sky;
-   * undefined when nothing can aim (no scenePick, or a canvas with no size).
-   */
+  /** Ground under the screen centre; null for sky, undefined when it cannot aim. */
   function screenCentreGround() {
     const canvas = state.viewer?.scene?.canvas;
     const pick = state.services.scenePick?.pickGroundPosition;
@@ -326,6 +318,7 @@ export function createStreetLevelLayer({
     abortNearest();
     const entry = state.providers.get(providerId);
     if (entry && !providerAvailable(entry)) {
+      state.street.loading = false;
       state.street.error = unavailableReason(entry);
       notify();
       return Promise.resolve(false);
@@ -337,18 +330,42 @@ export function createStreetLevelLayer({
     return `${entry.def.name} needs the Google 3D map: choose it under MAP SOURCE`;
   }
 
+  /** One imagery source at a time: lighting a provider darkens the others. */
   function setProviderEnabled(providerId, on) {
     const entry = state.providers.get(providerId);
     if (!entry) return false;
     const next = on !== false;
-    if (entry.on === next) return true;
-    entry.on = next;
-    if (state.enabled) {
-      if (next) activate(entry);
-      else deactivate(entry);
-    }
+    if (next)
+      for (const other of state.providers.values())
+        if (other !== entry && other.on) switchProvider(other, false);
+    switchProvider(entry, next);
     notify();
     return true;
+  }
+
+  function switchProvider(entry, on) {
+    if (entry.on === on) return;
+    entry.on = on;
+    if (!state.enabled) return;
+    if (on) activate(entry);
+    else deactivate(entry);
+  }
+
+  /**
+   * The one provider params leave lit: of those they switch on, the one
+   * already on (reapplying never flips), else the first; with none, the lit
+   * one unless they switch it off.
+   */
+  function litByParams(switches) {
+    const asked = [...state.providers.keys()].filter(
+      (id) => switches.get(id) === true,
+    );
+    const current = [...state.providers]
+      .filter(([, entry]) => entry.on)
+      .map(([id]) => id);
+    if (asked.length)
+      return asked.find((id) => current.includes(id)) ?? asked[0];
+    return current.find((id) => switches.get(id) !== false) ?? null;
   }
 
   function setCoverageFilter(next) {
@@ -390,7 +407,6 @@ export function createStreetLevelLayer({
         hint: hintFor(entry, stats),
         error: stats.error || null,
         color: entry.def.colors.coverage,
-        /** No coverage to click: it opens where the user points. */
         groundClick: entry.def.groundClick === true,
         filters: [...filtersOf(entry.def)],
       };
@@ -418,7 +434,7 @@ export function createStreetLevelLayer({
 
   function getUIState() {
     const { host, ...street } = state.street;
-    return composeUIState({
+    const ui = composeUIState({
       enabled: state.enabled,
       groundClickReady: state.groundClickReady,
       filter: state.filter,
@@ -427,6 +443,13 @@ export function createStreetLevelLayer({
       sequence: sequenceSnapshot(),
       surface: state.surface,
     });
+    // The lit source cannot run on this map: say so, not a blank panel.
+    const stranded = [...state.providers.values()].find(
+      (entry) => entry.on && !providerAvailable(entry),
+    );
+    if (stranded && !ui.providers.some((p) => p.on))
+      ui.coverage.hint = unavailableReason(stranded);
+    return ui;
   }
 
   const layer = {
@@ -533,7 +556,6 @@ export function createStreetLevelLayer({
         count: coverage.count,
         loading: coverage.loading,
         keyRequired: coverage.keyRequired,
-        /** Switched-off sources that would draw with a key already set. */
         keyAlternatives: keyAlternatives(snapshots),
         error: coverage.keyRequired
           ? coverage.keyRejected
@@ -583,7 +605,11 @@ export function createStreetLevelLayer({
         providerIds: state.providers.keys(),
         filter: state.filter,
       });
-      for (const [id, on] of decoded.providers) setProviderEnabled(id, on);
+      const lit = litByParams(decoded.providers);
+      for (const [id, entry] of state.providers)
+        if (id !== lit) switchProvider(entry, false);
+      if (lit) switchProvider(state.providers.get(lit), true);
+      notify();
       setCoverageFilter(decoded.filter);
       return true;
     },
@@ -612,10 +638,9 @@ export function createStreetLevelLayer({
     setCoverageFilter,
     openImage,
     /**
-     * Open the nearest image any active provider (or only `providerIds`)
-     * has around a point; without one, around the view centre, or with
-     * `aim: 'screen-centre'` the ground under the middle of the screen. An
-     * aim at the sky opens nothing rather than somewhere else.
+     * Open the nearest image of the active providers (or `providerIds`) near
+     * a point, else the view centre, or with `aim: 'screen-centre'` the ground
+     * under the screen centre (sky: nothing).
      */
     async openNearest(
       point,
@@ -663,14 +688,16 @@ export function createStreetLevelLayer({
         }
         if (signal.aborted) return false;
         if (!state.enabled) break;
-        // This provider was switched off while it looked: try the next.
-        if (!imageId || !entry.on) continue;
+        // Switched off, or its map left, while it looked: try the next.
+        if (!imageId || !entry.on || !providerAvailable(entry)) continue;
         nearestLookup = null;
         return openImage(entry.def.id, imageId, { frame });
       }
       if (nearestLookup === lookup) nearestLookup = null;
       // Switched off while it looked: nothing to open, nothing to report.
-      const stillOn = activeEntries().some(asked);
+      const stillOn = entries.some(
+        (entry) => entry.on && providerAvailable(entry),
+      );
       if (state.enabled && stillOn)
         state.street.error =
           lastError?.message ||

@@ -65,10 +65,7 @@ export function imageConeGlyph({
   });
 }
 
-/**
- * Street View-style marker: a soft field-of-view cone in `color` from a
- * white-ringed dot, as Google Maps shows where its panorama looks.
- */
+/** Street View-style marker: a field-of-view cone from a white-ringed dot. */
 export function viewConeMarkerGlyph({ size = 56, color = '#4285f4' } = {}) {
   return cachedGlyph(`view-cone:${size}:${color}`, size, (ctx, c) => {
     wedge(ctx, c, size * 0.48, 0.62, color, 0.38);

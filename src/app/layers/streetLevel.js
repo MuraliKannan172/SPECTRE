@@ -10,12 +10,7 @@ import * as render from '../../renderGovernor.js';
 /** The browser Maps key the scene was started with (src/app/scene.js). */
 const googleApiKey = () => globalThis.window?.__GOOGLE_MAPS_API_KEY__ || null;
 
-/**
- * The default providers, once the application supplies its Street Level
- * source: Mapillary, and Google Street View, which needs only the browser
- * Maps key (off until lit). Without that source there are none, and the
- * layer reads as not configured.
- */
+/** Mapillary and Google Street View, once the Mapillary source is supplied; else none. */
 function defaultProviders(sources) {
   if (sources.mapillary == null) return [];
   return [

@@ -1,9 +1,7 @@
 import { encodeIdSwitches } from '../../data/idSwitches.js';
 
-/** The imagery filters a provider can honour. */
 export const IMAGERY_FILTERS = Object.freeze(['pano', 'since']);
 
-/** The filters `provider` honours: both, unless it says otherwise. */
 export function filtersOf(provider) {
   return provider?.filters ?? IMAGERY_FILTERS;
 }
@@ -19,11 +17,11 @@ export function filtersOf(provider) {
  * @property {string} pickPrefix    Every primitive id the provider creates starts with it.
  * @property {{coverage: string}} colors   The source's one colour, from policy.js PROVIDER_COLORS.
  * @property {{html: string}} credit   On-globe attribution while the provider is active.
- * @property {boolean} [groundClick]   No coverage to click: a click on the ground at street zoom opens its nearest image.
- * @property {string} [requiresMapStack]   Usable only on this map stack (Google Street View: 'photoreal', per Google's terms).
- * @property {boolean} [defaultOn]     Switched on until the user says otherwise (default true); a share link without its switch keeps it.
- * @property {{kind: 'view-cone', color: string}} [marker]   On-globe marker for its open image (default GEV's pin): Street View's blue field-of-view cone.
- * @property {Array<'pano'|'since'>} [filters]   The imagery filters it honours (default both); the panel hides a filter no lit provider honours.
+ * @property {boolean} [groundClick]   No coverage: a ground click at street zoom opens its nearest image.
+ * @property {string} [requiresMapStack]   Usable only on this map stack.
+ * @property {boolean} [defaultOn]     Default true.
+ * @property {{kind: 'view-cone', color: string}} [marker]   Default: GEV's pin.
+ * @property {Array<'pano'|'since'>} [filters]   Filters it honours (default both).
  * @property {(context: ProviderContext) => ProviderInstance} create
  *
  * @typedef {object} ProviderContext   Handed to `create()` once by the core.

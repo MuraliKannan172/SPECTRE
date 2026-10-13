@@ -532,7 +532,105 @@ test('Street View starts off, and the layer row names the key of the providers t
   assert.equal(google().on, false);
   assert.equal(layer.requiresKeyId, 'mapillary');
   layer.setProviderEnabled('google', true);
-  assert.equal(layer.requiresKeyId, null, 'two keys: each chip names its own');
+  assert.equal(layer.requiresKeyId, 'google-maps', 'Street View alone');
+});
+
+test('the layer starts with one source lit: the first that defaults on', async (t) => {
+  const { layer } = await enabledLayer(t, [
+    fakeProvider(),
+    fakeProvider({ id: 'panoramax', pickPrefix: 'pmx:' }),
+  ]);
+  assert.deepEqual(
+    layer
+      .getUIState()
+      .providers.filter((p) => p.on)
+      .map((p) => p.id),
+    ['mapillary'],
+  );
+});
+
+test('leaving Google 3D during a Street View lookup ends it without an error or a stuck spinner', async (t) => {
+  const { layer, stack, fake } = await withStreetView(t);
+  layer.setProviderEnabled('google', true);
+  let answer;
+  fake.library.StreetViewService.prototype.getPanorama = () =>
+    new Promise((resolve) => {
+      answer = resolve;
+    });
+  const opening = layer.openNearest({ lat: 38.5816, lon: -121.4944 });
+  await settle();
+  assert.equal(layer.getUIState().street.loading, true);
+  stack.switchTo('bing');
+  answer({ data: { location: { pano: 'pano-a' }, imageDate: '2024-05' } });
+  assert.equal(await opening, false);
+  const { street } = layer.getUIState();
+  assert.equal(street.loading, false, 'OPEN STREET VIEW is usable again');
+  assert.equal(street.error, null);
+  assert.equal(street.open, false);
+});
+
+test('a source swap during a lookup reports no false "no imagery"', async (t) => {
+  let answer;
+  const mapillary = fakeProvider({
+    nearestImage: () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+  });
+  const other = fakeProvider({ id: 'panoramax', pickPrefix: 'pmx:' });
+  const { layer } = await enabledLayer(t, [mapillary, other]);
+  const opening = layer.openNearest({ lat: 1, lon: 2 });
+  layer.setProviderEnabled('panoramax', true);
+  answer('img-1');
+  assert.equal(await opening, false);
+  assert.equal(layer.getUIState().street.error, null);
+  assert.equal(layer.getUIState().street.loading, false);
+});
+
+test('Street View lit off Google 3D says why the panel is empty', async (t) => {
+  const { layer, stack } = await withStreetView(t);
+  layer.setProviderEnabled('google', true);
+  stack.switchTo('esri-imagery');
+  assert.match(
+    layer.getUIState().coverage.hint,
+    /Google Street View needs the Google 3D map/,
+  );
+  layer.setProviderEnabled('mapillary', true);
+  assert.doesNotMatch(layer.getUIState().coverage.hint, /Google 3D/);
+});
+
+test('one imagery source at a time: lighting one darkens the other, either way', async (t) => {
+  const { layer } = await withStreetView(t);
+  const lit = () =>
+    layer
+      .getUIState()
+      .providers.filter((p) => p.on)
+      .map((p) => p.id);
+  assert.deepEqual(lit(), ['mapillary'], 'Mapillary by default: it is free');
+  layer.setProviderEnabled('google', true);
+  assert.deepEqual(lit(), ['google']);
+  assert.equal(layer.getParams().mapillary, false);
+  layer.setProviderEnabled('mapillary', true);
+  assert.deepEqual(lit(), ['mapillary']);
+  assert.equal(layer.getParams().google, false);
+  // Params that light one switch to it; reapplying them changes nothing.
+  layer.setParams({ google: true });
+  assert.deepEqual(lit(), ['google']);
+  layer.setParams({ google: true });
+  assert.deepEqual(lit(), ['google']);
+  // Params lighting both keep the one already on, however often applied.
+  for (let i = 0; i < 2; i++) {
+    layer.setParams({ mapillary: true, providerSwitches: 'google-1' });
+    assert.deepEqual(lit(), ['google']);
+  }
+  layer.setParams({ mapillary: true, google: false });
+  assert.deepEqual(lit(), ['mapillary']);
+  // Filter-only params leave the source alone.
+  layer.setParams({ pano: 'pano' });
+  assert.deepEqual(lit(), ['mapillary']);
+  // Darkening the only lit one leaves none: the panel turns the layer off.
+  layer.setProviderEnabled('mapillary', false);
+  assert.deepEqual(lit(), []);
 });
 
 test('Street View appears only on the Google 3D map: chip, legend, credit, source and images', async (t) => {

@@ -10,18 +10,16 @@ import {
   streetViewUrl,
 } from './policy.js';
 
-/** Google's own controls, minus those the Street Level panel already has. */
 const PANORAMA_OPTIONS = Object.freeze({
   visible: false,
-  // The address goes in the panel caption: Google's card covers half a
-  // docked panorama.
+  // The caption has the address; Google's card covers a docked panorama.
   addressControl: false,
   linksControl: true,
   panControl: true,
   zoomControl: true,
   clickToGo: true,
   showRoadLabels: true,
-  // The panel has EXPAND and ×; Google's fullscreen would leave the modal.
+  // The panel has EXPAND and ×.
   fullscreenControl: false,
   enableCloseButton: false,
   motionTracking: false,
@@ -29,10 +27,8 @@ const PANORAMA_OPTIONS = Object.freeze({
 });
 
 /**
- * Viewer adapter over Google's StreetViewPanorama. It renders in its own
- * element inside the core's host, and emits a provider-neutral pose for every
- * panorama and view change, including steps along Google's own arrows.
- * `getService` hands out the StreetViewService the provider shares.
+ * Viewer adapter over Google's StreetViewPanorama: emits a pose for every
+ * panorama and view change, including steps along Google's arrows.
  * @param {{loader: ReturnType<import('./mapsLoader.js').createMapsLoader>, getService?: () => Promise<object>, render?: object}} options
  * @returns {import('../../registry.js').ViewerAdapter & {remember: Function}}
  */
@@ -43,19 +39,13 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
   let host = null;
   let service = null;
   let pendingOpen = null;
-  /** Settles the open waiting for its panorama, when a close overtakes it. */
   let cancelShown = null;
-  /** Bumped by `unmount`, so a construction it overtook builds nothing. */
+  /** Bumped by `unmount`: a construction it overtook builds nothing. */
   let generation = 0;
   let subscriptions = [];
-  /** Panorama id → its {capturedAt, creator, title}. */
   const described = new Map();
-  /**
-   * Panorama id → its lookup in flight ({timer}). A late answer to a lookup
-   * no longer here (timed out, or unmounted) is dropped.
-   */
+  /** Panorama id → its lookup in flight; a late answer to a dropped one is ignored. */
   const lookingUp = new Map();
-  /** Panorama id → earliest retry time after a failed details lookup. */
   const retryAfter = new Map();
   const listeners = new Set();
 
@@ -87,9 +77,8 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
   }
 
   /**
-   * Look up a panorama's date, photographer and address once; the pose
-   * already out is sent again with them. A lookup that fails or takes longer
-   * than DETAILS_TIMEOUT_MS lets view events retry once the cooldown expires.
+   * Look up a panorama's date, photographer and address once, then re-emit
+   * the pose. A failed or timed-out lookup can retry after the cooldown.
    */
   async function describe(panoId) {
     if (described.has(panoId) || lookingUp.has(panoId)) return;
@@ -110,7 +99,6 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
           return service.getPanorama({ pano: panoId });
         })().then(resolve, reject);
       });
-      // Released by an unmount: the viewer it was for is gone.
       if (!current()) return;
       described.set(panoId, metaFrom(data));
       retryAfter.delete(panoId);
@@ -125,13 +113,11 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
     publishPose();
   }
 
-  /** Drop every lookup in flight: a remount looks again. */
   function releaseLookups() {
     for (const lookup of lookingUp.values()) clearTimeout(lookup.timer);
     lookingUp.clear();
   }
 
-  /** Emit the pose on screen now, dated once its lookup has answered. */
   function publishPose() {
     const panoId = panorama?.getPano?.();
     const latLng = panorama?.getPosition?.();
@@ -173,8 +159,7 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
     target.append(element);
     host = target;
     panorama = new StreetViewPanorama(element, PANORAMA_OPTIONS);
-    // Not pano_changed: it can fire before the new panorama's data, with the
-    // old position. A step along an arrow moves the position.
+    // Not pano_changed: it can fire with the old panorama's position.
     subscriptions = ['position_changed', 'pov_changed'].map((name) =>
       panorama.addListener(name, () => publishPose()),
     );
@@ -196,10 +181,8 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
   }
 
   /**
-   * Resolves once `panoId` shows: an OK status, or (when the status was
-   * already OK and does not change) the new position. Rejects when Google has
-   * no imagery for it, refuses the key (reported apart from the status), or
-   * does not answer. Google may show a newer id for the same place.
+   * Resolves once `panoId` shows (OK status, or a new position when the
+   * status stays OK); rejects on no imagery, a refused key or no answer.
    */
   function shown(instance, panoId) {
     if (instance.getPano() === panoId && instance.getStatus() === 'OK')
@@ -213,8 +196,7 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
         finish(reject, new Error(KEY_REJECTED_MESSAGE)),
       );
       cancelShown = () => finish(resolve);
-      // Only a status event can fail the open: at a position event the
-      // status may still be the previous panorama's failure.
+      // At a position event the status may still be the last panorama's failure.
       const onStatus = () => {
         if (pendingOpen !== panoId) return finish(resolve);
         const status = instance.getStatus();
@@ -249,7 +231,6 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
       await ensurePanorama(target);
     },
 
-    /** Resolves once the panorama is on screen and its first pose was emitted. */
     async open(imageId) {
       const panoId = String(imageId);
       if (!host) throw new Error('Street View is not mounted');
@@ -297,7 +278,7 @@ export function createGoogleViewer({ loader, getService, render } = {}) {
       return () => listeners.delete(listener);
     },
 
-    /** Keep a lookup's answer, so the panorama it found needs no second one. */
+    /** Seed the details cache from a nearest lookup's answer. */
     remember(panoId, data) {
       if (panoId && data) described.set(String(panoId), metaFrom(data));
     },

@@ -3108,11 +3108,11 @@ miss cooldown. Roads on elevated decks are still drawn at
 ground level. Framing a photo ignores mesh samples far below the bare earth
 (unloaded tiles).
 
-The header pill is the layer switch. With one provider its chip is a layer
-switch too; with several, darkening the last lit chip turns the layer off. A
-chip without a usable key explains the key instead of lighting (or of
-switching the layer off as the last lit chip); it still darkens beside a lit
-one, and the other chips keep switching. When the switched-on providers lack
+The header pill is the layer switch. Lighting a chip swaps the source;
+clicking the lit chip turns the layer off. A chip without a usable key
+explains the key instead of switching, and the other chips keep switching.
+Lit off its map stack, a provider leaves the panel saying which map it
+needs. When the switched-on providers lack
 their keys but a switched-off one would draw with a key already set (no
 Mapillary token, Street View on Google 3D with a Google key), the layer
 reports it (`keyAlternatives`), and the panel's KEY REQUIRED, its coverage
@@ -3158,7 +3158,14 @@ and leaves the camera where it is (`groundClick.js`). Higher up the hint
 says to zoom in. **OPEN STREET VIEW** beside that hint (`#sl-nearest-btn`)
 does the same at the view centre, so Street View needs no pointer; it is
 disabled until the camera is at street zoom (and aimed at the sky, it opens
-nothing and says to aim at a street). The chip reads GOOGLE STREET VIEW. Its
+nothing and says to aim at a street). One provider is lit at a time:
+`setProviderEnabled(id, true)` darkens the others, a chip click sends every
+switch in one update so the share link records the swap, and params that
+light several keep the one already on, else the first in chip order
+(`litByParams`; reapplying them never flips). Mapillary, free, is lit by
+default. The chip reads GOOGLE STREET VIEW, and an open panorama's globe
+marker is a Google-blue view cone (`marker: {kind: 'view-cone'}`) in place
+of GEV's amber pin. Its
 panoramas are all 360° and it draws no coverage, so it declares `filters: []`
 (a provider's `filters` default to both `pano` and `since`): lookups ignore
 the IMAGERY and SINCE filters, the panel hides each filter row no lit provider

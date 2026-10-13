@@ -37,12 +37,8 @@ export const FOLLOW_MAP_STACK_ID = 'photoreal';
 /** Eye height above the sampled ground when the globe camera follows the viewer. */
 export const FOLLOW_EYE_HEIGHT_M = 2.4;
 
-/**
- * A ground click opens the nearest image of a provider without coverage lines
- * (Google Street View) only from this close: from higher up it is a misclick.
- */
+/** Above this, a ground click is a misclick, not a street. */
 export const GROUND_CLICK_MAX_HEIGHT_M = 3_000;
 
-/** OPEN STREET VIEW aimed at the sky: it opens what the user aims at, or nothing. */
 export const AIM_AT_GROUND_MESSAGE =
   'Aim the middle of the view at a street to look for imagery there';

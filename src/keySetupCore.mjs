@@ -353,9 +353,7 @@ export function keySetupRequirement(id) {
 }
 
 /**
- * Key guidance that also names the switched-off sources the layer could use
- * with a key that is already set: `[{label, requiresKeyId}]`, e.g. Street
- * View beside a Mapillary layer with no token.
+ * Key guidance that also names switched-off sources whose key is already set.
  * @param {string} requirement What `keySetupRequirement` said ('' allowed).
  * @param {Array<{label: string, requiresKeyId?: string|null}>} [alternatives]
  */

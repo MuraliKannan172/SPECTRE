@@ -1176,7 +1176,7 @@ test('OPEN STREET VIEW opens the nearest panorama at the view centre without mov
     assert.equal(button.hidden, true);
   }));
 
-test('a refused key on one provider leaves the other chip switchable, and the refused chip darkens beside it', () =>
+test('a refused Street View key cannot lock Mapillary out; its chip only explains itself', () =>
   withDom(async (dom) => {
     const state = uiState({ on: false, keyRequired: true });
     state.providers.push({
@@ -1194,23 +1194,37 @@ test('a refused key on one provider leaves the other chip switchable, and the re
     const chips = () => dom.root.querySelector('#sl-provider-chips').children;
     chips()[0].click(); // Mapillary: configured, dark
     await settle();
+    // One source at a time: lighting Mapillary darkens Street View too.
     assert.deepEqual(calls.setParams, [
-      [{ mapillary: true }, { origin: 'user' }],
+      [{ mapillary: true, google: false }, { origin: 'user' }],
     ]);
-    // With Mapillary lit, the refused Street View chip can be darkened.
+    // Now dark, the refused chip says why instead of lighting.
     state.providers[0].on = true;
+    state.providers[1].on = false;
     state.keyRequired = false;
     layer.publish({ ...state });
     chips()[1].click();
     await settle();
-    assert.deepEqual(calls.setParams.at(-1), [
-      { google: false },
-      { origin: 'user' },
+    assert.equal(calls.setParams.length, 1);
+    assert.deepEqual(calls.toasts, [
+      dom.root.querySelector('#sl-provider-chips').children[1].title,
     ]);
-    assert.equal(calls.toasts.length, 0);
   }));
 
-test('Street View alone hides the imagery filters and the legend; Mapillary beside it brings them back', () =>
+test('a swap names every registered provider, also those hidden on this map', () =>
+  withDom(async (dom) => {
+    const state = uiState({ on: false });
+    const { calls, layer, chip } = stubPanel(dom, state);
+    // Off Google 3D the Street View chip is not listed, but stays registered.
+    layer.providerIds = ['mapillary', 'google'];
+    chip().click();
+    await settle();
+    assert.deepEqual(calls.setParams, [
+      [{ mapillary: true, google: false }, { origin: 'user' }],
+    ]);
+  }));
+
+test('Street View lit hides the imagery filters and the legend; Mapillary lit shows them', () =>
   withDom(async (dom) => {
     const state = uiState();
     const { layer } = stubPanel(dom, state);

@@ -49,9 +49,8 @@ export function isPickedWorldPosition(position) {
 }
 
 /**
- * The world position under a screen point: the rendered surface (terrain,
- * Google 3D) where the depth buffer has it, else the ellipsoid. Null over the
- * sky or for a pick that names no place.
+ * The world position under a screen point: the rendered surface where the
+ * depth buffer has it, else the ellipsoid; null over the sky.
  *
  * @param {object} viewer A Cesium viewer.
  * @param {{x: number, y: number}} screenPosition
@@ -84,8 +83,8 @@ export function pickGroundPosition(viewer, screenPosition) {
 }
 
 /**
- * Whether a `scene.pick()` result is the map itself: nothing, or Google 3D
- * tile content, which picks without an id.
+ * Whether a `scene.pick()` result is the map itself: nothing, or 3D tile
+ * content (which has no id).
  *
  * @param {object|null|undefined} picked
  * @returns {boolean}
