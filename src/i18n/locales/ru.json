@@ -2060,5 +2060,7 @@
   "{duration}s + {hold}s": "{duration} с + {hold} с",
   "Configured Source": "Настроенный источник",
   "subject": "объект",
-  "{value}m": "{value} м"
+  "{value}m": "{value} м",
+  "Google 3D tiles unavailable — check the key's API restrictions, quota, or network": "Тайлы Google 3D недоступны — проверьте ограничения API ключа, квоту или сеть",
+  "Needs {envVars} — add it in Provider Settings — or a Cesium ion token for the ion-hosted route": "Нужен {envVars} — добавьте его в «Настройках провайдеров» — или токен Cesium ion для маршрута через ion"
 }

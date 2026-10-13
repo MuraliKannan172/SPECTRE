@@ -129,6 +129,10 @@ const PANEL_LABELS = {
   'local-firms': msg('Active Fires'),
 };
 
+function englishPanelLabel(layer) {
+  return PANEL_LABELS[layer.id] || LAYER_NAME_KEYS[layer.id] || layer.name;
+}
+
 // The panel's own English names win, as before i18n; module names otherwise.
 function panelLabel(layer) {
   if (PANEL_LABELS[layer.id]) return t(PANEL_LABELS[layer.id]);
@@ -378,6 +382,8 @@ export class LayerPanel {
       const row = document.createElement('div');
       row.className = 'data-toggle-row';
       row.dataset.layerId = layer.id;
+      // English name for voice tools, which must not receive translated text.
+      row.dataset.layerName = englishPanelLabel(layer);
 
       const topRow = document.createElement('div');
       topRow.className = 'data-toggle-top';

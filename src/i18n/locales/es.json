@@ -2028,5 +2028,7 @@
   "{duration}s + {hold}s": "{duration} s + {hold} s",
   "Configured Source": "Fuente configurada",
   "subject": "sujeto",
-  "{value}m": "{value} m"
+  "{value}m": "{value} m",
+  "Google 3D tiles unavailable — check the key's API restrictions, quota, or network": "Teselas de Google 3D no disponibles: revisa las restricciones de API de la clave, la cuota o la red",
+  "Needs {envVars} — add it in Provider Settings — or a Cesium ion token for the ion-hosted route": "Necesita {envVars} — añádela en Ajustes de proveedores — o un token de Cesium ion para la ruta alojada en ion"
 }
