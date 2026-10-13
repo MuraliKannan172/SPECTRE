@@ -221,6 +221,18 @@
   white-space: nowrap;
 }
 
+/* A longer translated title in a collapsed rail launcher tightens its
+   tracking rather than pushing the disclosure button out of the card. */
+html:not([lang='en'])
+  #right-context-rail
+  .panel-collapsible.collapsed
+  .panel-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 2px;
+}
+
 .panel-divider {
   flex: 1;
   height: 1px;

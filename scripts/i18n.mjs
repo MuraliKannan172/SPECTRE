@@ -4,6 +4,10 @@
 //   npm run i18n -- --prune          also drop entries the code no longer uses
 //   npm run i18n -- --missing ru     print what ru lacks, as JSON to translate
 //
+// A translation identical to the English is reported too, unless it is
+// listed for that locale in src/i18n/same-as-english.json (codes, product
+// names, words spelled the same in both languages).
+//
 // Messages are the English literals passed to t(), tn() and msg() in src/,
 // plus the markup opted in with data-i18n* in src/ui/templates and index.html.
 // It also lists UI text that is not marked at all (see findUnmarked).
@@ -14,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOCALES_DIR = path.join(ROOT, 'src/i18n/locales');
+const SAME_AS_ENGLISH = path.join(ROOT, 'src/i18n/same-as-english.json');
 
 const STRING = String.raw`'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|\`(?:\\.|[^\`\\$])*\``;
 const CALL = new RegExp(
@@ -424,11 +429,26 @@ export function shippedLocales() {
   );
 }
 
+/** Messages a locale keeps exactly as in English, on purpose. */
+export function readSameAsEnglish(locale) {
+  const lists = JSON.parse(readFileSync(SAME_AS_ENGLISH, 'utf8'));
+  return new Set(lists[locale] || []);
+}
+
+/** The English a message shows: its text without the "context|" prefix. */
+const englishOf = (text) => text.slice(text.indexOf('|') + 1);
+
 /**
  * Compare one catalog with the extracted messages.
+ * @param {Set<string>} [sameAsEnglish] Messages allowed to read as English.
  * @returns {{missing: string[], stale: string[], errors: string[]}}
  */
-export function checkCatalog(locale, catalog, messages) {
+export function checkCatalog(
+  locale,
+  catalog,
+  messages,
+  sameAsEnglish = readSameAsEnglish(locale),
+) {
   const categories = new Intl.PluralRules(locale).resolvedOptions()
     .pluralCategories;
   const missing = [];
@@ -456,6 +476,14 @@ export function checkCatalog(locale, catalog, messages) {
       errors.push(`"${text}" must be a string`);
     } else if (placeholders(entry) !== placeholders(text)) {
       errors.push(`"${text}" placeholders differ: ${entry}`);
+    } else if (
+      entry === englishOf(text) &&
+      /\p{L}{2}/u.test(entry.replace(/\{[^}]*\}/g, '')) &&
+      !sameAsEnglish.has(text)
+    ) {
+      errors.push(
+        `"${text}" is still English: translate it, or list it under "${locale}" in src/i18n/same-as-english.json`,
+      );
     }
   }
   const stale = Object.keys(catalog).filter((text) => !messages.has(text));

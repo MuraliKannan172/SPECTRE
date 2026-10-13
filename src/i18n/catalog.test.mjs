@@ -66,6 +66,28 @@ test('checkCatalog reports missing, stale, placeholder and plural problems', () 
   assert.equal(result.errors.length, 2);
 });
 
+test('checkCatalog reports a translation left in English unless it is allowed', () => {
+  const fixture = new Map([
+    ['Bloom', { plural: false }],
+    ['HDG', { plural: false }],
+    ['voice|READY', { plural: false }],
+    ['{state} · {source}', { plural: false }],
+  ]);
+  const catalog = {
+    Bloom: 'Bloom',
+    HDG: 'HDG',
+    'voice|READY': 'READY',
+    '{state} · {source}': '{state} · {source}',
+  };
+  const errors = (allowed) =>
+    checkCatalog('es', catalog, fixture, new Set(allowed)).errors;
+  assert.deepEqual(
+    errors([]).map((error) => error.split(' is still English')[0]),
+    ['"Bloom"', '"HDG"', '"voice|READY"'],
+  );
+  assert.deepEqual(errors(['Bloom', 'HDG', 'voice|READY']), []);
+});
+
 test('unmarkedMarkup finds text and attributes without data-i18n*', () => {
   const texts = (html) => unmarkedMarkup('f.html', html).map((f) => f.text);
   assert.deepEqual(texts('<span>Close</span>'), ['Close']);

@@ -70,7 +70,7 @@ export function createCategories({
   function buildRadioCategories(stations) {
     const rows = Array.isArray(stations) ? stations : [];
     const categories = [
-      { id: 'all', label: t('All') },
+      { id: 'all', label: t('All', { context: 'radio tag' }) },
       { id: 'news', label: t('News') },
       { id: 'talk', label: t('Talk') },
       { id: 'weather', label: t('Weather / Emergency') },
@@ -89,7 +89,7 @@ export function createCategories({
     for (const [genre, label] of MUSIC_GENRES) {
       const id = `genre:${genre}`;
       if (rows.some((station) => stationMatchesRadioCategory(station, id))) {
-        categories.push({ id, label });
+        categories.push({ id, label: t(label) });
       }
     }
     categories.push({ id: 'other', label: t('Other') });

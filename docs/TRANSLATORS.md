@@ -32,7 +32,7 @@ npm run i18n -- --missing ru      # missing ru entries as JSON, ready to transla
 npm run i18n -- --prune           # drop entries the code no longer uses
 ```
 
-`npm test` runs the same check (`src/i18n/catalog.test.mjs`). It fails when a translation is missing, when an entry is no longer used, when placeholders differ from the English, or when a plural entry lacks a form.
+`npm test` runs the same check (`src/i18n/catalog.test.mjs`). It fails when a translation is missing, when an entry is no longer used, when placeholders differ from the English, when a plural entry lacks a form, or when a translation is still the English text. If an entry is right as it is in English (a code such as HDG, a product name, a word spelled the same in your language), add it under your language code in `src/i18n/same-as-english.json`.
 
 Changing English text changes its key: the old translation becomes unused and the new text shows as missing. Translate it and prune.
 

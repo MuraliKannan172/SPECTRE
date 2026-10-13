@@ -366,6 +366,15 @@
   color: var(--text-secondary);
   font-style: italic;
 }
+/* A translated slot line (date · source · resolution · state) is longer:
+   let it take a second line rather than cut off the state at the end. */
+html:not([lang='en']) .recent-imagery-readout .ri-slot {
+  height: auto;
+  min-height: 20px;
+}
+html:not([lang='en']) .recent-imagery-readout .ri-slot-value {
+  white-space: normal;
+}
 .recent-imagery-readout .ri-unpin {
   width: 22px;
   padding: 0;

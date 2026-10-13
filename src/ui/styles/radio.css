@@ -647,6 +647,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Translated layer names are longer: break between words, and hyphenate a
+   word that still does not fit instead of splitting it anywhere. */
+html:not([lang='en']) .data-name {
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
 .data-toggle-right {
   display: flex;
   flex: 0 1 auto;

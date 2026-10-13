@@ -404,3 +404,13 @@ html:not([lang='en']) #cctv-camera-select {
   font-size: 10px;
   letter-spacing: 0.04em;
 }
+
+/* The camera name gets its own row; PREV / NEXT share the row below it. */
+html:not([lang='en']) .cctv-controls:has(#cctv-camera-select) {
+  flex-wrap: wrap;
+}
+
+html:not([lang='en']) #cctv-camera-select {
+  flex: 1 1 100%;
+  order: -1;
+}
