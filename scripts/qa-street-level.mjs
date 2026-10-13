@@ -1813,6 +1813,9 @@ async function main() {
                   .split('_')
                   .includes(token),
               option,
+              // The link is written once the view rests for 500 ms; under a
+              // software renderer with a photo open that can take a while.
+              { timeout: 30_000 },
             ),
             `the share link keeps the choice: ${option}`,
           );

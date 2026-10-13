@@ -195,7 +195,9 @@ button.sl-status:focus-visible {
   min-width: 0;
 }
 
-.sl-nearest-btn {
+/* Scoped to outrank .scene-btn's flex: 1, which squeezed the button to its
+   min-width beside a long coverage line and clipped its one-line label. */
+.sl-meta-row .sl-nearest-btn {
   flex: 0 0 auto;
 }
 
@@ -504,7 +506,9 @@ button.sl-status:focus-visible {
 /* A dragged window keeps its natural height, so bound it to the viewport:
    the rail's max-height: 100% does not bind an auto-height parent.
    Id-qualified to outrank that rule. */
-#right-context-rail > #street-level-panel.panel-floating > .street-level-panel-inner {
+#right-context-rail
+  > #street-level-panel.panel-floating
+  > .street-level-panel-inner {
   max-height: calc(100vh - 12px);
   overflow-y: auto;
 }
