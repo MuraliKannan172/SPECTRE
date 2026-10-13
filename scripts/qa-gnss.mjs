@@ -539,6 +539,53 @@ async function main() {
       const { viewer } = window.__godsEyeView;
       viewer.camera.setView({
         destination: viewer.scene.globe.ellipsoid.cartographicToCartesian({
+          longitude: (12.5 * Math.PI) / 180,
+          latitude: (41.9 * Math.PI) / 180,
+          height: 16_000_000,
+        }),
+        orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
+      });
+      viewer.scene.requestRender();
+    });
+    await page.waitForFunction(
+      () => {
+        const url = window.__gnssQaRequests.at(-1);
+        const params = url && new URL(url, location.origin).searchParams;
+        return (
+          params &&
+          Math.abs(Number(params.get('lon')) - 12.5) < 1 &&
+          Math.abs(Number(params.get('lat')) - 41.9) < 1
+        );
+      },
+      { timeout: 15000 },
+    );
+    const world = await page.evaluate((id) => {
+      const { viewer, dataManager } = window.__godsEyeView;
+      const bounds = viewer.camera.computeViewRectangle(
+        viewer.scene.globe.ellipsoid,
+      );
+      return {
+        enabled: dataManager.isEnabled(id),
+        height: viewer.camera.positionCartographic.height,
+        boundsMidLongitude:
+          bounds && ((bounds.west + bounds.east) * 90) / Math.PI,
+        coverage: dataManager.layers.get(id).module.getStats().coverage,
+      };
+    }, LAYER_ID);
+    record(
+      'GLOBE: zoomed-out sampling stays centred on Rome and exposes its regional radius',
+      world.enabled &&
+        world.height > 15_000_000 &&
+        world.coverage?.longitude === 13 &&
+        world.coverage?.latitude === 42 &&
+        world.coverage?.radiusNm === 250,
+      JSON.stringify(world),
+    );
+    await shoot(page, 'globe-regional');
+    await page.evaluate(() => {
+      const { viewer } = window.__godsEyeView;
+      viewer.camera.setView({
+        destination: viewer.scene.globe.ellipsoid.cartographicToCartesian({
           longitude: (18.6 * Math.PI) / 180,
           latitude: (54.6 * Math.PI) / 180,
           height: 450_000,
