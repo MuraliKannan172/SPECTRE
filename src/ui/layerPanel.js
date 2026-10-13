@@ -3,7 +3,7 @@ import { syncRowList } from './rowList.js';
 import { layerFeedState } from '../data/feedState.js';
 export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
-import { keySetupRequirementEnvVars } from '../keySetupCore.mjs';
+import { keyGuidanceText, keyRequirementText } from './keyGuidance.js';
 import { createWeatherPanel } from './weatherPanel.js';
 import { msg, t, translateKnown } from '../i18n/index.js';
 
@@ -205,15 +205,23 @@ function sourceLabel(source) {
 export function layerKeyRequirementTooltip(layer = {}) {
   if (layer?.stats?.keyRequired !== true) return '';
   const requiresKeyId = String(layer.requiresKeyId || '').trim();
-  const envVars = requiresKeyId
-    ? keySetupRequirementEnvVars(requiresKeyId)
-    : null;
-  return envVars
-    ? t('Needs {envVars} — add it in Provider Settings', { envVars })
-    : '';
+  // A layer with several sources also names the ones it could use instead.
+  return keyGuidanceText(
+    requiresKeyId ? keyRequirementText(requiresKeyId) : '',
+    layer.stats.keyAlternatives || [],
+  );
 }
 
 const ROW_TEXT_SEPARATOR = ' · ';
+
+/** A loading label is English data, at times several joined by " · ". */
+function translateLoadingLabel(label) {
+  return label
+    .trim()
+    .split(ROW_TEXT_SEPARATOR)
+    .map(translateKnown)
+    .join(ROW_TEXT_SEPARATOR);
+}
 // A short Latin code joined by hyphens. Longer runs (a URL, a token in an
 // error) keep their break opportunities so they cannot overflow the rail.
 const HYPHENATED_CODE = /[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+/g;
@@ -754,14 +762,14 @@ export class LayerPanel {
     if (stats.loading) {
       const loadingLabel =
         typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
-          ? translateKnown(stats.loadingLabel.trim())
+          ? translateLoadingLabel(stats.loadingLabel)
           : t('loading...');
       return t('{source} · {loadingLabel}', { source, loadingLabel });
     }
     if (feedState === 'fallback') {
       const detail =
         typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
-          ? translateKnown(stats.loadingLabel.trim())
+          ? translateLoadingLabel(stats.loadingLabel)
           : stats.coverage || ago;
       return t('{state} · {source} · {detail}', {
         state: stateLabel,
@@ -806,7 +814,7 @@ export class LayerPanel {
     if (typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()) {
       return t('{source} · {loadingLabel}', {
         source,
-        loadingLabel: translateKnown(stats.loadingLabel.trim()),
+        loadingLabel: translateLoadingLabel(stats.loadingLabel),
       });
     }
     return t('{source} · {ago}', { source, ago });
