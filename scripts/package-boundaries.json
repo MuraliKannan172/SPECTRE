@@ -305,6 +305,7 @@
       "server/providers/common/request.js",
       "server/providers/common/source-root.js",
       "server/providers/openai.js",
+      "server/providers/openai/codex-auth.js",
       "server/providers/openai/constants.js",
       "server/providers/openai/debug-log.js",
       "server/providers/openai/hud-summary.js",
@@ -561,6 +562,7 @@
       "src/contextModePolicy.js",
       "src/data/detectionPolicy.js",
       "src/data/installationFeedback.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateCoordinator.js",
       "src/data/layerStateTokenReservations.json",
@@ -809,6 +811,7 @@
       "src/data/cockpitContactDot.js",
       "src/data/contactMatch.js",
       "src/data/iconOrientation.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateTokenReservations.json",
       "src/data/modelVisualAnchor.js",
@@ -851,6 +854,7 @@
       "src/data/cockpitContactDot.js",
       "src/data/contactMatch.js",
       "src/data/iconOrientation.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateTokenReservations.json",
       "src/data/modelVisualAnchor.js",
@@ -888,6 +892,7 @@
       "src/data/cockpitContactDot.js",
       "src/data/contactMatch.js",
       "src/data/iconOrientation.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateCoordinator.js",
       "src/data/layerStateTokenReservations.json",
@@ -943,6 +948,7 @@
     "exports": ["./layers/recent-imagery"],
     "modules": [
       "src/layers/recentImagery/index.js",
+      "src/layers/recentImagery/source.js",
       "src/layers/recentImagery/model.js",
       "src/layers/recentImagery/catalog.js",
       "src/layers/recentImagery/rendering.js",
@@ -1212,6 +1218,7 @@
       "src/layers/streetLevel/groundCast.js",
       "src/layers/streetLevel/meshSampler.js",
       "src/layers/streetLevel/pickRouter.js",
+      "src/data/idSwitches.js",
       "src/layers/streetLevel/params.js",
       "src/layers/streetLevel/registry.js",
       "src/layers/streetLevel/filter.js",
@@ -1257,6 +1264,7 @@
     "exports": ["./layers/radio"],
     "modules": [
       "src/data/iconOrientation.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateTokenReservations.json",
       "src/data/radioCountry.js",
@@ -1365,6 +1373,7 @@
     "modules": [
       "src/voice/realtimeController.js",
       "src/voice/realtimeBackend.js",
+      "src/voice/cloudVoiceAuth.js",
       "src/voice/control.js",
       "src/voice/layerSummary.js",
       "src/voice/voiceCost.js",
@@ -1442,6 +1451,7 @@
       "src/annotations/worldAnnotationRenderer.js",
       "src/app/catalog.js",
       "src/app/constructCatalog.js",
+      "src/app/sourceComposition.js",
       "src/app/controls.js",
       "src/app/data.js",
       "src/app/errors.js",
@@ -1543,6 +1553,7 @@
       "src/data/installationFeedback.js",
       "src/data/issPass.js",
       "src/data/labelArbiter.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateCoordinator.js",
       "src/data/layerStateTokenReservations.json",
@@ -1980,6 +1991,7 @@
       "src/voice/resultDisplay.js",
       "src/voice/gevRealtime.js",
       "src/voice/layerSummary.js",
+      "src/voice/cloudVoiceAuth.js",
       "src/voice/realtimeBackend.js",
       "src/voice/realtimeController.js",
       "src/voice/voiceCost.js",
@@ -2000,6 +2012,7 @@
       "src/annotations/drawTool.js",
       "src/data/routeSteps.js",
       "src/layers/directions/index.js",
+      "src/layers/directions/source.js",
       "src/data/directions.js",
       "src/app/layers/directions.js",
       "src/search/coordinateGeocoder.js",
@@ -2134,6 +2147,7 @@
       "src/ui/localSdrPresentation.js",
       "src/app/layers/recentImagery.js",
       "src/layers/recentImagery/index.js",
+      "src/layers/recentImagery/source.js",
       "src/layers/recentImagery/model.js",
       "src/layers/recentImagery/catalog.js",
       "src/layers/recentImagery/rendering.js",
@@ -2229,6 +2243,7 @@
       "src/annotations/resolver.js",
       "src/app/catalog.js",
       "src/app/constructCatalog.js",
+      "src/app/sourceComposition.js",
       "src/layers/wind/index.js",
       "src/layers/wind/model.js",
       "src/layers/wind/fields.js",
@@ -2288,6 +2303,7 @@
       "src/data/issPass.js",
       "src/data/satellitePass.js",
       "src/data/labelArbiter.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateTokenReservations.json",
       "src/data/localGeojson.js",
@@ -2578,6 +2594,7 @@
       "src/services/groundFloor.js",
       "src/data/routeSteps.js",
       "src/layers/directions/index.js",
+      "src/layers/directions/source.js",
       "src/services/terrainHeights.js",
       "src/data/terrainHeights.js",
       "src/data/groundFloor.js",
@@ -2666,6 +2683,7 @@
       "src/data/modelEligibility.js",
       "src/app/layers/recentImagery.js",
       "src/layers/recentImagery/index.js",
+      "src/layers/recentImagery/source.js",
       "src/layers/recentImagery/model.js",
       "src/layers/recentImagery/catalog.js",
       "src/layers/recentImagery/rendering.js",
@@ -2807,6 +2825,7 @@
     "exports": ["./ui/share-restoration"],
     "modules": [
       "src/data/installationFeedback.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateCoordinator.js",
       "src/data/layerStateTokenReservations.json",
@@ -2920,9 +2939,27 @@
     ],
     "external": []
   },
+  "directions-source": {
+    "exports": ["./layers/directions/source"],
+    "modules": ["src/layers/directions/source.js"],
+    "external": []
+  },
+  "recent-imagery-source": {
+    "exports": ["./layers/recent-imagery/source"],
+    "modules": [
+      "src/layers/recentImagery/source.js",
+      "src/layers/recentImagery/catalog.js",
+      "src/layers/recentImagery/model.js"
+    ],
+    "external": []
+  },
   "directions-layer": {
     "exports": ["./layers/directions"],
-    "modules": ["src/layers/directions/index.js", "src/data/routeSteps.js"],
+    "modules": [
+      "src/layers/directions/index.js",
+      "src/layers/directions/source.js",
+      "src/data/routeSteps.js"
+    ],
     "external": ["cesium"]
   },
   "radio-browser-source": {
@@ -3309,6 +3346,7 @@
       "src/tools/queries/brief.js",
       "src/tools/queries/maritime.js",
       "src/tools/queries/share.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateTokenReservations.json",
       "src/sources/gbfsStations.js",
@@ -3431,6 +3469,7 @@
     "exports": ["./view"],
     "modules": [
       "src/view/index.js",
+      "src/data/idSwitches.js",
       "src/data/layerState.js",
       "src/data/layerStateTokenReservations.json"
     ],
