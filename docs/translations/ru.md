@@ -25,40 +25,41 @@ When a word next to a number cannot agree in every form, move the number after a
 
 ## Glossary
 
-| English                                    | Русский                                                            |
-| ------------------------------------------ | ------------------------------------------------------------------ |
-| layer / data layer                         | слой / слой данных                                                 |
-| feed                                       | поток данных (short: поток)                                        |
-| source / data source                       | источник / источник данных                                         |
-| LIVE (status) / live data                  | ОНЛАЙН / в реальном времени                                        |
-| SIMULATED                                  | СИМУЛЯЦИЯ                                                          |
-| stale / degraded / unavailable             | устарел / с перебоями / недоступен                                 |
-| retry                                      | повтор                                                             |
-| key (API key) / POWER UP                   | ключ / ЗАПУСК                                                      |
-| Provider Settings                          | Настройки провайдеров                                              |
-| globe / map / map source                   | глобус / карта / источник карты                                    |
-| aircraft / flight / military flights       | самолёт (short HUD: борт) / рейс / военные рейсы                   |
-| vessel, ship / vessels                     | судно / суда                                                       |
-| satellite                                  | спутник                                                            |
-| launch (rocket) / space mission            | пуск / космическая миссия                                          |
-| contact / tracking                         | контакт / отслеживание                                             |
-| installation, site                         | объект                                                             |
-| camera / CCTV camera                       | камера / камера CCTV                                               |
-| earthquake / active fire                   | землетрясение / активный пожар                                     |
-| scene / shot / scene recipe                | сцена / кадр / рецепт сцены                                        |
-| briefing / panel / dock                    | брифинг / панель / док                                             |
-| preset / visual preset                     | пресет / визуальный пресет                                         |
-| Scope (circular viewport mask)             | прицел                                                             |
-| heading / altitude / ground speed          | курс / высота / путевая скорость                                   |
-| HDG / BRG / CRS / FOV / DEST / SPD / RANGE | КУРС / ПЕЛ. / ПУТЬ / ОБЗОР / НАЗН. / СКОР / ДАЛЬН.                 |
-| advisory (NHC/CPHC cyclone)                | сводка (не «бюллетень»); Advisory center — центр циклона по сводке |
-| Street View (Google)                       | Просмотр улиц (как в русских Google Картах)                        |
-| CONUS (NOAA region code)                   | CONUS, без перевода                                                |
-| PREV / NEXT                                | ПРЕД. / СЛЕД.                                                      |
-| Previous / Next (button text)              | Назад / Далее                                                      |
-| anchor / data pack / bundle (scene)        | якорь / пакет данных / архив                                       |
-| basemap / box (Recent Imagery area)        | подложка / область                                                 |
-| camera move                                | перелёт                                                            |
-| SIG / NEWS / LOCAL (briefing tabs)         | СИГН. / НОВОСТИ / МЕСТН.                                           |
-| compass points (N, NNE, …)                 | С, ССВ, …                                                          |
-| L / R (relative bearing)                   | Л / П                                                              |
+| English                                     | Русский                                                            |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| layer / data layer                          | слой / слой данных                                                 |
+| feed                                        | поток данных (short: поток)                                        |
+| source / data source                        | источник / источник данных                                         |
+| LIVE (status) / live data                   | ОНЛАЙН / в реальном времени                                        |
+| SIMULATED                                   | СИМУЛЯЦИЯ                                                          |
+| stale / degraded / unavailable              | устарел / с перебоями / недоступен                                 |
+| retry                                       | повтор                                                             |
+| key (API key) / POWER UP                    | ключ / ЗАПУСК                                                      |
+| Provider Settings                           | Настройки провайдеров                                              |
+| globe / map / map source                    | глобус / карта / источник карты                                    |
+| aircraft / flight / military flights        | самолёт (short HUD: борт) / рейс / военные рейсы                   |
+| vessel, ship / vessels                      | судно / суда                                                       |
+| satellite                                   | спутник                                                            |
+| launch (rocket) / space mission             | пуск / космическая миссия                                          |
+| contact / tracking                          | контакт / отслеживание                                             |
+| installation, site                          | объект                                                             |
+| camera / CCTV camera                        | камера / камера CCTV                                               |
+| earthquake / active fire                    | землетрясение / активный пожар                                     |
+| scene / shot / scene recipe                 | сцена / кадр / рецепт сцены                                        |
+| briefing / panel / dock                     | брифинг / панель / док                                             |
+| preset / visual preset                      | пресет / визуальный пресет                                         |
+| Scope (circular viewport mask)              | прицел                                                             |
+| heading / altitude / ground speed           | курс / высота / путевая скорость                                   |
+| HDG / BRG / CRS / FOV / DEST / SPD / RANGE  | КУРС / ПЕЛ. / ПУТЬ / ОБЗОР / НАЗН. / СКОР / ДАЛЬН.                 |
+| advisory (NHC/CPHC cyclone)                 | сводка (не «бюллетень»); Advisory center — центр циклона по сводке |
+| Street View (Google)                        | Просмотр улиц (как в русских Google Картах)                        |
+| CONUS (NOAA region code)                    | CONUS, без перевода                                                |
+| WHOT/BHOT, Ironbow (thermal modes, palette) | без перевода                                                       |
+| PREV / NEXT                                 | ПРЕД. / СЛЕД.                                                      |
+| Previous / Next (button text)               | Назад / Далее                                                      |
+| anchor / data pack / bundle (scene)         | якорь / пакет данных / архив                                       |
+| basemap / box (Recent Imagery area)         | подложка / область                                                 |
+| camera move                                 | перелёт                                                            |
+| SIG / NEWS / LOCAL (briefing tabs)          | СИГН. / НОВОСТИ / МЕСТН.                                           |
+| compass points (N, NNE, …)                  | С, ССВ, …                                                          |
+| L / R (relative bearing)                    | Л / П                                                              |
