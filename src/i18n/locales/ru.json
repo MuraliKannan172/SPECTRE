@@ -2042,7 +2042,6 @@
   "Box and images cleared": "Область и снимки сброшены",
   "Box is {size} wide · limit {limit}": "Область шириной {size} · предел {limit}",
   "View is {size} wide · limit {limit}": "Вид шириной {size} · предел {limit}",
-  "{state}: {layers}": "{state}: {layers}",
   "{mode} · {band} · {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}": "{mode} · {band} · {locality} | {region} | ALT {alt} | ОКНО {window} | SUN {sun}° | ONA {ona}° | {zone}",
   "Frame unavailable; previous observation retained": "Кадр недоступен; показано предыдущее наблюдение",
   "Weather imagery unavailable": "Погодные снимки недоступны",
@@ -2055,5 +2054,8 @@
   "Globe imagery unavailable": "Снимки глобуса недоступны",
   "Globe field image unavailable": "Изображение поля на глобусе недоступно",
   "status chip|UNAVAILABLE": "НЕДОСТ.",
-  "Uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.": "Используется зарегистрированный контент или связанные медиафайлы. Эти внешние файлы не входят в архив сцены. Их исходные уведомления по-прежнему действуют."
+  "Uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.": "Используется зарегистрированный контент или связанные медиафайлы. Эти внешние файлы не входят в архив сцены. Их исходные уведомления по-прежнему действуют.",
+  "{state} {layers}": "{state}: {layers}",
+  "Selected Space Mission": "Выбранная космическая миссия",
+  "{duration}s + {hold}s": "{duration} с + {hold} с"
 }

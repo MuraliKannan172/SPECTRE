@@ -129,10 +129,11 @@ const PANEL_LABELS = {
   'local-firms': msg('Active Fires'),
 };
 
+// The panel's own English names win, as before i18n; module names otherwise.
 function panelLabel(layer) {
+  if (PANEL_LABELS[layer.id]) return t(PANEL_LABELS[layer.id]);
   const key = LAYER_NAME_KEYS[layer.id];
-  if (key) return t(key);
-  return PANEL_LABELS[layer.id] ? t(PANEL_LABELS[layer.id]) : layer.name;
+  return key ? t(key) : layer.name;
 }
 
 // English module names (layer.name) that other surfaces print, such as the

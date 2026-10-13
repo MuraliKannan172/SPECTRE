@@ -2010,7 +2010,6 @@
   "Box and images cleared": "Recuadro e imágenes borrados",
   "Box is {size} wide · limit {limit}": "El recuadro mide {size} · límite {limit}",
   "View is {size} wide · limit {limit}": "La vista mide {size} · límite {limit}",
-  "{state}: {layers}": "{state}: {layers}",
   "{mode} · {band} · {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}": "{mode} · {band} · {locality} | {region} | ALT {alt} | VENTANA {window} | SUN {sun}° | ONA {ona}° | {zone}",
   "Frame unavailable; previous observation retained": "Fotograma no disponible; se mantiene la observación anterior",
   "Weather imagery unavailable": "Imágenes meteorológicas no disponibles",
@@ -2023,5 +2022,8 @@
   "Globe imagery unavailable": "Imágenes del globo no disponibles",
   "Globe field image unavailable": "Imagen del campo en el globo no disponible",
   "status chip|UNAVAILABLE": "NO DISP.",
-  "Uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.": "Usa contenido registrado o medios vinculados. Esos archivos externos no se incluyen en un paquete de escena. Sus avisos originales siguen vigentes."
+  "Uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.": "Usa contenido registrado o medios vinculados. Esos archivos externos no se incluyen en un paquete de escena. Sus avisos originales siguen vigentes.",
+  "{state} {layers}": "{state}: {layers}",
+  "Selected Space Mission": "Misión espacial seleccionada",
+  "{duration}s + {hold}s": "{duration} s + {hold} s"
 }

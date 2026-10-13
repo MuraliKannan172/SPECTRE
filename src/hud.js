@@ -113,7 +113,7 @@ function localizedProvenanceTag(provenance) {
     ? t(FEED_STATE_LABELS[provenance.state])
     : provenance.state.toUpperCase();
   if (!provenance.names.length) return state;
-  return t('{state}: {layers}', {
+  return t('{state} {layers}', {
     state,
     layers: provenance.names
       .map((name) => localizeLayerName(name).toUpperCase())

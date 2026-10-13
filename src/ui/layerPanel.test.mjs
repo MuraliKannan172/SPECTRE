@@ -327,5 +327,5 @@ test('the unavailable chip may abbreviate, but its accessible name keeps the ful
   });
   assert.equal(button.textContent, 'UNAVAILABLE');
   assert.equal(button.dataset.feedState, 'unavailable');
-  assert.match(attrs.get('aria-label'), /^FIRMS Active Fires: UNAVAILABLE\./);
+  assert.match(attrs.get('aria-label'), /^Active Fires: UNAVAILABLE\./);
 });

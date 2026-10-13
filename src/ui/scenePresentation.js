@@ -1,6 +1,5 @@
 /** Scene panel elements and text-only project presentation. */
-import { msg, t } from '../i18n/index.js';
-import { formatQuantity } from './unitLabels.js';
+import { formatNumber, msg, t } from '../i18n/index.js';
 
 // Labels for what a shot stores; anything else shows as stored. Style names
 // match STYLE_STATUS_LABELS in visualPresets.js, which this package cannot
@@ -145,11 +144,16 @@ export function renderSceneShots(
       ? t(DETECTION_MODE_LABELS[mode])
       : mode;
     const seconds = (value) =>
-      formatQuantity(value, 's', {
+      formatNumber(value, {
         minimumFractionDigits: 1,
         maximumFractionDigits: 1,
       });
-    meta.textContent = `${styleLabel} · ${modeLabel} · ${seconds(shot.durationSec)} + ${seconds(shot.holdSec)}`;
+    // English keeps its compact "4.0s + 0.9s"; other languages space the unit.
+    const timing = t('{duration}s + {hold}s', {
+      duration: seconds(shot.durationSec),
+      hold: seconds(shot.holdSec),
+    });
+    meta.textContent = `${styleLabel} · ${modeLabel} · ${timing}`;
     row.appendChild(top);
     row.appendChild(meta);
     element.appendChild(row);
