@@ -5,7 +5,7 @@ import {
   SINCE_STOPS,
 } from './streetLevelPresentation.js';
 
-import { t } from '../i18n/index.js';
+import { t, translateKnown } from '../i18n/index.js';
 const RENDER_MODE_KEY = 'gev:street-level:render-mode';
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -229,7 +229,8 @@ export class StreetLevelControls {
       await this.actions.setEnabled?.(true);
     } catch (error) {
       this.actions.showToast?.(
-        error?.message || t('Street Level could not start'),
+        translateKnown(error?.message || '') ||
+          t('Street Level could not start'),
       );
       return false;
     }
@@ -242,7 +243,7 @@ export class StreetLevelControls {
       await this.actions.setEnabled?.(!enabled);
     } catch (error) {
       this.actions.showToast?.(
-        error?.message || t('Street Level toggle failed'),
+        translateKnown(error?.message || '') || t('Street Level toggle failed'),
       );
     }
   }
@@ -276,7 +277,7 @@ export class StreetLevelControls {
       await this.actions.setEnabled?.(false);
     } catch (error) {
       this.actions.showToast?.(
-        error?.message || t('Street Level toggle failed'),
+        translateKnown(error?.message || '') || t('Street Level toggle failed'),
       );
     }
   }

@@ -253,7 +253,8 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
     providers: presentProviders(state),
     error: keyMissing
       ? null
-      : state.street.error || state.coverage.error || null,
+      : translateKnown(state.street.error || state.coverage.error || '') ||
+        null,
     filter: { pano: filter.pano, sinceDays: Number(filter.sinceDays) || 0 },
     filterControls: {
       pano: state.filterControls?.pano !== false,
