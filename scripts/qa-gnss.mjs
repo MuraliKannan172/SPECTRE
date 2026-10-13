@@ -724,6 +724,9 @@ async function main() {
     const retry = await browser.newPage();
     await retry.setViewport({ width: 1440, height: 900 });
     retry.on('pageerror', (e) => errors.push(e.message));
+    // Pages share the disposable test context's storage. Start this one cold,
+    // so a previous fixture cannot auto-enable GNSS before the START test.
+    await retry.evaluateOnNewDocument(() => localStorage.clear());
     await stubRoute(retry, { initialFailures: 1, stale: false });
     await boot(retry, { lon: 18.6, lat: 54.6, height: 450_000 });
     await showLayerRow(retry);
