@@ -5,9 +5,17 @@ import {
   createTileCache,
   kartaViewZoomFor,
 } from './index.js';
-import { SEQUENCE_PAGE_SIZE } from './policy.js';
+import {
+  NO_COVERAGE_HINT,
+  SEQUENCE_PAGE_SIZE,
+  TOO_HIGH_HINT,
+} from './policy.js';
 import { validateProviders } from '../../registry.js';
-import { fakeHost } from '../../../../testSupport/kartaViewFakes.mjs';
+import { fakeHost, until } from '../../../../testSupport/kartaViewFakes.mjs';
+import {
+  coverageViewer,
+  tileCentre,
+} from '../../../../testSupport/streetLevelFakes.mjs';
 
 /** A photo record `metres` east of (42.3314, -83.0458), in sequence `seq` at `index`. */
 function photoRecord(id, { metres = 0, seq = '14010', index = 0 } = {}) {
@@ -71,13 +79,13 @@ function fakeSource({ nearest = [], sequences = {}, archived = [] } = {}) {
   };
 }
 
-function fakeContext() {
+function fakeContext({ filter = { pano: 'all', sinceMs: null } } = {}) {
   const actions = { opened: [], nearest: [], instance: null };
   return {
     actions,
     context: {
       services: {},
-      getFilter: () => ({ pano: 'all', sinceMs: null }),
+      getFilter: () => filter,
       isActive: () => true,
       groundCaster: null,
       meshSampler: null,
@@ -97,7 +105,7 @@ function fakeContext() {
   };
 }
 
-function setup(sourceOptions) {
+function setup(sourceOptions, contextOptions) {
   const source = fakeSource(sourceOptions);
   const loads = [];
   const definition = createKartaViewProvider({
@@ -112,7 +120,7 @@ function setup(sourceOptions) {
       },
     },
   });
-  const { context, actions } = fakeContext();
+  const { context, actions } = fakeContext(contextOptions);
   const instance = definition.create(context);
   actions.instance = instance;
   return { definition, instance, source, actions, loads };
@@ -126,6 +134,11 @@ test('KartaView registers keyless, off by default, with no filters and its own w
   assert.equal(definition.requiresKeyId, null);
   assert.equal(definition.defaultOn, false);
   assert.deepEqual(definition.filters, []);
+  assert.equal(
+    definition.highlightsSequence,
+    false,
+    'its lines are streets: a selected drive shows as cones',
+  );
   assert.match(
     definition.credit.html,
     /KartaView<\/a> contributors, CC BY-SA 4\.0/,
@@ -147,6 +160,11 @@ test('coverage is drawn from z14 near the street and z13 a little higher; never 
   assert.deepEqual(kartaViewZoomFor(300), { zoom: 14, kind: 'sequence' });
   assert.deepEqual(kartaViewZoomFor(2_500), { zoom: 14, kind: 'sequence' });
   assert.deepEqual(kartaViewZoomFor(4_000), { zoom: 13, kind: 'sequence' });
+  assert.deepEqual(
+    kartaViewZoomFor(6_000),
+    { zoom: 13, kind: 'sequence' },
+    'the top of the range still draws',
+  );
   assert.equal(kartaViewZoomFor(6_001), null);
   assert.equal(kartaViewZoomFor(NaN), null);
 });
@@ -206,13 +224,16 @@ test('coverage stats report KartaView as configured and key-free', async () => {
   assert.equal(stats.count, 0);
 });
 
-const press = async (button) => {
+/** Press a step button and wait until it has opened a photo (`opened` grew). */
+const press = async (button, opened) => {
+  const before = opened.length;
   button.fire('click');
-  for (let i = 0; i < 12; i++) await settle();
+  await until(() => opened.length > before);
+  await settle();
 };
 
-async function mounted(sourceOptions) {
-  const env = setup(sourceOptions);
+async function mounted(sourceOptions, contextOptions) {
+  const env = setup(sourceOptions, contextOptions);
   const host = fakeHost();
   await env.instance.viewer.mount(host);
   const poses = [];
@@ -228,20 +249,26 @@ test('› walks across sequence pages without moving the camera; ‹ walks back;
     sequences: { s: indexes },
   });
   await instance.viewer.open(`s-${size - 1}`);
-  await press(next);
+  await press(next, poses);
   assert.equal(poses.at(-1), `s-${size}`, 'onto the second page');
   assert.deepEqual(actions.opened.at(-1), {
     id: `s-${size}`,
     options: { frame: false },
   });
   assert.ok(source.calls.pages.includes('s:2'));
-  await press(prev);
+  await press(prev, poses);
   assert.equal(poses.at(-1), `s-${size - 1}`);
   await instance.viewer.open('s-0');
-  for (let i = 0; i < 6; i++) await settle();
-  assert.equal(prev.disabled, true, 'nothing before the first photo');
-  await press(prev);
-  assert.equal(poses.at(-1), 's-0');
+  assert.ok(await until(() => prev.disabled), 'nothing before the first photo');
+  // ‹ at the start opens nothing: presses run in turn, so once a later ›
+  // has opened its photo, a ‹ that opened one would show before it.
+  const before = actions.opened.length;
+  prev.fire('click');
+  await press(next, poses);
+  assert.deepEqual(
+    actions.opened.slice(before).map((open) => open.id),
+    ['s-1'],
+  );
 });
 
 test('pages that overlap in index (id order) step one photo at a time across the edge', async () => {
@@ -260,7 +287,7 @@ test('pages that overlap in index (id order) step one photo at a time across the
     sequences: { s: [...first, ...second] },
   });
   await instance.viewer.open(`s-${size - 5}`);
-  for (let k = 1; k <= 8; k++) await press(next);
+  for (let k = 1; k <= 8; k++) await press(next, poses);
   assert.deepEqual(
     poses.slice(-9).map((id) => Number(id.slice(2))),
     Array.from({ length: 9 }, (_, i) => size - 5 + i),
@@ -278,14 +305,13 @@ test('a photo whose index outruns the page count is found, and its neighbours ar
     sequences: { s: indexes },
   });
   await instance.viewer.open('s-1500');
-  await press(next);
+  await press(next, poses);
   assert.equal(poses.at(-1), 's-1501');
-  await press(prev);
-  await press(prev);
+  await press(prev, poses);
+  await press(prev, poses);
   assert.equal(poses.at(-1), 's-499', 'back across the gap');
   await instance.viewer.open('s-1999');
-  for (let i = 0; i < 8; i++) await settle();
-  assert.equal(next.disabled, true, 'the last photo');
+  assert.ok(await until(() => next.disabled), 'the last photo');
 });
 
 test('archived photos are skipped: by the nearest lookup, and by › and ‹', async () => {
@@ -302,7 +328,7 @@ test('archived photos are skipped: by the nearest lookup, and by › and ‹', a
     'kept',
   );
   await instance.viewer.open('s-1');
-  await press(next);
+  await press(next, poses);
   assert.equal(poses.at(-1), 's-4', 'two archived photos stepped over');
   const allGone = setup({
     nearest: [photoRecord('gone', { metres: 3 })],
@@ -348,12 +374,14 @@ async function withCones(t, env) {
     },
     camera: { positionWC: new Cesium.Cartesian3(0, 0, 1e8) },
   });
-  return () => {
+  const cones = () => {
     const indexes = [];
     for (let i = 0; i < collection.length; i++)
       indexes.push(Number(collection.get(i).id.split('-').at(-1)));
     return [Math.min(...indexes), Math.max(...indexes)];
   };
+  cones.count = () => collection?.length ?? 0;
+  return cones;
 }
 
 test('the cones follow the open photo to another page of a long sequence, cached or not', async (t) => {
@@ -362,26 +390,27 @@ test('the cones follow the open photo to another page of a long sequence, cached
     sequences: { s: Array.from({ length: size * 5 }, (_, i) => i) },
   });
   const cones = await withCones(t, env);
-  const settleLong = async () => {
-    for (let i = 0; i < 40; i++) await settle();
-  };
+  const drawnAround = (index) =>
+    until(
+      () =>
+        !env.instance.sequenceStats().loading &&
+        cones.count() > 0 &&
+        cones()[0] <= index &&
+        cones()[1] >= index,
+    );
   await env.instance.viewer.open('s-10');
   await env.instance.selectSequence('s');
-  await settleLong();
+  assert.ok(await drawnAround(10));
   assert.ok(cones()[1] < size, `first page: ${cones()}`);
   // A line click further along the same drive: the core does not reselect.
   await env.instance.viewer.open(`s-${size * 4 + 10}`);
-  await settleLong();
+  assert.ok(await drawnAround(size * 4 + 10), `re-centred: ${cones()}`);
   assert.ok(cones()[0] >= size * 3, `re-centred: ${cones()}`);
   // Closed and reopened on another page: not the sequence's cached cones.
   env.instance.clearSequence();
   await env.instance.viewer.open(`s-${size * 2 + 10}`);
   await env.instance.selectSequence('s');
-  await settleLong();
-  assert.ok(
-    cones()[0] <= size * 2 + 10 && cones()[1] >= size * 2 + 10,
-    `around the photo: ${cones()}`,
-  );
+  assert.ok(await drawnAround(size * 2 + 10), `around the photo: ${cones()}`);
 });
 
 test('a storage hiccup is not remembered as an archived photo', async () => {
@@ -406,14 +435,18 @@ test('a photo far past a run of deleted photos still finds its page and neighbou
     ...Array.from({ length: 1000 }, (_, i) => i),
     ...Array.from({ length: 20 }, (_, i) => 6000 + i),
   ];
-  const { instance, poses, next, prev } = await mounted({
+  const { instance, poses, next, prev, source } = await mounted({
     sequences: { s: indexes },
   });
   await instance.viewer.open('s-6005');
-  for (let i = 0; i < 12; i++) await settle();
+  // Both ends checks have found a neighbour (and probed it) before the look.
+  const probed = (id) =>
+    source.calls.probes.some((url) => url.endsWith(`/${id}.jpg`));
+  assert.ok(await until(() => probed('s-6004') && probed('s-6006')));
+  await settle();
   assert.equal(next.disabled, false);
   assert.equal(prev.disabled, false);
-  await press(next);
+  await press(next, poses);
   assert.equal(poses.at(-1), 's-6006');
 });
 
@@ -445,6 +478,10 @@ test('coverage tiles are kept for a while: panning back asks KartaView nothing',
   now = 2000;
   await tiles.get(a, {});
   assert.equal(asked.length, 5, 'stale after the TTL');
+  // The same x/y at another zoom is another tile.
+  await tiles.get({ ...a, z: 13 }, {});
+  assert.deepEqual(asked.at(-1), '13/1/2');
+  assert.equal(asked.length, 6);
   // A failed load is not kept.
   const failing = createTileCache({
     load: async () => {
@@ -454,4 +491,258 @@ test('coverage tiles are kept for a while: panning back asks KartaView nothing',
     ttlMs: 1000,
   });
   await assert.rejects(failing.get(a, {}), /did not answer/);
+});
+
+test('a page in id order, its indexes out of order, still steps in index order', async () => {
+  const { instance, poses, next, prev } = await mounted({
+    sequences: { s: [0, 2, 1, 3, 4] },
+  });
+  await instance.viewer.open('s-0');
+  await press(next, poses);
+  assert.equal(poses.at(-1), 's-1');
+  await press(next, poses);
+  assert.equal(poses.at(-1), 's-2');
+  await press(prev, poses);
+  assert.equal(poses.at(-1), 's-1');
+});
+
+test('a sequence page that failed once is asked again: › then reaches the next photo', async () => {
+  const env = await mounted({ sequences: { s: [0, 1, 2, 3] } });
+  const real = env.source.getSequencePhotos;
+  let fail = true;
+  env.source.getSequencePhotos = async (...args) => {
+    env.source.calls.pages.push('failing');
+    if (fail) throw new Error('KartaView did not answer in time — try again');
+    return real(...args);
+  };
+  await env.instance.viewer.open('s-1');
+  // The ends checks ask for the page and get no answer.
+  assert.ok(await until(() => env.source.calls.pages.includes('failing')));
+  await settle();
+  fail = false;
+  await press(env.next, env.poses);
+  assert.equal(env.poses.at(-1), 's-2');
+});
+
+test('a lookup overtaken while it probes shares the probe with the next one, which finds the photo', async () => {
+  const env = setup({ nearest: [photoRecord('kept', { metres: 9 })] });
+  let answer;
+  env.source.probeImage = (url) => {
+    env.source.calls.probes.push(url);
+    return new Promise((resolve) => (answer = resolve));
+  };
+  env.source.nearestPhotos = async (point, { signal } = {}) => {
+    signal?.throwIfAborted();
+    return [photoRecord('kept', { metres: 9 })];
+  };
+  const point = { lat: 42.3314, lon: -83.0458 };
+  const controller = new AbortController();
+  const first = env.instance.nearestImage(point, { signal: controller.signal });
+  assert.ok(await until(() => env.source.calls.probes.length === 1));
+  controller.abort(new Error('overtaken'));
+  const second = env.instance.nearestImage(point);
+  await settle();
+  answer(true);
+  assert.equal(await second, 'kept');
+  await first.catch(() => {});
+  assert.equal(env.source.calls.probes.length, 1, 'one probe, shared');
+  // A definite answer is kept: the next lookup asks storage nothing.
+  assert.equal(await env.instance.nearestImage(point), 'kept');
+  assert.equal(env.source.calls.probes.length, 1);
+  // A lookup aborted before KartaView answers gives up.
+  const late = new AbortController();
+  late.abort(new Error('closed'));
+  await assert.rejects(
+    env.instance.nearestImage(point, { signal: late.signal }),
+    /closed/,
+  );
+});
+
+test('a probe that fails outright is tried, and asked again next time', async () => {
+  const env = setup({ nearest: [photoRecord('near', { metres: 3 })] });
+  let probe = async () => {
+    throw new TypeError('Failed to fetch');
+  };
+  env.source.probeImage = (url) => probe(url);
+  const point = { lat: 42.3314, lon: -83.0458 };
+  assert.equal(await env.instance.nearestImage(point), 'near');
+  probe = async () => false;
+  await assert.rejects(env.instance.nearestImage(point), /archived/);
+});
+
+test('a photo past the last page asks for no page beyond it', async () => {
+  const env = await mounted({
+    sequences: { s: Array.from({ length: 10 }, (_, i) => i) },
+  });
+  // KartaView knows photo 12, but no page lists it (moved or re-indexed).
+  const getPhoto = env.source.getPhoto;
+  env.source.getPhoto = async (id) =>
+    id === 's-12'
+      ? photoRecord('s-12', { seq: 's', index: 12, metres: 60 })
+      : getPhoto(id);
+  await env.instance.viewer.open('s-12');
+  await press(env.prev, env.poses);
+  assert.equal(env.poses.at(-1), 's-9');
+  assert.deepEqual([...new Set(env.source.calls.pages)], ['s:1']);
+});
+
+test('the cones re-centre when ‹ › walk off the page they were drawn from', async (t) => {
+  const size = SEQUENCE_PAGE_SIZE;
+  const env = await mounted({
+    sequences: { s: Array.from({ length: size * 3 }, (_, i) => i) },
+  });
+  const cones = await withCones(t, env);
+  const settled = () =>
+    until(() => !env.instance.sequenceStats().loading && cones.count() > 0);
+  // Near the start of page 2: the cones show page 2 alone.
+  await env.instance.viewer.open(`s-${size + 12}`);
+  await env.instance.selectSequence('s');
+  assert.ok(await settled());
+  assert.deepEqual(cones(), [size, size * 2 - 1]);
+  // ‹ back across the edge onto page 1.
+  for (let k = 0; k < 13; k++) await press(env.prev, env.poses);
+  assert.equal(env.poses.at(-1), `s-${size - 1}`);
+  assert.ok(
+    await until(() => cones()[0] < size),
+    `drawn around page 1 now: ${cones()}`,
+  );
+  // › forward, off the far end of page 2.
+  await env.instance.viewer.open(`s-${size * 2 - 13}`);
+  assert.ok(await until(() => cones()[0] >= size), `${cones()}`);
+  for (let k = 0; k < 13; k++) await press(env.next, env.poses);
+  assert.equal(env.poses.at(-1), `s-${size * 2}`);
+  assert.ok(
+    await until(() => cones()[1] >= size * 2),
+    `drawn around page 3 now: ${cones()}`,
+  );
+});
+
+test('a leftover imagery filter hides no cones: flat, undated photos still draw', async (t) => {
+  const env = await mounted(
+    { sequences: { s: [0, 1, 2, 3] } },
+    { filter: { pano: 'pano', sinceMs: Date.now() - 86_400_000 } },
+  );
+  // Undated records: no capture time to pass a "since" filter with.
+  const undated = (record) => ({ ...record, shotDate: '', dateAdded: '' });
+  const getPhoto = env.source.getPhoto;
+  env.source.getPhoto = async (id) => undated(await getPhoto(id));
+  const getPage = env.source.getSequencePhotos;
+  env.source.getSequencePhotos = async (...args) => {
+    const page = await getPage(...args);
+    return { ...page, photos: page.photos.map(undated) };
+  };
+  const cones = await withCones(t, env);
+  await env.instance.viewer.open('s-1');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => !env.instance.sequenceStats().loading));
+  assert.equal(env.instance.sequenceStats().images, 4);
+  assert.equal(cones.count(), 4, 'every cone drawn');
+});
+
+/**
+ * The provider drawing coverage on a stand-in viewer above one z14 tile.
+ * `lines` are the tile's tracks as [lon, lat] pairs; `getTile` may be held.
+ */
+function coverageSetup(t, { lines = [], filter, height = 900 } = {}) {
+  const env = setup({}, { filter });
+  const centre = tileCentre(-83.0458, 42.3314);
+  const viewer = coverageViewer(
+    { lon: centre.lon, lat: centre.lat, height },
+    t,
+  );
+  const tiles = [];
+  let hold = null;
+  env.source.getTile = (tile) => {
+    tiles.push(`${tile.z}/${tile.x}/${tile.y}`);
+    const answer = {
+      lines: lines.map((track) => ({
+        track: track.map(([lon, lat]) => ({
+          lat: String(lat),
+          lng: String(lon),
+        })),
+      })),
+    };
+    return hold ? hold.then(() => answer) : Promise.resolve(answer);
+  };
+  env.instance.init(viewer);
+  t.after(() => env.instance.destroy(viewer));
+  return {
+    ...env,
+    viewer,
+    centre,
+    tiles,
+    holdTiles() {
+      let release;
+      hold = new Promise((resolve) => (release = resolve));
+      return () => {
+        hold = null;
+        release();
+      };
+    },
+  };
+}
+
+test('a leftover imagery filter hides no KartaView line', async (t) => {
+  const { instance, viewer, centre } = coverageSetup(t, {
+    filter: { pano: 'pano', sinceMs: Date.now() - 86_400_000 },
+    lines: [
+      [
+        [-83.0458 - 0.001, 42.3314],
+        [-83.0458 + 0.001, 42.3314],
+      ],
+    ],
+  });
+  assert.ok(centre);
+  instance.activate(viewer);
+  assert.ok(await until(() => instance.coverageStats().count === 1));
+  assert.equal(instance.coverageStats().hint, '');
+});
+
+test('coverage hints: zoom in from too high, “no photos” only once an empty view has loaded', async (t) => {
+  const env = coverageSetup(t, { height: 7_000 });
+  env.instance.activate(env.viewer);
+  assert.equal(env.instance.coverageStats().hint, TOO_HIGH_HINT);
+  assert.deepEqual(env.tiles, [], 'nothing asked from up there');
+  const release = env.holdTiles();
+  env.viewer.view.height = 900;
+  env.instance.refreshCoverage();
+  assert.ok(await until(() => env.instance.coverageStats().loading));
+  assert.equal(env.instance.coverageStats().hint, '', 'not while it loads');
+  release();
+  assert.ok(await until(() => !env.instance.coverageStats().loading));
+  assert.equal(env.instance.coverageStats().count, 0);
+  assert.equal(env.instance.coverageStats().hint, NO_COVERAGE_HINT);
+});
+
+test('a coverage tile loaded a moment ago is not asked for again', async (t) => {
+  const env = coverageSetup(t, {
+    lines: [
+      [
+        [-83.0458 - 0.001, 42.3314],
+        [-83.0458 + 0.001, 42.3314],
+      ],
+    ],
+  });
+  env.instance.activate(env.viewer);
+  assert.ok(await until(() => env.instance.coverageStats().count === 1));
+  // Off and on again (or a pan away and back): drawn from the kept tile.
+  env.instance.deactivate();
+  env.instance.activate(env.viewer);
+  assert.ok(await until(() => env.instance.coverageStats().count === 1));
+  assert.equal(env.tiles.length, 1);
+});
+
+test('a photo no page lists steps to the photos either side of its index', async () => {
+  const env = await mounted({ sequences: { s: [0, 1, 2, 3, 4, 6, 7, 8, 9] } });
+  const getPhoto = env.source.getPhoto;
+  env.source.getPhoto = async (id) =>
+    id === 's-5'
+      ? photoRecord('s-5', { seq: 's', index: 5, metres: 25 })
+      : getPhoto(id);
+  await env.instance.viewer.open('s-5');
+  await press(env.next, env.poses);
+  assert.equal(env.poses.at(-1), 's-6');
+  await env.instance.viewer.open('s-5');
+  await press(env.prev, env.poses);
+  assert.equal(env.poses.at(-1), 's-4');
 });

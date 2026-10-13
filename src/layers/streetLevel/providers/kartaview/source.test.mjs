@@ -6,8 +6,11 @@ import {
   createLimiter,
 } from './source.js';
 import {
+  NEAREST_LIMIT,
+  NEAREST_SEARCH_ZOOM,
   PHOTO_API_CONCURRENCY,
   PHOTO_API_RETRIES,
+  PHOTO_API_TIMEOUT_MS,
   TILE_CONCURRENCY,
 } from './policy.js';
 
@@ -345,4 +348,94 @@ test('sequence pages run one at a time, the newest first', async () => {
   release();
   await Promise.all(pages);
   assert.deepEqual(order, ['1', '3', '2']);
+});
+
+/** Every pending promise callback, without moving the mocked clock. */
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * Run `call` on the mocked clock in 100 ms steps until it settles (60 s at
+ * most). `stamp()` reads the clock, for a fetch to record when it was asked.
+ */
+async function onMockClock(t, call) {
+  let now = 0;
+  const stamp = () => now;
+  let outcome = null;
+  const promise = call(stamp);
+  promise.then(
+    (value) => (outcome = { value, at: now }),
+    (error) => (outcome = { error, at: now }),
+  );
+  while (!outcome && now < 60_000) {
+    await flush();
+    if (outcome) break;
+    t.mock.timers.tick(100);
+    now += 100;
+  }
+  await flush();
+  return outcome;
+}
+
+test('429 waits double from 0.8 s, wait out a longer Retry-After up to 10 s, and 2 s without one', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  async function waits(retryAfter) {
+    const asked = [];
+    const headers = new Map(
+      retryAfter === undefined ? [] : [['retry-after', retryAfter]],
+    );
+    const outcome = await onMockClock(t, (stamp) =>
+      createKartaViewSource({
+        fetchImpl: async () => {
+          asked.push(stamp());
+          return asked.length <= PHOTO_API_RETRIES
+            ? status(429, headers)
+            : ok(photoPayload({ id: '1' }));
+        },
+      }).getPhoto('1'),
+    );
+    assert.deepEqual(outcome?.value, { id: '1' }, `answered (${retryAfter})`);
+    return asked.slice(1).map((at, i) => at - asked[i]);
+  }
+  assert.deepEqual(await waits('0'), [800, 1600, 3200], 'doubling backoff');
+  assert.deepEqual(await waits('5'), [5000, 5000, 5000], 'Retry-After wins');
+  assert.deepEqual(await waits('30'), [10_000, 10_000, 10_000], 'capped');
+  assert.deepEqual(await waits(undefined), [2000, 2000, 3200], 'assumed 2 s');
+});
+
+test('a lookup that hangs is given up after the photo timeout, once more, then reported', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const asked = [];
+  const outcome = await onMockClock(t, (stamp) =>
+    createKartaViewSource({
+      fetchImpl: (url, { signal }) => {
+        asked.push(stamp());
+        return new Promise((resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason)),
+        );
+      },
+    }).getPhoto('1'),
+  );
+  assert.deepEqual(asked, [0, PHOTO_API_TIMEOUT_MS]);
+  assert.match(String(outcome?.error?.message), /did not answer in time/);
+  assert.equal(outcome.at, 2 * PHOTO_API_TIMEOUT_MS);
+});
+
+test('the nearest lookup asks for the few photos around the point at the search zoom', async () => {
+  const urls = [];
+  const source = createKartaViewSource({
+    fetchImpl: async (url) => {
+      urls.push(new URL(url));
+      return ok(photoPayload([]));
+    },
+  });
+  await source.nearestPhotos({ lat: 42.33, lon: -83.04 });
+  assert.equal(urls[0].pathname, '/2.0/photo/');
+  assert.deepEqual(Object.fromEntries(urls[0].searchParams), {
+    lat: '42.3300000',
+    lng: '-83.0400000',
+    zoomLevel: String(NEAREST_SEARCH_ZOOM),
+    itemsPerPage: String(NEAREST_LIMIT),
+  });
+  assert.equal(NEAREST_SEARCH_ZOOM, 18);
+  assert.equal(NEAREST_LIMIT, 10);
 });

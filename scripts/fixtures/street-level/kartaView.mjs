@@ -6,7 +6,11 @@ import { metresApart, photoJpeg } from './mapillaryGraph.mjs';
  * the gate's KartaView steps need no network. One drive runs north along
  * KV_LINE; every tenth photo is a 360° one. Photos live on storage2 while
  * their `fileurl*` name storage1, as KartaView's API does, so the gate also
- * proves the provider builds addresses from `storage`.
+ * proves the provider builds addresses from `storage`. Every odd-indexed
+ * photo is archived (storage answers 409, the image proxy still serves it),
+ * so the nearest photo opened is even and › must skip the one after it. The
+ * first nearest-photo lookup is rate-limited (429, Retry-After: 0), as
+ * KartaView does under load.
  */
 
 export const KV_SEQUENCE_ID = '900001';
@@ -21,7 +25,15 @@ const SHOT = '2024-05-02 16:20:00.000';
 
 const CORS = Object.freeze({ 'Access-Control-Allow-Origin': '*' });
 
-/** The drive's photos, south to north; every tenth is 360°. */
+/** Lookups answered so far: the first one is rate-limited. */
+let nearestLookups = 0;
+
+/** Forget the lookups answered, so the next one is rate-limited again. */
+export function resetKartaViewFixture() {
+  nearestLookups = 0;
+}
+
+/** The drive's photos, south to north; every tenth is 360°, every odd one archived. */
 export function kartaViewPhotos() {
   const step = KV_SPACING_M / METRES_PER_DEG_LAT;
   const count = Math.floor((KV_LINE.north - KV_LINE.south) / step) + 1;
@@ -31,6 +43,7 @@ export function kartaViewPhotos() {
     lon: KV_LINE.lon,
     lat: Number((KV_LINE.south + i * step).toFixed(7)),
     isPano: i % 10 === 5,
+    archived: i % 2 === 1,
   }));
 }
 
@@ -127,10 +140,16 @@ export function answerKartaViewRequest({ method, url }) {
     return /^\/pr:sharp\/rs:fit:\d+:\d+\/[\w-]+$/.test(address.pathname)
       ? image
       : { ...raw(404, {}), known: false };
-  if (address.hostname === 'storage2.openstreetcam.org')
-    return address.pathname.includes(KV_SEQUENCE_ID)
-      ? image
-      : { ...raw(404, {}), known: false };
+  if (address.hostname === 'storage2.openstreetcam.org') {
+    if (!address.pathname.includes(KV_SEQUENCE_ID))
+      return { ...raw(404, {}), known: false };
+    const archived = photos.some(
+      (photo) =>
+        photo.archived && address.pathname.endsWith(`_${photo.id}.jpg`),
+    );
+    // An archived photo's file is gone from storage: KartaView answers 409.
+    return archived ? { ...raw(409, {}), known: true } : image;
+  }
   if (/^storage\d+\.openstreetcam\.org$/.test(address.hostname))
     // The wrong host the API names: KartaView answers 404 there.
     return { ...raw(404, {}), known: false };
@@ -148,6 +167,16 @@ export function answerKartaViewRequest({ method, url }) {
       known: true,
     };
   if (path === '/2.0/photo/') {
+    if (nearestLookups++ === 0)
+      return {
+        ...raw(429, {}),
+        headers: {
+          ...CORS,
+          'Retry-After': '0',
+          'Access-Control-Expose-Headers': 'Retry-After',
+        },
+        known: true,
+      };
     const q = address.searchParams;
     const at = { lat: Number(q.get('lat')), lon: Number(q.get('lng')) };
     const near = photos

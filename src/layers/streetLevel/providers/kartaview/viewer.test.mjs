@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createKartaViewViewer } from './viewer.js';
-import { fakeHost } from '../../../../testSupport/kartaViewFakes.mjs';
+import { fakeHost, until } from '../../../../testSupport/kartaViewFakes.mjs';
 
 const PHOTOS = {
   flat1: {
@@ -49,6 +49,21 @@ const PHOTOS = {
       pano: 'https://storage13.openstreetcam.org/wrapped_proc/p.jpg',
     },
   },
+  pano2: {
+    id: 'pano2',
+    sequenceId: 's2',
+    sequenceIndex: 8,
+    lon: 106.8401,
+    lat: -6.19,
+    heading: 152,
+    isPano: true,
+    capturedAt: Date.UTC(2022, 2, 21),
+    urls: {
+      view: 'https://storage13.openstreetcam.org/lth/q.jpg',
+      full: 'https://storage13.openstreetcam.org/wrapped_proc/q.jpg',
+      pano: 'https://storage13.openstreetcam.org/wrapped_proc/q.jpg',
+    },
+  },
 };
 
 function fakeRenderer(canvas) {
@@ -82,12 +97,15 @@ function setup({
   const loads = [];
   const renderers = [];
   const stepped = [];
+  const asked = [];
+  const attempts = { renderer: 0 };
   const viewer = createKartaViewViewer({
     getPhoto: async (id) => {
       if (!PHOTOS[id]) throw new Error('no such photo');
       return PHOTOS[id];
     },
     step: async (photo, delta) => {
+      asked.push(`${photo.id}:${delta}`);
       if (failSteps) throw new Error('KartaView did not answer in time');
       return steps[`${photo.id}:${delta}`] ?? null;
     },
@@ -103,6 +121,7 @@ function setup({
       return { src: url };
     },
     createRenderer: (canvas) => {
+      attempts.renderer++;
       if (rendererThrows) throw new Error('WebGL is unavailable');
       const renderer = fakeRenderer(canvas);
       renderers.push(renderer);
@@ -112,7 +131,16 @@ function setup({
   const poses = [];
   viewer.onPose((pose) => poses.push(pose));
   const host = fakeHost();
-  return { viewer, poses, host, loads, renderers, stepped };
+  return {
+    viewer,
+    poses,
+    host,
+    loads,
+    renderers,
+    stepped,
+    asked,
+    attempts,
+  };
 }
 
 const parts = (host) => {
@@ -245,27 +273,37 @@ test('without WebGL, or when the panorama fails, a 360° photo shows its front v
 });
 
 test('‹ › and the arrow keys step along the sequence; ends disable at once', async () => {
-  const { viewer, poses, host, stepped } = setup({
+  const { viewer, poses, host, stepped, asked } = setup({
     steps: { 'flat1:1': 'flat2', 'flat2:-1': 'flat1' },
   });
   await viewer.mount(host);
   await viewer.open('flat1');
   const { root, prev, next } = parts(host);
-  await settle();
-  assert.equal(prev.disabled, true, 'flat1 is the first photo: known up front');
+  assert.ok(
+    await until(() => prev.disabled),
+    'flat1 is the first photo: known up front',
+  );
   assert.equal(next.disabled, false);
   next.fire('click');
-  for (let i = 0; i < 4; i++) await settle();
-  assert.equal(poses.at(-1).imageId, 'flat2');
+  assert.ok(await until(() => poses.at(-1).imageId === 'flat2'));
   assert.deepEqual(stepped, ['flat2'], 'the core is asked to open it');
-  assert.equal(next.disabled, true, 'flat2 is the last photo');
+  assert.ok(await until(() => next.disabled), 'flat2 is the last photo');
   assert.equal(prev.disabled, false);
+  // A modified arrow, then a plain → (at the end: it only asks). Presses run
+  // in turn, so once → has asked, a stepping ⌘← would have asked first.
+  const before = asked.length;
   root.fire('keydown', { key: 'ArrowLeft', metaKey: true });
+  root.fire('keydown', { key: 'ArrowRight' });
+  assert.ok(await until(() => asked.length > before));
   await settle();
-  assert.equal(poses.at(-1).imageId, 'flat2', 'modified arrows are not ours');
+  assert.deepEqual(
+    asked.slice(before),
+    ['flat2:1'],
+    'modified arrows are not ours',
+  );
+  assert.equal(poses.at(-1).imageId, 'flat2');
   root.fire('keydown', { key: 'ArrowLeft' });
-  for (let i = 0; i < 4; i++) await settle();
-  assert.equal(poses.at(-1).imageId, 'flat1');
+  assert.ok(await until(() => poses.at(-1).imageId === 'flat1'));
 });
 
 test('quick presses each step on from the photo the last one chose', async () => {
@@ -279,7 +317,7 @@ test('quick presses each step on from the photo the last one chose', async () =>
   const { next } = parts(host);
   next.fire('click');
   next.fire('click');
-  for (let i = 0; i < 8; i++) await settle();
+  assert.ok(await until(() => stepped.length === 2), `stepped ${stepped}`);
   assert.deepEqual(stepped, ['flat2', 'pano1']);
 });
 
@@ -318,13 +356,16 @@ test('a panorama is put on screen before its image is sized into the canvas', as
 });
 
 test('a step that gets no answer is not the end of the sequence', async () => {
-  const { viewer, host, poses } = setup({ failSteps: true });
+  const { viewer, host, poses, asked } = setup({ failSteps: true });
   await viewer.mount(host);
   await viewer.open('flat1');
   const { next } = parts(host);
   next.disabled = false;
+  // The ends check asked once already; the press asks again and fails.
+  const asks = () => asked.filter((ask) => ask === 'flat1:1').length;
   next.fire('click');
-  for (let i = 0; i < 4; i++) await settle();
+  assert.ok(await until(() => asks() === 2), 'the press asked');
+  await settle();
   assert.equal(next.disabled, false, 'still enabled: try again');
   assert.equal(poses.at(-1).imageId, 'flat1');
 });
@@ -332,28 +373,36 @@ test('a step that gets no answer is not the end of the sequence', async () => {
 test('the keyboard looks around a panorama: Shift+arrows turn, ↑ ↓ tilt, + − zoom', async (t) => {
   globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
   t.after(() => delete globalThis.requestAnimationFrame);
-  const { viewer, host, renderers, stepped } = setup({
+  const { viewer, host, renderers, stepped, asked } = setup({
     steps: { 'pano1:1': 'flat1' },
   });
   await viewer.mount(host);
   await viewer.open('pano1');
   const { root } = parts(host);
   const view = () => renderers[0].getView();
+  const before = asked.length;
   root.fire('keydown', { key: 'ArrowRight', shiftKey: true });
   assert.ok(view().yaw > 0, 'turned right');
   root.fire('keydown', { key: 'ArrowUp' });
   assert.ok(view().pitch > 0, 'looked up');
-  const before = view().fov;
+  const fov = view().fov;
   root.fire('keydown', { key: '+' });
-  assert.ok(view().fov < before, 'zoomed in');
+  assert.ok(view().fov < fov, 'zoomed in');
   root.fire('keydown', { key: '-' });
   root.fire('keydown', { key: '-' });
-  assert.ok(view().fov > before, 'zoomed out');
-  for (let i = 0; i < 4; i++) await settle();
-  assert.deepEqual(stepped, [], 'none of those stepped');
+  assert.ok(view().fov > fov, 'zoomed out');
   root.fire('keydown', { key: 'ArrowRight' });
-  for (let i = 0; i < 4; i++) await settle();
+  assert.ok(await until(() => stepped.length === 1));
   assert.deepEqual(stepped, ['flat1'], 'a plain arrow still steps');
+  // Only that press asked, then flat1's ends check: a Shift+→ that stepped
+  // would have sent the plain → on from flat1.
+  assert.ok(await until(() => asked.slice(before).length >= 3));
+  await settle();
+  assert.deepEqual(
+    asked.slice(before).sort(),
+    ['flat1:-1', 'flat1:1', 'pano1:1'],
+    'none of the others stepped',
+  );
 });
 
 test('two fingers pinch the panorama’s zoom', async () => {
@@ -391,8 +440,7 @@ test('a lost WebGL context drops the panorama and shows the photo again on a new
   await viewer.open('pano1');
   parts(host).canvas.fire('webglcontextlost');
   assert.equal(renderers[0].destroyed, true);
-  for (let i = 0; i < 4; i++) await settle();
-  assert.equal(renderers.length, 2, 'a new renderer');
+  assert.ok(await until(() => renderers.length === 2), 'a new renderer');
   assert.equal(poses.at(-1).imageId, 'pano1');
   assert.equal(parts(host).canvas.hidden, false);
 });
@@ -423,4 +471,264 @@ test('a WebGL failure only lasts until the viewer is mounted again', async () =>
   await viewer.open('pano1');
   assert.equal(built.length, 1);
   assert.equal(parts(again).canvas.hidden, false);
+});
+
+/** Flat photos a → d of one drive, for the tests that hold loads back. */
+const DRIVE = Object.fromEntries(
+  ['a', 'b', 'c', 'd'].map((id, index) => [
+    id,
+    {
+      id,
+      sequenceId: 'drive',
+      sequenceIndex: index,
+      lon: 0.1 + index * 0.0001,
+      lat: 0.1,
+      heading: 0,
+      isPano: false,
+      capturedAt: 0,
+      urls: {
+        view: `https://storage2.openstreetcam.org/lth/${id}.jpg`,
+        full: `https://storage2.openstreetcam.org/proc/${id}.jpg`,
+        pano: null,
+      },
+    },
+  ]),
+);
+const DRIVE_ORDER = Object.keys(DRIVE);
+
+/** Which drive photo, at which size, an image address shows. */
+function shows(src) {
+  const proxied =
+    /^https:\/\/cdn\.kartaview\.org\/pr:sharp\/rs:fit:(\d+):\d+\/([\w-]+)$/.exec(
+      src || '',
+    );
+  const url = proxied ? Buffer.from(proxied[2], 'base64url').toString() : src;
+  const id = /\/(\w+)\.jpg$/.exec(url || '')?.[1] ?? null;
+  return proxied ? `${id}@${proxied[1]}` : id;
+}
+
+/**
+ * A viewer whose photo loads (and, with `slowSteps`, step answers) wait for
+ * the test. ‹ › open through a stand-in core that, like the real one, awaits
+ * a tick (the viewer mount) before it opens the photo.
+ */
+function heldSetup({ slowSteps = false } = {}) {
+  const loads = [];
+  const asks = [];
+  const stepped = [];
+  const shown = [];
+  const viewer = createKartaViewViewer({
+    getPhoto: async (id) => {
+      if (!DRIVE[id]) throw new Error('no such photo');
+      return DRIVE[id];
+    },
+    step: (photo, delta) => {
+      const answer = DRIVE_ORDER[DRIVE_ORDER.indexOf(photo.id) + delta] ?? null;
+      if (!slowSteps) return Promise.resolve(answer);
+      return new Promise((resolve) =>
+        asks.push({ key: `${photo.id}:${delta}`, resolve }),
+      );
+    },
+    onStep: async (id) => {
+      stepped.push(id);
+      await settle();
+      viewer.open(id).catch(() => {});
+    },
+    onShown: (photo) => shown.push(photo.id),
+    load: (url) =>
+      new Promise((resolve, reject) =>
+        loads.push({
+          url,
+          shows: shows(url),
+          resolve: () => resolve({ src: url }),
+          reject: () =>
+            reject(new Error('The KartaView photo could not be loaded')),
+        }),
+      ),
+    createRenderer: () => {
+      throw new Error('no WebGL in Node');
+    },
+  });
+  const poses = [];
+  viewer.onPose((pose) => poses.push(pose.imageId));
+  const host = fakeHost();
+  /** Let the load showing `what` (e.g. 'a@1280') finish. */
+  const release = async (what) => {
+    assert.ok(
+      await until(() => loads.some((load) => load.shows === what)),
+      `${what} is loading: ${loads.map((load) => load.shows)}`,
+    );
+    const at = loads.findIndex((load) => load.shows === what);
+    loads.splice(at, 1)[0].resolve();
+    await settle();
+  };
+  /** Answer the oldest pending step ask for `key` (e.g. 'a:1'). */
+  const answer = async (key, value) => {
+    assert.ok(await until(() => asks.some((ask) => ask.key === key)));
+    const at = asks.findIndex((ask) => ask.key === key);
+    asks.splice(at, 1)[0].resolve(value);
+    await settle();
+  };
+  return { viewer, host, loads, asks, stepped, shown, poses, release, answer };
+}
+
+test('quick presses while the next photo is still loading each step on from the last one chosen', async () => {
+  const { viewer, host, stepped, release } = heldSetup();
+  await viewer.mount(host);
+  const opening = viewer.open('a');
+  await release('a@1280');
+  await opening;
+  const { next } = parts(host);
+  assert.ok(await until(() => !next.disabled));
+  // b, c and d never load: each press steps on from the photo on its way.
+  next.fire('click');
+  next.fire('click');
+  next.fire('click');
+  assert.ok(await until(() => stepped.length >= 3), `stepped ${stepped}`);
+  await settle();
+  assert.deepEqual(stepped, ['b', 'c', 'd']);
+});
+
+test('a slow sharp version of an older photo never replaces the newer photo', async () => {
+  const { viewer, host, shown, poses, release } = heldSetup();
+  await viewer.mount(host);
+  const first = viewer.open('a');
+  await release('a@1280');
+  await first;
+  const second = viewer.open('b');
+  await release('b@1280');
+  await second;
+  const { picture } = parts(host);
+  assert.equal(shows(picture.src), 'b@1280');
+  await release('a@2560'); // a's upgrade, overtaken
+  assert.equal(shows(picture.src), 'b@1280', 'a never comes back');
+  await release('b@2560');
+  assert.equal(shows(picture.src), 'b@2560', 'b’s own upgrade lands');
+  assert.deepEqual(shown, ['a', 'b']);
+  assert.deepEqual(poses, ['a', 'b']);
+});
+
+test('an overtaken flat open never shows, nor tells the provider it did', async () => {
+  const { viewer, host, shown, poses, loads, release } = heldSetup();
+  await viewer.mount(host);
+  const first = viewer.open('a');
+  assert.ok(await until(() => loads.length === 1), 'a is loading');
+  const second = viewer.open('b');
+  await release('b@1280');
+  await second;
+  await release('a@1280');
+  await first;
+  const { picture } = parts(host);
+  assert.equal(shows(picture.src), 'b@1280');
+  assert.deepEqual(poses, ['b']);
+  assert.deepEqual(shown, ['b'], 'onShown only for the photo on screen');
+});
+
+test('a photo still loading when the viewer closes stays closed', async () => {
+  const { viewer, host, shown, poses, loads, release } = heldSetup();
+  await viewer.mount(host);
+  const opening = viewer.open('a');
+  assert.ok(await until(() => loads.length === 1), 'a is loading');
+  viewer.close();
+  await release('a@1280');
+  await opening;
+  const { picture, root } = parts(host);
+  assert.equal(picture.hidden, true);
+  assert.equal(root.dataset.kind, '');
+  assert.deepEqual(poses, []);
+  assert.deepEqual(shown, []);
+});
+
+test('an ends check for an earlier photo does not disable › on the photo now showing', async () => {
+  const { viewer, host, release, answer } = heldSetup({ slowSteps: true });
+  await viewer.mount(host);
+  const first = viewer.open('a');
+  await release('a@1280');
+  await first;
+  const second = viewer.open('c');
+  await release('c@1280');
+  await second;
+  const { prev, next } = parts(host);
+  await answer('c:-1', 'b');
+  await answer('c:1', 'd');
+  // a's check answers last, saying nothing lies before or after it.
+  await answer('a:-1', null);
+  await answer('a:1', null);
+  assert.equal(prev.disabled, false);
+  assert.equal(next.disabled, false, 'c still has a next photo');
+});
+
+test('a press whose answer comes after another photo was opened is dropped', async () => {
+  const { viewer, host, stepped, release, answer, asks } = heldSetup({
+    slowSteps: true,
+  });
+  await viewer.mount(host);
+  const first = viewer.open('a');
+  await release('a@1280');
+  await first;
+  await answer('a:-1', null);
+  await answer('a:1', 'b');
+  const { next } = parts(host);
+  next.disabled = false;
+  next.fire('click');
+  assert.ok(await until(() => asks.some((ask) => ask.key === 'a:1')));
+  // The user picks another photo meanwhile.
+  const other = viewer.open('d');
+  await release('d@1280');
+  await other;
+  await answer('a:1', 'b');
+  await settle();
+  assert.deepEqual(stepped, [], 'the old press does not open b over d');
+});
+
+test('a failed open does not become the photo ‹ › step from', async () => {
+  const { viewer, host, stepped } = setup({ steps: { 'flat1:1': 'flat2' } });
+  await viewer.mount(host);
+  await viewer.open('flat1');
+  await assert.rejects(viewer.open('nope'), /no such photo/);
+  parts(host).next.disabled = false;
+  parts(host).next.fire('click');
+  assert.ok(await until(() => stepped.length === 1));
+  assert.deepEqual(stepped, ['flat2'], 'from the photo still showing');
+});
+
+test('WebGL is tried once per mount, not again for every 360° photo', async () => {
+  const { viewer, host, attempts } = setup({ rendererThrows: true });
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  await viewer.open('pano2');
+  assert.equal(attempts.renderer, 1);
+  assert.equal(parts(host).picture.hidden, false, 'front views instead');
+});
+
+test('a step button that disables under the keyboard hands focus to the viewer', async () => {
+  const { viewer, host } = setup();
+  await viewer.mount(host);
+  const { root, prev, next } = parts(host);
+  let focused = 0;
+  root.focus = () => focused++;
+  next.ownerDocument = { activeElement: next };
+  prev.ownerDocument = { activeElement: root };
+  await viewer.open('flat1');
+  assert.ok(await until(() => next.disabled && prev.disabled));
+  assert.equal(focused, 1, 'only for the focused button');
+});
+
+test('› to another 360° photo keeps the look direction; opening one afresh faces its heading', async (t) => {
+  globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+  t.after(() => delete globalThis.requestAnimationFrame);
+  const { viewer, host, renderers, poses } = setup({
+    steps: { 'pano1:1': 'pano2' },
+  });
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  const { root, next } = parts(host);
+  root.fire('keydown', { key: 'ArrowRight', shiftKey: true });
+  const yaw = renderers[0].getView().yaw;
+  assert.ok(yaw > 0);
+  next.fire('click');
+  assert.ok(await until(() => poses.at(-1).imageId === 'pano2'));
+  assert.equal(renderers[0].getView().yaw, yaw, 'still looking the same way');
+  await viewer.open('pano1');
+  assert.equal(renderers[0].getView().yaw, 0, 'a fresh open faces ahead');
 });

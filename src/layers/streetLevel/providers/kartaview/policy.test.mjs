@@ -72,13 +72,17 @@ test('photo files come from the storage host the record names, not the one its U
   for (const fileurlLTh of [
     'https://tracker.example/x.jpg',
     'http://storage1.openstreetcam.org/a.jpg',
+    'https://storage1.openstreetcam.org.evil.example/a.jpg',
     'javascript:alert(1)',
   ]) {
     const hostile = normalizePhoto(
       record({ storage: '', filepathLTh: '', fileurlLTh, fileurl: fileurlLTh }),
     );
     assert.notEqual(hostile.urls.view, fileurlLTh);
-    assert.doesNotMatch(String(hostile.urls.view), /tracker|javascript|^http:/);
+    assert.doesNotMatch(
+      String(hostile.urls.view),
+      /tracker|javascript|evil|^http:/,
+    );
   }
   // An unexpected storage value falls back to the URLs as given.
   const odd = normalizePhoto(record({ storage: 'https://evil.example' }));
@@ -170,4 +174,66 @@ test('resized images go through the proxy with a base64url address', () => {
     'https://storage13.openstreetcam.org/files/photo/a?b=c+d',
   );
   assert.equal(resizedImageUrl(null, [1, 1]), null);
+});
+
+test('a storage value that only contains a storage host name builds no address from it', () => {
+  for (const storage of ['evil.example/#storage1', 'storage1.evil.example']) {
+    const photo = normalizePhoto(record({ storage }));
+    // Not a storage host: the API's own storage URLs serve.
+    assert.equal(
+      photo.urls.view,
+      'https://storage1.openstreetcam.org/files/photo/2016/8/24/lth/14010_ba53c_57bd1d23d50b7.jpg',
+      storage,
+    );
+    assert.equal(
+      photo.urls.full,
+      'https://storage1.openstreetcam.org/files/photo/2016/8/24/proc/14010_ba53c_57bd1d23d50b7.jpg',
+      storage,
+    );
+  }
+});
+
+test('a 360° field of view makes a panorama whatever the projection says', () => {
+  assert.equal(
+    normalizePhoto(record({ projection: 'PLANE', fieldOfView: '360' })).isPano,
+    true,
+  );
+  assert.equal(
+    normalizePhoto(record({ projection: 'PLANE', fieldOfView: '359' })).isPano,
+    false,
+  );
+});
+
+test('a longitude past ±180 is not a position', () => {
+  assert.equal(normalizePhoto(record({ lng: '181', matchLng: '181' })), null);
+  assert.equal(normalizePhoto(record({ lng: '-181', matchLng: '-181' })), null);
+  assert.equal(
+    normalizePhoto(record({ lng: '180', matchLng: '180' })).lon,
+    180,
+  );
+});
+
+test('with no processed-photo path the size prefix gives the full photo', () => {
+  const photo = normalizePhoto(
+    record({ filepathProc: '', fileurlProc: '', storage: 'storage3' }),
+  );
+  assert.equal(
+    photo.urls.full,
+    'https://storage3.openstreetcam.org/files/photo/2016/8/24/proc/14010_ba53c_57bd1d23d50b7.jpg',
+  );
+  // Only the large thumbnail, no path at all: the thumbnail still shows.
+  const thumbOnly = normalizePhoto(
+    record({
+      filepathProc: '',
+      fileurlProc: '',
+      filepath: '',
+      fileurl: '',
+      storage: 'storage3',
+    }),
+  );
+  assert.equal(thumbOnly.urls.full, null);
+  assert.match(
+    thumbOnly.urls.view,
+    /^https:\/\/storage3\.openstreetcam\.org\/.*\/lth\//,
+  );
 });

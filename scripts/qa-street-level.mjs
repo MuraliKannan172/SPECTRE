@@ -850,7 +850,7 @@ async function main() {
         },
       );
       await step(
-        'KartaView: a click on a line opens the nearest photo, cones follow its drive, and › steps along it',
+        'KartaView: a click on a line opens the nearest photo where the camera is, cones follow its drive, and › steps along it, past an archived photo',
         async ({ skip }) => {
           const along = Array.from({ length: 9 }, (_, i) => [
             KV_LINE.lon,
@@ -871,6 +871,17 @@ async function main() {
           if (!handle && !fixtures) return skip('no KartaView line in view');
           assert.ok(handle, 'a KartaView line is pickable');
           const at = await handle.jsonValue();
+          const camera = () =>
+            page.evaluate(() => {
+              const c = window.__godsEyeView.viewer.camera.positionCartographic;
+              return {
+                lon: (c.longitude * 180) / Math.PI,
+                lat: (c.latitude * 180) / Math.PI,
+                height: c.height,
+              };
+            });
+          const parked = await camera();
+          // The first lookup is rate-limited (fixtures): it waits and retries.
           await page.mouse.click(at.x, at.y);
           await page.waitForFunction(
             () => {
@@ -894,10 +905,22 @@ async function main() {
             }),
             'the photo is on screen',
           );
+          // A line click picks a spot: the camera stays where it was.
+          await sleep(1500);
+          const now = await camera();
+          assert.ok(
+            Math.abs(now.lon - parked.lon) < 1e-6 &&
+              Math.abs(now.lat - parked.lat) < 1e-6 &&
+              Math.abs(now.height - parked.height) < 0.5,
+            `the camera did not move: ${JSON.stringify({ parked, now })}`,
+          );
           if (fixtures) {
-            assert.ok(
-              photos.some((photo) => photo.id === street.imageId),
-              `${street.imageId} is a fixture photo`,
+            const opened = photos.find((photo) => photo.id === street.imageId);
+            assert.ok(opened, `${street.imageId} is a fixture photo`);
+            assert.equal(
+              opened.archived,
+              false,
+              'the nearest photo that storage still has',
             );
             assert.ok(
               await uiUntil(
@@ -922,12 +945,21 @@ async function main() {
             ),
             '› opened the next photo',
           );
-          if (fixtures)
+          if (fixtures) {
+            const skipped = photos.find(
+              (photo) => photo.id === String(Number(before) + 1),
+            );
+            assert.equal(
+              skipped?.archived,
+              true,
+              'the photo after is archived',
+            );
             assert.equal(
               (await ui()).street.imageId,
-              String(Number(before) + 1),
-              'the next photo along the drive',
+              String(Number(before) + 2),
+              '› skipped the archived photo to the next one along the drive',
             );
+          }
         },
       );
       if (fixtures)

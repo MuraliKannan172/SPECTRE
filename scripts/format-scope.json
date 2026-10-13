@@ -921,6 +921,7 @@
   "src/layers/streetLevel/providers/kartaview/panorama.test.mjs",
   "src/layers/streetLevel/providers/kartaview/viewer.test.mjs",
   "src/layers/streetLevel/providers/kartaview/provider.test.mjs",
+  "src/layers/streetLevel/lineCoverage.test.mjs",
   "src/testSupport/kartaViewFakes.mjs",
   "src/testSupport/googleStreetViewFakes.mjs",
   "server/providers/mapillary.js",

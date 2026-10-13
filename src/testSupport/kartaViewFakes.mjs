@@ -58,3 +58,16 @@ export function fakeHost() {
   host.ownerDocument = doc;
   return host;
 }
+
+/**
+ * Wait, a macrotask at a time, until `condition` holds; false if it never
+ * does within `ticks`. A test asserting that something did not happen waits
+ * on a sign that the work is done instead of a fixed count of ticks.
+ */
+export async function until(condition, { ticks = 200 } = {}) {
+  for (let i = 0; i < ticks; i++) {
+    if (await condition()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return Boolean(await condition());
+}

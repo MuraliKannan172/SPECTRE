@@ -26,9 +26,13 @@ import {
   KV_LINE,
   KV_SEQUENCE_ID,
   kartaViewPhotos,
+  resetKartaViewFixture,
 } from '../../scripts/fixtures/street-level/kartaView.mjs';
 import { lonToTileX, latToTileY } from '../layers/streetLevel/tileMath.js';
-import { normalizePhoto } from '../layers/streetLevel/providers/kartaview/policy.js';
+import {
+  normalizePhoto,
+  resizedImageUrl,
+} from '../layers/streetLevel/providers/kartaview/policy.js';
 
 // The press helpers wait for paint; Node has no frames, so a tick stands in.
 globalThis.requestAnimationFrame ??= (callback) =>
@@ -665,10 +669,16 @@ test('KartaView fixtures draw the drive, answer nearest first, and refuse the st
     url: `https://api.kartaview.org/2.0/sequence/tiles/${x + 3}/${y}/14.json`,
   });
   assert.deepEqual(body(empty).lines, []);
-  const near = answerKartaViewRequest({
-    method: 'GET',
-    url: `https://api.kartaview.org/2.0/photo/?lat=${lat}&lng=${KV_LINE.lon + 0.0001}&zoomLevel=18&itemsPerPage=10`,
-  });
+  const nearUrl = `https://api.kartaview.org/2.0/photo/?lat=${lat}&lng=${KV_LINE.lon + 0.0001}&zoomLevel=18&itemsPerPage=10`;
+  resetKartaViewFixture();
+  // The first lookup is rate-limited, readable cross-origin; the retry answers.
+  const limited = answerKartaViewRequest({ method: 'GET', url: nearUrl });
+  assert.equal(limited.status, 429);
+  assert.equal(limited.known, true);
+  assert.equal(limited.headers['Retry-After'], '0');
+  assert.match(limited.headers['Access-Control-Expose-Headers'], /Retry-After/);
+  const near = answerKartaViewRequest({ method: 'GET', url: nearUrl });
+  assert.equal(near.status, 200);
   const records = body(near).result.data;
   assert.ok(records.length > 1);
   assert.ok(Number(records[0].distance) <= Number(records[1].distance));
@@ -677,6 +687,42 @@ test('KartaView fixtures draw the drive, answer nearest first, and refuse the st
   assert.equal(
     answerKartaViewRequest({ method: 'GET', url: photo.urls.view }).known,
     true,
+  );
+  // Every odd photo is archived: its file answers 409, an even one the image.
+  const photos = kartaViewPhotos();
+  const storageAnswer = (index) =>
+    answerKartaViewRequest({
+      method: 'GET',
+      url: normalizePhoto(
+        body(
+          answerKartaViewRequest({
+            method: 'GET',
+            url: `https://api.kartaview.org/2.0/photo/${photos[index].id}`,
+          }),
+        ).result.data,
+      ).urls.view,
+    });
+  assert.equal(photos[3].archived, true);
+  assert.equal(storageAnswer(3).status, 409);
+  assert.equal(storageAnswer(3).known, true);
+  assert.equal(photos[4].archived, false);
+  assert.equal(storageAnswer(4).status, 200);
+  assert.equal(storageAnswer(4).contentType, 'image/jpeg');
+  // The image proxy still serves an archived photo: the 360° step opens one.
+  const pano = photos.find((p) => p.isPano);
+  assert.equal(pano.archived, true);
+  const panoRecord = body(
+    answerKartaViewRequest({
+      method: 'GET',
+      url: `https://api.kartaview.org/2.0/photo/${pano.id}`,
+    }),
+  ).result.data;
+  assert.equal(
+    answerKartaViewRequest({
+      method: 'GET',
+      url: resizedImageUrl(normalizePhoto(panoRecord).urls.pano, [1024, 512]),
+    }).status,
+    200,
   );
   assert.equal(
     answerKartaViewRequest({ method: 'GET', url: records[0].fileurlLTh }).known,

@@ -6,6 +6,7 @@ import {
   PANO_PITCH_LIMIT_DEG,
   clampFov,
   clampPitch,
+  createPanoramaRenderer,
   rayToUv,
   wrapDegrees,
 } from './panorama.js';
@@ -34,4 +35,108 @@ test('view limits: pitch stops short of the poles, field of view stays usable', 
   assert.equal(clampFov(170), PANO_FOV_MAX_DEG);
   assert.equal(wrapDegrees(-30), 330);
   assert.equal(wrapDegrees(725), 5);
+});
+
+/**
+ * A WebGL stand-in that records draw calls and uniform values; `lost` makes
+ * it report a lost context.
+ */
+function stubGl() {
+  const gl = {
+    lost: false,
+    calls: [],
+    uniforms: {},
+    isContextLost: () => gl.lost,
+    getShaderParameter: () => true,
+    getProgramParameter: () => true,
+    getUniformLocation: (program, name) => name,
+    getExtension: () => null,
+    uniform1f: (name, value) => (gl.uniforms[name] = value),
+  };
+  return new Proxy(gl, {
+    get(target, key) {
+      if (key in target) return target[key];
+      if (typeof key === 'string' && /^[A-Z_0-9]+$/.test(key)) return key;
+      return (...args) => {
+        target.calls.push(key);
+        return { key, args };
+      };
+    },
+  });
+}
+
+/** A panorama on a stub canvas, with frames run when the test says. */
+function stubPanorama(t, { width = 400, height = 250 } = {}) {
+  const gl = stubGl();
+  const canvas = {
+    clientWidth: width,
+    clientHeight: height,
+    width: 300,
+    height: 150,
+    getContext: () => gl,
+  };
+  const frames = [];
+  const saved = {
+    request: globalThis.requestAnimationFrame,
+    cancel: globalThis.cancelAnimationFrame,
+  };
+  globalThis.requestAnimationFrame = (callback) => frames.push(callback);
+  globalThis.cancelAnimationFrame = () => {};
+  t.after(() => {
+    globalThis.requestAnimationFrame = saved.request;
+    globalThis.cancelAnimationFrame = saved.cancel;
+  });
+  const renderer = createPanoramaRenderer(canvas);
+  const runFrames = () => {
+    while (frames.length) frames.shift()();
+  };
+  return { gl, canvas, renderer, runFrames };
+}
+
+const IMAGE = { width: 1024, height: 512 };
+
+test('a panorama draws once it has an image; looking up and right are positive angles', (t) => {
+  const { gl, renderer, runFrames } = stubPanorama(t);
+  renderer.render();
+  runFrames();
+  assert.equal(gl.calls.includes('drawArrays'), false, 'nothing to draw yet');
+  renderer.setImage(IMAGE);
+  renderer.setView({ yaw: 30, pitch: 30 });
+  runFrames();
+  assert.ok(gl.calls.includes('drawArrays'));
+  assert.ok(gl.uniforms.u_pitch > 0, `u_pitch ${gl.uniforms.u_pitch}`);
+  assert.ok(Math.abs(gl.uniforms.u_pitch - Math.PI / 6) < 1e-9);
+  assert.ok(Math.abs(gl.uniforms.u_yaw - Math.PI / 6) < 1e-9);
+  renderer.setView({ pitch: -20 });
+  runFrames();
+  assert.ok(gl.uniforms.u_pitch < 0, 'looking down is negative');
+});
+
+test('a lost WebGL context draws nothing', (t) => {
+  const { gl, renderer, runFrames } = stubPanorama(t);
+  renderer.setImage(IMAGE);
+  gl.lost = true;
+  gl.calls.length = 0;
+  runFrames();
+  assert.deepEqual(
+    gl.calls.filter((call) =>
+      ['viewport', 'clear', 'drawArrays'].includes(call),
+    ),
+    [],
+  );
+});
+
+test('the canvas is measured again when it draws, not only when its image arrived', (t) => {
+  // The image arrives while the canvas is still hidden (0×0)…
+  const { canvas, renderer, runFrames } = stubPanorama(t, {
+    width: 0,
+    height: 0,
+  });
+  renderer.setImage(IMAGE);
+  assert.deepEqual([canvas.width, canvas.height], [1, 1]);
+  // …and is laid out before the frame draws.
+  canvas.clientWidth = 400;
+  canvas.clientHeight = 250;
+  runFrames();
+  assert.deepEqual([canvas.width, canvas.height], [400, 250]);
 });

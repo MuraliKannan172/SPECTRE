@@ -4,6 +4,7 @@ import * as Cesium from 'cesium';
 import { createStreetLevelLayer } from './index.js';
 import { MAPILLARY_CREDIT_HTML } from './providers/mapillary/policy.js';
 import { createMapillaryProvider } from './providers/mapillary/index.js';
+import { createKartaViewProvider } from './providers/kartaview/index.js';
 import { fakeStreetLevelProvider as fakeProvider } from '../../testSupport/streetLevelFakes.mjs';
 
 /**
@@ -92,8 +93,8 @@ function deferred() {
 }
 
 /** A provider whose viewer reports a pose for every image it opens. */
-function posingProvider() {
-  const provider = fakeProvider();
+function posingProvider(options) {
+  const provider = fakeProvider(options);
   const create = provider.create;
   provider.create = (context) => {
     const instance = create(context);
@@ -837,4 +838,62 @@ test('a failed lookup’s error goes when another source is lit; a provider can 
   await other.context().actions.openImage('img-1', { frame: false });
   assert.deepEqual(other.calls.open, ['img-1']);
   assert.equal(viewer.flights.started, 0);
+});
+
+test('a provider’s own open can leave the camera where it is; a default open frames', async (t) => {
+  const provider = posingProvider();
+  const { layer, viewer } = await enabledLayer(t, [provider]);
+  layer.attachViewerHost({});
+  await provider.context().actions.openImage('img-1', { frame: false });
+  assert.deepEqual(provider.calls.open, ['img-1']);
+  assert.equal(viewer.flights.started, 0, 'frame: false keeps the camera');
+  await provider.context().actions.openImage('img-2');
+  assert.equal(viewer.flights.started, 1, 'a default open frames the image');
+});
+
+test('a provider’s openNearest (a line click) asks only that provider and leaves the camera', async (t) => {
+  const lit = posingProvider({ nearestImage: async () => 'lit-near' });
+  const other = fakeProvider({
+    id: 'other',
+    pickPrefix: 'oth:',
+    nearestImage: async () => 'other-near',
+  });
+  const { layer, viewer } = await enabledLayer(t, [lit, other]);
+  layer.attachViewerHost({});
+  const point = { lat: 38.58, lon: -121.49 };
+  // The other source is off: its click asks nobody else.
+  await other.context().actions.openNearest(point);
+  await settle();
+  assert.deepEqual(lit.calls.open, [], 'the lit source was not asked');
+  assert.deepEqual(other.calls.open, []);
+  await lit.context().actions.openNearest(point);
+  assert.deepEqual(lit.calls.open, ['lit-near']);
+  assert.equal(viewer.flights.started, 0, 'the user picked the spot');
+});
+
+test('KartaView through the core: its own swatch without Selected, its lines counted as streets', async (t) => {
+  const kartaView = createKartaViewProvider({
+    source: {
+      getTile: async () => ({ lines: [] }),
+      nearestPhotos: async () => [],
+      getPhoto: async () => {
+        throw new Error('KartaView has no such photo');
+      },
+      getSequencePhotos: async () => ({ photos: [], hasMore: false }),
+      probeImage: async () => true,
+    },
+  });
+  const { layer } = await enabledLayer(t, [kartaView]);
+  layer.setProviderEnabled('kartaview', true);
+  await settle();
+  const ui = layer.getUIState();
+  assert.deepEqual(
+    ui.legend.map((entry) => entry.key),
+    ['kartaview'],
+  );
+  assert.equal(ui.coverage.label?.noun, 'streets');
+  assert.equal(
+    ui.providers.find((p) => p.id === 'kartaview').highlightsSequence,
+    false,
+  );
 });
