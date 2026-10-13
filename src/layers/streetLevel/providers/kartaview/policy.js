@@ -66,6 +66,11 @@ export const TILE_CONCURRENCY = 3;
 export const PAGE_CONCURRENCY = 1;
 export const TILE_TIMEOUT_MS = 20_000;
 export const PHOTO_API_TIMEOUT_MS = 15_000;
+/**
+ * The first try of a lookup: KartaView sometimes sits on a lookup for 11 s
+ * and more, then answers the same one again in 3 s.
+ */
+export const PHOTO_API_FIRST_TIMEOUT_MS = 8_000;
 /** A sequence page is about 650 kB of JSON. */
 export const PAGE_TIMEOUT_MS = 30_000;
 /** Real tiles are under 1 MB; refuse anything absurd before parsing it. */

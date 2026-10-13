@@ -3221,7 +3221,10 @@ up front at the ends. `api.kartaview.org` speaks HTTP/1.1, so of the
 browser's six connections to it tiles take three, lookups two and pages one
 (newest first), and a lookup never waits behind tiles; the photo API answers
 429 to more than about three requests at once, so a 429 is retried with
-backoff (at most 10 s) and a timed-out lookup once. Photo URLs are built from
+backoff (at most 10 s), and a lookup gets 8 s, then 15 s once more (KartaView
+sometimes sits on a lookup for 11 s and answers the same one in 3 s). Answers
+are read with a running byte count and cut off past 16 MB (KartaView sends
+them chunked, without a length). Photo URLs are built from
 `storage` and `filepath*`: the API's `fileurl*` always name storage1, where
 photos stored elsewhere 404, and a `fileurl*` fallback must itself be an
 https storage host. The viewer (`viewer.js`) shows a flat photo at 1,280 px,
@@ -3232,7 +3235,8 @@ equirectangular `wrapped_proc` image (13,000 px wide upstream) resized to
 centre = the camera heading; drag, pinch, wheel, Shift+← →, ↑ ↓, + −; the
 canvas re-measures every frame). Without WebGL, or if the proxy fails within
 15 s, a 360° photo shows its front view; a lost context draws the photo again
-on a new one. FIT / FILL hide for panoramas (`supportsRenderModes`). The
+on a new canvas (a lost canvas only gives back its lost context), through the
+core and only if no newer photo is opening. FIT / FILL hide for panoramas (`supportsRenderModes`). The
 caption has no place name (KartaView's is where the drive began) and links to
 the full-size photo through the image proxy, since kartaview.org's photo
 pages fail for signed-out visitors.

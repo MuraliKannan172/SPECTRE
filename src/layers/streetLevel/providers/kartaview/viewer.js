@@ -83,6 +83,8 @@ export function createKartaViewViewer({
   let drag = null;
   let poseFrame = 0;
   let removeListeners = [];
+  /** The document the viewer was built in (new canvases come from it). */
+  let documentOf = null;
   /** The photo an open is fetching: ‹ › step on from it, not the old one. */
   let openingId = null;
   /** ‹ › chose this photo: keep the panorama's look direction for it. */
@@ -202,11 +204,33 @@ export function createKartaViewViewer({
     } catch {
       /* already gone */
     }
-    if (showing === 'pano' && photo) {
+    // A lost canvas hands back its lost context: draw on a new element.
+    const fresh = makeCanvas(documentOf);
+    fresh.hidden = canvas.hidden;
+    canvas.replaceWith?.(fresh);
+    canvas = fresh;
+    // Show the photo again through the core, unless a newer one is opening.
+    if (showing === 'pano' && photo && openingId === null) {
       const again = photo.id;
       show(null);
-      adapter.open(again).catch(() => {});
+      keepViewFor = again;
+      openingId = again;
+      onStep(again);
     }
+  }
+
+  /** The panorama canvas, wired for drag, pinch, wheel and context loss. */
+  function makeCanvas(doc) {
+    const element = doc.createElement('canvas');
+    element.className = 'sl-kv-pano';
+    element.hidden = true;
+    listen(element, 'pointerdown', onPointerDown);
+    listen(element, 'pointermove', onPointerMove);
+    listen(element, 'pointerup', onPointerUp);
+    listen(element, 'pointercancel', onPointerUp);
+    listen(element, 'wheel', onWheel, { passive: false });
+    listen(element, 'webglcontextlost', onContextLost);
+    return element;
   }
 
   /**
@@ -346,6 +370,7 @@ export function createKartaViewViewer({
 
   function build(host) {
     const doc = host.ownerDocument;
+    documentOf = doc;
     root = doc.createElement('div');
     root.className = 'sl-kv-viewer';
     root.tabIndex = 0;
@@ -359,9 +384,7 @@ export function createKartaViewViewer({
     picture.alt = 'KartaView street-level photo';
     picture.draggable = false;
     picture.hidden = true;
-    canvas = doc.createElement('canvas');
-    canvas.className = 'sl-kv-pano';
-    canvas.hidden = true;
+    canvas = makeCanvas(doc);
     const nav = (label, glyph, delta) => {
       const button = doc.createElement('button');
       button.type = 'button';
@@ -380,12 +403,6 @@ export function createKartaViewViewer({
     nextButton = nav('Next photo in this sequence (→)', '›', 1);
     root.append(picture, canvas, prevButton, nextButton);
     host.append(root);
-    listen(canvas, 'pointerdown', onPointerDown);
-    listen(canvas, 'pointermove', onPointerMove);
-    listen(canvas, 'pointerup', onPointerUp);
-    listen(canvas, 'pointercancel', onPointerUp);
-    listen(canvas, 'wheel', onWheel, { passive: false });
-    listen(canvas, 'webglcontextlost', onContextLost);
     listen(root, 'keydown', onKeyDown);
     applyRenderMode();
   }

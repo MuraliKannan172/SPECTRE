@@ -69,6 +69,7 @@ const PHOTOS = {
 function fakeRenderer(canvas) {
   const view = { yaw: 0, pitch: 0, fov: 80 };
   return {
+    canvas,
     images: [],
     hiddenAtSetImage: [],
     setImage(image) {
@@ -435,14 +436,30 @@ test('two fingers pinch the panorama’s zoom', async () => {
 });
 
 test('a lost WebGL context drops the panorama and shows the photo again on a new one', async () => {
-  const { viewer, host, renderers, poses } = setup();
+  const { viewer, host, renderers, poses, stepped } = setup();
   await viewer.mount(host);
   await viewer.open('pano1');
-  parts(host).canvas.fire('webglcontextlost');
+  const lost = parts(host).canvas;
+  lost.fire('webglcontextlost');
   assert.equal(renderers[0].destroyed, true);
+  // A lost canvas only ever gives back its lost context: a new element.
+  assert.notEqual(parts(host).canvas, lost);
+  assert.deepEqual(stepped, ['pano1'], 'reopened through the core');
   assert.ok(await until(() => renderers.length === 2), 'a new renderer');
+  assert.equal(renderers[1].canvas, parts(host).canvas);
   assert.equal(poses.at(-1).imageId, 'pano1');
   assert.equal(parts(host).canvas.hidden, false);
+});
+
+test('a context lost while a newer photo opens leaves that open alone', async () => {
+  const { viewer, host, stepped } = setup();
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  const opening = viewer.open('flat1');
+  parts(host).canvas.fire('webglcontextlost');
+  await opening;
+  assert.deepEqual(stepped, [], 'no reopen of the old panorama');
+  assert.equal(parts(host).picture.hidden, false);
 });
 
 test('a WebGL failure only lasts until the viewer is mounted again', async () => {

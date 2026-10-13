@@ -30,6 +30,14 @@ export function fakeElement(tag) {
       if (list) list.splice(list.indexOf(element), 1);
       element.parentNode = null;
     },
+    replaceWith(next) {
+      const parent = element.parentNode;
+      if (!parent) return;
+      parent.children[parent.children.indexOf(element)] = next;
+      next.parentNode = parent;
+      next.ownerDocument = element.ownerDocument;
+      element.parentNode = null;
+    },
     setAttribute: (name, value) => (element.attributes[name] = value),
     removeAttribute: (name) => {
       delete element.attributes[name];

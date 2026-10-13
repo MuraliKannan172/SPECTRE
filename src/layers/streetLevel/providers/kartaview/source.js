@@ -10,6 +10,7 @@ import {
   PHOTO_API_RETRIES,
   PHOTO_API_RETRY_BASE_MS,
   PHOTO_API_RETRY_MAX_MS,
+  PHOTO_API_FIRST_TIMEOUT_MS,
   PHOTO_API_TIMEOUT_MS,
   TILE_CONCURRENCY,
   TILE_TIMEOUT_MS,
@@ -144,11 +145,33 @@ export function createKartaViewSource({
           { status: response.status },
         );
       const length = Number(response.headers?.get?.('content-length'));
-      if (length > MAX_RESPONSE_BYTES)
-        throw new KartaViewSourceError('KartaView sent too much data', {
+      const tooMuch = () =>
+        new KartaViewSourceError('KartaView sent too much data', {
           status: response.status,
         });
-      return await response.json();
+      if (length > MAX_RESPONSE_BYTES) throw tooMuch();
+      // KartaView answers chunked, without a length: count while reading.
+      const reader = response.body?.getReader?.();
+      if (!reader) return await response.json();
+      const chunks = [];
+      let bytes = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > MAX_RESPONSE_BYTES) {
+          reader.cancel().catch(() => {});
+          throw tooMuch();
+        }
+        chunks.push(value);
+      }
+      const body = new Uint8Array(bytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return JSON.parse(new TextDecoder().decode(body));
     } catch (error) {
       if (signal?.aborted) throw signal.reason;
       if (controller.signal.aborted) throw controller.signal.reason;
@@ -168,7 +191,11 @@ export function createKartaViewSource({
     path,
     params,
     { signal } = {},
-    { gate = limiter, timeoutMs = PHOTO_API_TIMEOUT_MS } = {},
+    {
+      gate = limiter,
+      timeoutMs = PHOTO_API_TIMEOUT_MS,
+      firstTimeoutMs = PHOTO_API_FIRST_TIMEOUT_MS,
+    } = {},
   ) {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     const url = `${apiHost}${path}${query}`;
@@ -176,7 +203,12 @@ export function createKartaViewSource({
     for (let attempt = 0; ; attempt++) {
       try {
         const payload = await gate.run(
-          () => getJson(url, { signal, timeoutMs }),
+          // A slow first answer is usually quick when asked again.
+          () =>
+            getJson(url, {
+              signal,
+              timeoutMs: timeouts === 0 ? firstTimeoutMs : timeoutMs,
+            }),
           { signal },
         );
         const code = Number(payload?.status?.apiCode);
@@ -300,7 +332,11 @@ export function createKartaViewSource({
         `/2.0/sequence/${encodeURIComponent(sequenceId)}/photos`,
         { page: String(page), itemsPerPage: String(itemsPerPage) },
         { signal },
-        { gate: pageLimiter, timeoutMs: PAGE_TIMEOUT_MS },
+        {
+          gate: pageLimiter,
+          timeoutMs: PAGE_TIMEOUT_MS,
+          firstTimeoutMs: PAGE_TIMEOUT_MS,
+        },
       );
       return {
         photos: Array.isArray(result.data) ? result.data : [],

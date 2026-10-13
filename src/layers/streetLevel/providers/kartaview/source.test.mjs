@@ -10,6 +10,7 @@ import {
   NEAREST_SEARCH_ZOOM,
   PHOTO_API_CONCURRENCY,
   PHOTO_API_RETRIES,
+  PHOTO_API_FIRST_TIMEOUT_MS,
   PHOTO_API_TIMEOUT_MS,
   TILE_CONCURRENCY,
 } from './policy.js';
@@ -402,7 +403,7 @@ test('429 waits double from 0.8 s, wait out a longer Retry-After up to 10 s, and
   assert.deepEqual(await waits(undefined), [2000, 2000, 3200], 'assumed 2 s');
 });
 
-test('a lookup that hangs is given up after the photo timeout, once more, then reported', async (t) => {
+test('a lookup that hangs is given up after a short first try, then the full timeout, then reported', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const asked = [];
   const outcome = await onMockClock(t, (stamp) =>
@@ -415,9 +416,9 @@ test('a lookup that hangs is given up after the photo timeout, once more, then r
       },
     }).getPhoto('1'),
   );
-  assert.deepEqual(asked, [0, PHOTO_API_TIMEOUT_MS]);
+  assert.deepEqual(asked, [0, PHOTO_API_FIRST_TIMEOUT_MS]);
   assert.match(String(outcome?.error?.message), /did not answer in time/);
-  assert.equal(outcome.at, 2 * PHOTO_API_TIMEOUT_MS);
+  assert.equal(outcome.at, PHOTO_API_FIRST_TIMEOUT_MS + PHOTO_API_TIMEOUT_MS);
 });
 
 test('the nearest lookup asks for the few photos around the point at the search zoom', async () => {
@@ -438,4 +439,50 @@ test('the nearest lookup asks for the few photos around the point at the search 
   });
   assert.equal(NEAREST_SEARCH_ZOOM, 18);
   assert.equal(NEAREST_LIMIT, 10);
+});
+
+test('a chunked answer with no length is cut off once it grows past the cap', async () => {
+  let reads = 0;
+  let cancelled = false;
+  const chunk = new Uint8Array(6 * 1024 * 1024);
+  const source = createKartaViewSource({
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      body: {
+        getReader: () => ({
+          read: async () =>
+            ++reads > 10 ? { done: true } : { done: false, value: chunk },
+          cancel: async () => {
+            cancelled = true;
+          },
+        }),
+      },
+    }),
+  });
+  await assert.rejects(source.getTile({ x: 1, y: 2, z: 13 }), /too much data/);
+  assert.equal(reads, 3, 'stopped at the third 6 MB chunk');
+  assert.equal(cancelled, true);
+  const small = createKartaViewSource({
+    fetchImpl: async () => {
+      const bytes = new TextEncoder().encode('{"lines":[]}');
+      let given = false;
+      return {
+        ok: true,
+        status: 200,
+        headers: new Map(),
+        body: {
+          getReader: () => ({
+            read: async () =>
+              given
+                ? { done: true }
+                : ((given = true), { done: false, value: bytes }),
+            cancel: async () => {},
+          }),
+        },
+      };
+    },
+  });
+  assert.deepEqual(await small.getTile({ x: 1, y: 2, z: 13 }), { lines: [] });
 });
