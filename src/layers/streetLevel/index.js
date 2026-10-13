@@ -109,6 +109,12 @@ export function createStreetLevelLayer({
       notify,
       actions: {
         openImage: (imageId) => openImage(entry.def.id, imageId),
+        /** This provider's image nearest a point the user picked on the map. */
+        openNearest: (point) =>
+          layer.openNearest(point, {
+            providerIds: [entry.def.id],
+            frame: false,
+          }),
         /**
          * Show a provider error, or withdraw it (null). A withdrawal clears
          * only this provider's own error, never a newer one from elsewhere.
@@ -407,6 +413,7 @@ export function createStreetLevelLayer({
         hint: hintFor(entry, stats),
         error: stats.error || null,
         color: entry.def.colors.coverage,
+        coverageLabel: entry.def.coverageLabel || null,
         groundClick: entry.def.groundClick === true,
         filters: [...filtersOf(entry.def)],
       };

@@ -193,7 +193,7 @@ function presentMeta(state) {
   const hint = state.coverage.hint || '';
   if (state.coverage.count > 0)
     return [
-      `${state.coverage.count.toLocaleString()} sequences in view · click a line for its photos`,
+      `${state.coverage.count.toLocaleString()} ${state.coverage.label?.noun || 'sequences'} in view · ${state.coverage.label?.action || 'click a line for its photos'}`,
       hint,
     ]
       .filter(Boolean)

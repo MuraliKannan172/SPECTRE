@@ -1,0 +1,203 @@
+import { COLORS as SHARED_COLORS, PROVIDER_COLORS } from '../../policy.js';
+
+export { NEAREST_RADIUS_M } from '../../policy.js';
+
+/** Identity and tuning for the KartaView street-level provider (keyless). */
+export const KARTAVIEW_PROVIDER_ID = 'kartaview';
+export const KARTAVIEW_NAME = 'KartaView';
+export const KARTAVIEW_LABEL = 'KARTAVIEW';
+
+/**
+ * The public API. Its documented twin, api.openstreetcam.org, still answers
+ * but serves empty coverage tiles.
+ */
+export const KARTAVIEW_API_HOST = 'https://api.kartaview.org';
+/** KartaView's image proxy: resizes a photo given its base64url address. */
+export const KARTAVIEW_CDN_HOST = 'https://cdn.kartaview.org';
+
+/** Stable id prefixes for picked primitives; every one starts with `kv:`. */
+export const PICK_PREFIX = Object.freeze({
+  root: 'kv:',
+  line: 'kv:line:',
+  image: 'kv:img:',
+});
+
+export const COLORS = Object.freeze({
+  coverage: PROVIDER_COLORS.kartaview,
+  selected: SHARED_COLORS.selected,
+});
+
+/**
+ * Coverage lines are OSM ways with photos, from z13–14 JSON tiles. Lower
+ * zooms take seconds per tile (z10 does not answer), so higher up the panel
+ * asks the user to zoom in.
+ */
+export const COVERAGE_STREET_ZOOM_BELOW_M = 2_500;
+export const COVERAGE_MAX_HEIGHT_M = 6_000;
+export const COVERAGE_TUNING = Object.freeze({
+  maxTiles: 9,
+  overviewMaxTiles: 0,
+  // Chained ways are short: a dense z13 tile holds ~1,300.
+  maxSequences: 9_000,
+  lineWidthPx: 2.5,
+  overviewPointPx: 2.5,
+  moveDebounceMs: 320,
+  viewRangeMinM: 2_500,
+  viewRangePerHeight: 10,
+  viewNearM: 1_000,
+});
+export const TOO_HIGH_HINT = 'zoom in to see KartaView coverage';
+export const RATE_LIMITED_MESSAGE =
+  'KartaView is rate-limiting requests — they resume on their own';
+
+/**
+ * The photo API answers 429 to more than about three requests at once, so
+ * at most two are in flight; a 429 is retried after a short wait.
+ */
+export const PHOTO_API_CONCURRENCY = 2;
+export const PHOTO_API_RETRIES = 3;
+export const PHOTO_API_RETRY_BASE_MS = 800;
+export const TILE_TIMEOUT_MS = 20_000;
+export const PHOTO_API_TIMEOUT_MS = 15_000;
+/** A photo download (tens of kilobytes to a few megabytes). */
+export const IMAGE_TIMEOUT_MS = 30_000;
+
+/** Photos asked for around a point; the API returns them nearest first. */
+export const NEAREST_LIMIT = 10;
+/** The photo API's search zoom: 18 searches the few tens of metres around the point. */
+export const NEAREST_SEARCH_ZOOM = 18;
+
+/**
+ * Photos of a sequence fetched at once, around the open one. Records are
+ * ~2 kB each, so a page is ~2 MB; the cones and prev/next use it.
+ */
+export const SEQUENCE_PAGE_SIZE = 1000;
+
+/** Equirectangular panorama sizes: a quick preview, then the sharp one. */
+export const PANO_PREVIEW_SIZE = Object.freeze([1024, 512]);
+export const PANO_FULL_SIZE = Object.freeze([4096, 2048]);
+/** A flat photo's sharp version, after the 1280 px one is on screen. */
+export const FLAT_FULL_SIZE = Object.freeze([2560, 2560]);
+
+/** On-globe credit: KartaView imagery is CC BY-SA 4.0 and needs attribution. */
+export const KARTAVIEW_CREDIT_HTML =
+  'Street Level: imagery © <a href="https://kartaview.org" target="_blank" rel="noopener">KartaView</a> contributors, CC BY-SA 4.0';
+
+/** The cone and coverage noun: a line is a street with photos, not a sequence. */
+export const COVERAGE_NOUN = 'streets';
+export const LINE_CLICK_HINT = 'click a line for its nearest photo';
+
+/** Base64url of a string, as the image proxy reads addresses. */
+function base64Url(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/** A photo resized by KartaView's image proxy to fit `width`×`height`. */
+export function resizedImageUrl(url, [width, height]) {
+  if (!url) return null;
+  return `${KARTAVIEW_CDN_HOST}/pr:sharp/rs:fit:${width}:${height}/${base64Url(url)}`;
+}
+
+/** Epoch ms for a KartaView timestamp ('2016-02-19 15:28:18.000', UTC), or null. */
+export function kartaViewTimeMs(value) {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(
+      String(value ?? ''),
+    );
+  if (!match) return null;
+  const [, y, mo, d, h = '0', mi = '0', s = '0'] = match;
+  if (Number(y) < 1990) return null;
+  const ms = Date.UTC(+y, +mo - 1, +d, +h, +mi, +s);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** A coordinate pair as numbers; the road-matched one when KartaView has it. */
+function positionOf(record) {
+  const matchLat = Number(record.matchLat);
+  const matchLon = Number(record.matchLng);
+  if (
+    Number.isFinite(matchLat) &&
+    Number.isFinite(matchLon) &&
+    (matchLat !== 0 || matchLon !== 0)
+  )
+    return { lat: matchLat, lon: matchLon };
+  return { lat: Number(record.lat), lon: Number(record.lng) };
+}
+
+const STORAGE_HOST = /^storage\d+$/;
+
+/**
+ * A photo file's address. The API's `fileurl*` fields always name storage1,
+ * but a photo whose `storage` is another host (storage2…) is only there, so
+ * the address is built from `storage` and the relative `filepath*`.
+ */
+function fileUrl(record, pathKey, urlKey) {
+  const path = record[pathKey];
+  if (STORAGE_HOST.test(record.storage || '') && path)
+    return `https://${record.storage}.openstreetcam.org/files/photo/${path}`;
+  return record[urlKey] || null;
+}
+
+/** A storage URL with its `{{sizeprefix}}` placeholder filled. */
+function sized(record, prefix) {
+  const url = fileUrl(record, 'filepath', 'fileurl') || '';
+  return url.includes('{{sizeprefix}}')
+    ? url.replace('{{sizeprefix}}', prefix)
+    : null;
+}
+
+/**
+ * A photo API record in the shape the provider uses, or null without an id
+ * or a position.
+ * @returns {{id: string, sequenceId: string|null, sequenceIndex: number|null, lon: number, lat: number, heading: number|null, isPano: boolean, capturedAt: number|null, urls: {view: string|null, full: string|null, pano: string|null}}|null}
+ */
+export function normalizePhoto(record) {
+  if (!record || record.id == null) return null;
+  const { lat, lon } = positionOf(record);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const heading =
+    record.heading === '' || record.heading == null
+      ? NaN
+      : Number(record.heading);
+  const isPano =
+    record.projection === 'SPHERE' || Number(record.fieldOfView) >= 360;
+  const full =
+    fileUrl(record, 'filepathProc', 'fileurlProc') || sized(record, 'proc');
+  const index = Number(record.sequenceIndex);
+  return {
+    id: String(record.id),
+    sequenceId: record.sequenceId != null ? String(record.sequenceId) : null,
+    sequenceIndex: Number.isFinite(index) ? index : null,
+    lon,
+    lat,
+    heading: Number.isFinite(heading) ? heading : null,
+    isPano,
+    capturedAt:
+      kartaViewTimeMs(record.shotDate) ?? kartaViewTimeMs(record.dateAdded),
+    urls: {
+      // A 1280 px rendition; for a 360° photo it is the front view only.
+      view:
+        fileUrl(record, 'filepathLTh', 'fileurlLTh') ||
+        sized(record, 'lth') ||
+        full,
+      full,
+      // A 360° photo's equirectangular image ('wrapped_proc').
+      pano: isPano && /wrapped/.test(full || '') ? full : null,
+    },
+  };
+}
+
+/**
+ * Where the image link goes. KartaView's photo pages fail for signed-out
+ * visitors ("Sequence cannot be loaded"), so it is the full-size photo on
+ * KartaView's own storage.
+ */
+export function kartaViewPhotoUrl(photo) {
+  return photo?.urls?.full || photo?.urls?.view || 'https://kartaview.org';
+}

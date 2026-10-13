@@ -17,6 +17,7 @@ import { COLORS } from './policy.js';
  * @property {string} color   The source's one colour.
  * @property {boolean} [groundClick]
  * @property {Array<'pano'|'since'>} [filters]
+ * @property {{noun: string, action: string}|null} [coverageLabel]
  */
 
 /**
@@ -34,6 +35,8 @@ export function summarizeCoverage(providers) {
         ? 'No street-level imagery providers configured'
         : [...new Set(active.map((p) => p.hint).filter(Boolean))].join(' · '),
     error: active.find((p) => p.error)?.error || null,
+    // One source is lit at a time; its wording counts the lines.
+    label: active.find((p) => p.coverageLabel)?.coverageLabel || null,
     keyRequired:
       active.length > 0 && active.every((p) => p.keyRequired === true),
     keyRejected:
