@@ -109,6 +109,18 @@ export function tn(count, one, other, values) {
   return interpolate(pattern, { ...values, count });
 }
 
+/**
+ * Translate text that may be ours or may come from a provider: a catalog
+ * entry is used when there is one, anything else shows as given, without a
+ * missing-translation warning.
+ */
+export function translateKnown(text) {
+  const catalog = CATALOGS[currentLocale];
+  if (!catalog || typeof text !== 'string') return text;
+  const entry = catalog[text];
+  return typeof entry === 'string' ? entry : text;
+}
+
 /** Mark English text that is stored in data and translated later by t(). */
 export function msg(text) {
   return text;

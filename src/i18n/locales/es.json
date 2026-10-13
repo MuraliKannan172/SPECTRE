@@ -2030,5 +2030,7 @@
   "subject": "sujeto",
   "{value}m": "{value} m",
   "Google 3D tiles unavailable — check the key's API restrictions, quota, or network": "Teselas de Google 3D no disponibles: revisa las restricciones de API de la clave, la cuota o la red",
-  "Needs {envVars} — add it in Provider Settings — or a Cesium ion token for the ion-hosted route": "Necesita {envVars} — añádela en Ajustes de proveedores — o un token de Cesium ion para la ruta alojada en ion"
+  "Needs {envVars} — add it in Provider Settings — or a Cesium ion token for the ion-hosted route": "Necesita {envVars} — añádela en Ajustes de proveedores — o un token de Cesium ion para la ruta alojada en ion",
+  "Comparison in use by another scene": "La comparación está en uso por otra escena",
+  "A location reading needs a loaded forecast and the Earth at the center of the view.": "Una lectura en un punto necesita un pronóstico cargado y la Tierra en el centro de la vista."
 }

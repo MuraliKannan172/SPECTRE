@@ -167,9 +167,14 @@ export function satelliteClassColor(group) {
  * @param {{ isIss?: boolean }} [options] Whether this is the ISS.
  * @returns {string} Display label.
  */
-export function satelliteClassLabel(group, { isIss = false } = {}) {
+export function satelliteClassLabel(
+  group,
+  { isIss = false, localize = true } = {},
+) {
   const { klass, subtype } = satelliteClassOf(group, { isIss });
-  const base = t(CLASS_DISPLAY_KEYS[klass].label);
+  // localize: false keeps the English label for data the AI tools query.
+  const label = CLASS_DISPLAY_KEYS[klass].label;
+  const base = localize ? t(label) : label;
   return subtype ? `${base} · ${subtype}` : base;
 }
 

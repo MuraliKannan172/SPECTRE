@@ -8,7 +8,7 @@
  * strip and selection bar are this adapter's own keyed DOM. Source toggles
  * live on the data-panel row.
  */
-import { t, tn, msg, formatNumber } from '../i18n/index.js';
+import { formatNumber, msg, t, tn, translateKnown } from '../i18n/index.js';
 import { createRailCardBlocks } from './railCardBlocks.js';
 import { createRailCards } from './railCards.js';
 import { createImagerySplit } from './imagerySplit.js';
@@ -39,7 +39,7 @@ function localizeNotice(text) {
   if (!text) return '';
   if (LAYER_NOTICES.has(text)) return t(text);
   const tooLarge = TOO_LARGE.exec(text);
-  if (!tooLarge) return text;
+  if (!tooLarge) return translateKnown(text);
   const values = {
     size: formatQuantity(Number(tooLarge[2].replace(/,/g, '')), 'km', {
       useGrouping: true,

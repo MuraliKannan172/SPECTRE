@@ -65,8 +65,9 @@ export function inspectWindAtCenter(
       model,
       validTime,
       status,
-      explanation:
+      explanation: msg(
         'A location reading needs a loaded forecast and the Earth at the center of the view.',
+      ),
     };
   const location = cesium.Cartographic.fromCartesian(point, ellipsoid);
   const lon = cesium.Math.toDegrees(location.longitude);

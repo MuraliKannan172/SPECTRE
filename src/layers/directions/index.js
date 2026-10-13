@@ -557,7 +557,8 @@ export function directionsStats(state) {
     armed,
     pointerBlocked,
   } = state;
-  const source = t('OSM routing');
+  // English in layer state; the layer row translates it.
+  const source = 'OSM routing'; // i18n-ignore: source name, translated by layerPanel
   if (pointerBlocked) {
     return {
       count: route?.steps.length || 0,

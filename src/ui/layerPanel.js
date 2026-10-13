@@ -5,7 +5,7 @@ export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
 import { keySetupRequirementEnvVars } from '../keySetupCore.mjs';
 import { createWeatherPanel } from './weatherPanel.js';
-import { t, msg } from '../i18n/index.js';
+import { msg, t, translateKnown } from '../i18n/index.js';
 
 // Feed-state enum VALUES are machine identifiers (layerFeedState contract, QA
 // hooks, CSS feed-* classes); only the final label value translates, at this
@@ -176,6 +176,8 @@ const SOURCE_LABEL_KEYS = new Map(
     msg('NOAA nowCOAST · OBSERVED'),
     msg('NASA FIRMS · LIVE'),
     msg('OSM routing'),
+    msg('Mapped camera locations'),
+    msg('OpenStreetMap · community mapped'),
   ].map((key) => [key, key]),
 );
 
@@ -721,8 +723,9 @@ export class LayerPanel {
         { source },
       );
     }
-    const presentedError =
-      stats.error || stats.lastError || stats.managerRefreshError;
+    const presentedError = translateKnown(
+      stats.error || stats.lastError || stats.managerRefreshError,
+    );
     if (presentedError) {
       if (typeof stats.retryInSec === 'number' && stats.retryInSec > 0) {
         return t('{state} · {source} · {detail} · retry {seconds}s', {
@@ -751,14 +754,14 @@ export class LayerPanel {
     if (stats.loading) {
       const loadingLabel =
         typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
-          ? stats.loadingLabel.trim()
+          ? translateKnown(stats.loadingLabel.trim())
           : t('loading...');
       return t('{source} · {loadingLabel}', { source, loadingLabel });
     }
     if (feedState === 'fallback') {
       const detail =
         typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
-          ? stats.loadingLabel.trim()
+          ? translateKnown(stats.loadingLabel.trim())
           : stats.coverage || ago;
       return t('{state} · {source} · {detail}', {
         state: stateLabel,
@@ -803,7 +806,7 @@ export class LayerPanel {
     if (typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()) {
       return t('{source} · {loadingLabel}', {
         source,
-        loadingLabel: stats.loadingLabel.trim(),
+        loadingLabel: translateKnown(stats.loadingLabel.trim()),
       });
     }
     return t('{source} · {ago}', { source, ago });
@@ -861,7 +864,9 @@ export class LayerPanel {
         ? t('UNAVAILABLE', { context: 'status chip' })
         : stateText;
     const keyGuidance = unavailable
-      ? String(layer.stats.error || t('Data source unavailable'))
+      ? String(
+          translateKnown(layer.stats.error) || t('Data source unavailable'),
+        )
       : layerKeyRequirementTooltip(layer);
     // Name the missing key on the control itself: a row reading KEY REQUIRED
     // without saying WHICH key leaves a dead control and no next step. Empty
