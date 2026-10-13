@@ -2025,5 +2025,8 @@
   "Uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.": "Usa contenido registrado o medios vinculados. Esos archivos externos no se incluyen en un paquete de escena. Sus avisos originales siguen vigentes.",
   "{state} {layers}": "{state}: {layers}",
   "Selected Space Mission": "Misión espacial seleccionada",
-  "{duration}s + {hold}s": "{duration} s + {hold} s"
+  "{duration}s + {hold}s": "{duration} s + {hold} s",
+  "Configured Source": "Fuente configurada",
+  "subject": "sujeto",
+  "{value}m": "{value} m"
 }

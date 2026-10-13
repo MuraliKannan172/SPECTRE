@@ -126,9 +126,13 @@ export function createSceneDialog(title, onClose) {
     const chosen = document.createElement('span');
     const showChosen = () => {
       const count = node.files?.length || 0;
-      chosen.textContent = count
-        ? tn(count, '{count} file selected', '{count} files selected')
-        : t('No file chosen');
+      // One file shows its name, like the browser's own picker did.
+      chosen.textContent =
+        count === 1
+          ? node.files[0].name
+          : count
+            ? tn(count, '{count} file selected', '{count} files selected')
+            : t('No file chosen');
     };
     showChosen();
     row.append(chooser, chosen);

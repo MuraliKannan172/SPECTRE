@@ -193,7 +193,7 @@ export class ShareRestoration {
         state: 'acquiring',
         detail: t('SHARED {subject}', {
           subject: String(
-            result.label ? t(result.label) : t('entity'),
+            result.label ? t(result.label) : t('subject'),
           ).toUpperCase(),
         }),
         persistent: true,

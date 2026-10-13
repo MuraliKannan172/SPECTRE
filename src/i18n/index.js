@@ -212,7 +212,7 @@ export function applyDocumentTranslations(doc) {
 /**
  * Persist a locale choice, then reload preserving window.location.hash exactly
  * and stripping ?lang from the search string, so the override is one-shot.
- * Storage is best-effort: where it is blocked the choice will not survive.
+ * Where storage is blocked, ?lang carries the choice instead.
  * @returns {boolean} true when a reload was triggered.
  */
 export function persistLocaleAndReload(
@@ -224,12 +224,14 @@ export function persistLocaleAndReload(
   } = {},
 ) {
   const normalized = normalizeLocale(locale) || DEFAULT_LOCALE;
-  writeStoredLocale(normalized, storage);
+  const stored = writeStoredLocale(normalized, storage);
   if (!location || typeof location.assign !== 'function') return false;
   let target = location.href;
   try {
+    // Without storage the choice only survives in the URL, so keep it there.
     const url = new URL(location.href);
-    url.searchParams.delete('lang');
+    if (stored) url.searchParams.delete('lang');
+    else url.searchParams.set('lang', normalized);
     target = url.href;
   } catch {
     // Keep the current href.

@@ -39,7 +39,7 @@ const SOURCE_MESSAGES = Object.freeze({
 
 const SOURCE_LABELS = Object.freeze({
   'Configured source': msg('Configured source'),
-  'Configured Source': msg('Configured source'),
+  'Configured Source': msg('Configured Source'),
   'Synthetic fallback': msg('Synthetic fallback'),
 });
 

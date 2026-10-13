@@ -1045,8 +1045,10 @@ const BUILTIN_SHOT_TITLES = new Set([
  */
 export function displaySceneTitle(scene) {
   const builtin = SCENE_RECIPES.find((recipe) => recipe.id === scene?.id);
-  if (!builtin?.title) return scene?.title || '';
-  return scene.title === builtin.title ? t(builtin.title) : scene.title;
+  if (builtin?.title && scene.title === builtin.title) return t(builtin.title);
+  const title = scene?.title || '';
+  const numbered = /^Scene (\d+)$/.exec(title);
+  return numbered ? t('Scene {n}', { n: Number(numbered[1]) }) : title;
 }
 
 /**

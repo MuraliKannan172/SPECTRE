@@ -2057,5 +2057,8 @@
   "Uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.": "Используется зарегистрированный контент или связанные медиафайлы. Эти внешние файлы не входят в архив сцены. Их исходные уведомления по-прежнему действуют.",
   "{state} {layers}": "{state}: {layers}",
   "Selected Space Mission": "Выбранная космическая миссия",
-  "{duration}s + {hold}s": "{duration} с + {hold} с"
+  "{duration}s + {hold}s": "{duration} с + {hold} с",
+  "Configured Source": "Настроенный источник",
+  "subject": "объект",
+  "{value}m": "{value} м"
 }

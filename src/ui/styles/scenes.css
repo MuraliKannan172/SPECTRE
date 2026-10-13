@@ -158,9 +158,8 @@
   border-radius: 7px;
   color: var(--text-primary);
   padding: 6px 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -465,4 +464,10 @@
 
 .director-sharing-dialog::backdrop {
   background: rgba(0, 8, 14, 0.65);
+}
+
+html:not([lang='en']) #scene-select {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
 }

@@ -507,9 +507,8 @@ export class SceneDirector {
 
     const scene = {
       id: uid('scene'),
-      title:
-        sceneName.trim() ||
-        t('Scene {n}', { n: this._project.scenes.length + 1 }),
+      // i18n-ignore: stored English, like normalizeProject; displaySceneTitle translates it.
+      title: sceneName.trim() || `Scene ${this._project.scenes.length + 1}`,
       shots: [],
     };
 
@@ -967,9 +966,8 @@ export class SceneDirector {
     const shot = normalizeShot(
       {
         id: uid('shot'),
-        title: t('Shot {n}', {
-          n: scene.shots.length + 1,
-        }),
+        // i18n-ignore: stored English; displayShotTitle translates it when shown.
+        title: `Shot ${scene.shots.length + 1}`,
         durationSec: DEFAULT_SHOT_DURATION_SEC,
         holdSec: DEFAULT_HOLD_SEC,
         camera,

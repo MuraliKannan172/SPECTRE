@@ -1,5 +1,4 @@
 import { formatNumber, t, msg } from '../i18n/index.js';
-import { formatQuantity } from './unitLabels.js';
 
 /** Shortest-wrap signed degrees, for heading offsets typed as absolute values. */
 const signedNormalizeDeg = (deg) => ((((deg + 180) % 360) + 360) % 360) - 180;
@@ -73,8 +72,14 @@ function calValueText(field, value) {
     minimumFractionDigits: field.decimals,
     maximumFractionDigits: field.decimals,
   };
-  if (field.unit === 'm')
-    return `${t(field.label)} ${formatQuantity(Number(value), 'm', options)}`;
+  if (field.unit === 'm') {
+    // English keeps its compact "RANGE 120m"; other languages space the unit.
+    const metres = formatNumber(Number(value), {
+      useGrouping: false,
+      ...options,
+    });
+    return `${t(field.label)} ${t('{value}m', { value: metres })}`;
+  }
   const number = formatNumber(Number(value), {
     useGrouping: false,
     ...options,
