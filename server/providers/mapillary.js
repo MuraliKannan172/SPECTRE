@@ -4,6 +4,7 @@ import {
   fetchTile,
   mapillaryToken,
   parseTilePath,
+  retryAfterWait,
   TileUpstreamError,
 } from './mapillary/tiles.js';
 
@@ -12,8 +13,6 @@ import {
  * 9-tile views a minute, more than a person flying the camera reaches.
  */
 export const TILE_ROUTE_MAX_PER_MIN = 600;
-/** The longest upstream Retry-After passed on, in seconds. */
-const MAX_RETRY_AFTER_SEC = 600;
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -69,11 +68,7 @@ async function handleTile(req, res, allow) {
         keyRejected: true,
       });
     if (status === 429) {
-      const sent = Number(error.retryAfter);
-      const retryAfter =
-        Number.isInteger(sent) && sent > 0
-          ? Math.min(sent, MAX_RETRY_AFTER_SEC)
-          : 60;
+      const retryAfter = retryAfterWait(error.retryAfter);
       res.setHeader('Retry-After', String(retryAfter));
       return sendJson(res, 429, {
         error: 'Mapillary is rate-limiting tile requests',

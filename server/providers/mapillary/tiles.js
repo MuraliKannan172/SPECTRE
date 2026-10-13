@@ -20,6 +20,10 @@ export const TILE_UPSTREAM_CONCURRENCY = 6;
 export const TILE_TTL_MS = 24 * 60 * 60 * 1000;
 /** Trimmed tiles are ~80 KB: a dozen 9-tile views, well under 100 MB. */
 export const TILE_MEMORY_MAX_TILES = 120;
+/** A trimmed tile is ~80 KB; a body this big failed to trim and is not kept. */
+export const TILE_MEMORY_MAX_TILE_BYTES = 4 * 1024 * 1024;
+/** The longest upstream Retry-After honoured, in seconds. */
+export const MAX_RETRY_AFTER_SEC = 600;
 
 /** The client token lives in the browser by design; the server adds it to tile URLs too. */
 export function mapillaryToken() {
@@ -35,6 +39,40 @@ export class TileUpstreamError extends Error {
     /** The upstream Retry-After header, as sent. */
     this.retryAfter = retryAfter;
   }
+}
+
+/** Seconds a Retry-After header asks for (an integer or an HTTP date), else null. */
+export function retryAfterSeconds(header, now = Date.now()) {
+  const text = String(header ?? '').trim();
+  if (!text) return null;
+  const seconds = /^\d+$/.test(text)
+    ? Number(text)
+    : (Date.parse(text) - now) / 1000;
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null;
+}
+
+/** The wait a 429 asks for, bounded; a missing or malformed header means a minute. */
+export function retryAfterWait(header, now = Date.now()) {
+  return Math.min(retryAfterSeconds(header, now) ?? 60, MAX_RETRY_AFTER_SEC);
+}
+
+/**
+ * While Mapillary rate-limits, tile misses are refused here until the wait is
+ * over, so the rest of a view (and the fetches queued behind the first 429)
+ * do not go on asking. Scoped to the token that was refused.
+ * @type {{until: number, token: string}|null}
+ */
+let refusal = null;
+
+/** The refusal still in force for `token`, as the error to answer with. */
+function refusedNow(token) {
+  if (!refusal) return null;
+  const left = refusal.until - Date.now();
+  if (left <= 0 || refusal.token !== token) {
+    refusal = null;
+    return null;
+  }
+  return new TileUpstreamError(429, undefined, String(Math.ceil(left / 1000)));
 }
 
 /**
@@ -60,9 +98,11 @@ function trim(bytes) {
 
 /** One tile from Mapillary, trimmed; empty bytes mean no coverage. */
 async function fetchUpstream({ z, x, y }, signal) {
-  const token = encodeURIComponent(mapillaryToken());
+  const token = mapillaryToken();
+  const refused = refusedNow(token);
+  if (refused) throw refused;
   const response = await fetch(
-    `${TILE_HOST}/mly1_public/2/${z}/${x}/${y}?access_token=${token}`,
+    `${TILE_HOST}/mly1_public/2/${z}/${x}/${y}?access_token=${encodeURIComponent(token)}`,
     {
       signal: AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT_MS)]),
       // The token is in the query: a redirect is never followed (a 3xx is a 502).
@@ -74,11 +114,13 @@ async function fetchUpstream({ z, x, y }, signal) {
     await response.body?.cancel().catch(() => {});
     if (response.status === 204 || response.status === 404)
       return Buffer.alloc(0);
-    throw new TileUpstreamError(
-      response.status,
-      undefined,
-      response.headers.get('retry-after'),
-    );
+    const retryAfter = response.headers.get('retry-after');
+    if (response.status === 429)
+      refusal = {
+        token,
+        until: Date.now() + retryAfterWait(retryAfter) * 1000,
+      };
+    throw new TileUpstreamError(response.status, undefined, retryAfter);
   }
   try {
     const bytes = await readResponseBytesCapped(response, TILE_MAX_BYTES);
@@ -147,6 +189,7 @@ const memory = new Map();
 const inFlight = new Map();
 
 function remember(key, bytes, at = Date.now()) {
+  if (bytes.length > TILE_MEMORY_MAX_TILE_BYTES) return;
   memory.delete(key);
   memory.set(key, { bytes, at });
   for (const oldest of memory.keys()) {
@@ -216,4 +259,5 @@ export async function fetchTile(address, { signal } = {}) {
 export function _resetTileCacheForTest() {
   memory.clear();
   inFlight.clear();
+  refusal = null;
 }

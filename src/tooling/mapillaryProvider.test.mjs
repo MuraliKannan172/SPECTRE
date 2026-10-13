@@ -7,7 +7,9 @@ import {
 } from 'gods-eye-view/server/providers/mapillary';
 import { stripTileLayers } from '../../server/providers/mapillary/trim.js';
 import {
+  MAX_RETRY_AFTER_SEC,
   TILE_MAX_BYTES,
+  TILE_MEMORY_MAX_TILE_BYTES,
   TILE_MEMORY_MAX_TILES,
   TILE_UPSTREAM_CONCURRENCY,
   TILE_TTL_MS,
@@ -244,7 +246,6 @@ for (const status of [401, 403])
 for (const [sent, expected] of [
   ['30', 30],
   [null, 60],
-  ['Wed, 21 Oct 2026 07:28:00 GMT', 60],
   ['999999', 600],
 ])
   test(`an upstream 429 (Retry-After ${sent}) is passed on as ${expected} s`, async () => {
@@ -262,9 +263,10 @@ for (const [sent, expected] of [
           error: 'Mapillary is rate-limiting tile requests',
           retryAfter: expected,
         });
-        // Errors are not cached: the next request asks again.
-        await call('/api/mapillary/tiles', '/coverage/14/5/5');
-        assert.equal(calls.length, 2);
+        // Not cached as a tile, but refused here until the wait is over.
+        const again = await call('/api/mapillary/tiles', '/coverage/14/5/5');
+        assert.equal(again.statusCode, 429);
+        assert.equal(calls.length, 1);
       },
     );
   });
@@ -553,6 +555,126 @@ test('the memory cache evicts the least recently used tile past its size', async
       assert.equal(await get(0), 'memory', 'so it stays');
       assert.equal(await get(1), 'upstream', 'the least recently used went');
       assert.equal(calls.length, TILE_MEMORY_MAX_TILES + 2);
+    },
+  );
+});
+
+// ── Upstream refusals ──
+
+const rateLimited = (retryAfter) =>
+  new Response('', { status: 429, headers: { 'retry-after': retryAfter } });
+
+test('after a 429 the rest of the view waits out Retry-After here instead of asking Mapillary', async (t) => {
+  const now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  await withUpstream(
+    (n) => (n === 1 ? rateLimited('120') : ok()),
+    async ({ calls, call }) => {
+      const first = await call('/api/mapillary/tiles', '/coverage/14/1/1');
+      assert.equal(first.statusCode, 429);
+      assert.equal(json(first).retryAfter, 120);
+      const rest = await Promise.all(
+        Array.from({ length: 8 }, (_, i) =>
+          call('/api/mapillary/tiles', `/coverage/14/2/${i}`),
+        ),
+      );
+      assert.equal(calls.length, 1, 'nothing else reached Mapillary');
+      for (const res of rest) {
+        assert.equal(res.statusCode, 429);
+        assert.equal(json(res).retryAfter, 120);
+      }
+      // Half way through the wait, the answer says what is left.
+      Date.now.mock.mockImplementation(() => now + 50_000);
+      const midway = await call('/api/mapillary/tiles', '/coverage/14/3/3');
+      assert.equal(json(midway).retryAfter, 70);
+      assert.equal(calls.length, 1);
+      // Once it is over, requests go upstream again.
+      Date.now.mock.mockImplementation(() => now + 121_000);
+      const later = await call('/api/mapillary/tiles', '/coverage/14/3/3');
+      assert.equal(later.statusCode, 200);
+      assert.equal(calls.length, 2);
+    },
+  );
+});
+
+test('a refusal is scoped to the token that was refused', async () => {
+  await withUpstream(
+    (n) => (n === 1 ? rateLimited('120') : ok()),
+    async ({ calls, call }) => {
+      await call('/api/mapillary/tiles', '/coverage/14/1/1');
+      process.env.MAPILLARY_CLIENT_TOKEN = 'MLY|replaced|token';
+      const res = await call('/api/mapillary/tiles', '/coverage/14/1/2');
+      assert.equal(res.statusCode, 200, 'a new token is tried at once');
+      assert.equal(calls.length, 2);
+    },
+  );
+});
+
+test(
+  'fetches queued behind a 429 never reach Mapillary',
+  { timeout: 5000 },
+  async () => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    const answer = (n) => gate.then(() => (n === 1 ? rateLimited('60') : ok()));
+    await withUpstream(answer, async ({ calls }) => {
+      const busy = Array.from({ length: TILE_UPSTREAM_CONCURRENCY }, (_, i) =>
+        fetchTile(parseTilePath(`/coverage/14/${i}/6`)).catch((e) => e),
+      );
+      const queued = Array.from({ length: 3 }, (_, i) =>
+        fetchTile(parseTilePath(`/coverage/14/${i}/7`)).catch((e) => e),
+      );
+      await settleSoon();
+      assert.equal(calls.length, TILE_UPSTREAM_CONCURRENCY, 'three wait');
+      release();
+      const [first] = await Promise.all(busy);
+      assert.equal(first.status, 429);
+      for (const outcome of await Promise.all(queued)) {
+        assert.equal(outcome.status, 429, 'refused here');
+        assert.equal(outcome.retryAfter, '60');
+      }
+      assert.equal(calls.length, TILE_UPSTREAM_CONCURRENCY, 'and never ran');
+    });
+  },
+);
+
+test('an HTTP-date Retry-After is passed on as the seconds left; garbage means a minute', async (t) => {
+  const now = Date.UTC(2026, 9, 13, 12, 0, 0);
+  t.mock.method(Date, 'now', () => now);
+  const inFiveMinutes = new Date(now + 5 * 60_000).toUTCString();
+  const inAnHour = new Date(now + 60 * 60_000).toUTCString();
+  const anHourAgo = new Date(now - 60 * 60_000).toUTCString();
+  const sent = [inFiveMinutes, inAnHour, anHourAgo, 'soon', ''];
+  await withUpstream(
+    (n) => rateLimited(sent[n - 1]),
+    async ({ call }) => {
+      const retryAfter = async (x) => {
+        _resetTileCacheForTest();
+        const res = await call('/api/mapillary/tiles', `/coverage/14/${x}/9`);
+        assert.equal(res.statusCode, 429);
+        assert.equal(res.headers['retry-after'], String(json(res).retryAfter));
+        return json(res).retryAfter;
+      };
+      assert.equal(await retryAfter(1), 300);
+      assert.equal(await retryAfter(2), MAX_RETRY_AFTER_SEC, 'capped');
+      assert.equal(await retryAfter(3), 60, 'a date in the past');
+      assert.equal(await retryAfter(4), 60, 'not a date');
+      assert.equal(await retryAfter(5), 60, 'no header');
+    },
+  );
+});
+
+test('a body too big to be a trimmed tile is served but not kept in memory', async () => {
+  const huge = Buffer.alloc(TILE_MEMORY_MAX_TILE_BYTES + 1, 0xff);
+  await withUpstream(
+    () => ok(huge),
+    async ({ calls, call }) => {
+      const first = await call('/api/mapillary/tiles', '/coverage/14/5/5');
+      assert.equal(first.statusCode, 200);
+      assert.equal(first.body.length, huge.length, 'served as it came');
+      const second = await call('/api/mapillary/tiles', '/coverage/14/5/5');
+      assert.equal(second.headers['x-gev-cache'], 'upstream', 'not cached');
+      assert.equal(calls.length, 2);
     },
   );
 });
