@@ -3,7 +3,7 @@
  * qa-emergency-squawk.mjs — headless proof for transponder emergency highlighting.
  *
  * Drives the REAL app in headless Chromium against a dev server (keyless).
- * `/api/opensky` and `/api/adsblol/mil` are stubbed in the page so the codes
+ * `/api/flights` and `/api/military` are stubbed in the page so the codes
  * are deterministic; everything downstream (normalizers, records, rendering,
  * Cockpit HUD) is production code.
  *
@@ -103,8 +103,12 @@ function installStubs() {
     const url = typeof input === 'string' ? input : input?.url || '';
     const now = Date.now();
     const { civil, mil } = window.__squawkQaFixtures;
-    if (url.includes('/api/opensky-track')) return json({ path: [] });
-    if (url.includes('/api/opensky')) {
+    if (
+      url.includes('/api/flights/track') ||
+      url.includes('/api/military/track')
+    )
+      return json({ path: [] });
+    if (url.includes('/api/flights')) {
       const t = Math.floor(now / 1000);
       return json({
         time: t,
@@ -116,7 +120,7 @@ function installStubs() {
         }),
       });
     }
-    if (url.includes('/api/adsblol/mil')) {
+    if (url.includes('/api/military')) {
       const cleared = window.__squawkQaPhase === 'cleared';
       return json({
         msg: 'No error',
