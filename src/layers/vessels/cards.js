@@ -160,11 +160,15 @@ export function createCards({
   }
 
   function formatSpeed(speed) {
-    return speed === null ? '--KT' : `${speed.toFixed(1)}KT`;
+    return t('{speed}KT', {
+      speed: speed === null ? '--' : speed.toFixed(1),
+    });
   }
 
   function formatHeading(heading) {
-    return Number.isFinite(heading) ? `${Math.round(heading)}DEG` : '--DEG';
+    return t('{heading}DEG', {
+      heading: Number.isFinite(heading) ? Math.round(heading) : '--',
+    });
   }
 
   function formatPositionTime(record) {

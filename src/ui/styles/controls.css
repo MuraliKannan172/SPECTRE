@@ -230,7 +230,7 @@ html:not([lang='en'])
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
 }
 
 .panel-divider {

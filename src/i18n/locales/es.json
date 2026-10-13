@@ -2073,5 +2073,7 @@
   "Soul": "Soul",
   "Techno": "Techno",
   "Trance": "Trance",
-  "World": "Músicas del mundo"
+  "World": "Músicas del mundo",
+  "{speed}KT": "{speed} KN",
+  "{heading}DEG": "{heading}°"
 }

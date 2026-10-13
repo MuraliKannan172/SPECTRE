@@ -5,7 +5,7 @@ export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
 import { keyGuidanceText, keyRequirementText } from './keyGuidance.js';
 import { createWeatherPanel } from './weatherPanel.js';
-import { msg, t, translateKnown } from '../i18n/index.js';
+import { formatNumber, msg, t, translateKnown } from '../i18n/index.js';
 
 // Feed-state enum VALUES are machine identifiers (layerFeedState contract, QA
 // hooks, CSS feed-* classes); only the final label value translates, at this
@@ -891,7 +891,12 @@ export class LayerPanel {
   }
 
   _formatCount(n) {
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    if (n >= 1000)
+      return `${formatNumber(n / 1000, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+        useGrouping: false,
+      })}K`;
     return String(n);
   }
 

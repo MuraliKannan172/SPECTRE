@@ -2105,5 +2105,7 @@
   "Soul": "Соул",
   "Techno": "Техно",
   "Trance": "Транс",
-  "World": "Музыка мира"
+  "World": "Музыка мира",
+  "{speed}KT": "{speed} УЗ",
+  "{heading}DEG": "{heading}°"
 }
