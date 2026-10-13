@@ -3083,8 +3083,8 @@ meaning), one viewer host and one on-globe credit per active provider. Each
 provider draws in one colour (`PROVIDER_COLORS` in
 `src/layers/streetLevel/policy.js`); 360° cones are rings and the selected
 sequence is GEV cyan. Share options: `m` (Mapillary), `r` (the other providers' switches by id,
-e.g. `google-1` for Street View), `p` (`a`/`p`/`f` panoramas), `s` (since, days). Mapillary and Google
-Street View are registered. Without
+e.g. `google-1` for Street View), `p` (`a`/`p`/`f` panoramas), `s` (since, days). Mapillary, Google
+Street View and KartaView are registered. Without
 `MAPILLARY_CLIENT_TOKEN` the panel reads KEY REQUIRED and the controls are
 disabled. With it, coverage draws as z0–5 overview points from orbit and z11–14
 sequence lines below 60 km; the proxy strips the unused `image` layer from z14
@@ -3135,9 +3135,12 @@ Providers implement the contract in `src/layers/streetLevel/registry.js`. The
 core routes clicks by pick prefix, swaps viewer adapters in the one host,
 manages each provider's credit and fans the filter out to every provider. To
 add a provider: implement the definition, register it in
-`src/app/layers/streetLevel.js`, add its boolean option to the `street-level`
-group in `src/data/layerState.js` and its modules to
-`scripts/package-boundaries.json`. With providers on different keys the
+`src/app/layers/streetLevel.js` and add its modules to
+`scripts/package-boundaries.json`; its share switch travels in `r` by id.
+A provider with line coverage builds it on `lineCoverage.js` (camera-driven
+XYZ tiles, draped or cast to bare earth, selection recolouring) and its cones
+on `sequenceCones.js`, passing its tile fetch, zoom ladder, colours and pick
+prefixes; Mapillary's `coverage.js` and `sequences.js` are such wrappers. With providers on different keys the
 layer's `requiresKeyId` is null and each chip reports its own key.
 
 Google Street View (`providers/google/`) runs on the Maps JavaScript API with
@@ -3183,6 +3186,35 @@ once; a lookup or open Google never answers fails after 10 or 20 s. In CI
 (no Google key, no Google 3D) the gate checks that nothing of Street View
 shows off Google 3D, even switched on by a share link; the click and button
 step skips as `no Google key`.
+
+KartaView (`providers/kartaview/`) is keyless and browser-side: CORS is open
+on `api.kartaview.org` (the documented `api.openstreetcam.org` answers but
+serves empty tiles), `cdn.kartaview.org` and `storage*.openstreetcam.org`.
+Its chip starts off. Coverage comes from z14 JSON tiles below 2.5 km above
+ground and z13 up to 6 km (lower zooms take seconds per tile; z10 does not
+answer), so higher up the hint says to zoom in. A tile's lines are OSM way
+segments with photos and carry no sequence, date or projection, so
+`decode.js` chains segments that meet end to start (about a quarter of the
+lines), they are drawn unselectable as `kv:line:<z/x/y/n>`, and the provider
+declares `filters: []` and `coverageLabel` ("N streets in view · click a line
+for its nearest photo"). A click on a line reaches `handlePick(id,
+{groundPoint})`, and the provider asks the core (`actions.openNearest`) for
+its photo nearest that point within 50 m, without framing. The open photo's
+sequence draws as cones from the 1,000-photo page holding it
+(`/2.0/sequence/{id}/photos`; a page with missing photos is found by stepping
+back), and ‹ › step across pages, re-centring the cones. The photo API answers
+429 to more than about three requests at once, so `source.js` keeps two in
+flight and retries a 429 with backoff. Photo URLs are built from `storage` and
+`filepath*`: the API's `fileurl*` always name storage1, where photos stored
+elsewhere 404. The viewer (`viewer.js`) shows a flat photo's 1280 px rendition,
+then a 2,560 px one from the image proxy (`pr:sharp/rs:fit:W:H/<base64url>`),
+and a 360° photo's equirectangular `wrapped_proc` image (13,000 px wide
+upstream) resized to 1,024 then 4,096 px on `panorama.js`, a single-triangle
+WebGL renderer (image centre = the camera heading; drag, wheel). Without WebGL
+a 360° photo shows its front view. FIT / FILL hide for panoramas
+(`supportsRenderModes`). The caption has no place name (KartaView's is where
+the drive began) and links to the full-size photo, since kartaview.org's photo
+pages fail for signed-out visitors.
 
 Street Level has two browser gates. `npm run qa:street-level -- --url <server>`
 runs against real Mapillary and needs `MAPILLARY_CLIENT_TOKEN`. `npm run

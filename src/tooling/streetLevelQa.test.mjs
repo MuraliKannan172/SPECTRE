@@ -20,6 +20,15 @@ import {
   THUMB_HOST,
 } from '../../scripts/fixtures/street-level/mapillaryGraph.mjs';
 import { redact } from '../../scripts/qa-browserEvidence.mjs';
+import {
+  answerKartaViewRequest,
+  describeKartaViewCall,
+  KV_LINE,
+  KV_SEQUENCE_ID,
+  kartaViewPhotos,
+} from '../../scripts/fixtures/street-level/kartaView.mjs';
+import { lonToTileX, latToTileY } from '../layers/streetLevel/tileMath.js';
+import { normalizePhoto } from '../layers/streetLevel/providers/kartaview/policy.js';
 
 // The press helpers wait for paint; Node has no frames, so a tick stands in.
 globalThis.requestAnimationFrame ??= (callback) =>
@@ -637,5 +646,54 @@ test('CI runs the gates hermetically against a production build, strict, with ev
     gate,
     /QA_FAIL_ON_RETRY: '1'/,
     'a missed header press fails CI now that the rail settles',
+  );
+});
+
+test('KartaView fixtures draw the drive, answer nearest first, and refuse the storage host the API names', () => {
+  const body = (answer) => JSON.parse(answer.body);
+  const lat = (KV_LINE.south + KV_LINE.north) / 2;
+  const x = lonToTileX(KV_LINE.lon, 14);
+  const y = latToTileY(lat, 14);
+  const tile = answerKartaViewRequest({
+    method: 'GET',
+    url: `https://api.kartaview.org/2.0/sequence/tiles/${x}/${y}/14.json`,
+  });
+  assert.equal(tile.known, true);
+  assert.ok(body(tile).lines.length >= 1);
+  const empty = answerKartaViewRequest({
+    method: 'GET',
+    url: `https://api.kartaview.org/2.0/sequence/tiles/${x + 3}/${y}/14.json`,
+  });
+  assert.deepEqual(body(empty).lines, []);
+  const near = answerKartaViewRequest({
+    method: 'GET',
+    url: `https://api.kartaview.org/2.0/photo/?lat=${lat}&lng=${KV_LINE.lon + 0.0001}&zoomLevel=18&itemsPerPage=10`,
+  });
+  const records = body(near).result.data;
+  assert.ok(records.length > 1);
+  assert.ok(Number(records[0].distance) <= Number(records[1].distance));
+  const photo = normalizePhoto(records[0]);
+  assert.match(photo.urls.view, /^https:\/\/storage2\.openstreetcam\.org\//);
+  assert.equal(
+    answerKartaViewRequest({ method: 'GET', url: photo.urls.view }).known,
+    true,
+  );
+  assert.equal(
+    answerKartaViewRequest({ method: 'GET', url: records[0].fileurlLTh }).known,
+    false,
+    'the storage1 address the API gives is not where the photo is',
+  );
+  const page = answerKartaViewRequest({
+    method: 'GET',
+    url: `https://api.kartaview.org/2.0/sequence/${KV_SEQUENCE_ID}/photos?page=1&itemsPerPage=1000`,
+  });
+  assert.equal(body(page).result.data.length, kartaViewPhotos().length);
+  assert.ok(kartaViewPhotos().some((p) => p.isPano));
+  assert.equal(
+    describeKartaViewCall(
+      'GET',
+      new URL('https://api.kartaview.org/2.0/photo/77000001'),
+    ),
+    'GET api.kartaview.org/2.0/photo/{id}',
   );
 });

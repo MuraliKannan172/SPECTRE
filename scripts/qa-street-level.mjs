@@ -3,8 +3,8 @@
  * Browser QA for the Street Level layer against a running server. Run with
  * `npm run qa:street-level -- --url http://localhost:4173`.
  *
- * `--fixtures` (the CI mode) answers every *.mapillary.com request from
- * fixtures, so nothing reaches Mapillary. The server still needs a token
+ * `--fixtures` (the CI mode) answers every *.mapillary.com and KartaView
+ * request from fixtures, so nothing reaches Mapillary or KartaView. The server still needs a token
  * because the bundle carries it; CI uses a dummy one. Fixture runs also stage
  * a rejected key and a keyless second server.
  *
@@ -37,6 +37,13 @@ import {
   PHOTO_SEQUENCE_ID,
   photoImages,
 } from './fixtures/street-level/mapillaryGraph.mjs';
+import {
+  answerKartaViewRequest,
+  describeKartaViewCall,
+  KV_LINE,
+  KV_SEQUENCE_ID,
+  kartaViewPhotos,
+} from './fixtures/street-level/kartaView.mjs';
 
 const PANEL_ID = 'street-level-panel';
 
@@ -49,7 +56,11 @@ export const VIEWPORTS = Object.freeze([
 ]);
 
 /** Provider chips the panel must show, in order. */
-export const EXPECTED_PROVIDERS = Object.freeze(['mapillary', 'google']);
+export const EXPECTED_PROVIDERS = Object.freeze([
+  'mapillary',
+  'google',
+  'kartaview',
+]);
 
 /**
  * Skips no setup can avoid: CI forks have no Google key (so neither Google 3D
@@ -229,6 +240,9 @@ export async function serveFixtures(page, fixture) {
     patterns: [
       { urlPattern: '*://*.mapillary.com/*' },
       { urlPattern: '*/api/mapillary/*' },
+      { urlPattern: '*://api.kartaview.org/*' },
+      { urlPattern: '*://cdn.kartaview.org/*' },
+      { urlPattern: '*://*.openstreetcam.org/*' },
     ],
   });
   const fulfil = (requestId, { status, headers = {}, contentType, body }) =>
@@ -257,6 +271,11 @@ export async function serveFixtures(page, fixture) {
         url: request.url,
         images: fixture.images,
       });
+      fixture.calls.add(call);
+      if (!answer.known) fixture.unknown.push(call);
+    } else if (/(^|\.)(kartaview|openstreetcam)\.org$/.test(address.hostname)) {
+      const call = describeKartaViewCall(method, address);
+      answer = answerKartaViewRequest({ method, url: request.url });
       fixture.calls.add(call);
       if (!answer.known) fixture.unknown.push(call);
     } else if (
@@ -725,6 +744,253 @@ async function main() {
     console.log(
       `${count} steps: ${count - skips.length} ok, ${skips.length} skipped`,
     );
+
+    /**
+     * KartaView: keyless coverage from its JSON tiles, a line click opening
+     * the nearest photo, cones along the drive, › and a 360° photo. Runs on a
+     * draped map so a line is where it is drawn; leaves Mapillary lit.
+     */
+    async function kartaViewSteps() {
+      const ui = () =>
+        page.evaluate(() =>
+          window.__godsEyeView.dataManager.layers
+            .get('street-level')
+            .module.getUIState(),
+        );
+      const uiUntil = (test, arg = null, options) =>
+        settle(
+          page,
+          `(${test})(window.__godsEyeView.dataManager.layers.get('street-level').module.getUIState(), ${JSON.stringify(arg)})`,
+          undefined,
+          options,
+        );
+      const lit = (id) =>
+        uiUntil(
+          (u, want) =>
+            u.providers.find((p) => p.id === want)?.on === true &&
+            u.providers.filter((p) => p.on).length === 1,
+          id,
+        );
+      const stack = () =>
+        page.evaluate(() =>
+          window.__godsEyeView.mapStackController.getActiveId(),
+        );
+      const setStack = async (id) => {
+        await page.evaluate(
+          (stackId) =>
+            window.__godsEyeView.mapStackController.setStack(stackId),
+          id,
+        );
+        await settle(
+          page,
+          (stackId) =>
+            window.__godsEyeView.mapStackController.getActiveId() === stackId,
+          id,
+        );
+      };
+      const kvChip = '#sl-provider-chips [data-chip-id="kartaview"]';
+      const original = await stack();
+      const photos = kartaViewPhotos();
+      await page.evaluate(() =>
+        window.__godsEyeView.dataManager.layers
+          .get('street-level')
+          .module.closeViewer(),
+      );
+      await setStack('esri-imagery');
+      // Over the fixture drive, looking down: its line is mid-screen.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await page.evaluate((at) => {
+          const v = window.__godsEyeView.viewer;
+          v.camera.cancelFlight?.();
+          const C = v.camera.positionCartographic.constructor;
+          v.camera.setView({
+            destination: v.scene.globe.ellipsoid.cartographicToCartesian(
+              C.fromDegrees(at.lon, at.lat, at.height),
+            ),
+            orientation: { heading: 0, pitch: at.pitch, roll: 0 },
+          });
+        }, PARK);
+        await sleep(1000);
+      }
+      await step(
+        'KartaView: its chip draws keyless coverage, credits KartaView and hides the filters',
+        async () => {
+          await clickPanelControl(page, kvChip);
+          assert.ok(await lit('kartaview'), 'KartaView alone is lit');
+          await waitForCoverage(page);
+          const u = await ui();
+          assert.equal(u.keyRequired, false);
+          assert.deepEqual(u.filterControls, { pano: false, since: false });
+          assert.equal(
+            await page.$eval(kvChip, (chip) =>
+              chip.style.getPropertyValue('--chip-color'),
+            ),
+            '#635bff',
+          );
+          assert.match(
+            await page.$eval('#sl-coverage-meta', (node) => node.textContent),
+            /streets in view · click a line for its nearest photo/,
+          );
+          await page.waitForFunction(
+            () =>
+              document.body.innerHTML.includes('KartaView</a> contributors'),
+            { timeout: 15_000 },
+          );
+          assert.ok(
+            await settle(page, () =>
+              (new URLSearchParams(location.hash.slice(1)).get('lo') || '')
+                .split('_')
+                .some(
+                  (entry) =>
+                    entry.startsWith('0.') && entry.includes('kartaview-1'),
+                ),
+            ),
+            `the share link lights KartaView: ${await page.evaluate(() => location.hash)}`,
+          );
+        },
+      );
+      await step(
+        'KartaView: a click on a line opens the nearest photo, cones follow its drive, and › steps along it',
+        async ({ skip }) => {
+          const along = Array.from({ length: 9 }, (_, i) => [
+            KV_LINE.lon,
+            KV_LINE.south + ((i + 2) / 13) * (KV_LINE.north - KV_LINE.south),
+          ]);
+          const handle = await page
+            .waitForFunction(
+              findPickPoint,
+              { timeout: 30_000, polling: 250 },
+              {
+                prefix: 'kv:line:',
+                id: null,
+                points: fixtures ? along : null,
+                billboardIds: null,
+              },
+            )
+            .catch(() => null);
+          if (!handle && !fixtures) return skip('no KartaView line in view');
+          assert.ok(handle, 'a KartaView line is pickable');
+          const at = await handle.jsonValue();
+          await page.mouse.click(at.x, at.y);
+          await page.waitForFunction(
+            () => {
+              const s = window.__godsEyeView.dataManager.layers
+                .get('street-level')
+                .module.getUIState().street;
+              return (s.imageId && !s.loading) || s.error;
+            },
+            { timeout: 60_000 },
+          );
+          const street = (await ui()).street;
+          if (!fixtures && /No street-level imagery/.test(street.error || ''))
+            return skip('no KartaView photo near the line');
+          assert.equal(street.error, null, `viewer error: ${street.error}`);
+          assert.equal(street.providerId, 'kartaview');
+          assert.equal(street.renderModes, true, 'FIT / FILL for a flat photo');
+          assert.ok(
+            await settle(page, () => {
+              const img = document.querySelector('.sl-kv-photo');
+              return img && !img.hidden && img.naturalWidth > 0;
+            }),
+            'the photo is on screen',
+          );
+          if (fixtures) {
+            assert.ok(
+              photos.some((photo) => photo.id === street.imageId),
+              `${street.imageId} is a fixture photo`,
+            );
+            assert.ok(
+              await uiUntil(
+                (u, want) =>
+                  u.sequence.selectedId === want.id &&
+                  !u.sequence.loading &&
+                  u.sequence.images === want.count,
+                { id: KV_SEQUENCE_ID, count: photos.length },
+                { timeout: 30_000 },
+              ),
+              `cones for the whole drive: ${JSON.stringify((await ui()).sequence)}`,
+            );
+          }
+          const before = street.imageId;
+          await clickPanelControl(page, '.sl-kv-step-next');
+          assert.ok(
+            await uiUntil(
+              (u, was) =>
+                u.street.imageId && u.street.imageId !== was && !u.street.error,
+              before,
+              { timeout: 30_000 },
+            ),
+            '› opened the next photo',
+          );
+          if (fixtures)
+            assert.equal(
+              (await ui()).street.imageId,
+              String(Number(before) + 1),
+              'the next photo along the drive',
+            );
+        },
+      );
+      if (fixtures)
+        await step(
+          'KartaView: a 360° photo opens on the panorama without FIT / FILL, and dragging turns it',
+          async () => {
+            const pano = photos.find((photo) => photo.isPano);
+            await page.evaluate((id) => {
+              void window.__godsEyeView.dataManager.layers
+                .get('street-level')
+                .module.openImage('kartaview', id);
+            }, pano.id);
+            assert.ok(
+              await uiUntil(
+                (u, want) =>
+                  u.street.imageId === want &&
+                  !u.street.loading &&
+                  u.street.isPano,
+                pano.id,
+                { timeout: 60_000 },
+              ),
+              `the panorama opened: ${JSON.stringify((await ui()).street)}`,
+            );
+            const u = await ui();
+            assert.equal(u.street.error, null);
+            assert.equal(u.street.renderModes, false, 'no frame to fit');
+            assert.equal(
+              await page.$eval('.sl-kv-pano', (canvas) => canvas.hidden),
+              false,
+            );
+            const box = await page.$eval('.sl-kv-pano', (canvas) => {
+              const r = canvas.getBoundingClientRect();
+              return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+            });
+            const bearing = u.street.bearing;
+            await page.mouse.move(box.x, box.y);
+            await page.mouse.down();
+            for (let i = 1; i <= 8; i++)
+              await page.mouse.move(box.x - i * 15, box.y);
+            await page.mouse.up();
+            assert.ok(
+              await uiUntil((v, was) => v.street.bearing !== was, bearing),
+              'dragging the panorama turned its bearing',
+            );
+          },
+        );
+      else
+        await skipStep(
+          'fixtures only',
+          'KartaView: a 360° photo opens on the panorama without FIT / FILL, and dragging turns it',
+        );
+      await page.evaluate(() =>
+        window.__godsEyeView.dataManager.layers
+          .get('street-level')
+          .module.closeViewer(),
+      );
+      await clickPanelControl(
+        page,
+        '#sl-provider-chips [data-chip-id="mapillary"]',
+      );
+      assert.ok(await lit('mapillary'), 'Mapillary is lit again');
+      await setStack(original);
+    }
 
     async function keyedSteps() {
       // A late startup flight only shows itself by moving the camera, so park
@@ -1803,16 +2069,24 @@ async function main() {
             credit: false,
             button: false,
           });
-          // Street View rides the shared provider-switch field (r).
+          // Street View rides the shared provider-switch field (r), beside
+          // the other providers' switches a chip click recorded.
           const option = `${STREET_LEVEL_TOKEN}.r.google-1`;
           assert.ok(
             await settle(
               page,
-              (token) =>
+              (prefix) =>
                 (new URLSearchParams(location.hash.slice(1)).get('lo') || '')
                   .split('_')
-                  .includes(token),
-              option,
+                  .some(
+                    (entry) =>
+                      entry.startsWith(prefix) &&
+                      entry
+                        .slice(prefix.length)
+                        .split('*')
+                        .includes('google-1'),
+                  ),
+              `${STREET_LEVEL_TOKEN}.r.`,
               // The link is written once the view rests for 500 ms; under a
               // software renderer with a photo open that can take a while.
               { timeout: 30_000 },
@@ -2026,6 +2300,7 @@ async function main() {
           }
         },
       );
+      await kartaViewSteps();
       await step(
         'a reload with the layer on keeps a collapsed panel collapsed, and the share link carries its ui token',
         async () => {
@@ -2108,7 +2383,7 @@ async function main() {
         );
       if (fixtures)
         await step(
-          'every Mapillary request was answered from a fixture',
+          'every Mapillary and KartaView request was answered from a fixture',
           () => {
             console.log(
               `  (answered: ${[...fixture.calls].sort().join(' | ')})`,

@@ -933,6 +933,7 @@
   "src/tooling/streetLevelQa.test.mjs",
   "scripts/qa-browserEvidence.mjs",
   "scripts/fixtures/street-level/mapillaryGraph.mjs",
+  "scripts/fixtures/street-level/kartaView.mjs",
   "src/layers/streetLevel/filter.test.mjs",
   "src/layers/streetLevel/registry.test.mjs",
   "src/layers/streetLevel/params.test.mjs",

@@ -95,6 +95,18 @@
 
 ## [Unreleased]
 
+- Street Level: KartaView is the third provider, keyless. Light its chip
+  (purple; off by default, one provider at a time) and zoom in below about
+  6 km: the lines are the streets KartaView has photos of (z13–14 tiles from
+  `api.kartaview.org`). A click on a line opens the photo nearest the click
+  without moving the camera, flat or 360° (a small WebGL panorama: drag to
+  look, wheel to zoom), with cones along its drive and ‹ › / ← → to step
+  through it. The caption links to the full-size photo (KartaView's photo
+  pages fail for signed-out visitors), and the globe credits "© KartaView
+  contributors, CC BY-SA 4.0". Share links carry it as `r.kartaview-1`.
+  Mapillary's line coverage and sequence cones are now shared by both
+  (`lineCoverage.js`, `sequenceCones.js`).
+
 - Street Level: Google Street View is the second provider. On the Google 3D
   map (Google's terms keep it off other maps), light its chip (off by
   default: every panorama is billed to the Google Maps key, which needs the
