@@ -440,8 +440,14 @@ export function createKartaViewProvider({
             if (metres <= NEAREST_RADIUS_M) near.push({ photo, metres });
           }
           near.sort((a, b) => a.metres - b.metres);
-          for (const { photo } of near.slice(0, NEAREST_PROBES))
-            if (await showable(photo, { signal })) return photo.id;
+          // Probed side by side (photo storage is not the API host): the
+          // nearest one that answers wins.
+          const candidates = near.slice(0, NEAREST_PROBES);
+          const answers = await Promise.all(
+            candidates.map(({ photo }) => showable(photo, { signal })),
+          );
+          const hit = candidates.find((_, i) => answers[i]);
+          if (hit) return hit.photo.id;
           if (near.length) throw new Error(ARCHIVED_MESSAGE);
           return null;
         },

@@ -71,8 +71,8 @@ export const PAGE_TIMEOUT_MS = 30_000;
 export const IMAGE_TIMEOUT_MS = 15_000;
 /** Whether a photo file is there (not archived): headers only. */
 export const IMAGE_PROBE_TIMEOUT_MS = 8_000;
-/** Nearest photos tried before giving up on archived ones. */
-export const NEAREST_PROBES = 4;
+/** Nearest photos probed (at once) before giving up on archived ones; ‹ › skip this many. */
+export const NEAREST_PROBES = 6;
 export const ARCHIVED_MESSAGE =
   'KartaView’s photos here are archived and cannot be shown';
 
