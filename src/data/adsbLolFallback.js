@@ -43,7 +43,14 @@ export function normalizeAdsbLolAircraftState(aircraft, nowSeconds) {
     .toLowerCase();
   const latitude = finiteNumber(aircraft?.lat);
   const longitude = finiteNumber(aircraft?.lon);
-  if (!hex || latitude === null || longitude === null) return null;
+  if (
+    !hex ||
+    latitude === null ||
+    longitude === null ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  )
+    return null;
 
   const seenPosition = Math.max(
     0,
@@ -95,21 +102,24 @@ export function normalizeAdsbLolPointResponse(payload) {
           responseNow > 10_000_000_000 ? responseNow / 1000 : responseNow,
         );
   const aircraft = Array.isArray(payload?.ac) ? payload.ac : [];
-  const states = aircraft
-    .map((aircraft) => normalizeAdsbLolAircraftState(aircraft, nowSeconds))
-    .filter(Boolean);
+  const states = [];
   // Keep the OpenSky vectors unchanged. The regional fallback's extra readsb
   // status travels alongside them, keyed only to admitted aircraft.
-  const admitted = new Set(states.map((row) => row[0]));
-  const emergencyByIcao = Object.fromEntries(
-    aircraft.flatMap((row) => {
-      const id = String(row?.hex || '')
-        .trim()
-        .toLowerCase();
-      if (!admitted.has(id) || typeof row?.emergency !== 'string') return [];
-      return [[id, row.emergency.trim().toLowerCase()]];
-    }),
-  );
+  const admitted = new Set();
+  const statuses = [];
+  for (const row of aircraft) {
+    const state = normalizeAdsbLolAircraftState(row, nowSeconds);
+    if (!state) continue;
+    states.push(state);
+    // The live contract admits the first valid vector for each ICAO. Its
+    // status must come from that same row, never an invalid or later duplicate.
+    const id = state[0];
+    if (admitted.has(id)) continue;
+    admitted.add(id);
+    if (typeof row.emergency === 'string')
+      statuses.push([id, row.emergency.trim().toLowerCase()]);
+  }
+  const emergencyByIcao = Object.fromEntries(statuses);
   return {
     time: nowSeconds,
     states,

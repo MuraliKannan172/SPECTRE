@@ -16,6 +16,25 @@ import { createGevActionRunner } from '../voice/gevActions.js';
 
 const NOW_MS = 1800000000000;
 
+test('fallback status belongs to the first valid admitted aircraft row', () => {
+  const valid = { hex: 'a1b2c3', lat: 30, lon: -97, squawk: '1200' };
+  for (const status of [undefined, 'general', 'none']) {
+    const payload = normalizeAdsbLolPointResponse({
+      now: NOW_MS,
+      ac: [
+        { ...valid, lat: 100, emergency: 'general' },
+        { ...valid, emergency: status },
+        { ...valid, lat: null, emergency: 'general' },
+        { ...valid, emergency: status === 'general' ? 'none' : 'general' },
+      ],
+    });
+    const snapshot = openSkySnapshot(payload, { now: NOW_MS });
+    assert.equal(snapshot.records.length, 1);
+    assert.equal(snapshot.records[0].emergency, status ?? null);
+    assert.equal(snapshot.records[0].latitude, 30);
+  }
+});
+
 function civilStore() {
   return new FlightRecords({
     geoidHeight: () => 0,
