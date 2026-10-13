@@ -50,6 +50,26 @@ export function extractStationsArray(payload) {
   return [];
 }
 
+/** Read legacy text or a GBFS v3 Localized String, preferring usable English text. */
+function stationName(value) {
+  if (typeof value === 'string') return value.trim();
+  if (!Array.isArray(value)) return '';
+
+  let fallback = '';
+  for (const translation of value) {
+    if (typeof translation?.text !== 'string') continue;
+    const text = translation.text.trim();
+    if (!text) continue;
+    if (!fallback) fallback = text;
+    if (
+      typeof translation.language === 'string' &&
+      /^en(?:-|$)/i.test(translation.language.trim())
+    )
+      return text;
+  }
+  return fallback;
+}
+
 /**
  * Parse a GBFS station_information payload into a Map of station metadata.
  * Handles field-name variations across different GBFS providers
@@ -69,21 +89,9 @@ export function parseStationInformation(payload) {
     const lon = Number(raw?.lon ?? raw?.longitude);
     if (!stationId || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
-    let name;
-    if (payload?.version >= 3) {
-      const handleLocalizedString = (array) =>
-        array.find((localizedString) =>
-          localizedString.language.toLowerCase() === 'en') || array[0];
-      name = String(
-        handleLocalizedString(raw?.name).text ||
-        handleLocalizedString(raw?.short_name).text || '').trim();
-    } else {
-      name = String(raw?.name || raw?.short_name || '').trim();
-    }
-
     stationMap.set(stationId, {
       stationId,
-      name,
+      name: stationName(raw?.name) || stationName(raw?.short_name),
       lat,
       lon,
       capacity: toNonNegativeInteger(raw?.capacity),
