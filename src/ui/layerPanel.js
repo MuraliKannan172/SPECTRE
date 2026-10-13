@@ -3,7 +3,7 @@ import { syncRowList } from './rowList.js';
 import { layerFeedState } from '../data/feedState.js';
 export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
-import { keySetupRequirementEnvVars } from '../keySetupCore.mjs';
+import { keyRequirementText, withKeyAlternatives } from './keyGuidance.js';
 import { createWeatherPanel } from './weatherPanel.js';
 import { t, msg } from '../i18n/index.js';
 
@@ -142,12 +142,11 @@ function panelLabel(layer) {
 export function layerKeyRequirementTooltip(layer = {}) {
   if (layer?.stats?.keyRequired !== true) return '';
   const requiresKeyId = String(layer.requiresKeyId || '').trim();
-  const envVars = requiresKeyId
-    ? keySetupRequirementEnvVars(requiresKeyId)
-    : null;
-  return envVars
-    ? t('Needs {envVars} — add it in Provider Settings', { envVars })
-    : '';
+  // A layer with several sources also names the ones it could use instead.
+  return withKeyAlternatives(
+    requiresKeyId ? keyRequirementText(requiresKeyId) : '',
+    layer.stats.keyAlternatives || [],
+  );
 }
 
 /** Layer row presentation over supplied state and actions; no layer imports. */

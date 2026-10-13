@@ -40,7 +40,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   Object.freeze({
     id: 'google-maps',
     title: 'GOOGLE MAPS',
-    unlocks: msg('The photorealistic 3D planet + place search'),
+    unlocks: msg('The photorealistic 3D planet, place search + Street View'),
     getUrl: 'https://developers.google.com/maps/documentation/tile/get-api-key',
     envVars: Object.freeze(['GOOGLE_MAPS_API_KEY']),
     tier: 'metered',
@@ -370,6 +370,50 @@ export function keySetupRequirement(id) {
   const entry = KEY_SETUP_KEYS.find((candidate) => candidate.id === id);
   if (!entry || entry.hidden) return '';
   return `Needs ${entry.envVars.join(' + ')} — add it in Provider Settings`;
+}
+
+/**
+ * Key guidance that also names switched-off sources whose key is already set.
+ * @param {string} requirement What `keySetupRequirement` said ('' allowed).
+ * @param {Array<{label: string, requiresKeyId?: string|null}>} [alternatives]
+ */
+export function keySetupWithAlternatives(requirement, alternatives = []) {
+  const options = alternatives.map(({ label, requiresKeyId }) => {
+    const entry = KEY_SETUP_KEYS.find(
+      (candidate) => candidate.id === requiresKeyId,
+    );
+    const name = entry
+      ? entry.title
+          .toLowerCase()
+          .replace(/\b\w/g, (letter) => letter.toUpperCase())
+      : null;
+    return name ? `light ${label} to use your ${name} key` : `light ${label}`;
+  });
+  if (!options.length) return requirement;
+  const offer = `or ${options.join(', or ')}`;
+  return requirement ? `${requirement}, ${offer}` : offer.replace(/^or l/, 'L');
+}
+
+/**
+ * Alternative sources plus the registry name of the key each would use, as
+ * machine values for presentation layers that localize the guidance sentence
+ * themselves (this module also runs in node-side key-setup builds, which stay
+ * English).
+ * @param {Array<{label: string, requiresKeyId?: string|null}>} [alternatives]
+ * @returns {Array<{label: string, name: string|null}>}
+ */
+export function keySetupAlternativeKeyNames(alternatives = []) {
+  return alternatives.map(({ label, requiresKeyId }) => {
+    const entry = KEY_SETUP_KEYS.find(
+      (candidate) => candidate.id === requiresKeyId,
+    );
+    const name = entry
+      ? entry.title
+          .toLowerCase()
+          .replace(/\b\w/g, (letter) => letter.toUpperCase())
+      : null;
+    return { label, name };
+  });
 }
 
 /**
