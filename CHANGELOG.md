@@ -1,5 +1,11 @@
 # Changelog
 
+- A failed Esri Satellite or keyless terrain load still shows OSM or flat terrain
+  at once, but no longer lasts the whole session: while the fallback is on
+  screen, the real provider is retried in the background (30 seconds, doubling
+  to a 10-minute cap) and replaces it live once it loads. Map switches never
+  wait for a retry.
+
 - Add Barcelona's bike share to the GBFS registry: Bicing (543 stations, the
   city's PBSC system) and AMBici (237 e-bike stations across the metropolitan
   area, run by nextbike). Both are keyless GBFS 2.3 feeds listed in
