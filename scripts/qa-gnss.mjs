@@ -239,23 +239,37 @@ function fixturePayload() {
 }
 
 /** Answer /api/gnss-integrity in-page from `fixturePayload()`. */
-async function stubRoute(page, { ageMs = 0 } = {}) {
+async function stubRoute(page, { ageMs = 0, initialFailures = 0, stale } = {}) {
   await page.evaluateOnNewDocument(
-    (payload, age) => {
+    (payload, age, failures, staleOverride) => {
       window.__gnssQaAgeMs = age;
       window.__gnssQaRequests = [];
+      window.__gnssQaFailures = failures;
       const realFetch = window.fetch.bind(window);
       window.__gnssQaMode = 'fixture';
       window.fetch = (input, init) => {
         const url = typeof input === 'string' ? input : input?.url || '';
         if (!url.includes('/api/gnss-integrity')) return realFetch(input, init);
         window.__gnssQaRequests.push(url);
+        if (window.__gnssQaFailures > 0) {
+          window.__gnssQaFailures--;
+          return Promise.resolve(
+            Response.json(
+              { error: 'rate_limited' },
+              {
+                status: 429,
+                headers: { 'Retry-After': '5' },
+              },
+            ),
+          );
+        }
         const ok = window.__gnssQaMode === 'fixture';
         const body = ok
           ? {
               ...payload,
               fetchedAt: Date.now() - (window.__gnssQaAgeMs || 0),
               ageMs: window.__gnssQaAgeMs || 0,
+              stale: staleOverride ?? payload.stale,
             }
           : { error: 'gnss_integrity_unavailable' };
         return Promise.resolve(
@@ -268,6 +282,8 @@ async function stubRoute(page, { ageMs = 0 } = {}) {
     },
     fixturePayload(),
     ageMs,
+    initialFailures,
+    stale,
   );
 }
 
@@ -701,6 +717,82 @@ async function main() {
     );
     await phone.screenshot({ path: path.join(SHOTS_DIR, 'gnss-phone.png') });
     await phone.close();
+
+    console.log(
+      '\nSTARTUP — initial rate limit stays enabled and recovers automatically...',
+    );
+    const retry = await browser.newPage();
+    await retry.setViewport({ width: 1440, height: 900 });
+    retry.on('pageerror', (e) => errors.push(e.message));
+    await stubRoute(retry, { initialFailures: 1, stale: false });
+    await boot(retry, { lon: 18.6, lat: 54.6, height: 450_000 });
+    await showLayerRow(retry);
+    await retry.evaluate((id) => {
+      window.__gnssQaFailedStarts = 0;
+      window.__godsEyeView.dataManager.subscribe((change) => {
+        if (change.layerId === id && change.type === 'visibility-failed')
+          window.__gnssQaFailedStarts++;
+      });
+    }, LAYER_ID);
+    const initial = await enableAndSettle(retry);
+    const limited = await retry.evaluate((id) => {
+      const dm = window.__godsEyeView.dataManager;
+      const row = document.querySelector(`[data-layer-id="${id}"]`);
+      return {
+        enabled: dm.isEnabled(id),
+        failedStarts: window.__gnssQaFailedStarts,
+        label: row.querySelector('.data-toggle-btn').textContent,
+        info: row.querySelector('.data-toggle-controls-info').textContent,
+      };
+    }, LAYER_ID);
+    record(
+      'STARTUP: first 429 keeps the layer enabled and shows automatic retry timing',
+      limited.enabled &&
+        limited.failedStarts === 0 &&
+        limited.label === 'UNAVAILABLE' &&
+        initial.stats.count === 0 &&
+        initial.stats.retryInSec > 0 &&
+        /rate limited.*Retrying automatically at/.test(limited.info),
+      JSON.stringify(limited),
+    );
+    await retry.screenshot({
+      path: path.join(SHOTS_DIR, 'gnss-startup-retrying.png'),
+    });
+    await retry.waitForFunction(
+      (id) => {
+        const layer = window.__godsEyeView.dataManager.layers.get(id);
+        return (
+          layer.enabled &&
+          layer.module.getStats().error === null &&
+          layer.module.getStats().count === 4
+        );
+      },
+      { timeout: 20000 },
+      LAYER_ID,
+    );
+    const recovered = await retry.evaluate(
+      (id) => ({
+        requests: window.__gnssQaRequests.length,
+        enabled: window.__godsEyeView.dataManager.isEnabled(id),
+        label: document.querySelector(
+          `[data-layer-id="${id}"] .data-toggle-btn`,
+        ).textContent,
+        info: document.querySelector(
+          `[data-layer-id="${id}"] .data-toggle-controls-info`,
+        ).textContent,
+      }),
+      LAYER_ID,
+    );
+    record(
+      'STARTUP: one automatic retry recovers to ON without toggling and clears the warning',
+      recovered.enabled &&
+        recovered.requests === 2 &&
+        recovered.label === 'ON' &&
+        !/Retrying/.test(recovered.info),
+      JSON.stringify(recovered),
+    );
+    await shoot(retry, 'startup-recovered');
+    await retry.close();
 
     // ── (vii) AGE ─────────────────────────────────────────────────────────
     console.log(

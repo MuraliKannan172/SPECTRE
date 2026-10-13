@@ -73,12 +73,15 @@ export function createGnssIntegrityLayer({
   let _stale = false;
   let _manager = null;
   let _cameraTimer = null;
-  let _cameraRefresh = null;
+  let _backgroundRefresh = null;
   let _lastQueryKey = null;
   let _lastRequestAt = -Infinity;
   let _removeCameraEnd = null;
   let _removeCameraChanged = null;
   let _coverage = null;
+  let _retryTimer = null;
+  let _retryAt = 0;
+  let _failureCount = 0;
   const _observations = new Map();
   const provenance = gnssProvenance({ windowMs });
 
@@ -89,6 +92,7 @@ export function createGnssIntegrityLayer({
 
   function scheduleCameraRefresh() {
     if (!_enabled || !_dataSource) return;
+    if (now() < _retryAt) return;
     const key = queryKey(viewAnchor(_viewer));
     if (!key || key === _lastQueryKey) return;
     clearTimeout(_cameraTimer);
@@ -97,32 +101,46 @@ export function createGnssIntegrityLayer({
     _cameraTimer = setTimeout(
       async () => {
         _cameraTimer = null;
-        if (!_enabled || _cameraRefresh) return;
+        if (!_enabled || _backgroundRefresh) return;
         const key = queryKey(viewAnchor(_viewer));
         if (!key || key === _lastQueryKey) return;
-        const controller = new AbortController();
-        _cameraRefresh = controller;
-        try {
-          if (_manager) {
-            // Use the normal refresh lane so counts, loading/errors and render
-            // demand settle together; wait out an older periodic request.
-            await _manager.refreshLayer(layer.id, {
-              signal: controller.signal,
-            });
-          } else {
-            await layer.update(undefined, { signal: controller.signal });
-          }
-        } finally {
-          if (_cameraRefresh === controller) {
-            _cameraRefresh = null;
-            // Movement during an in-flight request is folded into one update
-            // for the latest view, rather than lost until the minute tick.
-            scheduleCameraRefresh();
-          }
-        }
+        await refreshInBackground();
       },
       Math.max(600, 2500 - (now() - _lastRequestAt)),
     );
+  }
+
+  async function refreshInBackground() {
+    if (!_enabled || _backgroundRefresh) return;
+    const controller = new AbortController();
+    _backgroundRefresh = controller;
+    try {
+      if (_manager)
+        await _manager.refreshLayer(layer.id, { signal: controller.signal });
+      else await layer.update(undefined, { signal: controller.signal });
+    } finally {
+      if (_backgroundRefresh === controller) {
+        _backgroundRefresh = null;
+        scheduleCameraRefresh();
+        scheduleRetry();
+      }
+    }
+  }
+
+  function scheduleRetry() {
+    clearTimeout(_retryTimer);
+    _retryTimer = null;
+    if (!_enabled || !_retryAt) return;
+    // Long provider cooldowns keep their full deadline. Browser timers cannot
+    // exceed ~24 days, so wake in bounded chunks without fetching early.
+    _retryTimer = setTimeout(
+      () => {
+        _retryTimer = null;
+        void refreshInBackground();
+      },
+      Math.min(2147483647, Math.max(0, _retryAt - now())),
+    );
+    _retryTimer?.unref?.();
   }
 
   /** Age the store without new evidence, so expired cells leave the globe. */
@@ -205,8 +223,10 @@ export function createGnssIntegrityLayer({
     disable() {
       clearTimeout(_cameraTimer);
       _cameraTimer = null;
-      _cameraRefresh?.abort();
-      _cameraRefresh = null;
+      clearTimeout(_retryTimer);
+      _retryTimer = null;
+      _backgroundRefresh?.abort();
+      _backgroundRefresh = null;
       _request?.abort();
       _request = null;
       _enabled = false;
@@ -215,6 +235,14 @@ export function createGnssIntegrityLayer({
 
     async update(_viewerArg, { signal } = {}) {
       if (!_enabled || !_dataSource || signal?.aborted) return false;
+      if (now() < _retryAt) {
+        expire();
+        scheduleRetry();
+        return true;
+      }
+      _retryAt = 0;
+      clearTimeout(_retryTimer);
+      _retryTimer = null;
       const anchor = viewAnchor(_viewer);
       // No anchor yet (camera still settling) is not a failure: returning
       // false would make the manager reject the enable. The next interval
@@ -236,12 +264,14 @@ export function createGnssIntegrityLayer({
         longitude: Math.round(anchor.longitude),
         radiusNm: 250,
       };
+      let received = false;
       try {
         const snapshot = await source.getSnapshot(anchor, {
           signal: request.signal,
         });
         if (request.signal.aborted || _request !== request || !_enabled)
           return false;
+        received = true;
         // Date the rows by when the proxy observed them: a cached or stale
         // replay keeps its original age instead of restarting the window.
         // The proxy reports that age, so client and server clocks never mix.
@@ -255,19 +285,37 @@ export function createGnssIntegrityLayer({
         _stale = snapshot.stale === true;
         _lastUpdate = now();
         _lastError = null;
+        _retryAt = 0;
+        _failureCount = 0;
         return true;
       } catch (e) {
         if (request.signal.aborted || _request !== request || !_enabled)
           return false;
+        // A renderer/programming failure remains a real lifecycle failure.
+        // Only acquisition failures are kept enabled for recovery.
+        if (received) throw e;
         console.warn('[Data:GNSS] Fetch error:', e);
         _lastError = e?.message || 'GNSS integrity source unavailable';
         // Keep the last cells only while their evidence is inside the window.
         expire();
-        return false;
+        if (e?.retryable === false) return false;
+        _failureCount = Math.min(3, _failureCount + 1);
+        const delay =
+          Number.isFinite(e?.retryAfterMs) && e.retryAfterMs > 0
+            ? e.retryAfterMs
+            : Math.min(120000, 30000 * 2 ** (_failureCount - 1));
+        _retryAt = Math.max(
+          _retryAt,
+          Math.min(Number.MAX_VALUE, now() + delay),
+        );
+        // Enabling the display succeeded. Stats still report an unavailable
+        // or degraded feed; the manager keeps its normal refresh failure lane.
+        return true;
       } finally {
         signal?.removeEventListener('abort', onAbort);
         if (_request === request) _request = null;
         scheduleCameraRefresh();
+        scheduleRetry();
       }
     },
 
@@ -292,6 +340,8 @@ export function createGnssIntegrityLayer({
       _lastError = null;
       _stale = false;
       _coverage = null;
+      _retryAt = 0;
+      _failureCount = 0;
       _lastQueryKey = null;
       _manager = null;
     },
@@ -299,7 +349,15 @@ export function createGnssIntegrityLayer({
     getRowControls() {
       return {
         chips: [],
-        info: 'Regional sample · 250 nm radius · pan to sample another area',
+        info:
+          'Regional sample · 250 nm radius · pan to sample another area' +
+          (_lastError && _retryAt
+            ? ` · ${_lastError} · Retrying automatically${
+                _retryAt <= 8640000000000000
+                  ? ` at ${new Date(_retryAt).toISOString().slice(11, 19)} UTC`
+                  : ' after provider cooldown'
+              }`
+            : ''),
         infoTitle:
           'Updates automatically after pan or zoom and once a minute. The public feed covers a 250-nautical-mile circle around the view centre; zooming out does not make it a worldwide snapshot. Blank cells have insufficient observations.',
         legend: ['high', 'medium', 'low'].map((level, index) => ({
@@ -320,6 +378,9 @@ export function createGnssIntegrityLayer({
         count: _cells.length,
         lastUpdate: _lastUpdate,
         error: _lastError,
+        retryInSec: _retryAt
+          ? Math.max(0, Math.ceil((_retryAt - now()) / 1000))
+          : null,
         stale: _stale,
         provenance,
         coverage: _coverage,

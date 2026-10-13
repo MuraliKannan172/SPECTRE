@@ -1,8 +1,18 @@
 import { readResponseJsonCapped } from '../../sources/httpBody.js';
 
+function retryDelay(raw, nowMs) {
+  if (!raw) return null;
+  const seconds = Number(raw);
+  const ms = seconds * 1000;
+  if (Number.isFinite(ms) && seconds > 0) return Math.max(5000, ms);
+  const at = Date.parse(raw);
+  return Number.isFinite(at) && at > nowMs ? Math.max(5000, at - nowMs) : null;
+}
+
 /** Request integrity facts around a view anchor through the same-origin adsb.lol proxy. */
 export function createAdsbGnssSource({
   fetchImpl = (...args) => globalThis.fetch(...args),
+  now = () => Date.now(),
 } = {}) {
   return {
     async getSnapshot({ latitude, longitude } = {}, { signal } = {}) {
@@ -16,7 +26,25 @@ export function createAdsbGnssSource({
       const response = await fetchImpl(`/api/gnss-integrity?${params}`, {
         signal,
       });
-      if (!response.ok) throw new Error(`adsb.lol HTTP ${response.status}`);
+      if (!response.ok) {
+        const limited = response.status === 429;
+        const retryAfterMs = retryDelay(
+          response.headers.get('retry-after'),
+          now(),
+        );
+        throw Object.assign(
+          new Error(
+            limited
+              ? 'adsb.lol rate limited (HTTP 429)'
+              : `adsb.lol feed unavailable (HTTP ${response.status})`,
+          ),
+          {
+            status: response.status,
+            retryable: limited || response.status >= 500,
+            retryAfterMs: retryAfterMs ?? (limited ? 60000 : null),
+          },
+        );
+      }
       const payload = await readResponseJsonCapped(
         response,
         4 * 1024 * 1024,

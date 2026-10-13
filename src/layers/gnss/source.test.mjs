@@ -74,3 +74,38 @@ test('the source reports stale proxy data and rejects bad input or responses', a
     ),
   );
 });
+
+test('HTTP failures distinguish rate limiting, preserve Retry-After and classify retryability', async () => {
+  const at = Date.UTC(2026, 9, 13, 12);
+  for (const [status, header, delay, retryable] of [
+    [429, '3600', 3600000, true],
+    [429, new Date(at + 3600000).toUTCString(), 3600000, true],
+    [429, null, 60000, true],
+    [429, 'Infinity', 60000, true],
+    [502, '5', 5000, true],
+    [502, null, null, true],
+    [400, null, null, false],
+  ]) {
+    const source = createAdsbGnssSource({
+      now: () => at,
+      fetchImpl: async () =>
+        Response.json(
+          {},
+          { status, headers: header ? { 'Retry-After': header } : {} },
+        ),
+    });
+    await assert.rejects(
+      source.getSnapshot({ latitude: 50, longitude: 20 }),
+      (e) => {
+        assert.equal(e.status, status);
+        assert.equal(e.retryAfterMs, delay);
+        assert.equal(e.retryable, retryable);
+        assert.match(
+          e.message,
+          status === 429 ? /rate limited/ : /feed unavailable/,
+        );
+        return true;
+      },
+    );
+  }
+});

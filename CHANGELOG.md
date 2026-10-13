@@ -189,6 +189,10 @@
   are navigation-integrity anomalies; suspected GNSS interference is a
   secondary, unvalidated interpretation. The layer and the proxy expose
   machine-readable provenance (`provenance`, `classifier: gev-nic-nacp-v1`).
+  Transient feed failures no longer reject GNSS activation: the layer stays
+  enabled, explains unavailable/degraded feed health and retries automatically.
+  Provider Retry-After deadlines survive movement and toggling; other failures
+  back off for 30/60/120 seconds. Disable/destroy cancels retry work.
   Automatically refreshes after camera pan/zoom without toggling, coalesces
   nearby views, and uses the Earth point under the screen centre at globe scale.
   Keyless regional sampling wherever adsb.lol has receivers; the row labels

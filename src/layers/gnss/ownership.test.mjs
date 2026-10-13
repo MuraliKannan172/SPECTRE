@@ -3,6 +3,7 @@ import test from 'node:test';
 import * as Cesium from 'cesium';
 import { createGnssIntegrityLayer, defaultGnssViewAnchor } from './index.js';
 import { LayerLifecycle } from '../../data/lifecycle.js';
+import { layerFeedState } from '../../data/feedState.js';
 
 const row = (hex, lat, degraded) => ({
   hex,
@@ -281,7 +282,7 @@ test('a failed refresh keeps the last cells and reports the error', async () => 
   await layer.update();
   assert.equal(layer.getStats().stale, true);
   fail = true;
-  assert.equal(await layer.update(), false);
+  assert.equal(await layer.update(), true);
   assert.equal(sources[0].entities.values.length, 1);
   assert.equal(layer.getStats().error, 'adsb.lol HTTP 502');
   assert.equal(layer.getStats().count, 1);
@@ -376,10 +377,10 @@ test('cells expire during prolonged fetch failures', async () => {
   await layer.update();
   fail = true;
   advance(20 * MIN);
-  assert.equal(await layer.update(), false);
+  assert.equal(await layer.update(), true);
   assert.equal(layer.getStats().count, 1, 'still inside the window');
   advance(11 * MIN);
-  assert.equal(await layer.update(), false);
+  assert.equal(await layer.update(), true);
   assert.equal(layer.getStats().count, 0);
   assert.equal(sources[0].entities.values.length, 0);
   assert.equal(layer.getStats().error, 'adsb.lol HTTP 502');
@@ -431,4 +432,126 @@ test('an identical snapshot leaves the drawn entities untouched', async () => {
   await layer.update();
   assert.equal(sources[0].entities.values.length, 1);
   assert.equal(sources[0].entities.values[0], first);
+});
+
+test('an initial feed failure stays enabled, reports unavailable, and recovers automatically', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  let calls = 0;
+  const h = harness(
+    async () => {
+      calls++;
+      if (calls === 1) throw new Error('adsb.lol HTTP 502');
+      return { rows: threeHealthy() };
+    },
+    { initialize: false },
+  );
+  const manager = new LayerLifecycle(h.viewer);
+  manager.register(h.layer);
+  h.layer.attachDataManager(manager);
+  const changes = [];
+  manager.subscribe((c) => changes.push(c.type));
+  assert.equal(await manager.setEnabled(h.layer.id, true), true);
+  assert.equal(manager.isEnabled(h.layer.id), true);
+  assert.equal(layerFeedState(h.layer.getStats()), 'unavailable');
+  assert.equal(h.layer.getStats().retryInSec, 30);
+  assert.match(
+    h.layer.getRowControls().info,
+    /HTTP 502.*Retrying automatically at/,
+  );
+  assert.equal(changes.includes('visibility-failed'), false);
+  assert.equal(
+    await manager.refreshLayer(h.layer.id),
+    false,
+    'feed remains honestly unhealthy during cooldown',
+  );
+  assert.equal(calls, 1, 'a manual refresh cannot bypass cooldown');
+  h.advance(30000);
+  t.mock.timers.tick(30000);
+  await flush();
+  assert.equal(calls, 2);
+  assert.equal(manager.isEnabled(h.layer.id), true);
+  assert.equal(layerFeedState(h.layer.getStats()), 'nominal');
+  assert.equal(h.layer.getStats().count, 1);
+  assert.equal(h.layer.getStats().retryInSec, null);
+  assert.doesNotMatch(h.layer.getRowControls().info, /Retrying/);
+  await manager.destroyAll();
+});
+
+test('provider cooldown is preserved across movement and toggling; disable cancels retry work', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let calls = 0;
+  const h = harness(async () => {
+    calls++;
+    if (calls === 1)
+      throw Object.assign(new Error('Rate limited (HTTP 429)'), {
+        retryAfterMs: 3600000,
+      });
+    return { rows: threeHealthy() };
+  });
+  h.layer.enable();
+  await h.layer.update();
+  h.setAnchor({ latitude: 10, longitude: 20 });
+  h.viewer.camera.moveEnd.raiseEvent();
+  h.advance(30000);
+  t.mock.timers.tick(30000);
+  await flush();
+  await h.layer.update();
+  assert.equal(calls, 1);
+  assert.equal(h.layer.getStats().retryInSec, 3570);
+  h.layer.disable();
+  h.advance(30000);
+  t.mock.timers.tick(30000);
+  await flush();
+  h.layer.enable();
+  await h.layer.update();
+  assert.equal(calls, 1, 'reenabling does not erase a provider deadline');
+  h.advance(3540000);
+  t.mock.timers.tick(3540000);
+  await flush();
+  assert.equal(calls, 2);
+  assert.deepEqual(h.anchors.at(-1), { latitude: 10, longitude: 20 });
+  h.layer.destroy();
+
+  const stopped = harness(async () => {
+    throw new Error('network unavailable');
+  });
+  stopped.layer.enable();
+  await stopped.layer.update();
+  stopped.layer.disable();
+  stopped.advance(30000);
+  t.mock.timers.tick(30000);
+  await flush();
+  assert.equal(stopped.anchors.length, 1, 'disabled layers do not retry');
+  stopped.layer.destroy();
+});
+
+test('repeated acquisition failures back off, while genuine non-retryable failures reject startup', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let calls = 0;
+  const h = harness(async () => {
+    calls++;
+    throw new Error('network unavailable');
+  });
+  h.layer.enable();
+  await h.layer.update();
+  assert.equal(h.layer.getStats().retryInSec, 30);
+  h.advance(30000);
+  t.mock.timers.tick(30000);
+  await flush();
+  assert.equal(h.layer.getStats().retryInSec, 60);
+  h.advance(60000);
+  t.mock.timers.tick(60000);
+  await flush();
+  assert.equal(h.layer.getStats().retryInSec, 120);
+  assert.equal(calls, 3);
+  h.layer.destroy();
+  const fatal = harness(async () => {
+    throw Object.assign(new Error('invalid request (HTTP 400)'), {
+      retryable: false,
+    });
+  });
+  fatal.layer.enable();
+  assert.equal(await fatal.layer.update(), false);
+  assert.equal(fatal.layer.getStats().retryInSec, null);
+  fatal.layer.destroy();
 });
