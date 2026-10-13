@@ -74,6 +74,8 @@
 - Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
 
 - Director timeline seeks cross the dateline along the short longitude arc.
+- Keep unknown GBFS availability counts neutral instead of turning null or empty
+  values into zero bikes.
 
 - Recent Imagery continues past malformed records in full catalog pages, respects the requested record limit, and reports results as truncated when that limit drops valid records.
 
