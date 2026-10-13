@@ -529,6 +529,42 @@ test('a slow import does not fly once something newer took the camera', async ()
   assert.equal(flown.length, 0);
 });
 
+test('a queued import cannot fly over navigation that happened while it waited', async () => {
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let generation = 0;
+  const flown = [];
+  const nav = {
+    beginDeferredLocationNavigation: () => ++generation,
+    reassertDeferredLocationNavigation: (stamp) => stamp === generation,
+  };
+  const t = setup({
+    navigation: nav,
+    flyToSource: (v, ds) => flown.push(ds),
+    load: async (f) => {
+      if (f.name === 'first.geojson') await gate;
+      return {
+        dataSource: {},
+        name: f.name,
+        format: 'geojson',
+        entityCount: 1,
+        revoke() {},
+      };
+    },
+  });
+  const first = t.tool.importFiles([file('first.geojson')]);
+  await new Promise((resolve) => setImmediate(resolve));
+  const queued = t.tool.importFiles([file('queued.geojson')]);
+  generation++; // A newer user camera action while the second batch is waiting.
+  release();
+  const results = await Promise.all([first, queued]);
+  assert.ok(results.every(([outcome]) => outcome.ok));
+  assert.equal(t.tool.list().length, 2);
+  assert.equal(flown.length, 0);
+});
+
 test('a refused deferred stamp (Cockpit) imports without flying', async () => {
   const flown = [];
   const nav = navigationDouble();

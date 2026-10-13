@@ -5,12 +5,14 @@ import * as Cesium from 'cesium';
 import {
   GeoImportError,
   MAX_IMPORT_POSITIONS,
+  MAX_IMPORT_ENTITIES,
   countGeoJsonGeometry,
   countKmlGeometry,
   detachImportedTime,
   gpxToGeoJson,
   importFeatureName,
   scrubImportedEntities,
+  sanitizeKmlDocument,
   stripGeoJsonStyleProperties,
   detectGeoFileFormat,
   importDisplayName,
@@ -231,8 +233,15 @@ function xmlEl(localName, attrs = {}, kids = []) {
     localName,
     childNodes: [],
     getAttribute: (n) => (n in attrs ? String(attrs[n]) : null),
+    removeChild(child) {
+      this.childNodes.splice(this.childNodes.indexOf(child), 1);
+      child.parentNode = null;
+    },
   };
-  for (const k of typeof kids === 'string' ? [] : kids) el.childNodes.push(k);
+  for (const k of typeof kids === 'string' ? [] : kids) {
+    k.parentNode = el;
+    el.childNodes.push(k);
+  }
   const text = typeof kids === 'string' ? kids : null;
   Object.defineProperty(el, 'textContent', {
     get: () => text ?? el.childNodes.map((c) => c.textContent).join(''),
@@ -251,6 +260,17 @@ const xmlDoc = (root) => ({
     walk(root);
     return out;
   },
+});
+test('KML extended metadata is removed before the document reaches the loader', () => {
+  const point = xmlEl('Point', {}, [xmlEl('coordinates', {}, '1,2,0')]);
+  const metadata = xmlEl('ExtendedData', {}, [
+    xmlEl('Data', { name: 'note' }, [xmlEl('value', {}, 'ordinary metadata')]),
+  ]);
+  const placemark = xmlEl('Placemark', {}, [metadata, point]);
+  const doc = xmlDoc(xmlEl('kml', {}, [placemark]));
+  assert.equal(sanitizeKmlDocument(doc).removed, 1);
+  assert.deepEqual(placemark.childNodes, [point]);
+  assert.equal(metadata.parentNode, null);
 });
 const trkpt = (lat, lon, time) =>
   xmlEl('trkpt', { lat, lon }, time ? [xmlEl('time', {}, time)] : []);
@@ -363,6 +383,7 @@ test('GeoJSON features and vertices are counted before loading, without recursio
   assert.deepEqual(countGeoJsonGeometry(fc), {
     features: 3,
     positions: 55,
+    entities: 4,
     over: '',
   });
   assert.equal(
@@ -375,6 +396,7 @@ test('GeoJSON features and vertices are counted before loading, without recursio
     {
       features: 1,
       positions: 1,
+      entities: 1,
       over: '',
     },
   );
@@ -384,6 +406,35 @@ test('GeoJSON features and vertices are counted before loading, without recursio
     coordinates: Array.from({ length: MAX_IMPORT_POSITIONS + 5 }, () => [0, 0]),
   };
   assert.equal(countGeoJsonGeometry(huge).over, 'positions');
+});
+
+test('multipart GeoJSON is refused before loading when it expands past the entity cap', () => {
+  const parts = Array.from({ length: MAX_IMPORT_ENTITIES + 1 }, () => [1, 2]);
+  for (const geometry of [
+    { type: 'MultiPoint', coordinates: parts },
+    {
+      type: 'GeometryCollection',
+      geometries: parts.map((coordinates) => ({ type: 'Point', coordinates })),
+    },
+    { type: 'MultiLineString', coordinates: parts.map((p) => [p, [2, 3]]) },
+  ]) {
+    const size = countGeoJsonGeometry({ type: 'Feature', geometry });
+    assert.equal(size.over, 'entities');
+  }
+});
+
+test('GPX points with missing or blank coordinates are skipped rather than placed at zero', () => {
+  const doc = xmlDoc(
+    xmlEl('gpx', {}, [
+      xmlEl('wpt', { lon: 2 }),
+      xmlEl('wpt', { lat: 1 }),
+      xmlEl('wpt', { lat: '', lon: 2 }),
+      xmlEl('wpt', { lat: 1, lon: ' ' }),
+      xmlEl('wpt', { lat: 0, lon: 0 }),
+    ]),
+  );
+  assert.equal(gpxToGeoJson(doc).features.length, 1);
+  assert.deepEqual(gpxToGeoJson(doc).features[0].geometry.coordinates, [0, 0]);
 });
 
 test('KML placemarks and coordinate tuples are counted before loading', () => {
@@ -406,12 +457,42 @@ test('KML placemarks and coordinate tuples are counted before loading', () => {
   );
   assert.deepEqual(countKmlGeometry(doc), {
     features: 2,
+    entities: 2,
     positions: 42,
     links: 0,
     over: '',
   });
   assert.equal(countKmlGeometry(doc, { maxPositions: 41 }).over, 'positions');
   assert.equal(countKmlGeometry(doc, { maxFeatures: 1 }).over, 'features');
+});
+
+test('KML multipart geometries count every Cesium entity before loading', () => {
+  const doc = xmlDoc(
+    xmlEl('kml', {}, [
+      xmlEl('Placemark', {}, [
+        xmlEl('MultiGeometry', {}, [
+          xmlEl('Point'),
+          xmlEl('MultiGeometry', {}, [xmlEl('Point'), xmlEl('LineString')]),
+          xmlEl('MultiTrack', {}, [xmlEl('Track'), xmlEl('Track')]),
+        ]),
+      ]),
+      xmlEl('GroundOverlay'),
+    ]),
+  );
+  assert.equal(countKmlGeometry(doc).entities, 9);
+  assert.equal(countKmlGeometry(doc, { maxEntities: 8 }).over, 'entities');
+  const oversized = xmlDoc(
+    xmlEl('kml', {}, [
+      xmlEl('Placemark', {}, [
+        xmlEl(
+          'MultiGeometry',
+          {},
+          Array.from({ length: MAX_IMPORT_ENTITIES }, () => xmlEl('Point')),
+        ),
+      ]),
+    ]),
+  );
+  assert.equal(countKmlGeometry(oversized).over, 'entities');
 });
 
 test('KML styles and icon links are counted against their own limit', () => {

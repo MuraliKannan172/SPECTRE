@@ -170,7 +170,9 @@
   names from the file (no descriptions, balloons or native labels), never
   moves the app's clock (dated tracks draw for all time), and keeps GPX track
   segments apart. Size limits are checked before anything is built. The import
-  half of #890.
+  half of #890. Thanks to Chase Mills (@kapturner). Multipart geometry limits
+  apply before loading, recorded KML tracks retain their original vertices,
+  and queued imports respect navigation made while waiting.
 
 ## [0.2.1] — 2026-10-02 — God's Eye View through Your Agent (with security fixes and other features)
 

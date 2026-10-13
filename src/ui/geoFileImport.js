@@ -212,17 +212,18 @@ export function initGeoFileImport({
    */
   function importFiles(files) {
     const list = [...(files || [])];
-    const run = queue.then(() => importBatch(list));
+    if (destroyed || !list.length) return Promise.resolve([]);
+    // Capture the user's intent when the files are chosen, including time
+    // spent waiting for an earlier batch. Later navigation must still win.
+    const generation = beginAutoFly();
+    const run = queue.then(() => importBatch(list, generation));
     queue = run.catch(() => {});
     return run;
   }
 
-  async function importBatch(list) {
+  async function importBatch(list, generation) {
     const outcomes = [];
     if (destroyed || !list.length) return outcomes;
-    // Stamped now, re-asserted before the fly: whatever navigation happens
-    // while the files load (a drag, a search, Cockpit) supersedes this one.
-    const generation = beginAutoFly();
     for (const file of list) {
       if (destroyed) break;
       const fileName = String(file?.name || 'file');

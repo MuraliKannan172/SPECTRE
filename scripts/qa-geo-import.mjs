@@ -78,6 +78,10 @@ const kml = (iconHref) => `<?xml version="1.0" encoding="UTF-8"?>
   <Placemark><name>QA moving</name>
     <gx:Track><when>2019-01-01T00:00:00Z</when><when>2019-01-01T01:00:00Z</when>
       <gx:coord>-122.49 37.767 0</gx:coord><gx:coord>-122.475 37.772 0</gx:coord></gx:Track></Placemark>
+  <Placemark><name>QA split tracks</name><gx:MultiTrack>
+    <gx:Track><gx:coord>-122.50 37.767 0</gx:coord><gx:coord>-122.49 37.768 0</gx:coord></gx:Track>
+    <gx:Track><gx:coord>-122.47 37.771 0</gx:coord><gx:coord>-122.46 37.772 0</gx:coord></gx:Track>
+  </gx:MultiTrack></Placemark>
   <Placemark><name>QA remote style</name><styleUrl>https://${TRAP_HOST}/styles.kml#x</styleUrl>
     <LineString><coordinates>-122.50,37.766 -122.46,37.772</coordinates></LineString></Placemark>
   <GroundOverlay><Icon><href>https://${TRAP_HOST}/overlay.png</href></Icon>
@@ -361,6 +365,11 @@ try {
       movingIsLine: Boolean(
         named('QA moving')?.polyline && !named('QA moving')?.position,
       ),
+      movingVertices:
+        named('QA moving')?.polyline?.positions?.getValue(now)?.length,
+      splitTracks: sources[1].entities.values
+        .filter((e) => e.parent?.name === 'QA split tracks' && e.polyline)
+        .map((e) => e.polyline.positions.getValue(now).length),
       gpxLines: gpx.filter((e) => e.polyline).length,
       gpxPoints: gpx.filter((e) => e.billboard || e.point).length,
     };
@@ -380,8 +389,14 @@ try {
     inside.clocks === 0 &&
       inside.hidden === 0 &&
       inside.datedPinNow &&
-      inside.movingIsLine,
+      inside.movingIsLine &&
+      inside.movingVertices === 2,
     JSON.stringify(inside),
+  );
+  check(
+    'KML MultiTrack keeps its segments and original vertex count',
+    inside.splitTracks.join() === '2,2',
+    JSON.stringify(inside.splitTracks),
   );
   check(
     'the GPX track keeps its two segments apart',

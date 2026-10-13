@@ -154,18 +154,24 @@ export function parseGeoJsonText(text) {
  * Count features and vertices in a parsed GeoJSON object without recursion
  * limits or array spreading, stopping as soon as a limit is passed.
  * @param {object} geojson
- * @param {{maxFeatures?: number, maxPositions?: number}} [limits]
- * @returns {{features: number, positions: number, over: ''|'features'|'positions'}}
+ * @param {{maxFeatures?: number, maxPositions?: number, maxEntities?: number}} [limits]
+ * @returns {{features: number, positions: number, entities: number,
+ *   over: ''|'features'|'positions'|'entities'}}
  */
 export function countGeoJsonGeometry(
   geojson,
   {
     maxFeatures = MAX_IMPORT_ENTITIES,
     maxPositions = MAX_IMPORT_POSITIONS,
+    maxEntities = MAX_IMPORT_ENTITIES,
   } = {},
 ) {
-  let features = 0;
+  let features = ['Feature', 'FeatureCollection'].includes(geojson?.type)
+    ? 0
+    : 1;
   let positions = 0;
+  let entities = 0;
+  const result = (over = '') => ({ features, positions, entities, over });
   const stack = [geojson];
   while (stack.length) {
     const node = stack.pop();
@@ -177,8 +183,11 @@ export function countGeoJsonGeometry(
     }
     if (node.type === 'Feature') {
       features += 1;
-      if (features > maxFeatures)
-        return { features, positions, over: 'features' };
+      if (features > maxFeatures) return result('features');
+      if (node.geometry == null) {
+        entities += 1;
+        if (entities > maxEntities) return result('entities');
+      }
       stack.push(node.geometry);
       continue;
     }
@@ -188,8 +197,14 @@ export function countGeoJsonGeometry(
       continue;
     }
     if (GEOJSON_TYPES.has(node.type)) {
-      // A bare geometry is one feature: Cesium makes one entity for it.
-      if (node === geojson) features += 1;
+      // Multipart geometries create one Cesium entity per component, even
+      // when the document wraps them in just one Feature.
+      entities += node.type.startsWith('Multi')
+        ? Array.isArray(node.coordinates)
+          ? node.coordinates.length
+          : 0
+        : 1;
+      if (entities > maxEntities) return result('entities');
       // Walk the coordinate arrays iteratively: a position is an array whose
       // first item is a number.
       const coords = [node.coordinates];
@@ -198,17 +213,20 @@ export function countGeoJsonGeometry(
         if (!Array.isArray(c)) continue;
         if (typeof c[0] === 'number') {
           positions += 1;
-          if (positions > maxPositions)
-            return { features, positions, over: 'positions' };
+          if (positions > maxPositions) return result('positions');
         } else for (let i = 0; i < c.length; i++) coords.push(c[i]);
       }
     }
   }
-  return { features, positions, over: '' };
+  return result();
 }
 
 /** The refusal for a file over a size limit, in the person's terms. */
 function overLimitError({ over, features, positions }) {
+  if (over === 'entities')
+    return new GeoImportError(
+      `That file draws more than ${MAX_IMPORT_ENTITIES.toLocaleString()} objects (the limit).`,
+    );
   if (over === 'links')
     return new GeoImportError(
       `That file has more than ${MAX_KML_LINKS.toLocaleString()} styles and icon links (the limit).`,
@@ -485,8 +503,36 @@ export function sanitizeKmlDocument(doc, resolveLocal = () => null) {
   }
   // Placemark balloons are HTML; the app shows no info box, and keeping their
   // <img>/<iframe> sources out means no future surface can load them either.
-  for (const name of ['description', 'BalloonStyle', 'Snippet'])
+  for (const name of ['description', 'BalloonStyle', 'Snippet', 'ExtendedData'])
     elementsNamed(doc, name).forEach(drop);
+  // Draw recorded KML paths as their original static vertices. Letting the
+  // loader build time-dynamic tracks would expand each into thousands of
+  // interpolated points later and exceed the checked geometry budget.
+  for (const track of elementsNamed(doc, 'Track')) {
+    const line = doc.createElementNS(
+      'http://www.opengis.net/kml/2.2',
+      'LineString',
+    );
+    const coordinates = doc.createElementNS(
+      'http://www.opengis.net/kml/2.2',
+      'coordinates',
+    );
+    const recordedCoordinates = childrenNamed(track, 'coord').map((coord) =>
+      coord.textContent.trim().split(/\s+/).join(','),
+    );
+    coordinates.textContent = recordedCoordinates.join(' ');
+    line.appendChild(coordinates);
+    track.parentNode?.replaceChild(line, track);
+  }
+  for (const tracks of elementsNamed(doc, 'MultiTrack')) {
+    const geometry = doc.createElementNS(
+      'http://www.opengis.net/kml/2.2',
+      'MultiGeometry',
+    );
+    for (const line of childrenNamed(tracks, 'LineString'))
+      geometry.appendChild(line);
+    tracks.parentNode?.replaceChild(geometry, tracks);
+  }
   return { removed };
 }
 
@@ -508,23 +554,46 @@ const childText = (el, localName) =>
  * and `<Style>` elements (`links`), each of which can make Cesium load and
  * decode an image.
  * @param {Document} doc
- * @returns {{features: number, positions: number, links: number,
- *   over: ''|'features'|'positions'|'links'}}
+ * @returns {{features: number, entities: number, positions: number, links: number,
+ *   over: ''|'features'|'entities'|'positions'|'links'}}
  */
 export function countKmlGeometry(
   doc,
   {
     maxFeatures = MAX_IMPORT_ENTITIES,
+    maxEntities = MAX_IMPORT_ENTITIES,
     maxPositions = MAX_IMPORT_POSITIONS,
     maxLinks = MAX_KML_LINKS,
   } = {},
 ) {
   let features = 0;
+  let entities = 0;
   let positions = 0;
   let links = 0;
-  const result = (over) => ({ features, positions, links, over });
+  const result = (over) => ({ features, entities, positions, links, over });
+  const geometryNames = new Set([
+    'Point',
+    'LineString',
+    'LinearRing',
+    'Polygon',
+    'Track',
+    'MultiTrack',
+    'MultiGeometry',
+    'Model',
+  ]);
   for (const el of doc.getElementsByTagName('*')) {
     const name = el.localName;
+    // Cesium creates a parent for every placemark and a child entity for
+    // each geometry in a MultiGeometry, including nested containers.
+    if (
+      name === 'Placemark' ||
+      name === 'GroundOverlay' ||
+      (geometryNames.has(name) &&
+        ['MultiGeometry', 'MultiTrack'].includes(el.parentNode?.localName))
+    ) {
+      entities += 1;
+      if (entities > maxEntities) return result('entities');
+    }
     if (name === 'href' || name === 'Style') {
       links += 1;
       if (links > maxLinks) return result('links');
@@ -574,8 +643,12 @@ export function gpxToGeoJson(
   const features = [];
   let positions = 0;
   const point = (el) => {
-    const lat = Number(el.getAttribute('lat'));
-    const lon = Number(el.getAttribute('lon'));
+    const rawLat = el.getAttribute('lat');
+    const rawLon = el.getAttribute('lon');
+    if (rawLat == null || rawLon == null || !rawLat.trim() || !rawLon.trim())
+      return null;
+    const lat = Number(rawLat);
+    const lon = Number(rawLon);
     if (
       !Number.isFinite(lat) ||
       !Number.isFinite(lon) ||
@@ -789,10 +862,10 @@ export async function loadGeoFile(file, { viewer, color = '#39d0ff' }) {
         );
       } else {
         geojson = parseGeoJsonText(new TextDecoder().decode(bytes));
-        const size = countGeoJsonGeometry(geojson);
-        if (size.over) throw overLimitError(size);
         stripGeoJsonStyleProperties(geojson);
       }
+      const size = countGeoJsonGeometry(geojson);
+      if (size.over) throw overLimitError(size);
       dataSource = await Cesium.GeoJsonDataSource.load(geojson, {
         clampToGround: true,
         stroke,
