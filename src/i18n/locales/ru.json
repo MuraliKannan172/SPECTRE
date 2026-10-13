@@ -2107,5 +2107,12 @@
   "Trance": "Транс",
   "World": "Музыка мира",
   "{speed}KT": "{speed} УЗ",
-  "{heading}DEG": "{heading}°"
+  "{heading}DEG": "{heading}°",
+  "At least {count}": "Не менее {count}",
+  "Named areas ({n})": "Именованные зоны ({n})",
+  "{distance} FLIGHT / VESSEL WINDOW": "ОКНО РЕЙСОВ / СУДОВ {distance}",
+  "mapped matches within {km} km of the subject": "совпадения на карте в радиусе {km} км от объекта",
+  "none mapped within {km} km; not a complete 250 km survey": "на карте нет в радиусе {km} км; это не полный обзор 250 км",
+  "mapped matches from the loaded viewport": "совпадения на карте в загруженной области",
+  "viewport feed is not a complete 250 km survey": "данные видимой области — не полный обзор 250 км"
 }

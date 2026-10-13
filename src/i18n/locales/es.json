@@ -2075,5 +2075,12 @@
   "Trance": "Trance",
   "World": "Músicas del mundo",
   "{speed}KT": "{speed} KN",
-  "{heading}DEG": "{heading}°"
+  "{heading}DEG": "{heading}°",
+  "At least {count}": "Al menos {count}",
+  "Named areas ({n})": "Zonas con nombre ({n})",
+  "{distance} FLIGHT / VESSEL WINDOW": "VENTANA DE VUELOS / BUQUES DE {distance}",
+  "mapped matches within {km} km of the subject": "coincidencias mapeadas a menos de {km} km del objetivo",
+  "none mapped within {km} km; not a complete 250 km survey": "ninguna mapeada a menos de {km} km; no es un barrido completo de 250 km",
+  "mapped matches from the loaded viewport": "coincidencias mapeadas en la vista cargada",
+  "viewport feed is not a complete 250 km survey": "los datos de la vista no son un barrido completo de 250 km"
 }
