@@ -266,11 +266,12 @@ try {
   await page.evaluate(() => {
     window.__qaPainted = [];
     const app = window.__godsEyeView;
-    // Place the station card below the mobile panel headers.
+    // Use the supported clean view to inspect the mobile card clear of panels.
+    app.styleManager.toggleCleanView(true);
     const Cartesian3 = app.viewer.camera.position.constructor;
     app.viewer.camera.cancelFlight();
     app.viewer.camera.setView({
-      destination: Cartesian3.fromDegrees(-97.7449, 30.2771, 3000),
+      destination: Cartesian3.fromDegrees(-97.7449, 30.2701, 3000),
       orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
     });
     app.dataManager.layers
