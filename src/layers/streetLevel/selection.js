@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium';
-import { STREET_LEVEL_LAYER_ID } from './policy.js';
+import { CLICK_PICK_WINDOW_PX, STREET_LEVEL_LAYER_ID } from './policy.js';
 
 /** One click handler for every provider's lines and cones, and the marker. */
 export function createSelection({ state, parts }) {
@@ -10,7 +10,11 @@ export function createSelection({ state, parts }) {
     const viewer = state.viewer;
     if (!viewer || !state.enabled) return;
     if (input?.isPointerFree && !input.isPointerFree()) return;
-    const picked = viewer.scene.pick(click.position);
+    const picked = viewer.scene.pick(
+      click.position,
+      CLICK_PICK_WINDOW_PX,
+      CLICK_PICK_WINDOW_PX,
+    );
     const id = picking?.resolvePickId
       ? picking.resolvePickId(picked)
       : picked?.id;

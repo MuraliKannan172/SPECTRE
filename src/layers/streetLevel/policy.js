@@ -13,6 +13,12 @@ export const MAPILLARY_SOURCE_METHODS = Object.freeze([
   'getSequenceImages',
 ]);
 
+/**
+ * The pixel window a click picks in: coverage lines are 2.5 px wide and there
+ * is no hover cue, so a click a few pixels off still finds the line.
+ */
+export const CLICK_PICK_WINDOW_PX = 9;
+
 /** Pick id of the viewer position marker. */
 export const POSITION_PICK_ID = 'sl:pos';
 
