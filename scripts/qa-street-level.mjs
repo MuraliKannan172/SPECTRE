@@ -296,6 +296,20 @@ const findPick = (page, prefix, { box = null, step = 3 } = {}) =>
     step,
   );
 
+/**
+ * `findPick`, retried until a hit or `timeout`: draped lines build in a
+ * worker after their tile decoded, so a scan right after LOADING clears can
+ * come too early on a slow machine.
+ */
+async function findPickUntil(page, prefix, { timeout = 30_000 } = {}) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const hit = await findPick(page, prefix);
+    if (hit || Date.now() >= deadline) return hit;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
 /** Park the camera over the photo line; a late startup flight can move it. */
 async function park(page) {
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -455,7 +469,7 @@ async function main() {
         'a line selects its sequence, and a cone opens its photo with a caption',
         async () => {
           // Fixtures answer lookups for the photo sequence only.
-          const line = await findPick(
+          const line = await findPickUntil(
             page,
             fixtures ? `mly:seq:${PHOTO_SEQUENCE_ID}` : 'mly:seq:',
           );
