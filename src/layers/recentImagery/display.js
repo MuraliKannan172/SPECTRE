@@ -27,7 +27,10 @@ export const displayMetres = (value) => formatQuantity(value, 'm');
 export const READOUT_WORDS = Object.freeze({
   date: (day) => displayDay(day, LONG_DAY),
   daysAgo: (delta) => formatRelativeTime(delta > 0 ? -delta : 0, 'day'),
-  sensor: (sensor) => t(sensor),
+  // "Sentinel-2" never breaks at its hyphen: a word joiner follows it
+  // (JetBrains Mono has no U+2011 non-breaking hyphen).
+  sensor: (sensor) =>
+    t(sensor).replace(/(?<=[\p{L}\p{N}])-(?=[\p{L}\p{N}])/gu, '-\u2060'),
   metres: displayMetres,
   overview: () => t('overview'),
   cloud: (cloud) => {

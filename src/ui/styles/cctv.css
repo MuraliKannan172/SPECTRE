@@ -106,22 +106,26 @@ html[lang='es'] .cctv-controls {
 }
 
 /* Click-to-edit effective-pose readout (viewshed/gizmo design §3d): compact
-   value chips replace the seven offset sliders. */
+   value chips replace the seven offset sliders. Tight enough that the seven
+   chips take two rows in a long-label language too, which keeps SAVE / RESET
+   in view; chips grow to fill each row, and a value never wraps inside one. */
 .cctv-cal-readout {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .cctv-cal-value {
+  flex: 1 1 auto;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: 9px;
-  letter-spacing: 0.7px;
+  letter-spacing: 0.3px;
   color: #91edff;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 7px;
-  padding: 4px 7px;
+  padding: 4px;
   cursor: text;
   transition:
     border-color 0.15s ease,

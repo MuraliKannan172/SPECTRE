@@ -147,9 +147,10 @@
 .rail-card-line {
   white-space: pre-line;
 }
+/* One line stays reserved so the card does not jump when a status appears;
+   a long (or translated) status wraps instead of being cut. */
 .weather-card [data-line-id='status'] {
-  height: 1.45em;
-  overflow-y: auto;
+  min-height: 1.45em;
   color: var(--accent);
 }
 .rail-card-ramp {

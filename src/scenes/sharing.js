@@ -135,7 +135,7 @@ export function createSceneSharing(director) {
     if (report.externalContent)
       dialog.text(
         t(
-          'This scene uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.',
+          'Uses registered content or linked media. Those external files are not included in a scene bundle. Their original notices still apply.',
         ),
       );
     if (report.bundledBytes)

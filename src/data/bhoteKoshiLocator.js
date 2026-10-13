@@ -12,7 +12,7 @@ import {
 } from './dataCredits.js';
 import { BHOTE_KOSHI_FLOOD_PATH } from './bhoteKoshiFloodPath.js';
 import { INCIDENT_OVERVIEW_PLACES } from './bhoteKoshiIncidentPlaces.js';
-import { t, msg } from '../i18n/index.js';
+import { t, msg, getLocale } from '../i18n/index.js';
 
 export const BHOTE_KOSHI_LOCATOR_LAYER_ID = 'bhote-koshi-locator';
 export const BHOTE_KOSHI_LOCATOR_OVERLAY_SOURCE_ID =
@@ -51,6 +51,26 @@ const TRIGGER_APPROACH_DURATION_SEC = 4.6;
 const TRIGGER_ORBIT_DURATION_SEC = 2.8;
 const TRIGGER_SOURCE_URL =
   'https://earthquake.usgs.gov/earthquakes/eventpage/us7000tbwb/executive';
+
+// Overview pin titles that are more than a place name translate at display,
+// through the same entries the event panel uses. The data stays English and
+// place names stay Latin; everything else shows as authored.
+const PLACE_TITLE_TEXT = new Map(
+  [
+    msg('Collapse viewpoint'),
+    msg('Dammed lake'),
+    msg('Second landslide'),
+    msg('Border gate'),
+    msg('Dandagaun viewpoint'),
+    msg('Bidur bridge'),
+    msg('Devighat bridge'),
+  ].map((text) => [text.toUpperCase(), text]),
+);
+
+function placeTitle(title) {
+  const text = PLACE_TITLE_TEXT.get(title);
+  return text ? t(text).toLocaleUpperCase(getLocale()) : title;
+}
 
 const INCIDENT = Object.freeze({
   lat: 28.3632333,
@@ -820,7 +840,7 @@ export function createBhoteKoshiLocatorLayer({
         position,
         variant: 'label',
         paintLane: 'ambient-label',
-        title: `${String(index + 1).padStart(2, '0')} · ${place.title}`,
+        title: `${String(index + 1).padStart(2, '0')} · ${placeTitle(place.title)}`,
         details: [],
         accent: INCIDENT_ACCENT,
         sourceAlpha: progress,

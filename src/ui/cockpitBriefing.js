@@ -1,5 +1,5 @@
 /** Regional briefing requests, pages and rotation for the Cockpit controller. */
-import { t, msg } from '../i18n/index.js';
+import { formatNumber, t, msg } from '../i18n/index.js';
 import {
   COCKPIT_BRIEF_ROTATE_MS,
   COCKPIT_BRIEF_CYCLE_OFF_HELP,
@@ -296,7 +296,11 @@ export function renderRegionalBrief(payload, info) {
     this.localPrecipitation.textContent = Number.isFinite(
       weather?.precipitationMm,
     )
-      ? weather.precipitationMm.toFixed(1)
+      ? formatNumber(weather.precipitationMm, {
+          useGrouping: false,
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })
       : '—';
   }
   if (this.signalStream)

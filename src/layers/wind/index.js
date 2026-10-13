@@ -11,7 +11,7 @@ import {
   createWindInspectionMarker,
   WIND_UNITS,
 } from './inspection.js';
-import { t } from '../../i18n/index.js';
+import { t, msg } from '../../i18n/index.js';
 import { unitLabel } from '../../ui/unitLabels.js';
 
 /** Format a forecast timestamp explicitly in UTC. */
@@ -174,7 +174,7 @@ export function createWindLayer({
         return true;
       } catch (cause) {
         if (controller.signal.aborted || request !== controller) return false;
-        error = cause?.message || 'Wind source unavailable';
+        error = cause?.message || msg('Wind source unavailable');
         return true;
       } finally {
         signal?.removeEventListener('abort', abort);
@@ -260,8 +260,11 @@ export function createWindLayer({
         requestedScalar() !== 'none' &&
         manifest &&
         (!manifest.scalar || manifest.scalar.kind !== overlay);
+      // Stored in English for diagnostics; shown translated.
       const imageryError =
-        enabled && !loading ? diagnostic?.imageryError : null;
+        enabled && !loading && diagnostic?.imageryError
+          ? t(diagnostic.imageryError)
+          : null;
       const label = {
         none: t('Wind motion'),
         speed: t('Wind speed'),
@@ -303,7 +306,7 @@ export function createWindLayer({
             ? t('Loading forecast')
             : preparing
               ? t('Preparing flow')
-              : error ||
+              : (error && t(error)) ||
                 manifest?.reason ||
                 imageryError ||
                 (scalarMissing ? t('Selected field unavailable') : null) ||
@@ -384,7 +387,7 @@ export function createWindLayer({
           model: model === 'ifs' ? 'ECMWF IFS' : 'GFS',
           field: label,
           unit: unitLabel(legendUnit),
-        })}${historyStatus ? `\n${historyStatus}` : ''}\n${t('Valid: {time}', { time: valid || t('Unavailable') })}${loading ? ` · ${t('loading')}` : preparing ? ` · ${t('preparing')}` : ''}\n${t('Issued: {time}', { time: run || t('Unavailable') })}${manifest?.stale ? ' · STALE' : ''}${error ? '\n' + error : ''}${scalarMissing ? `\n${t('Selected field unavailable · wind remains visible')}` : ''}${imageryError && !scalarMissing ? `\n${t('{error} · wind remains visible', { error: imageryError })}` : ''}`,
+        })}${historyStatus ? `\n${historyStatus}` : ''}\n${t('Valid: {time}', { time: valid || t('Unavailable') })}${loading ? ` · ${t('loading')}` : preparing ? ` · ${t('preparing')}` : ''}\n${t('Issued: {time}', { time: run || t('Unavailable') })}${manifest?.stale ? ' · STALE' : ''}${error ? `\n${t(error)}` : ''}${scalarMissing ? `\n${t('Selected field unavailable · wind remains visible')}` : ''}${imageryError && !scalarMissing ? `\n${t('{error} · wind remains visible', { error: imageryError })}` : ''}`,
         infoTitle: t(
           'Surface wind at 10 m. Approximately 1° global grid. Curves follow the 10 m wind field, lifted 12 km for visibility; display height is not weather altitude. View lighting is for readability. Animation shows flow through one fixed forecast; it does not advance time. Color fields drape the globe basemap or the active photorealistic 3D Tiles.',
         ),

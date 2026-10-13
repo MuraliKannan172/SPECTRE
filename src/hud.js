@@ -27,7 +27,7 @@ import { getBasemapLabelContext } from './voice/gevActions.js';
 import {
   hudSummaryMatchesProvenance,
   hudSummaryLayerContext,
-  hudTelemetryProvenanceTag,
+  hudTelemetryProvenance,
   isHudSummaryUnconfigured,
 } from './hudSummaryResponse.js';
 import {
@@ -37,6 +37,7 @@ import {
 } from './hudLayouts.js';
 import { formatNumber, msg, t } from './i18n/index.js';
 import { unitLabel } from './ui/unitLabels.js';
+import { localizeLayerName } from './ui/layerPanel.js';
 
 /** Color palettes keyed by shader mode; applied as CSS custom properties. */
 const HUD_COLORS = {
@@ -90,6 +91,35 @@ const REGION_LABELS = Object.freeze({
   'NORTHERN OCEANIC GRID': msg('NORTHERN OCEANIC GRID'),
   'SOUTHERN OCEANIC GRID': msg('SOUTHERN OCEANIC GRID'),
 });
+
+/** Feed-state ids from hudTelemetryProvenance() and the word shown for each. */
+const FEED_STATE_LABELS = Object.freeze({
+  loading: msg('LOADING'),
+  degraded: msg('DEGRADED'),
+  stale: msg('STALE'),
+  partial: msg('PARTIAL'),
+  fallback: msg('FALLBACK'),
+  unavailable: msg('UNAVAILABLE'),
+});
+
+/**
+ * The summary's feed-state suffix in the active language, e.g.
+ * `UNAVAILABLE: LIVE AIS VESSELS`. State ids and layer names stay English in
+ * layer data; only this line translates them.
+ */
+function localizedProvenanceTag(provenance) {
+  if (!provenance) return null;
+  const state = FEED_STATE_LABELS[provenance.state]
+    ? t(FEED_STATE_LABELS[provenance.state])
+    : provenance.state.toUpperCase();
+  if (!provenance.names.length) return state;
+  return t('{state}: {layers}', {
+    state,
+    layers: provenance.names
+      .map((name) => localizeLayerName(name).toUpperCase())
+      .join('/'),
+  });
+}
 
 /** The name shown for a _viewBand() id. */
 function viewBandLabel(band) {
@@ -751,12 +781,12 @@ export class IntelHUD {
       LOCALIZED_LOCALITY,
     );
 
-    const provenance = hudTelemetryProvenanceTag(
-      this._dataManager?.getAll?.() || [],
+    const provenance = localizedProvenanceTag(
+      hudTelemetryProvenance(this._dataManager?.getAll?.() || []),
     );
     // ALT, SUN and ONA are sensor codes, as in the corner readouts.
     const line = t(
-      '{mode} {band} {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}',
+      '{mode} · {band} · {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}',
       {
         mode: modeLabel,
         band: viewBandLabel(band),

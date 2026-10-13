@@ -206,6 +206,64 @@ export function layerKeyRequirementTooltip(layer = {}) {
     : '';
 }
 
+const ROW_TEXT_SEPARATOR = ' · ';
+// A short Latin code joined by hyphens. Longer runs (a URL, a token in an
+// error) keep their break opportunities so they cannot overflow the rail.
+const HYPHENATED_CODE = /[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+/g;
+const HYPHENATED_CODE_MAX = 16;
+
+/** A span for one run of row text; `keep` stops the browser breaking inside it. */
+function rowTextSpan(text, keep) {
+  const span = document.createElement('span');
+  if (keep) span.className = 'data-keep';
+  span.textContent = text;
+  return span;
+}
+
+/**
+ * Set a row's name, count or meta line so that a narrow column wraps it well
+ * in every language: a Latin code with hyphens (ADS-B, RTL-SDR, GTFS-RT) never
+ * splits at its hyphen, and a " · " separator stays at the end of the line it
+ * closes, so no line starts with "·". The element's textContent is still the
+ * plain string; text with neither feature is set directly.
+ *
+ * @param {HTMLElement} element
+ * @param {string} text
+ */
+export function setRowText(element, text) {
+  const value = String(text ?? '');
+  // Refreshes run every second; leave unchanged text (and its spans) alone.
+  if (element.textContent === value) return;
+  const codes = [...value.matchAll(HYPHENATED_CODE)].filter(
+    (match) => match[0].length <= HYPHENATED_CODE_MAX,
+  );
+  if (!codes.length && !value.includes(ROW_TEXT_SEPARATOR)) {
+    element.textContent = value;
+    return;
+  }
+  const spans = [];
+  const pushPlain = (from, to) => {
+    if (to <= from) return;
+    const pieces = value.slice(from, to).split(ROW_TEXT_SEPARATOR);
+    pieces.forEach((piece, index) => {
+      // The space before the dot belongs to a no-wrap span, so the only break
+      // opportunity around a separator is the space after it.
+      if (index > 0) spans.push(rowTextSpan(' ·', true));
+      const textPiece = index > 0 ? ` ${piece}` : piece;
+      if (textPiece) spans.push(rowTextSpan(textPiece, false));
+    });
+  };
+  let cursor = 0;
+  for (const match of codes) {
+    pushPlain(cursor, match.index);
+    spans.push(rowTextSpan(match[0], true));
+    cursor = match.index + match[0].length;
+  }
+  pushPlain(cursor, value.length);
+  element.textContent = '';
+  for (const span of spans) element.appendChild(span);
+}
+
 /** Layer row presentation over supplied state and actions; no layer imports. */
 export class LayerPanel {
   constructor({
@@ -331,7 +389,7 @@ export class LayerPanel {
       icon.textContent = layer.icon;
       const name = document.createElement('span');
       name.className = 'data-name';
-      name.textContent = panelLabel(layer);
+      setRowText(name, panelLabel(layer));
       left.appendChild(icon);
       left.appendChild(name);
 
@@ -340,7 +398,7 @@ export class LayerPanel {
 
       const count = document.createElement('span');
       count.className = 'data-count';
-      count.textContent = this._layerCountText(layer.stats);
+      this._syncCount(row, count, layer.stats);
 
       const toggle = document.createElement('button');
       toggle.type = 'button';
@@ -379,7 +437,7 @@ export class LayerPanel {
 
       const bottomRow = document.createElement('div');
       bottomRow.className = 'data-toggle-meta';
-      bottomRow.textContent = this._buildMetaText(layer);
+      setRowText(bottomRow, this._buildMetaText(layer));
 
       row.appendChild(topRow);
       row.appendChild(bottomRow);
@@ -480,6 +538,21 @@ export class LayerPanel {
           ...this._rowControlsFor(layer.id),
         })),
     );
+  }
+
+  /**
+   * Write a row's count. A count that is a phrase carrying its own number
+   * ("24 nearby · 2 on screen") moves to its own line under the name: beside
+   * the toggle it squeezes the name to a word per line in any language. The
+   * "—" placeholder is marked so it can give way to a wide status chip.
+   */
+  _syncCount(row, count, stats) {
+    const text = this._layerCountText(stats);
+    setRowText(count, text);
+    const phrase =
+      typeof stats.countLabel === 'string' && /\d/.test(stats.countLabel);
+    row.classList.toggle('data-toggle-row--count-line', phrase);
+    count.classList.toggle('data-count-empty', text === '—');
   }
 
   /** Qualify a loaded count when it does not mean items currently on screen. */
@@ -605,12 +678,12 @@ export class LayerPanel {
 
       const count = row.querySelector('.data-count');
       if (count) {
-        count.textContent = this._layerCountText(layer.stats);
+        this._syncCount(row, count, layer.stats);
       }
 
       const meta = row.querySelector('.data-toggle-meta');
       if (meta) {
-        meta.textContent = this._buildMetaText(layer);
+        setRowText(meta, this._buildMetaText(layer));
       }
 
       this._syncRowControls(
@@ -765,13 +838,21 @@ export class LayerPanel {
       String(transitioning || (unavailable && !layer.enabled)),
     );
     button.setAttribute('aria-busy', String(transitioning));
-    button.textContent = transitioning
+    const showsFeedState =
+      !transitioning && !uncertain && (layer.enabled || unavailable);
+    const stateText = transitioning
       ? lifecycleStateLabel(layer.lifecycleState)
       : uncertain
         ? t('UNCERTAIN')
-        : layer.enabled || unavailable
+        : showsFeedState
           ? t(FEED_STATE_LABEL_KEYS[feedState])
           : t('OFF');
+    // The chip may abbreviate where a language's word is wider than the
+    // status column; the meta line and the accessible name keep the full word.
+    button.textContent =
+      showsFeedState && feedState === 'unavailable'
+        ? t('UNAVAILABLE', { context: 'status chip' })
+        : stateText;
     const keyGuidance = unavailable
       ? String(layer.stats.error || t('Data source unavailable'))
       : layerKeyRequirementTooltip(layer);
@@ -781,7 +862,7 @@ export class LayerPanel {
     button.title = keyGuidance;
     const ariaLabel = t('{name}: {state}', {
       name: panelLabel(layer),
-      state: button.textContent,
+      state: stateText,
     });
     button.setAttribute(
       'aria-label',

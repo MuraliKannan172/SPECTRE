@@ -977,6 +977,11 @@
 #draw-mode-row {
   min-width: 184px;
 }
+/* Equal thirds with room around the label, so a long shape name never runs
+   edge to edge in its segment. */
+#draw-mode-row .pp-mode-btn {
+  padding: 0 4px;
+}
 #draw-label-row {
   flex-wrap: wrap;
   row-gap: 6px;

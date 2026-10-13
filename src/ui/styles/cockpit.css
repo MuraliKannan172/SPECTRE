@@ -569,6 +569,9 @@ body.cockpit-mode:has(#left-panel-stack > .panel-collapsible:not(.collapsed))
   text-align: center;
   vertical-align: -0.08em;
 }
+.cockpit-roll-token.is-separator {
+  min-width: 0.3em;
+}
 .cockpit-roll-token.is-rolling {
   color: color-mix(in srgb, currentColor 92%, var(--cockpit-accent));
   text-shadow: 0 0 10px

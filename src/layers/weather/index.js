@@ -7,7 +7,7 @@ import {
   GLOBAL_INFRARED_MAX_GAP_MS,
   LIGHTNING_MAX_GAP_MS,
 } from './clock.js';
-import { t } from '../../i18n/index.js';
+import { t, msg } from '../../i18n/index.js';
 import { formatScaleLabel } from '../../ui/unitLabels.js';
 
 const STOPS = [
@@ -229,12 +229,14 @@ export function createWeatherLayer({
         rendering.setHidden?.(false);
         void warmNext(time);
       }
-      error = ok ? null : 'Frame unavailable; previous observation retained';
+      error = ok
+        ? null
+        : msg('Frame unavailable; previous observation retained');
       if (!ok) stop();
       return ok;
     } catch {
       if (owner === generation && !controller.signal.aborted) {
-        error = 'Weather imagery unavailable';
+        error = msg('Weather imagery unavailable');
         stop();
       }
       return false;
@@ -340,7 +342,9 @@ export function createWeatherLayer({
         if (!enabled || controller.signal.aborted || request !== controller)
           return false;
         if (snapshot.unavailable) {
-          error = 'Weather source unavailable; previous observation retained';
+          error = msg(
+            'Weather source unavailable; previous observation retained',
+          );
           stop();
           return true;
         }
@@ -370,7 +374,7 @@ export function createWeatherLayer({
         return !controller.signal.aborted && request === controller && enabled;
       } catch (cause) {
         if (controller.signal.aborted || request !== controller) return false;
-        error = cause?.message || 'Weather unavailable';
+        error = cause?.message || msg('Weather unavailable');
         stop();
         return true;
       } finally {
@@ -524,6 +528,10 @@ export function createWeatherLayer({
               })
             : t('{minutes}m ago', { minutes: age });
       const diagnostic = rendering?.getDiagnostics();
+      // Errors are stored in English (stats, diagnostics); shown translated.
+      const problem = error || diagnostic?.error;
+      const shownProblem = problem ? t(problem) : null;
+      const shownHost = hostStatus ? t(hostStatus) : null;
       const b = manifest?.bounds;
       const canvas = viewer?.scene?.canvas;
       const point =
@@ -618,9 +626,8 @@ export function createWeatherLayer({
           detail,
           status:
             missing ||
-            hostStatus ||
-            error ||
-            diagnostic?.error ||
+            shownHost ||
+            shownProblem ||
             (observationDelayed()
               ? t('Source observations delayed')
               : manifest?.stale
@@ -701,8 +708,8 @@ export function createWeatherLayer({
               }))
             : [],
         info: hostHidden
-          ? hostStatus
-          : `${infoHeading}\n${infoTime}${missing ? `\n${missing}` : ''}${manifest?.stale ? `\n${t('STALE · cached source metadata')}` : ''}${error || diagnostic?.error ? '\n' + (error || diagnostic.error) : ''}\n${infoCoverage}${outside ? `\n${t('Map center is outside source coverage')}` : ''}${infoMotion ? `\n${infoMotion}` : ''}`,
+          ? shownHost
+          : `${infoHeading}\n${infoTime}${missing ? `\n${missing}` : ''}${manifest?.stale ? `\n${t('STALE · cached source metadata')}` : ''}${shownProblem ? `\n${shownProblem}` : ''}\n${infoCoverage}${outside ? `\n${t('Map center is outside source coverage')}` : ''}${infoMotion ? `\n${infoMotion}` : ''}`,
         infoTitle: lightning
           ? t(
               'NOAA/NWS 15-minute lightning density derived from Vaisala NLDN/GLD360. Coverage 110°E across the Pacific/Americas to 0°, 25°S–80°N. Not a live strike count, global coverage or a safety warning.',

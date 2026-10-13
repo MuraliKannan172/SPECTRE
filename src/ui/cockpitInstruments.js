@@ -1,5 +1,5 @@
 /** Instrument values, routes and vision controls for the Cockpit controller. */
-import { t } from '../i18n/index.js';
+import { formatNumber, t } from '../i18n/index.js';
 import {
   COCKPIT_VISION_MODES,
   normalizeCockpitVisionMode,
@@ -69,7 +69,7 @@ export function updateHud(
     setCockpitRollingValue(
       this.altitude,
       displayedAltitudeFt !== null
-        ? displayedAltitudeFt.toLocaleString('en-US')
+        ? formatNumber(displayedAltitudeFt)
         : '-----',
       displayedAltitudeFt,
       { immediate: forceContext },

@@ -8,6 +8,7 @@ import {
   relativeBearing,
   resolveCockpitContextReadout,
 } from '../cockpitMath.js';
+import { formatCockpitDistance } from './cockpitPresentation.js';
 
 /** The Context scope line in the active language (see cockpitMath.js). */
 const LOCALIZED_CONTEXT_SCOPE = Object.freeze({
@@ -117,12 +118,7 @@ export function updateContext(info, heading) {
   if (this.contextDistance) {
     const distanceM = closest?.distanceM;
     this.contextDistance.textContent = Number.isFinite(distanceM)
-      ? t('{value} KM', {
-          value:
-            distanceM < 10000
-              ? (distanceM / 1000).toFixed(1)
-              : Math.round(distanceM / 1000),
-        })
+      ? formatCockpitDistance(distanceM)
       : '—';
     this.contextDistance.setAttribute(
       'aria-label',

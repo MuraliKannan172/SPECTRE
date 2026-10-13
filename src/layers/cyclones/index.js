@@ -17,10 +17,11 @@ import {
 import { t, tn, msg } from '../../i18n/index.js';
 import { formatQuantity } from '../../ui/unitLabels.js';
 
-// "10-12 15:00 UTC" never breaks across lines.
+// "10-12 15:00 UTC" never breaks across lines: no-break spaces, and a word
+// joiner after the hyphen (JetBrains Mono has no U+2011 non-breaking hyphen).
 const utc = (value) =>
   value
-    ? `${value.slice(5, 16).replace('T', '\u00a0')}\u00a0UTC`
+    ? `${value.slice(5, 16).replace('-', '-\u2060').replace('T', '\u00a0')}\u00a0UTC`
     : t('Unavailable');
 const COVERAGE = msg(
   'Atlantic and eastern/central North Pacific; not worldwide cyclone coverage.',

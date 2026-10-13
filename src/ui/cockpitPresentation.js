@@ -1,5 +1,6 @@
 /** Pure formatting and fixed presentation constants used by Cockpit components. */
 import { formatNumber, t, msg } from '../i18n/index.js';
+import { formatQuantity } from './unitLabels.js';
 
 export const COCKPIT_HEADING_SLEW_DPS = 28;
 
@@ -126,11 +127,33 @@ export function formatCockpitCoordinate(value, positive, negative) {
   return `${amount}°${compassPointLabel(value >= 0 ? positive : negative)}`;
 }
 
+/**
+ * A contact distance such as `4.2 KM` / `44 KM` in the active language
+ * (`4,2 КМ`): one decimal under 10 km, whole kilometres beyond.
+ */
+export function formatCockpitDistance(distanceM) {
+  const digits = distanceM < 10000 ? 1 : 0;
+  return formatQuantity(distanceM / 1000, 'km', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).toUpperCase();
+}
+
 export function formatCockpitWindDirection(value) {
   if (!Number.isFinite(value)) return t('DIR UNKNOWN');
   const labels = Object.keys(COMPASS_POINT_LABELS);
   const normalized = ((value % 360) + 360) % 360;
   return `${compassPointLabel(labels[Math.round(normalized / 45) % labels.length])} · ${Math.round(normalized)}°`;
+}
+
+// Digit grouping and decimal marks (`26,175`, `26 175`, `26.175`) take a
+// narrow cell; a full digit cell would open a gap in the middle of a number.
+const ROLL_SEPARATOR = /^[,.\u00a0\u202f]$/;
+
+function rollTokenClass(character) {
+  return ROLL_SEPARATOR.test(character)
+    ? 'cockpit-roll-token is-separator'
+    : 'cockpit-roll-token';
 }
 
 export function setCockpitRollingValue(
@@ -169,7 +192,7 @@ export function setCockpitRollingValue(
       element.replaceChildren(
         ...Array.from(nextText, (character) => {
           const token = document.createElement('span');
-          token.className = 'cockpit-roll-token';
+          token.className = rollTokenClass(character);
           token.setAttribute('aria-hidden', 'true');
           token.textContent = character;
           return token;
@@ -198,7 +221,7 @@ export function setCockpitRollingValue(
     const previousCharacter = from[index];
     const nextCharacter = to[index];
     const token = document.createElement('span');
-    token.className = 'cockpit-roll-token';
+    token.className = rollTokenClass(nextCharacter);
     token.setAttribute('aria-hidden', 'true');
 
     if (

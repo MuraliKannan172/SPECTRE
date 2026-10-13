@@ -281,8 +281,10 @@
   border-top: 3px solid #6be8ff;
 }
 
-/* Up to two lines, so a translated title is not cut to a stub. */
+/* The title takes the full card width and up to two lines, so a translated
+   title keeps its place name; the link sits beside the status below it. */
 .bhote-embedded-callout footer strong {
+  grid-column: 1 / -1;
   display: -webkit-box;
   overflow: hidden;
   font-size: 11px;
@@ -292,9 +294,9 @@
   -webkit-line-clamp: 2;
 }
 
-/* The status takes the full width under the title and link. */
 .bhote-embedded-callout footer small {
-  grid-column: 1 / -1;
+  grid-column: 1;
+  align-self: center;
   color: rgba(151, 211, 224, 0.7);
   font-size: 8px;
   line-height: 1.35;
@@ -302,7 +304,7 @@
 
 .bhote-embedded-callout footer a {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
   align-self: center;
   white-space: nowrap;
   color: #6be8ff;
@@ -450,7 +452,7 @@
   align-content: center;
   column-gap: 9px;
   min-width: 0;
-  padding: 7px 10px;
+  padding: 5px 10px;
   border: 1px solid rgba(88, 196, 218, 0.18);
   background: rgba(6, 19, 27, 0.72);
 }
@@ -462,20 +464,24 @@
   line-height: 1.25;
 }
 
+/* Up to two lines: a translated beat title keeps its subject. Two title lines
+   and one meta line still fit the 54px arrow buttons, so the controls stay put. */
 .bhote-event-story-current strong {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--text-primary);
   font-size: 11px;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* Phase / time / sources run long in translation: allow a second line. */
 .bhote-event-story-current small {
   display: -webkit-box;
   grid-column: 1 / -1;
-  margin-top: 4px;
+  margin-top: 3px;
   overflow: hidden;
   color: rgba(116, 216, 235, 0.7);
   -webkit-box-orient: vertical;
