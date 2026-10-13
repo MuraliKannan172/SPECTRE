@@ -107,8 +107,13 @@
             </span>
           </div>
         </div>
+        <div class="sl-providers" role="group" aria-label="Imagery providers">
+          <span class="cctv-summary-label">PROVIDERS</span>
+          <div id="sl-provider-chips" class="sl-chips"></div>
+        </div>
         <div id="sl-error" class="sl-error" role="alert" hidden><span aria-hidden="true">⚠</span> <span id="sl-error-text"></span></div>
-        <!-- A missing key gates the filters; the line above says how to add it. -->
+        <!-- A missing key gates the filters only: the chips above stay
+             focusable so their tooltip can say how to add the key. -->
         <fieldset id="sl-controls" class="sl-controls">
           <div class="sl-filters" role="group" aria-label="Imagery filters">
             <span class="cctv-summary-label">IMAGERY</span>

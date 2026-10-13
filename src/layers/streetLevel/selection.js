@@ -1,37 +1,22 @@
 import * as Cesium from 'cesium';
-import {
-  PICK_PREFIX,
-  POSITION_PICK_ID,
-  STREET_LEVEL_LAYER_ID,
-} from './policy.js';
-import { sequenceIdFromPick } from './coverage.js';
+import { STREET_LEVEL_LAYER_ID } from './policy.js';
 
-/** One click handler for coverage lines, image cones and the marker. */
+/** One click handler for every provider's lines and cones, and the marker. */
 export function createSelection({ state, parts }) {
   const { picking, input } = state.services;
 
-  /** Lines and cones (`mly:`) and the position marker are this layer's. */
-  function ownsPick(id) {
-    return (
-      typeof id === 'string' &&
-      (id === POSITION_PICK_ID || id.startsWith(PICK_PREFIX.root))
-    );
-  }
-
-  /** A line selects its sequence; a cone opens its image. */
+  /** The id carries a provider's prefix: that provider handles the pick. */
   function onClick(click) {
     const viewer = state.viewer;
-    if (!viewer || !state.enabled || !state.providerOn) return;
+    if (!viewer || !state.enabled) return;
     if (input?.isPointerFree && !input.isPointerFree()) return;
     const picked = viewer.scene.pick(click.position);
     const id = picking?.resolvePickId
       ? picking.resolvePickId(picked)
       : picked?.id;
-    if (typeof id !== 'string') return;
-    const sequenceId = sequenceIdFromPick(id);
-    if (sequenceId) parts.sequences.select(sequenceId);
-    else if (id.startsWith(PICK_PREFIX.image))
-      parts.openImage(id.slice(PICK_PREFIX.image.length));
+    const hit = parts.router.resolve(id);
+    // The position marker is the core's own: nothing to select.
+    if (hit?.instance) hit.instance.handlePick(hit.id);
   }
 
   /**
@@ -49,9 +34,9 @@ export function createSelection({ state, parts }) {
       )
     )
       return;
-    if (!state.sequence.selectedId) return;
+    if (!parts.hasSelectedSequence()) return;
     event.preventDefault();
-    parts.sequences.clearSelection();
+    parts.clearSequences();
   }
 
   function install(viewer) {
@@ -64,7 +49,7 @@ export function createSelection({ state, parts }) {
       Cesium.ScreenSpaceEventType.LEFT_CLICK,
     );
     document.addEventListener('keydown', onKeyDown);
-    picking?.registerPickOwner?.(STREET_LEVEL_LAYER_ID, ownsPick);
+    picking?.registerPickOwner?.(STREET_LEVEL_LAYER_ID, parts.router.ownsPick);
   }
 
   function uninstall() {
@@ -76,5 +61,5 @@ export function createSelection({ state, parts }) {
     picking?.unregisterPickOwner?.(STREET_LEVEL_LAYER_ID);
   }
 
-  return { install, uninstall, ownsPick };
+  return { install, uninstall, ownsPick: parts.router.ownsPick };
 }

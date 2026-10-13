@@ -4,10 +4,36 @@ import {
   presentStreetLevelPanel,
   sinceStopIndex,
 } from './streetLevelPresentation.js';
+import { providerSnapshot } from '../testSupport/streetLevelFakes.mjs';
+
+const provider = providerSnapshot;
+
+test('an empty composition explains unavailable imagery even while disabled', () => {
+  for (const enabled of [false, true]) {
+    const view = presentStreetLevelPanel(
+      snapshot({
+        enabled,
+        providers: [],
+        coverage: { hint: 'No street-level imagery providers configured' },
+      }),
+    );
+    assert.equal(view.controlsDisabled, true);
+    assert.equal(view.keyRequired, false);
+    assert.deepEqual(view.providers, []);
+    assert.equal(view.meta, 'No street-level imagery providers configured');
+  }
+});
+
 function snapshot(overrides = {}) {
   const base = {
     enabled: false,
-    providerOn: true,
+    // The one provider's key state follows the summary the test asks for.
+    providers: [
+      provider({
+        keyRequired: overrides.keyRequired === true,
+        keyRejected: overrides.keyRejected === true,
+      }),
+    ],
     keyRequired: false,
     keyRejected: false,
     filter: { pano: 'all', sinceDays: 0 },
@@ -17,6 +43,7 @@ function snapshot(overrides = {}) {
       open: false,
       loading: false,
       error: null,
+      providerLabel: null,
       imageId: null,
       position: null,
       bearing: null,
@@ -204,7 +231,7 @@ test('the meta line never mixes the visible-sequence count with the selected seq
 test('an empty view says so, and whether the filter emptied it', () => {
   const meta = (overrides) =>
     presentStreetLevelPanel(snapshot({ enabled: true, ...overrides })).meta;
-  assert.equal(meta({}), 'No Mapillary coverage in view');
+  assert.equal(meta({}), 'No coverage in view');
   assert.equal(
     meta({ filter: { pano: 'flat', sinceDays: 0 } }),
     'No sequences in view match the filter',
@@ -225,6 +252,7 @@ test('viewer caption reads "Image by" left, date right, and links to Mapillary',
       enabled: true,
       street: {
         open: true,
+        providerLabel: 'MAPILLARY',
         imageId: '1814275685699406',
         creator: 'mapfool',
         capturedAt: Date.UTC(2023, 9, 8),

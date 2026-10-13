@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as Cesium from 'cesium';
 import { createSelection } from './selection.js';
+import { createPickRouter } from './pickRouter.js';
 
 /** The selection installed on a stand-in viewer, with what its clicks reach. */
 function harness({ selected = false } = {}) {
@@ -38,28 +39,36 @@ function harness({ selected = false } = {}) {
   const state = {
     viewer,
     enabled: true,
-    providerOn: true,
     clickHandler: null,
     services: { picking: null, input: null },
-    sequence: {
-      get selectedId() {
-        return sequences.selected ? 'seq-1' : null;
-      },
+    providers: new Map([
+      [
+        'mapillary',
+        {
+          def: { id: 'mapillary', pickPrefix: 'mly:' },
+          instance: {
+            handlePick(id) {
+              if (id.startsWith('mly:seq:'))
+                sequences.selects.push(id.slice(8));
+              else if (id.startsWith('mly:img:')) opened.push(id.slice(8));
+              return true;
+            },
+          },
+        },
+      ],
+    ]),
+  };
+  const parts = {
+    router: createPickRouter(() => state.providers.values(), {
+      positionId: 'sl:pos',
+    }),
+    hasSelectedSequence: () => sequences.selected,
+    clearSequences() {
+      sequences.cleared++;
+      sequences.selected = false;
     },
   };
-  const selection = createSelection({
-    state,
-    parts: {
-      sequences: {
-        select: (id) => sequences.selects.push(id),
-        clearSelection() {
-          sequences.cleared++;
-          sequences.selected = false;
-        },
-      },
-      openImage: (id) => opened.push(id),
-    },
-  });
+  const selection = createSelection({ state, parts });
   selection.install(viewer);
   const action = (type) =>
     state.clickHandler.getInputAction(Cesium.ScreenSpaceEventType[type]);
@@ -103,11 +112,6 @@ test('a click on a line selects its sequence, on a cone opens its image, elsewhe
       h.click();
     }
     assert.deepEqual([h.sequences.selects, h.opened], [['abc'], ['42']]);
-    // Mapillary switched off under a layer that is on: lines are not drawn.
-    h.state.providerOn = false;
-    h.scene.under = 'mly:seq:abc';
-    h.click();
-    assert.deepEqual(h.sequences.selects, ['abc']);
   } finally {
     h.restore();
   }

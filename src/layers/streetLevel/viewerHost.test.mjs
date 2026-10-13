@@ -35,13 +35,29 @@ const { createMapillaryViewer } = await import('./viewer.js');
  * `selected` every sequence the layer was asked to select.
  */
 function harness(adapter) {
+  const selected = [];
   const state = {
     enabled: true,
     notify() {},
     street: { host: {}, renderMode: 'letterbox' },
     sequence: { selectedId: null },
+    providers: new Map([
+      [
+        'mapillary',
+        {
+          def: { id: 'mapillary', name: 'Mapillary', label: 'MAPILLARY' },
+          instance: {
+            viewer: adapter,
+            selectSequence(id) {
+              selected.push(id);
+              state.sequence.selectedId = id;
+            },
+            sequenceStats: () => ({ selectedId: state.sequence.selectedId }),
+          },
+        },
+      ],
+    ]),
   };
-  const selected = [];
   const framing = { begun: 0, started: 0, cancelled: 0 };
   const marker = [];
   const parts = {
@@ -55,12 +71,6 @@ function harness(adapter) {
       frame: (ticket) => ticket && framing.started++,
       cancel: () => framing.cancelled++,
     },
-    sequences: {
-      select(id) {
-        selected.push(id);
-        state.sequence.selectedId = id;
-      },
-    },
   };
   return {
     state,
@@ -71,7 +81,7 @@ function harness(adapter) {
     clearSequence() {
       state.sequence.selectedId = null;
     },
-    host: createViewerHost({ state, parts, adapter }),
+    host: createViewerHost({ state, parts }),
   };
 }
 
@@ -132,10 +142,10 @@ function fakeAdapter({ failMounts = 0, gate = null, openGate = null } = {}) {
 test('a failed mount is retried on the next open instead of being cached', async () => {
   const adapter = fakeAdapter({ failMounts: 1 });
   const { state, host } = harness(adapter);
-  await host.open('a');
+  await host.open('mapillary', 'a');
   assert.equal(state.street.error, 'library failed to load');
   assert.equal(adapter.calls.listeners, 0, 'the pose listener was released');
-  await host.open('b');
+  await host.open('mapillary', 'b');
   assert.equal(state.street.error, null);
   assert.equal(adapter.calls.mount, 2);
   assert.deepEqual(adapter.calls.open, ['b']);
@@ -146,7 +156,7 @@ test('a failed mount is retried on the next open instead of being cached', async
 test('concurrent opens share one mount and one pose listener', async () => {
   const adapter = fakeAdapter();
   const { host } = harness(adapter);
-  await Promise.all([host.open('a'), host.open('b')]);
+  await Promise.all([host.open('mapillary', 'a'), host.open('mapillary', 'b')]);
   assert.equal(adapter.calls.mount, 1);
   assert.equal(adapter.calls.listeners, 1);
 });
@@ -154,14 +164,14 @@ test('concurrent opens share one mount and one pose listener', async () => {
 test('unmounting while a mount is in flight does not leave it active', async () => {
   const adapter = fakeAdapter();
   const { state, host } = harness(adapter);
-  const opening = host.open('a');
+  const opening = host.open('mapillary', 'a');
   host.unmount();
   await opening;
   assert.equal(adapter.calls.listeners, 0);
   assert.equal(adapter.calls.unmount, 2, 'layer off, then the late mount');
   assert.equal(state.street.open, false);
   // Not left active: the next open mounts again.
-  await host.open('b');
+  await host.open('mapillary', 'b');
   assert.equal(adapter.calls.mount, 2);
   assert.equal(state.street.imageId, 'b');
 });
@@ -169,7 +179,7 @@ test('unmounting while a mount is in flight does not leave it active', async () 
 test('a pose that arrives after the photo was closed does not bring it back', async () => {
   const adapter = fakeAdapter();
   const { state, host } = harness(adapter);
-  await host.open('a');
+  await host.open('mapillary', 'a');
   host.close();
   const before = { ...state.street };
   // The library's `image` event for a photo that was still loading.
@@ -193,7 +203,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 test('every pose the viewer reports moves the marker; only the open frames the camera', async () => {
   const adapter = fakeAdapter();
   const { host, marker, framing } = harness(adapter);
-  await host.open('a');
+  await host.open('mapillary', 'a');
   assert.deepEqual(marker, [{ position: { lon: 1, lat: 2 }, bearing: 90 }]);
   // The user walks on: the marker goes along, the globe camera stays.
   adapter.emitPose('b', { position: { lon: 3, lat: 4 }, bearing: 180 });
@@ -211,7 +221,7 @@ test('a pose on another sequence selects it, but not while the image still loads
   const openGate = deferred();
   const adapter = fakeAdapter({ openGate });
   const { state, host, selected, clearSequence } = harness(adapter);
-  const opening = host.open('a');
+  const opening = host.open('mapillary', 'a');
   await settle();
   assert.equal(state.street.loading, true, 'the image is downloading');
   assert.equal(state.street.sequenceId, 'seq-a', 'its pose is in');
@@ -234,7 +244,7 @@ test('a pose on another sequence selects it, but not while the image still loads
 test('closing the photo clears the marker', async () => {
   const adapter = fakeAdapter();
   const { host, marker } = harness(adapter);
-  await host.open('a');
+  await host.open('mapillary', 'a');
   assert.notEqual(marker.at(-1), null);
   host.close();
   assert.equal(marker.at(-1), null);
@@ -244,7 +254,7 @@ test('an open still mounting when the photo is closed does nothing when the moun
   const gate = deferred();
   const adapter = fakeAdapter({ gate });
   const { state, host, framing, selected } = harness(adapter);
-  const opening = host.open('a'); // MapillaryJS still loading
+  const opening = host.open('mapillary', 'a'); // MapillaryJS still loading
   await settle();
   host.close();
   gate.resolve();
@@ -257,7 +267,7 @@ test('an open still mounting when the photo is closed does nothing when the moun
     [false, false, null],
   );
   // The mounted viewer serves the next open.
-  assert.equal(await host.open('b'), true);
+  assert.equal(await host.open('mapillary', 'b'), true);
   assert.equal(state.street.imageId, 'b');
 });
 
@@ -265,7 +275,7 @@ test('an image still opening when the photo is closed is neither framed nor sele
   const openGate = deferred();
   const adapter = fakeAdapter({ openGate });
   const { state, host, framing, selected } = harness(adapter);
-  const opening = host.open('a');
+  const opening = host.open('mapillary', 'a');
   await settle();
   assert.deepEqual(adapter.calls.open, ['a'], 'the image is downloading');
   host.close();
@@ -343,16 +353,16 @@ test('the Mapillary viewer survives the layer going off and on during its first 
   const { gate, viewers } = fakeLibrary();
   const adapter = createMapillaryViewer({ source: { token: 't' } });
   const { state, host } = harness(adapter);
-  const first = host.open('img1');
+  const first = host.open('mapillary', 'img1');
   await Promise.resolve();
   host.unmount();
-  const second = host.open('img2');
+  const second = host.open('mapillary', 'img2');
   await Promise.resolve();
   gate.resolve();
   await Promise.all([first, second]);
   assert.equal(state.street.error, null);
   assert.equal(state.street.imageId, 'img2');
-  await host.open('img3');
+  await host.open('mapillary', 'img3');
   assert.equal(state.street.error, null, 'later opens are not stuck');
   assert.equal(state.street.imageId, 'img3');
   assert.equal(viewers.live, 1);
@@ -379,7 +389,7 @@ test('closing the photo stops sequence playback in the hidden viewer', async () 
   gate.resolve();
   const adapter = createMapillaryViewer({ source: { token: 't' } });
   const { host } = harness(adapter);
-  await host.open('img1');
+  await host.open('mapillary', 'img1');
   const [viewer] = viewers.instances;
   assert.equal(viewer.playback.stops, 0);
   host.close();
@@ -455,7 +465,7 @@ test('a photo asks for the camera when it starts opening and frames with that ti
   const openGate = deferred();
   const adapter = fakeAdapter({ openGate });
   const { host, framing } = harness(adapter);
-  const opening = host.open('a');
+  const opening = host.open('mapillary', 'a');
   assert.equal(framing.begun, 1, 'claimed before the download');
   await settle();
   assert.equal(framing.started, 0);

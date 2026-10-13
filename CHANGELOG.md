@@ -1,5 +1,37 @@
 # Changelog
 
+- Treat explicitly current, complete empty vessel coverage as a successful update,
+  clearing obsolete contacts while retaining stale or incomplete snapshots.
+
+- Custom Street Level provider switches survive share links and stored state
+  using URL-safe stable provider IDs and a shared boolean-switch codec; existing
+  Mapillary links keep their meaning. Explicit provider toggles reach durable
+  state without adopting unrelated live switch changes.
+
+- Directions and Recent Imagery accept replaceable acquisition sources, including
+  route transport, imagery catalog, thumbnails, tile templates and attribution.
+  Explicitly removing either source leaves its layer unavailable; standalone
+  defaults preserve the existing providers.
+
+- Catalog source availability no longer modifies layer objects; unavailable
+  tooltips use layer display names.
+
+- Street Level with no providers uses the shared unavailable state and refuses
+  activation before initialization, while keeping its layer identity visible.
+
+- Application source configuration accepts replacements and explicit removal.
+  Missing catalog feeds leave their layers unavailable without blocking startup
+  or making fallback requests; malformed supplied feeds remain configuration errors.
+
+- Street Level providers are optional in application composition. Omitting a
+  Mapillary source no longer prevents startup; callers can inject a different
+  provider list or an empty list without changing layer identities or share links.
+
+- Vector tile sources take their allowed tile origin from the configured
+  `tileJsonUrl`, so repointing only that URL at a mirror loads tiles from the
+  mirror or fails visibly instead of silently using OpenFreeMap. Thanks to
+  [daikaginza](https://github.com/daikaginza) (#935).
+
 - MCP setup examples use the app's default port, `4173`. Thanks to
   [Huanyi Xie](https://github.com/xiehuanyi) (#934) and
   [shirunjies8-png](https://github.com/shirunjies8-png) (#959) for the same fix.
@@ -63,6 +95,22 @@
 
 ## [Unreleased]
 
+- Keep later satellites when a TLE catalog entry is missing an orbital line.
+  The parser skips the incomplete set and resumes at the next complete named
+  set, instead of losing the rest of the group (#906).
+
+- Add an experimental ChatGPT/Codex OAuth option for cloud voice in Provider
+  Settings. API-key voice remains the default. Local sign-in can start from
+  the auth button and reports completion, failure, timeout, or expired
+  credentials. OAuth credentials stay on the server; local routes require
+  loopback access and same-site requests. OAuth sessions retain usage data
+  and show unknown cost; caption transcriptions are counted rather than
+  priced into the API-key cap. The auth button keeps keyboard focus after a
+  mode change, and pending sign-in does not discard text in the key fields.
+  Thanks to [Shayan Khan](https://github.com/devv-shayan) for #621 and
+  [TheSmokeDev](https://github.com/TheSmokeDev) for the credential handling
+  from #653.
+
 - Stdio servers from one install share a panel key so a page read from one
   process can make requests through another. Concurrent malformed-key repairs
   now select one winner; unavailable storage or a busy repair retains the
@@ -71,15 +119,16 @@
   proposed diagnosis in #927, and [kvnloo](https://github.com/kvnloo) for identifying
   the repair race. Windows/Claude Desktop Cowork confirmation remains outstanding.
 
-- Street Level: Mapillary street-level imagery (free client token, CC BY-SA
-  4.0). A right-rail panel holds an ON/OFF pill, 360°/flat and captured-since
-  filters and an embedded viewer with EXPAND and FIT/FILL. Coverage
-  lines (below 60 km) and image cones drape on terrain and Google 3D tiles;
-  opening a photo frames it with one camera flight. Share links carry the
-  switch, the filters and the panel's collapsed state. A server proxy adds the
-  token to coverage tiles, trims and caches them for 24 h, refuses cross-site
-  requests and redirects, and limits load per IP and upstream. The panel reads
-  KEY REQUIRED without a token and KEY REJECTED when Mapillary refuses it.
+- Street Level: street-level imagery from providers, Mapillary first (free
+  client token, CC BY-SA 4.0). A right-rail panel holds a chip per provider,
+  360°/flat and captured-since filters and an embedded viewer with EXPAND and
+  FIT/FILL. Coverage lines (below 60 km) and image cones drape on terrain and
+  Google 3D tiles; opening a photo frames it with one camera flight. Share
+  links carry the provider switches, the filters and the panel's collapsed
+  state. A server proxy adds the token to Mapillary coverage tiles, trims and
+  caches them for 24 h, refuses cross-site requests and redirects, and limits
+  load per IP and upstream. The panel reads KEY REQUIRED without a token and
+  KEY REJECTED when Mapillary refuses it.
 
 - Add Norway's road cameras from Statens vegvesen as a CCTV pack. The camera
   list is one keyless GeoJSON request to the agency's OGC API view of its

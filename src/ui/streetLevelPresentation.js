@@ -54,11 +54,8 @@ function formatDate(ms) {
   }
 }
 
-/** Whether the layer draws: on, and Mapillary not switched off by a link or tool. */
-const drawing = (state) => state.enabled === true && state.providerOn !== false;
-
 function presentStatus(state) {
-  const pressed = drawing(state);
+  const pressed = state.enabled === true;
   const title = pressed ? 'Turn Street Level off' : 'Turn Street Level on';
   const key = keyStatusLabel(state);
   if (key) return { text: key, tone: 'warn', pressed, title };
@@ -69,10 +66,44 @@ function presentStatus(state) {
     : { text: 'OFF', tone: '', pressed, title };
 }
 
-/** How to add the missing Mapillary key. */
-function keyHint() {
-  const requirement = keySetupRequirement('mapillary');
-  return requirement ? `Mapillary: ${requirement}` : null;
+/** A chip is lit only while the layer and its provider are both on. */
+function presentProviders(state) {
+  const enabled = state.enabled === true;
+  return (state.providers || []).map((provider) => {
+    const keyRequired = provider.keyRequired === true;
+    const on = enabled && provider.on === true;
+    let title = `${provider.name} imagery ${on ? 'on' : 'off'}`;
+    if (provider.keyRejected && provider.error)
+      title = `${provider.name}: ${provider.error}`;
+    else if (keyRequired && provider.requiresKeyId)
+      title = `${provider.name}: ${keySetupRequirement(provider.requiresKeyId)}`;
+    else if (provider.error) title = `${provider.name}: ${provider.error}`;
+    return {
+      id: provider.id,
+      label: provider.label,
+      color: provider.color || null,
+      title,
+      active: on,
+      disabled: false,
+      state: keyRequired
+        ? 'error'
+        : on && provider.loading
+          ? 'loading'
+          : on
+            ? 'active'
+            : 'idle',
+      busy: on && provider.loading === true,
+    };
+  });
+}
+
+/** How to add the key the first switched-on provider is missing. */
+function keyHint(state) {
+  const provider = (state.providers || []).find(
+    (p) => p.on && p.keyRequired && p.requiresKeyId,
+  );
+  const requirement = provider && keySetupRequirement(provider.requiresKeyId);
+  return requirement ? `${provider.name}: ${requirement}` : null;
 }
 
 function presentViewer(state) {
@@ -89,14 +120,16 @@ function presentViewer(state) {
     captionLeft: street.creator ? `Image by ${street.creator}` : '',
     captionRight: right.join(' · '),
     link: street.externalUrl || null,
-    linkLabel: street.externalUrl ? 'MAPILLARY ↗' : '',
+    linkLabel: street.providerLabel ? `${street.providerLabel} ↗` : '',
   };
 }
 
 function presentMeta(state) {
+  const providers = state.providers || [];
+  if (providers.length === 0) return state.coverage.hint || '';
   if (!state.enabled) return 'Switch Street Level on to draw its coverage.';
-  if (!drawing(state))
-    return 'Mapillary is off in this view. Switch Street Level on to show it.';
+  if (!providers.some((p) => p.on))
+    return 'Every provider is switched off: light a chip to draw its coverage.';
   if (state.sequence.selectedId)
     return state.sequence.loading
       ? 'Loading this sequence…'
@@ -110,20 +143,23 @@ function presentMeta(state) {
   const filter = state.filter || {};
   return (filter.pano || 'all') !== 'all' || Number(filter.sinceDays) > 0
     ? 'No sequences in view match the filter'
-    : 'No Mapillary coverage in view';
+    : 'No coverage in view';
 }
 
 /** @param {{now?: number}} [options] Clock for the SINCE readout. */
 export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
+  const keyRequired = state.keyRequired === true;
   const filter = state.filter || { pano: 'all', sinceDays: 0 };
   // A missing key says how to add it; a rejected key's own error names the fix.
-  const keyMissing = state.keyRequired === true && state.keyRejected !== true;
+  const keyMissing = keyRequired && state.keyRejected !== true;
   return {
     enabled: state.enabled === true,
+    keyRequired,
     status: presentStatus(state),
-    controlsDisabled: state.keyRequired === true,
+    controlsDisabled: keyRequired || (state.providers || []).length === 0,
+    providers: presentProviders(state),
     error: keyMissing
-      ? keyHint()
+      ? keyHint(state)
       : state.street.error ||
         state.sequence.error ||
         state.coverage.error ||

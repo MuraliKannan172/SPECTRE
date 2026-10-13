@@ -162,6 +162,7 @@
     "./layers/vessels": "./src/layers/vessels/index.js",
     "./layers/earthquakes": "./src/layers/earthquakes/index.js",
     "./layers/recent-imagery": "./src/layers/recentImagery/index.js",
+    "./layers/recent-imagery/source": "./src/layers/recentImagery/source.js",
     "./layers/perimeters": "./src/layers/perimeters/index.js",
     "./sources/firms-csv": "./src/data/firmsCsv.js",
     "./layers/firms": "./src/layers/firms/index.js",
@@ -172,6 +173,7 @@
     "./layers/traffic": "./src/layers/traffic/index.js",
     "./layers/bikeshare": "./src/layers/bikeshare/index.js",
     "./layers/directions": "./src/layers/directions/index.js",
+    "./layers/directions/source": "./src/layers/directions/source.js",
     "./layers/cctv": "./src/layers/cctv/index.js",
     "./layers/alpr": "./src/layers/alpr/index.js",
     "./layers/radio": "./src/layers/radio/index.js",
@@ -260,6 +262,7 @@
       "node": "./server/providers/mapillary.js"
     },
     "./layers/street-level": "./src/layers/streetLevel/index.js",
+    "./layers/street-level/mapillary": "./src/layers/streetLevel/mapillaryProvider.js",
     "./layers/street-level/mapillary/source": "./src/layers/streetLevel/source.js",
     "./tools": "./src/tools/index.js",
     "./tools/mcp": "./src/tools/mcp/index.js",

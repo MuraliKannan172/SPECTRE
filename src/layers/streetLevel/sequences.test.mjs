@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as Cesium from 'cesium';
+import { resolveFilter } from './filter.js';
 import { createSequences } from './sequences.js';
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -56,6 +57,7 @@ function setup() {
     services: {},
     viewer: {},
     filter: { pano: 'all', sinceDays: 0 },
+    getFilter: () => resolveFilter(state.filter),
     notify() {},
     sequence: {
       selectedId: null,

@@ -1,3 +1,4 @@
+import { normalizeIdSwitches, patchRequestedIdSwitches } from './idSwitches.js';
 import reservationRows from './layerStateTokenReservations.json' with { type: 'json' };
 
 const VALID_DISPOSITIONS = new Set([
@@ -411,8 +412,17 @@ const OPTION_GROUPS = Object.freeze({
     booleanOption('viirs', 'v', false),
   ]),
   'street-level': Object.freeze([
-    // The Mapillary switch: off, the layer draws nothing.
+    // Preserve the published Mapillary token; custom switches use stable IDs.
     booleanOption('mapillary', 'm', true),
+    Object.freeze({
+      key: 'providerSwitches',
+      patchRequested: patchRequestedIdSwitches,
+      token: 'r',
+      defaultValue: '',
+      normalize: (value) => normalizeIdSwitches(value, ['mapillary']),
+      encode: normalizeIdSwitches,
+      decode: (value) => normalizeIdSwitches(value, ['mapillary']),
+    }),
     enumOption('pano', 'p', 'all', ['all', 'pano', 'flat'], {
       all: 'a',
       pano: 'p',

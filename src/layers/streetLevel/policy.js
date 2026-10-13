@@ -1,7 +1,17 @@
-/** Identity and tuning for the Street Level layer and its Mapillary imagery. */
+/** Identity and tuning for the Street Level layer and its Mapillary provider. */
 export const STREET_LEVEL_LAYER_ID = 'street-level';
+export const MAPILLARY_PROVIDER_ID = 'mapillary';
+export const MAPILLARY_NAME = 'Mapillary';
+export const MAPILLARY_LABEL = 'MAPILLARY';
 export const MAPILLARY_KEY_ID = 'mapillary';
 export const MAPILLARY_GRAPH_HOST = 'https://graph.mapillary.com';
+
+/** What the provider needs from its source (source.js or a stand-in). */
+export const MAPILLARY_SOURCE_METHODS = Object.freeze([
+  'getStatus',
+  'getTile',
+  'getSequenceImages',
+]);
 
 /** Pick id of the viewer position marker. */
 export const POSITION_PICK_ID = 'sl:pos';

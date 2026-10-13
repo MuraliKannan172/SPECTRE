@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { StreetLevelControls } from './streetLevelControls.js';
 import { createStreetLevelLayer } from '../layers/streetLevel/index.js';
+import { createMapillaryProvider } from '../layers/streetLevel/mapillaryProvider.js';
 import { DataLayerManager } from '../data/manager.js';
 import { LayerStateCoordinator } from '../data/layerStateCoordinator.js';
 import {
@@ -9,7 +10,10 @@ import {
   REGISTERED_LAYER_IDS,
   encodeLayerStateParams,
 } from '../data/layerState.js';
-import { fakeMapillarySource } from '../testSupport/streetLevelFakes.mjs';
+import {
+  fakeMapillarySource,
+  providerSnapshot,
+} from '../testSupport/streetLevelFakes.mjs';
 
 /* ── A small DOM: just what the panel controls touch ───────────────────── */
 
@@ -93,6 +97,23 @@ class FakeNode {
     for (let current = node; current; current = current.parent)
       if (current === this) return true;
     return false;
+  }
+  closest(selector) {
+    for (let current = this; current; current = current.parent)
+      if (current.matches?.(selector)) return current;
+    return null;
+  }
+  insertBefore(child, before) {
+    child.parent?.children.splice(child.parent.children.indexOf(child), 1);
+    child.parent = this;
+    const at = before ? this.children.indexOf(before) : -1;
+    if (at === -1) this.children.push(child);
+    else this.children.splice(at, 0, child);
+    return child;
+  }
+  remove() {
+    this.parent?.children.splice(this.parent.children.indexOf(this), 1);
+    this.parent = null;
   }
   focus() {
     this.ownerDocument.activeElement = this;
@@ -182,6 +203,7 @@ function panelDom({ fullscreen = true, popover = false } = {}) {
   const add = (parent, tag, options) =>
     parent.appendChild(new FakeNode(document, tag, options));
   add(root, 'button', { id: 'sl-status' });
+  add(root, 'div', { id: 'sl-provider-chips' });
   const wrap = add(root, 'div', { id: 'sl-viewer-wrap' });
   if (fullscreen) wrap.requestFullscreen = async () => fullscreenTo(wrap);
   if (popover) {
@@ -280,7 +302,9 @@ const memoryStorage = () => {
 
 /** The production path: controls → dataManager → layer → durable layer state. */
 async function productionPanel(dom) {
-  const layer = createStreetLevelLayer({ source: fakeMapillarySource() });
+  const layer = createStreetLevelLayer({
+    providers: [createMapillaryProvider({ source: fakeMapillarySource() })],
+  });
   const manager = new DataLayerManager({});
   for (const id of REGISTERED_LAYER_IDS)
     manager.register(id === 'street-level' ? layer : plainLayer(id));
@@ -390,7 +414,7 @@ function uiState({
 } = {}) {
   return {
     enabled,
-    providerOn: on,
+    providers: [providerSnapshot({ on, keyRequired })],
     keyRequired,
     keyRejected: false,
     filter: { pano, sinceDays: 0 },
@@ -408,7 +432,7 @@ function uiState({
 
 function stubPanel(dom, state, extraActions = {}) {
   const layer = stubLayer();
-  const calls = { setParams: [], setEnabled: [], collapsed: [] };
+  const calls = { setParams: [], setEnabled: [], collapsed: [], toasts: [] };
   let enabled = state.enabled;
   /** Reports a switch-on request's origin, as the data manager does. */
   let announce = null;
@@ -425,7 +449,7 @@ function stubPanel(dom, state, extraActions = {}) {
       setParams: (params, options) => calls.setParams.push([params, options]),
       setPanelCollapsed: (collapsed, options) =>
         calls.collapsed.push([collapsed, options]),
-      showToast() {},
+      showToast: (message) => calls.toasts.push(message),
       subscribeEnableRequests: (listener) => {
         announce = listener;
         return () => {
@@ -442,44 +466,66 @@ function stubPanel(dom, state, extraActions = {}) {
     controls,
     announce: (origin) => announce?.(origin),
     subscribed: () => announce !== null,
+    chip: () => dom.root.querySelector('#sl-provider-chips').children[0],
   };
 }
 
-test('the header pill switches the layer, bringing back Mapillary switched off elsewhere', () =>
+test('the header pill switches the layer; provider switches are left alone', () =>
   withDom(async (dom) => {
     const status = dom.root.querySelector('#sl-status');
-    const on = stubPanel(dom, uiState());
+    const { calls, controls } = stubPanel(dom, uiState());
     status.click();
     await settle();
-    assert.deepEqual(on.calls.setEnabled, [false]);
-    assert.deepEqual(on.calls.setParams, [], 'switching off keeps the switch');
-    on.controls.destroy();
-    const dark = stubPanel(dom, uiState({ enabled: false, on: false }));
-    status.click();
-    await settle();
-    assert.deepEqual(dark.calls.setParams, [
-      [{ mapillary: true }, { origin: 'user' }],
-    ]);
-    assert.deepEqual(dark.calls.setEnabled, [true]);
-    dark.controls.destroy();
+    assert.deepEqual(calls.setEnabled, [false]);
+    assert.deepEqual(calls.setParams, []);
+    controls.destroy();
   }));
 
-test('a layer that is on with Mapillary switched off reads OFF, and the pill brings Mapillary back', () =>
+test('darkening the only lit chip turns the layer off and keeps the provider switched on', () =>
   withDom(async (dom) => {
-    const status = dom.root.querySelector('#sl-status');
-    const { calls, controls } = stubPanel(dom, uiState({ on: false }));
-    assert.equal(status.textContent, 'OFF');
-    assert.equal(status.getAttribute('aria-pressed'), 'false');
-    assert.match(
-      dom.root.querySelector('#sl-coverage-meta').textContent,
-      /Mapillary is off in this view/,
+    const { calls, chip, controls } = stubPanel(dom, uiState());
+    assert.equal(chip().dataset.chipId, 'mapillary');
+    assert.equal(chip().getAttribute('aria-pressed'), 'true');
+    chip().click();
+    await settle();
+    assert.deepEqual(calls.setEnabled, [false]);
+    assert.deepEqual(calls.setParams, [], 'the provider switch is untouched');
+    controls.destroy();
+  }));
+
+test('lighting a dark chip switches the provider on as a user params request, then the layer', () =>
+  withDom(async (dom) => {
+    const { calls, chip, controls } = stubPanel(
+      dom,
+      uiState({ enabled: false, on: false }),
     );
-    status.click();
+    assert.equal(chip().getAttribute('aria-pressed'), 'false');
+    chip().click();
     await settle();
     assert.deepEqual(calls.setParams, [
       [{ mapillary: true }, { origin: 'user' }],
     ]);
-    assert.deepEqual(calls.setEnabled, [], 'the layer itself stays on');
+    assert.deepEqual(calls.setEnabled, [true]);
+    controls.destroy();
+  }));
+
+test('under KEY REQUIRED the provider chip stays live and explains the key instead of toggling', () =>
+  withDom(async (dom) => {
+    const { calls, chip, controls } = stubPanel(
+      dom,
+      uiState({ keyRequired: true }),
+    );
+    assert.equal(
+      dom.root.querySelector('#sl-controls').contains(chip()),
+      false,
+      'the chip is outside the disabled fieldset',
+    );
+    chip().click();
+    await settle();
+    assert.deepEqual(calls.setEnabled, []);
+    assert.deepEqual(calls.setParams, []);
+    assert.equal(calls.toasts.length, 1);
+    assert.match(calls.toasts[0], /^Mapillary: Needs /);
     controls.destroy();
   }));
 

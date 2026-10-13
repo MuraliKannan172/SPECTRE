@@ -1,10 +1,85 @@
-/** Shared Street Level test stand-ins: Mapillary source, photo viewer, Cesium viewer, ray-casting camera. */
+/** Shared Street Level test stand-ins: provider snapshot and provider, Mapillary source, photo viewer, Cesium viewer, ray-casting camera. */
 import * as Cesium from 'cesium';
+import { MAPILLARY_CREDIT_HTML } from '../layers/streetLevel/policy.js';
 
 const RAD = Math.PI / 180;
 
+/** One provider as `getUIState().providers` lists it. */
+export function providerSnapshot(overrides = {}) {
+  return {
+    id: 'mapillary',
+    name: 'Mapillary',
+    label: 'MAPILLARY',
+    on: true,
+    configured: true,
+    keyRequired: false,
+    requiresKeyId: 'mapillary',
+    loading: false,
+    count: 0,
+    hint: '',
+    error: null,
+    color: '#05cb63',
+    ...overrides,
+  };
+}
+
 /**
- * A Mapillary source for the layer: a configured key, empty tiles, and the
+ * The smallest provider the core accepts. Mutate `stats` to change what
+ * coverageStats() answers; `calls`, `filters` and `context()` record use.
+ */
+export function fakeStreetLevelProvider({
+  id = 'mapillary',
+  pickPrefix = 'mly:',
+  html = MAPILLARY_CREDIT_HTML,
+} = {}) {
+  const calls = { activate: 0, deactivate: 0, mount: 0, open: [], unmount: 0 };
+  const filters = [];
+  const stats = {
+    count: 0,
+    loading: false,
+    hint: '',
+    error: null,
+    keyRequired: false,
+  };
+  let context = null;
+  return {
+    calls,
+    filters,
+    stats,
+    context: () => context,
+    id,
+    name: 'Mapillary',
+    label: 'MAPILLARY',
+    requiresKeyId: null,
+    pickPrefix,
+    colors: { coverage: '#05cb63' },
+    credit: { html },
+    create: (providerContext) => {
+      context = providerContext;
+      return {
+        status: async () => ({ configured: true }),
+        init() {},
+        activate: () => calls.activate++,
+        deactivate: () => calls.deactivate++,
+        destroy() {},
+        setFilter: (filter) => filters.push(filter),
+        coverageStats: () => ({ ...stats }),
+        handlePick: () => false,
+        viewer: {
+          mount: async () => calls.mount++,
+          open: async (imageId) => calls.open.push(imageId),
+          close() {},
+          unmount: () => calls.unmount++,
+          resize() {},
+          onPose: () => () => {},
+        },
+      };
+    },
+  };
+}
+
+/**
+ * A Mapillary source for the provider: a configured key, empty tiles, and the
  * given lookups; `calls` records tile requests.
  */
 export function fakeMapillarySource(overrides = {}) {

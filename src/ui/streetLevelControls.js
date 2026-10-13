@@ -1,4 +1,5 @@
 import { isExplicitLayerStateOrigin } from '../data/layerState.js';
+import { syncChipGroup } from './chipGroup.js';
 import {
   presentStreetLevelPanel,
   SINCE_STOPS,
@@ -24,8 +25,8 @@ const setAttr = (node, key, value) => {
 };
 
 /**
- * Fills the Street Level panel body: filters and viewer. The panel chrome
- * itself belongs to the application shell.
+ * Fills the Street Level panel body: provider chips, filters and viewer. The
+ * panel chrome itself belongs to the application shell.
  */
 export class StreetLevelControls {
   constructor({ root, layer, actions }) {
@@ -36,6 +37,7 @@ export class StreetLevelControls {
     this.listeners = new AbortController();
     this._unsubscribe = null;
     this._state = null;
+    this._view = null;
     this._wasEnabled = null;
     this._wasOpen = false;
     // Whether the last switch-on was explicit (user, voice, tool), not a restore.
@@ -53,6 +55,7 @@ export class StreetLevelControls {
     ];
     return {
       status: byId('sl-status'),
+      providerChips: byId('sl-provider-chips'),
       controls: byId('sl-controls'),
       error: byId('sl-error'),
       errorText: byId('sl-error-text'),
@@ -85,6 +88,17 @@ export class StreetLevelControls {
     this.layer.attachViewerHost?.(el.viewer);
 
     this.listen(el.status, 'click', () => this._toggleEnabled());
+    this.listen(el.providerChips, 'click', (event) => {
+      const button = event.target?.closest?.('.data-toggle-chip');
+      if (!button || button.disabled) return;
+      // Without a key the chips stay focusable for their tooltip; a click
+      // says the same thing rather than switching on a layer that cannot draw.
+      if (this._view?.controlsDisabled) {
+        if (button.title) this.actions.showToast?.(button.title);
+        return;
+      }
+      this._toggleProvider(button.dataset.chipId);
+    });
     for (const button of el.panoButtons) {
       this.listen(button, 'click', () =>
         this._setParams({ pano: button.dataset.slPano }),
@@ -192,14 +206,47 @@ export class StreetLevelControls {
 
   async _toggleEnabled() {
     const enabled = this.actions.isEnabled?.() === true;
-    // The pill is the only switch: it also brings back Mapillary that a link
-    // or tool switched off under a layer that is on.
-    if (this._state?.providerOn === false) {
-      this._setParams({ mapillary: true });
-      if (enabled) return;
-    }
     try {
       await this.actions.setEnabled?.(!enabled);
+    } catch (error) {
+      this.actions.showToast?.(error?.message || 'Street Level toggle failed');
+    }
+  }
+
+  async _ensureEnabled() {
+    if (this.actions.isEnabled?.()) return true;
+    try {
+      await this.actions.setEnabled?.(true);
+    } catch (error) {
+      this.actions.showToast?.(
+        error?.message || 'Street Level could not start',
+      );
+      return false;
+    }
+    return this.actions.isEnabled?.() === true;
+  }
+
+  /**
+   * Lighting a chip turns the layer on; darkening the last lit one turns the
+   * layer off but keeps the provider on, so the layer comes back with it.
+   */
+  async _toggleProvider(providerId) {
+    const chip = this._view?.providers.find((entry) => entry.id === providerId);
+    if (!chip) return;
+    if (!chip.active) {
+      this._setParams({ [providerId]: true });
+      await this._ensureEnabled();
+      return;
+    }
+    const othersLit = this._view.providers.some(
+      (entry) => entry.id !== providerId && entry.active,
+    );
+    if (othersLit) {
+      this._setParams({ [providerId]: false });
+      return;
+    }
+    try {
+      await this.actions.setEnabled?.(false);
     } catch (error) {
       this.actions.showToast?.(error?.message || 'Street Level toggle failed');
     }
@@ -315,8 +362,10 @@ export class StreetLevelControls {
     if (this.destroyed || !state || !this.root) return;
     this._state = state;
     const view = presentStreetLevelPanel(state);
+    this._view = view;
     this._renderHeader(view);
     setProp(this._elements.controls, 'disabled', view.controlsDisabled);
+    syncChipGroup(this._elements.providerChips, view.providers);
     this._renderError(view);
     this._renderFilters(view);
     this._renderViewer(view);

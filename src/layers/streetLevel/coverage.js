@@ -1,7 +1,6 @@
 import * as Cesium from 'cesium';
 import { decodeCoverageTile } from './decode.js';
-import { passesImageryFilter, resolveFilter } from './filter.js';
-import { isActive } from './state.js';
+import { passesImageryFilter } from './filter.js';
 import { groundUnderCamera, viewFocus, visibleBbox } from './view.js';
 import { coverageZoomForHeight, tilesForBbox } from './tileMath.js';
 import {
@@ -96,7 +95,7 @@ export function createCoverage({ state, source }) {
 
   /** The imagery filter, resolved now: "since N days" moves with the clock. */
   function filter() {
-    return resolveFilter(state.filter);
+    return state.getFilter();
   }
 
   /**
@@ -320,7 +319,7 @@ export function createCoverage({ state, source }) {
   /** Recompute the tile set for the current camera and reconcile primitives. */
   function refresh() {
     const viewer = state.viewer;
-    if (!viewer || !isActive(state) || state.coverage.blocked) return;
+    if (!viewer || !state.isActive() || state.coverage.blocked) return;
     const { zoom, tiles, hint } = wantedTiles(viewer);
     if (hint) {
       state.coverage.hint = hint;
@@ -410,7 +409,7 @@ export function createCoverage({ state, source }) {
       // Waiting for the key status is loading too, not an empty view.
       loading:
         state.coverage.pending.size > 0 ||
-        (blocked === 'status' && isActive(state)),
+        (blocked === 'status' && state.isActive()),
       hint: state.coverage.hint,
       keyRequired: blocked === 'no-key' || blocked === 'rejected',
       keyRejected: blocked === 'rejected',

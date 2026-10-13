@@ -3,6 +3,7 @@ import test from 'node:test';
 import * as Cesium from 'cesium';
 import { createCoverage, ZOOM_IN_HINT } from './coverage.js';
 import { freshCoverage } from './state.js';
+import { resolveFilter } from './filter.js';
 import { encodeCoverageTile } from './coverageFixture.mjs';
 import { rayCamera } from '../../testSupport/streetLevelFakes.mjs';
 import { COVERAGE_MAX_SEQUENCES, COVERAGE_MAX_TILES } from './policy.js';
@@ -93,6 +94,8 @@ function setup() {
     enabled: true,
     providerOn: true,
     filter: { pano: 'all', sinceDays: 0 },
+    getFilter: () => resolveFilter(state.filter),
+    isActive: () => state.enabled && state.providerOn,
     notify() {},
     coverage: {
       ...freshCoverage(),

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as Cesium from 'cesium';
 import { createStreetLevelLayer } from './index.js';
+import { createMapillaryProvider } from './mapillaryProvider.js';
 import { MAPILLARY_CREDIT_HTML } from './policy.js';
 import {
   fakeCesiumViewer,
@@ -18,6 +19,7 @@ async function startLayer(
   {
     source = fakeMapillarySource(),
     photoViewer = fakePhotoViewer(),
+    providers = [createMapillaryProvider({ source, photoViewer })],
     view = false,
     enable = true,
   } = {},
@@ -32,7 +34,7 @@ async function startLayer(
     async () => {},
   );
   const viewer = fakeCesiumViewer({ view });
-  const layer = createStreetLevelLayer({ source, photoViewer });
+  const layer = createStreetLevelLayer({ providers });
   layer.init(viewer);
   if (enable) layer.enable(viewer);
   t.after(() => {
@@ -181,13 +183,13 @@ test('a rejected key gates the layer as KEY REJECTED until it goes off', async (
 test('switching Mapillary off clears coverage and closes the image it shows', async (t) => {
   const { layer, photoViewer } = await startLayer(t);
   layer.attachViewerHost({});
-  assert.equal(await layer.openImage('img1'), true);
+  assert.equal(await layer.openImage('mapillary', 'img1'), true);
   assert.deepEqual(photoViewer.calls.open, ['img1']);
   assert.equal(layer.getUIState().street.open, true);
   layer.setParams({ mapillary: false });
   assert.equal(photoViewer.calls.unmount, 1, 'its viewer is released');
   assert.equal(layer.getUIState().street.open, false);
-  assert.equal(layer.getUIState().providerOn, false);
+  assert.equal(layer.getUIState().providers[0].on, false);
 });
 
 test('a sequence that fails to load reports it apart from the photo, and the error goes with it', async (t) => {
@@ -202,7 +204,7 @@ test('a sequence that fails to load reports it apart from the photo, and the err
   });
   const { layer } = await startLayer(t, { source, photoViewer });
   layer.attachViewerHost({});
-  assert.equal(await layer.openImage('img1'), true);
+  assert.equal(await layer.openImage('mapillary', 'img1'), true);
   await settle();
   let ui = layer.getUIState();
   assert.equal(ui.sequence.error, 'Sequence images unavailable');
@@ -217,17 +219,17 @@ test('closing the photo, switching the layer off or destroying it stops the fram
     photoViewer: posingViewer(),
   });
   layer.attachViewerHost({});
-  assert.equal(await layer.openImage('img1'), true);
+  assert.equal(await layer.openImage('mapillary', 'img1'), true);
   assert.equal(viewer.flights.started, 1, 'the photo is framed');
   layer.closeViewer();
   assert.equal(viewer.flights.cancelled, 1, 'closed');
 
-  await layer.openImage('img2');
+  await layer.openImage('mapillary', 'img2');
   layer.disable();
   assert.equal(viewer.flights.cancelled, 2, 'layer off');
 
   layer.enable(viewer);
-  await layer.openImage('img3');
+  await layer.openImage('mapillary', 'img3');
   layer.destroy();
   assert.equal(viewer.flights.cancelled, 3, 'destroyed');
 });
@@ -264,7 +266,7 @@ test('setParams ignores unknown keys and malformed values', async (t) => {
   });
 });
 
-test('switching Mapillary on while the layer is off draws nothing (M01)', async (t) => {
+test('switching Mapillary on while the layer is off draws nothing', async (t) => {
   const { layer, viewer, source, photoViewer } = await startLayer(t, {
     view: true,
     enable: false,
@@ -276,10 +278,24 @@ test('switching Mapillary on while the layer is off draws nothing (M01)', async 
   assert.equal(source.calls.tiles.length, 0, 'no coverage drawn');
   assert.deepEqual(viewer.credits, [], 'no credit shown');
   assert.equal(photoViewer.calls.mount, 0, 'no viewer stood up');
-  assert.equal(layer.getUIState().providerOn, true, 'the switch is kept');
+  assert.equal(layer.getUIState().providers[0].on, true, 'the switch is kept');
   // Enabling the layer is what draws it.
   layer.enable(viewer);
   await settle();
   assert.ok(source.calls.tiles.length > 0);
   assert.equal(viewer.credits.length, 1);
+});
+
+test('an empty provider composition enables and tears down without acquiring imagery', async (t) => {
+  const { layer, viewer } = await startLayer(t, { providers: [] });
+  assert.deepEqual(layer.providerIds, []);
+  assert.deepEqual(layer.getUIState().providers, []);
+  assert.equal(layer.getUIState().keyRequired, false);
+  assert.match(
+    layer.getUIState().coverage.hint,
+    /No street-level imagery providers/,
+  );
+  layer.disable();
+  layer.enable(viewer);
+  assert.deepEqual(layer.getUIState().providers, []);
 });

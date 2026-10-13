@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium';
 import { imageConeGlyph } from './glyphs.js';
-import { passesImageryFilter, resolveFilter } from './filter.js';
+import { passesImageryFilter } from './filter.js';
 import { createHorizonCull, metresBetween } from './view.js';
 import {
   COLORS,
@@ -89,7 +89,7 @@ export function createSequences({ state, source, parts }) {
       pano: true,
     });
     // Resolved now, so a "since N days" window keeps up with the clock.
-    const filter = resolveFilter(state.filter);
+    const filter = state.getFilter();
     for (const image of images) {
       if (!passesImageryFilter(image, filter)) continue;
       const billboard = collection.add({

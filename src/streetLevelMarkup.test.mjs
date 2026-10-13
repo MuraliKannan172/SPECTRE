@@ -46,6 +46,9 @@ test('the key gate holds every filter, with the error line outside it', () => {
   assert.match(gate, /data-sl-pano="all"/);
   assert.match(gate, /id="sl-since"/);
   assert.ok(html.indexOf('id="sl-error"') < start);
+  // The chips stay outside the gate, so their key tooltip is reachable.
+  assert.match(html, /<div id="sl-provider-chips" class="sl-chips"><\/div>/);
+  assert.doesNotMatch(gate, /sl-provider-chips/);
   assert.match(html, /id="sl-error"[^>]*role="alert"/);
 });
 
