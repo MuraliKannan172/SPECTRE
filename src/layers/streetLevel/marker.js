@@ -1,10 +1,27 @@
 import * as Cesium from 'cesium';
-import { positionMarkerGlyph } from './glyphs.js';
+import { positionMarkerGlyph, viewConeMarkerGlyph } from './glyphs.js';
 import { COLORS, POSITION_PICK_ID } from './policy.js';
 import { refineHeights } from './groundCast.js';
 import { createHorizonCull } from './view.js';
 
 const SPRITE_ID = 'street-level:marker';
+
+/** The billboard look for a marker style: GEV's pin, or a provider's view cone. */
+function markerLook(style) {
+  if (style?.kind === 'view-cone') {
+    const color = style.color || COLORS.position;
+    return {
+      key: `view-cone:${color}`,
+      image: viewConeMarkerGlyph({ color }),
+      size: 48,
+    };
+  }
+  return {
+    key: 'pin',
+    image: positionMarkerGlyph({ color: COLORS.position }),
+    size: 40,
+  };
+}
 
 /** On-globe marker for the open image; in terrain mode it stands on bare earth. */
 export function createMarker({ state, parts }) {
@@ -42,7 +59,8 @@ export function createMarker({ state, parts }) {
     const dem = ground.groundAt(lon, lat);
     if (dem === null) {
       ground.prepare([[lon, lat]]).then((ready) => {
-        if (ready && last?.position === position) set(position, last.bearing);
+        if (ready && last?.position === position)
+          set(position, last.bearing, last.style);
       });
       return null;
     }
@@ -53,14 +71,19 @@ export function createMarker({ state, parts }) {
 
   // A new mesh sample may move the marker onto (or off) the road surface.
   parts?.meshSampler?.onSampled(() => {
-    if (last && state.surface === 'terrain') set(last.position, last.bearing);
+    if (last && state.surface === 'terrain')
+      set(last.position, last.bearing, last.style);
   });
 
-  /** Move (or create) the marker; a null position removes it. */
-  function set(position, bearing) {
+  /**
+   * Move (or create) the marker; a null position removes it. `style` is the
+   * open image's provider marker ({kind: 'view-cone', color}); GEV's pin
+   * without one.
+   */
+  function set(position, bearing, style = null) {
     const collection = state.marker.collection;
     if (!collection) return;
-    last = position ? { position, bearing } : null;
+    last = position ? { position, bearing, style } : null;
     if (!position) {
       collection.removeAll();
       state.marker.billboard = null;
@@ -78,14 +101,21 @@ export function createMarker({ state, parts }) {
       height === null
         ? Cesium.HeightReference.CLAMP_TO_GROUND
         : Cesium.HeightReference.NONE;
+    const look = markerLook(style);
+    // Another provider's photo: the marker changes its look.
+    if (state.marker.billboard && state.marker.look !== look.key) {
+      collection.remove?.(state.marker.billboard);
+      state.marker.billboard = null;
+    }
     if (!state.marker.billboard) {
+      state.marker.look = look.key;
       state.marker.billboard = collection.add({
         id: POSITION_PICK_ID,
         position: cartesian,
-        image: positionMarkerGlyph({ color: COLORS.position }),
-        imageId: 'sl-position',
-        width: 40,
-        height: 40,
+        image: look.image,
+        imageId: `sl-position:${look.key}`,
+        width: look.size,
+        height: look.size,
         alignedAxis: Cesium.Cartesian3.UNIT_Z,
         heightReference,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -117,7 +147,7 @@ export function createMarker({ state, parts }) {
 
   /** Re-place the marker after the surface mode changes. */
   function setSurface() {
-    if (last) set(last.position, last.bearing);
+    if (last) set(last.position, last.bearing, last.style);
   }
 
   return {

@@ -1960,7 +1960,7 @@ async function main() {
             }));
             assert.match(shown.by, /Image by /);
             assert.match(shown.when, /\d{4}-\d{2}$/, 'dated by month');
-            assert.equal(shown.label, 'STREET VIEW ↗');
+            assert.equal(shown.label, 'GOOGLE STREET VIEW ↗');
             assert.match(shown.href, /map_action=pano&pano=/);
             assert.equal(shown.fitFillHidden, true, 'no FIT/FILL for Google');
             assert.equal(shown.panorama, true);

@@ -102,7 +102,9 @@
   open Google's own panorama in
   the panel, with its arrows, the address and month in the caption, a link
   to Google Maps and FOLLOW. Share links carry it in the provider switches
-  (`r.google-1`).
+  (`r.google-1`). Its panoramas are all 360°, so the IMAGERY and SINCE
+  filters and the legend apply to Mapillary only and hide when GOOGLE STREET
+  VIEW is the only lit provider.
 
 - Add an experimental ChatGPT/Codex OAuth option for cloud voice in Provider
   Settings. API-key voice remains the default. Local sign-in can start from

@@ -15,6 +15,8 @@ import { COLORS } from './policy.js';
  * @property {string} hint
  * @property {string|null} error
  * @property {string} color   The source's one colour.
+ * @property {boolean} [groundClick]   Draws no coverage: opens where the user clicks.
+ * @property {Array<'pano'|'since'>} [filters]   Imagery filters it honours.
  */
 
 /**
@@ -56,8 +58,22 @@ export function keyAlternatives(providers) {
 }
 
 /**
+ * Which filter controls mean anything: those a switched-on provider honours.
+ * With none switched on, both show (they apply once one is).
+ * @param {Array<ProviderSnapshot>} providers
+ */
+export function filterControls(providers) {
+  const active = providers.filter((p) => p.on);
+  const honoured = (key) =>
+    active.length === 0 ||
+    active.some((p) => (p.filters ?? ['pano', 'since']).includes(key));
+  return { pano: honoured('pano'), since: honoured('since') };
+}
+
+/**
  * The panel snapshot from core state and provider snapshots. The legend has
- * one swatch per active source, then the shared selection colour.
+ * one swatch per active source that draws coverage lines, then the shared
+ * selection colour; a source that only opens where the user clicks has none.
  * @param {{enabled: boolean, filter: object, providers: Array<ProviderSnapshot>, street: object, sequence: object}} input
  */
 export function composeUIState({
@@ -72,12 +88,14 @@ export function composeUIState({
   const active = providers.filter((p) => p.on);
   const { keyRequired, keyRejected, ...coverage } =
     summarizeCoverage(providers);
-  const legend = active.map((provider) => ({
-    key: provider.id,
-    label: provider.name,
-    color: provider.color,
-  }));
-  if (active.length)
+  const legend = active
+    .filter((provider) => provider.groundClick !== true)
+    .map((provider) => ({
+      key: provider.id,
+      label: provider.name,
+      color: provider.color,
+    }));
+  if (legend.length)
     legend.push({ key: 'selected', label: 'Selected', color: COLORS.selected });
   return {
     enabled,
@@ -87,6 +105,7 @@ export function composeUIState({
     keyAlternatives: keyAlternatives(providers),
     keyRejected,
     filter: { ...filter },
+    filterControls: filterControls(providers),
     providers: providers.map((p) => ({ ...p })),
     coverage,
     legend,

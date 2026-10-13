@@ -69,6 +69,8 @@ export class StreetLevelControls {
       nearestBtn: byId('sl-nearest-btn'),
       error: byId('sl-error'),
       errorText: byId('sl-error-text'),
+      panoRow: byId('sl-pano-row'),
+      sinceRow: byId('sl-since-row'),
       sinceRange: byId('sl-since'),
       sinceLabel: byId('sl-since-label'),
       legend: byId('sl-legend'),
@@ -532,6 +534,11 @@ export class StreetLevelControls {
 
   _renderFilters(view) {
     const el = this._elements;
+    const shows = view.filterControls || { pano: true, since: true };
+    setProp(el.panoRow, 'hidden', !shows.pano);
+    setProp(el.sinceRow, 'hidden', !shows.since);
+    setProp(el.controls, 'hidden', !shows.pano && !shows.since);
+    setProp(el.legend, 'hidden', view.legend.length === 0);
     this._renderRadios(
       el.panoButtons,
       (button) => button.dataset.slPano === view.filter.pano,

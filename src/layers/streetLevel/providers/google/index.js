@@ -1,4 +1,3 @@
-import { passesImageryFilter } from '../../filter.js';
 import { FOLLOW_MAP_STACK_ID } from '../../policy.js';
 import { createMapsLoader } from './mapsLoader.js';
 import { createGoogleViewer } from './viewer.js';
@@ -9,14 +8,12 @@ import {
   GOOGLE_LABEL,
   GOOGLE_NAME,
   GOOGLE_PROVIDER_ID,
-  FLAT_FILTER_HINT,
   GROUND_CLICK_HINT,
   KEY_REJECTED_MESSAGE,
   NEAREST_RADIUS_M,
   NEAREST_TIMEOUT_MS,
   NO_ANSWER_MESSAGE,
   PICK_PREFIX,
-  imageMonthEndMs,
 } from './policy.js';
 
 /**
@@ -75,6 +72,11 @@ export function createGoogleProvider({
     requiresMapStack: FOLLOW_MAP_STACK_ID,
     // Every panorama is billed to the Maps key: the user lights the chip.
     defaultOn: false,
+    // Every panorama is 360°, and with no coverage drawn there is nothing
+    // for a date filter to thin: the user picks the place by clicking it.
+    filters: [],
+    // Google Maps' own look for where a panorama stands and looks.
+    marker: Object.freeze({ kind: 'view-cone', color: COLORS.coverage }),
 
     create(context) {
       let keyRequired = !getApiKey();
@@ -122,7 +124,7 @@ export function createGoogleProvider({
 
         refreshCoverage() {},
 
-        /** Nothing drawn to redraw: lookups read the filter when they run. */
+        /** No filter applies to Street View (see `filters`). */
         setFilter() {},
 
         coverageStats() {
@@ -133,11 +135,7 @@ export function createGoogleProvider({
             kind: null,
             loading: false,
             hint:
-              !active || keyRequired || keyRejected
-                ? ''
-                : context.getFilter().pano === 'flat'
-                  ? FLAT_FILTER_HINT
-                  : GROUND_CLICK_HINT,
+              !active || keyRequired || keyRejected ? '' : GROUND_CLICK_HINT,
             error: keyRejected ? KEY_REJECTED_MESSAGE : null,
             keyRequired,
             keyRejected,
@@ -147,14 +145,12 @@ export function createGoogleProvider({
         handlePick: () => false,
 
         /**
-         * Nearest Google-collected outdoor panorama that passes the imagery
-         * filter, or null. Every Street View panorama is 360°.
+         * Nearest Google-collected outdoor panorama, or null. The imagery
+         * filters do not apply (see `filters`).
          */
         async nearestImage({ lat, lon }, { signal } = {}) {
           if (loader.authFailed()) throw new Error(KEY_REJECTED_MESSAGE);
           signal?.throwIfAborted();
-          const filter = context.getFilter();
-          if (filter.pano === 'flat') return null;
           // Set once the caller has its answer (aborted, timed out, refused):
           // a lookup still waiting on Google's script then asks nothing.
           let settled = false;
@@ -186,11 +182,6 @@ export function createGoogleProvider({
           });
           const panoId = data?.location?.pano;
           if (!panoId) return null;
-          const passes = passesImageryFilter(
-            { isPano: true, capturedAt: imageMonthEndMs(data.imageDate) ?? 0 },
-            filter,
-          );
-          if (!passes) return null;
           viewer.remember(panoId, data);
           return panoId;
         },

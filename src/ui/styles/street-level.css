@@ -229,7 +229,11 @@ button.sl-status:focus-visible {
   border-radius: 999px;
 }
 
-.sl-seg[hidden] {
+.sl-seg[hidden],
+.sl-controls[hidden],
+.sl-filters[hidden],
+.sl-since[hidden],
+.sl-legend[hidden] {
   display: none;
 }
 

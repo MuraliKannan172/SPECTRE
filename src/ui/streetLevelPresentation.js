@@ -222,6 +222,11 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
       ? null
       : state.street.error || state.coverage.error || null,
     filter: { pano: filter.pano, sinceDays: Number(filter.sinceDays) || 0 },
+    // Only the filters a lit provider honours (none for Street View alone).
+    filterControls: {
+      pano: state.filterControls?.pano !== false,
+      since: state.filterControls?.since !== false,
+    },
     since: presentSince(filter.sinceDays, now),
     legend: state.legend || [],
     viewer: presentViewer(state),

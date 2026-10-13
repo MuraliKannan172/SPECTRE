@@ -307,10 +307,12 @@ function panelDom() {
     add(settings, 'div', { id });
   // A missing key gates the filters only; the chips stay outside the gate.
   const controls = add(settings, 'fieldset', { id: 'sl-controls' });
+  const panoRow = add(controls, 'div', { id: 'sl-pano-row' });
   for (const pano of ['all', 'pano', 'flat'])
-    add(controls, 'button', { dataset: { slPano: pano } });
-  add(controls, 'input', { id: 'sl-since' });
-  add(controls, 'output', { id: 'sl-since-label' });
+    add(panoRow, 'button', { dataset: { slPano: pano } });
+  const sinceRow = add(controls, 'div', { id: 'sl-since-row' });
+  add(sinceRow, 'input', { id: 'sl-since' });
+  add(sinceRow, 'output', { id: 'sl-since-label' });
   add(settings, 'ul', { id: 'sl-legend' });
   const metaRow = add(settings, 'div', { classes: ['sl-meta-row'] });
   add(metaRow, 'div', { id: 'sl-coverage-meta' });
@@ -1206,4 +1208,40 @@ test('a refused key on one provider leaves the other chip switchable, and the re
       { origin: 'user' },
     ]);
     assert.equal(calls.toasts.length, 0);
+  }));
+
+test('Street View alone hides the imagery filters and the legend; Mapillary beside it brings them back', () =>
+  withDom(async (dom) => {
+    const state = uiState();
+    const { layer } = stubPanel(dom, state);
+    const shown = () => ({
+      pano: !dom.root.querySelector('#sl-pano-row').hidden,
+      since: !dom.root.querySelector('#sl-since-row').hidden,
+      controls: !dom.root.querySelector('#sl-controls').hidden,
+      legend: !dom.root.querySelector('#sl-legend').hidden,
+    });
+    assert.deepEqual(shown(), {
+      pano: true,
+      since: true,
+      controls: true,
+      legend: true,
+    });
+    layer.publish({
+      ...state,
+      filterControls: { pano: false, since: false },
+      legend: [],
+    });
+    assert.deepEqual(shown(), {
+      pano: false,
+      since: false,
+      controls: false,
+      legend: false,
+    });
+    layer.publish(state);
+    assert.deepEqual(shown(), {
+      pano: true,
+      since: true,
+      controls: true,
+      legend: true,
+    });
   }));

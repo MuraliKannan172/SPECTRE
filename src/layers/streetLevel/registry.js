@@ -1,5 +1,13 @@
 import { encodeIdSwitches } from '../../data/idSwitches.js';
 
+/** The imagery filters a provider can honour. */
+export const IMAGERY_FILTERS = Object.freeze(['pano', 'since']);
+
+/** The filters `provider` honours: both, unless it says otherwise. */
+export function filtersOf(provider) {
+  return provider?.filters ?? IMAGERY_FILTERS;
+}
+
 /**
  * The contract an imagery provider registers with the Street Level layer.
  *
@@ -14,6 +22,8 @@ import { encodeIdSwitches } from '../../data/idSwitches.js';
  * @property {boolean} [groundClick]   No coverage to click: a click on the ground at street zoom opens its nearest image.
  * @property {string} [requiresMapStack]   Usable only on this map stack (Google Street View: 'photoreal', per Google's terms).
  * @property {boolean} [defaultOn]     Switched on until the user says otherwise (default true); a share link without its switch keeps it.
+ * @property {{kind: 'view-cone', color: string}} [marker]   On-globe marker for its open image (default GEV's pin): Street View's blue field-of-view cone.
+ * @property {Array<'pano'|'since'>} [filters]   The imagery filters it honours (default both); the panel hides a filter no lit provider honours.
  * @property {(context: ProviderContext) => ProviderInstance} create
  *
  * @typedef {object} ProviderContext   Handed to `create()` once by the core.
@@ -128,6 +138,26 @@ export function validateProviders(providers) {
     )
       throw new TypeError(
         `Street Level provider ${label} needs a coverage colour`,
+      );
+    if (
+      provider.marker !== undefined &&
+      !(
+        provider.marker?.kind === 'view-cone' &&
+        typeof provider.marker.color === 'string'
+      )
+    )
+      throw new TypeError(
+        `Street Level provider ${label}: marker must be {kind: 'view-cone', color}`,
+      );
+    if (
+      provider.filters !== undefined &&
+      !(
+        Array.isArray(provider.filters) &&
+        provider.filters.every((key) => IMAGERY_FILTERS.includes(key))
+      )
+    )
+      throw new TypeError(
+        `Street Level provider ${label}: filters must list ${IMAGERY_FILTERS.join(' or ')}`,
       );
     ids.add(provider.id);
     prefixes.push(provider.pickPrefix);

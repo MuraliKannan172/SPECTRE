@@ -5,7 +5,7 @@ export { NEAREST_RADIUS_M } from '../../policy.js';
 /** Identity of the Google Street View street-level provider. */
 export const GOOGLE_PROVIDER_ID = 'google';
 export const GOOGLE_NAME = 'Google Street View';
-export const GOOGLE_LABEL = 'STREET VIEW';
+export const GOOGLE_LABEL = 'GOOGLE STREET VIEW';
 /** The browser Maps key; Street View also needs the Maps JavaScript API on it. */
 export const GOOGLE_KEY_ID = 'google-maps';
 
@@ -40,9 +40,6 @@ export const DETAILS_RETRY_COOLDOWN_MS = 5_000;
 export const NO_ANSWER_MESSAGE =
   'Street View did not answer — check the network, and that the Maps JavaScript API is enabled for GOOGLE_MAPS_API_KEY';
 
-/** Under FLAT, in place of the click hint: every Street View photo is 360°. */
-export const FLAT_FILTER_HINT = 'Street View has 360° photos only';
-
 /** Shown while the provider is on, in place of coverage lines it does not have. */
 export const GROUND_CLICK_HINT = 'click a street to open Street View';
 
@@ -65,17 +62,6 @@ export function imageDateMs(imageDate) {
   const month = Number(match[2]);
   if (month < 1 || month > 12) return null;
   return Date.UTC(Number(match[1]), month - 1, 1);
-}
-
-/**
- * The last millisecond of an image's month: Google dates by month, so a
- * "since" window keeps a panorama taken any time in its cut-off month.
- */
-export function imageMonthEndMs(imageDate) {
-  const start = imageDateMs(imageDate);
-  if (start === null) return null;
-  const date = new Date(start);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1) - 1;
 }
 
 /** The photographer from a copyright line ('© 2024 Google' → 'Google'). */

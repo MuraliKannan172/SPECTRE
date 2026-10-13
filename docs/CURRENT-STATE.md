@@ -3157,12 +3157,19 @@ below 3 km) opens its nearest Google-collected outdoor panorama within 50 m
 and leaves the camera where it is (`groundClick.js`). Higher up the hint
 says to zoom in. **OPEN STREET VIEW** beside that hint (`#sl-nearest-btn`)
 does the same at the view centre, so Street View needs no pointer; it is
-disabled until the camera is at street zoom. The viewer is Google's `StreetViewPanorama` in its own
+disabled until the camera is at street zoom (and aimed at the sky, it opens
+nothing and says to aim at a street). The chip reads GOOGLE STREET VIEW. Its
+panoramas are all 360° and it draws no coverage, so it declares `filters: []`
+(a provider's `filters` default to both `pano` and `since`): lookups ignore
+the IMAGERY and SINCE filters, the panel hides each filter row no lit provider
+honours (`filterControls`), and the legend lists only providers that draw
+lines, with "Selected" only beside one of them. The viewer is Google's `StreetViewPanorama` in its own
 element in the viewer host, without Google's fullscreen, close and address
 controls (the address goes in the caption); a pose goes out at once and
 again when the panorama's month, photographer and address arrive (one
 successful lookup per panorama per session, seeded by the nearest lookup;
-failed details lookups wait five seconds before a view event can retry). A key
+a details lookup that fails or takes over ten seconds waits five seconds
+before a view event can retry, and an unmount drops lookups in flight). A key
 Google refuses (`gm_authFailure`: the API not enabled, a referrer it does
 not allow, billing off) reads KEY REJECTED and fails a pending open at
 once; a lookup or open Google never answers fails after 10 or 20 s. In CI

@@ -40,7 +40,11 @@ export function createViewerHost({ state, parts }) {
       creator: pose.creator || null,
       externalUrl: pose.externalUrl || null,
     });
-    parts.marker.set(state.street.position, state.street.bearing);
+    parts.marker.set(
+      state.street.position,
+      state.street.bearing,
+      providerEntry(pose.providerId)?.def.marker,
+    );
     parts.follow.followCamera();
     // Select the sequence only once the image is on screen, so its lookup
     // never competes with the image download.

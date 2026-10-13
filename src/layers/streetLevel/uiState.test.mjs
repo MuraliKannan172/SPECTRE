@@ -85,6 +85,49 @@ test('the legend is one swatch per active source, in its colour, then Selected',
   );
 });
 
+test('Street View draws no lines: no legend swatch, and no Selected on its own', () => {
+  const streetView = provider({
+    id: 'google',
+    name: 'Google Street View',
+    color: '#4285f4',
+    count: 0,
+    groundClick: true,
+    filters: [],
+  });
+  assert.deepEqual(
+    composeUIState({ ...base, providers: [streetView] }).legend,
+    [],
+  );
+  assert.deepEqual(
+    composeUIState({
+      ...base,
+      providers: [provider(), streetView],
+    }).legend.map((entry) => entry.key),
+    ['mapillary', 'selected'],
+  );
+});
+
+test('the filter controls show only for a lit provider that honours them', () => {
+  const streetView = provider({ id: 'google', groundClick: true, filters: [] });
+  const controls = (providers) =>
+    composeUIState({ ...base, providers }).filterControls;
+  assert.deepEqual(controls([streetView]), { pano: false, since: false });
+  assert.deepEqual(controls([provider(), streetView]), {
+    pano: true,
+    since: true,
+  });
+  assert.deepEqual(
+    controls([provider({ on: false }), streetView]),
+    { pano: false, since: false },
+    'Mapillary switched off',
+  );
+  assert.deepEqual(
+    controls([provider({ on: false }), { ...streetView, on: false }]),
+    { pano: true, since: true },
+    'nothing lit: both, ready for the first chip',
+  );
+});
+
 test('hint and error come from the first active provider that has one', () => {
   const ui = composeUIState({
     ...base,

@@ -696,7 +696,7 @@ test('with no Mapillary token, the layer points at Street View, on Google 3D onl
   const stats = layer.getStats();
   assert.equal(stats.keyRequired, true);
   assert.deepEqual(stats.keyAlternatives, [
-    { id: 'google', label: 'STREET VIEW', requiresKeyId: 'google-maps' },
+    { id: 'google', label: 'GOOGLE STREET VIEW', requiresKeyId: 'google-maps' },
   ]);
   assert.deepEqual(layer.getUIState().keyAlternatives, stats.keyAlternatives);
   stack.switchTo('esri-imagery');

@@ -6,7 +6,7 @@ import { createCredits } from './credits.js';
 import { createPickRouter } from './pickRouter.js';
 import { createSelection } from './selection.js';
 import { createViewerHost } from './viewerHost.js';
-import { requiresKeyIdFor, validateProviders } from './registry.js';
+import { filtersOf, requiresKeyIdFor, validateProviders } from './registry.js';
 import { normalizeFilter, resolveFilter, sameFilter } from './filter.js';
 import { decodeParams, encodeParams } from './params.js';
 import {
@@ -392,6 +392,7 @@ export function createStreetLevelLayer({
         color: entry.def.colors.coverage,
         /** No coverage to click: it opens where the user points. */
         groundClick: entry.def.groundClick === true,
+        filters: [...filtersOf(entry.def)],
       };
     });
   }

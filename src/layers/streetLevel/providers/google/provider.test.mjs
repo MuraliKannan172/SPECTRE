@@ -64,7 +64,9 @@ function setup({ key = 'browser-key', nearest = () => 'fresh' } = {}) {
 test('the provider registers beside Mapillary, off by default, gated on the browser Maps key', () => {
   const { def } = setup();
   assert.equal(def.id, 'google');
-  assert.equal(def.label, 'STREET VIEW');
+  assert.equal(def.label, 'GOOGLE STREET VIEW');
+  assert.deepEqual(def.filters, [], 'no imagery filter applies');
+  assert.deepEqual(def.marker, { kind: 'view-cone', color: '#4285f4' });
   assert.equal(def.requiresKeyId, 'google-maps');
   assert.equal(def.defaultOn, false, 'every panorama is billed');
   assert.equal(def.groundClick, true);
@@ -105,20 +107,23 @@ test('the nearest lookup asks Google for its own outdoor imagery within 50 m', a
   assert.equal(request.preference, 'nearest');
 });
 
-test('no panorama nearby, or one the imagery filter excludes, is null', async () => {
+test('no panorama nearby is null; the imagery filters (Mapillary\u2019s) do not apply', async () => {
   const none = setup({ nearest: () => null });
   assert.equal(await none.instance.nearestImage({ lat: 0, lon: 0 }), null);
 
-  const { instance, fake, setFilter } = setup({ nearest: () => 'old' });
-  setFilter({ pano: 'all', sinceMs: Date.UTC(2020, 0, 1) });
-  assert.equal(await instance.nearestImage({ lat: 0, lon: 0 }), null);
-  // Every Street View panorama is 360°: FLAT asks Google nothing.
+  const { instance, setFilter } = setup({ nearest: () => 'old' }); // 2009
+  for (const filter of [
+    { pano: 'all', sinceMs: Date.UTC(2020, 0, 1) },
+    { pano: 'flat', sinceMs: null },
+    { pano: 'pano', sinceMs: Date.UTC(2025, 0, 1) },
+  ]) {
+    setFilter(filter);
+    assert.equal(await instance.nearestImage({ lat: 0, lon: 0 }), 'old');
+  }
+  assert.equal(instance.coverageStats().hint, '', 'off: no hint');
+  instance.activate();
   setFilter({ pano: 'flat', sinceMs: null });
-  const asked = fake.lookups.length;
-  assert.equal(await instance.nearestImage({ lat: 0, lon: 0 }), null);
-  assert.equal(fake.lookups.length, asked);
-  setFilter({ pano: 'pano', sinceMs: null });
-  assert.equal(await instance.nearestImage({ lat: 0, lon: 0 }), 'old');
+  assert.equal(instance.coverageStats().hint, GROUND_CLICK_HINT);
 });
 
 test('an aborted lookup gives up before asking Google', async () => {
@@ -269,14 +274,6 @@ test('a refusal while the provider is off reports no error over another photo', 
     true,
     'its chip still says so',
   );
-});
-
-test('a since window keeps a panorama taken any time in its cut-off month', async () => {
-  const { instance, setFilter } = setup({ nearest: () => 'fresh' }); // 2025-06
-  setFilter({ pano: 'all', sinceMs: Date.UTC(2025, 5, 20) });
-  assert.equal(await instance.nearestImage({ lat: 0, lon: 0 }), 'fresh');
-  setFilter({ pano: 'all', sinceMs: Date.UTC(2025, 6, 1) });
-  assert.equal(await instance.nearestImage({ lat: 0, lon: 0 }), null);
 });
 
 test('the panorama a lookup found is dated without a second lookup', async () => {
