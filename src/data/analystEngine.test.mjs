@@ -7,7 +7,7 @@ const TEXLAND = { name: 'Texland', ring: [[-100, 28], [-94, 28], [-94, 33], [-10
 const FLIGHTS = [
   { id: 'SWA1', lat: 30.2, lon: -97.7, altitudeM: 11000, speedMps: 240, military: false, onGround: false, routeOrigin: 'AUS', routeDestination: 'LAX' },
   { id: 'RCH01', lat: 31.0, lon: -97.0, altitudeM: 13500, speedMps: 250, military: true, onGround: false, routeOrigin: null, routeDestination: null },
-  { id: 'N123', lat: 45.0, lon: -122.0, altitudeM: 2000, speedMps: 80, military: false, onGround: false, routeOrigin: null, routeDestination: null },
+  { id: 'N123', lat: 45.0, lon: -122.0, altitudeM: 2000, speedMps: 80, military: false, onGround: false, squawk: '7700', emergency: true, emergencyKind: 'general', routeOrigin: null, routeDestination: null },
   { id: 'GND1', lat: 30.19, lon: -97.66, altitudeM: 150, speedMps: 5, military: false, onGround: true, routeOrigin: null, routeDestination: null },
 ];
 const SHIPS = [
@@ -325,6 +325,19 @@ test('analyst: route fields queryable from cached enrichment only', async () => 
   assert.deepEqual(r.items.map((i) => i.id), ['SWA1'], 'null route fields never match');
 });
 
+test('analyst: aircraft broadcasting an emergency are filterable by flag and code', async () => {
+  const flagged = await makeEngine().query({
+    layers: ['flights'], scope: { kind: 'anywhere' },
+    filters: [{ field: 'emergency', op: 'eq', value: true }],
+  });
+  assert.deepEqual(flagged.items.map((i) => i.id), ['N123']);
+  const coded = await makeEngine().query({
+    layers: ['flights'], scope: { kind: 'anywhere' },
+    filters: [{ field: 'squawk', op: 'eq', value: '7700' }],
+  });
+  assert.deepEqual(coded.items.map((i) => i.id), ['N123']);
+});
+
 test('analyst: satellites and local infrastructure are queryable layers', async () => {
   const SATS = [
     { id: 'ISS (ZARYA)', noradId: '25544', name: 'ISS (ZARYA)', lat: 30.3, lon: -97.7, altitudeM: 410000, satelliteClass: 'STATION · ISS', group: 'stations' },
@@ -505,6 +518,7 @@ test('time fields filter by ISO and derive ageHours; the feed window is exposed'
   assert.equal(age.display.window, 'last 24 h');
   assert.equal(age.coverage.layersQueried[0].window, 'last 24 h');
 });
+
 
 test('follow-up provenance stays attached to old rows after a feed recovers', async () => {
   let state = 'stale';

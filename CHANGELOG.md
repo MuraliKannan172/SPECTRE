@@ -95,6 +95,20 @@
 
 ## [Unreleased]
 
+- Flights and Military Flights highlight aircraft broadcasting a transponder
+  emergency. Squawk 7500 (unlawful interference), 7600 (radio failure) and
+  7700 (general emergency) — or adsb.lol's ADS-B `emergency` status, which
+  also reports downed aircraft — tint the aircraft red on the globe, in
+  Cockpit contacts and in snapshots, and name the code on the Cockpit HUD.
+  Minimum-fuel and lifeguard statuses are reported but not tinted. The status
+  follows the latest poll instead of sticking, so a cleared code stops
+  highlighting on the next refresh. The analyst and voice query engine can
+  filter by `squawk`, `emergency`, `emergencyKind` and `emergencySource`
+  (whether the squawk or the ADS-B field named the status), and each result
+  says when the transponder was last heard, so answers read "broadcasting
+  squawk 7700" or "ADS-B reports general emergency". No new source or
+  request: OpenSky already carries the squawk and adsb.lol carries both.
+
 - Street Level: Google Street View is the second provider. On the Google 3D
   map (Google's terms keep it off other maps), light its chip (off by
   default: every panorama is billed to the Google Maps key, which needs the
