@@ -282,8 +282,67 @@ test('an image probe reads only the status: an archived photo (409) is not showa
       throw new TypeError('Failed to fetch');
     },
   });
+  // No answer is not an answer: the caller may try again later.
   assert.equal(
     await offline.probeImage('https://x.openstreetcam.org/a.jpg'),
-    false,
+    null,
   );
+  const busy = createKartaViewSource({
+    fetchImpl: async () => ({ ok: false, status: 502 }),
+  });
+  assert.equal(
+    await busy.probeImage('https://x.openstreetcam.org/a.jpg'),
+    null,
+  );
+});
+
+test('a cold tile that times out is asked once more', async () => {
+  let calls = 0;
+  const source = createKartaViewSource({
+    fetchImpl: async () => {
+      calls++;
+      if (calls === 1) throw new TypeError('Failed to fetch');
+      return ok({ lines: [] });
+    },
+  });
+  assert.deepEqual(await source.getTile({ x: 1, y: 2, z: 13 }), { lines: [] });
+  assert.equal(calls, 2);
+});
+
+test('an absurdly large answer is refused before it is parsed', async () => {
+  let parsed = false;
+  const source = createKartaViewSource({
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-length', String(64 * 1024 * 1024)]]),
+      json: async () => {
+        parsed = true;
+        return { lines: [] };
+      },
+    }),
+  });
+  await assert.rejects(source.getTile({ x: 1, y: 2, z: 13 }), /too much data/);
+  assert.equal(parsed, false);
+});
+
+test('sequence pages run one at a time, the newest first', async () => {
+  const order = [];
+  let release;
+  const gate = new Promise((resolve) => (release = resolve));
+  const source = createKartaViewSource({
+    fetchImpl: async (url) => {
+      const page = new URL(url).searchParams.get('page');
+      order.push(page);
+      if (page === '1') await gate;
+      return ok(photoPayload([]));
+    },
+  });
+  const pages = ['1', '2', '3'].map((page) =>
+    source.getSequencePhotos('9', { page, itemsPerPage: 250 }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  release();
+  await Promise.all(pages);
+  assert.deepEqual(order, ['1', '3', '2']);
 });

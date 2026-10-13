@@ -37,8 +37,9 @@ export const COVERAGE_MAX_HEIGHT_M = 6_000;
 export const COVERAGE_TUNING = Object.freeze({
   maxTiles: 9,
   overviewMaxTiles: 0,
-  // Chained ways are short: a dense z13 tile holds ~1,300.
-  maxSequences: 9_000,
+  // Chained ways are short: a dense downtown z13 tile holds ~1,500, so each
+  // tile may draw 1,600 (a frame stays at 16.7 ms with 4,400 drawn).
+  maxSequences: 14_400,
   lineWidthPx: 2.5,
   overviewPointPx: 2.5,
   moveDebounceMs: 320,
@@ -65,8 +66,10 @@ export const TILE_CONCURRENCY = 3;
 export const PAGE_CONCURRENCY = 1;
 export const TILE_TIMEOUT_MS = 20_000;
 export const PHOTO_API_TIMEOUT_MS = 15_000;
-/** A sequence page is about a megabyte of JSON. */
+/** A sequence page is about 650 kB of JSON. */
 export const PAGE_TIMEOUT_MS = 30_000;
+/** Real tiles are under 1 MB; refuse anything absurd before parsing it. */
+export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 /** A photo download (tens of kilobytes to a few megabytes). */
 export const IMAGE_TIMEOUT_MS = 15_000;
 /** Whether a photo file is there (not archived): headers only. */
@@ -83,17 +86,18 @@ export const NEAREST_SEARCH_ZOOM = 18;
 
 /**
  * Photos of a sequence fetched at once, around the open one. Records are
- * ~2.4 kB each, so a page is ~1.2 MB; the cones and ‹ › use it. Pages are in
+ * ~2.6 kB each, so a page is ~650 kB; the cones and ‹ › use it. Pages are in
  * photo-id order, which only roughly follows the sequence index.
  */
-export const SEQUENCE_PAGE_SIZE = 500;
+export const SEQUENCE_PAGE_SIZE = 250;
 /** Within this many photos of a page's edge, its neighbour page joins it. */
 export const SEQUENCE_PAGE_EDGE = 12;
 
 /** Equirectangular panorama sizes: a quick preview, then the sharp one. */
 export const PANO_PREVIEW_SIZE = Object.freeze([1024, 512]);
 export const PANO_FULL_SIZE = Object.freeze([4096, 2048]);
-/** A flat photo's sharp version, after the 1280 px one is on screen. */
+/** A flat photo's first version, then its sharp one. */
+export const FLAT_VIEW_SIZE = Object.freeze([1280, 1280]);
 export const FLAT_FULL_SIZE = Object.freeze([2560, 2560]);
 
 /** On-globe credit: KartaView imagery is CC BY-SA 4.0 and needs attribution. */
@@ -149,24 +153,46 @@ function positionOf(record) {
 
 const STORAGE_HOST = /^storage\d+$/;
 
+/** A KartaView photo-storage address, or null for anything else. */
+function storageUrl(value) {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'https:' &&
+      /^storage\d+\.openstreetcam\.org$/.test(url.hostname)
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * A photo file's address. The API's `fileurl*` fields always name storage1,
  * but a photo whose `storage` is another host (storage2…) is only there, so
- * the address is built from `storage` and the relative `filepath*`.
+ * the address is built from `storage` and the relative `filepath*`. A
+ * `fileurl*` fallback must itself be on KartaView's storage.
  */
 function fileUrl(record, pathKey, urlKey) {
   const path = record[pathKey];
   if (STORAGE_HOST.test(record.storage || '') && path)
-    return `https://${record.storage}.openstreetcam.org/files/photo/${path}`;
-  return record[urlKey] || null;
+    return storageUrl(
+      `https://${record.storage}.openstreetcam.org/files/photo/${path}`,
+    );
+  return storageUrl(record[urlKey]);
 }
 
 /** A storage URL with its `{{sizeprefix}}` placeholder filled. */
 function sized(record, prefix) {
-  const url = fileUrl(record, 'filepath', 'fileurl') || '';
-  return url.includes('{{sizeprefix}}')
-    ? url.replace('{{sizeprefix}}', prefix)
-    : null;
+  const fill = (value) =>
+    typeof value === 'string' && value.includes('{{sizeprefix}}')
+      ? value.replace('{{sizeprefix}}', prefix)
+      : null;
+  const path = fill(record.filepath);
+  return fileUrl(
+    { ...record, filepath: path, fileurl: fill(record.fileurl) },
+    'filepath',
+    'fileurl',
+  );
 }
 
 /**

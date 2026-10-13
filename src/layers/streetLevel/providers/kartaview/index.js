@@ -30,7 +30,10 @@ import {
 /** Photos kept in memory by id (sequence pages fill it). */
 const PHOTO_CACHE_SIZE = 4000;
 /** Sequence pages kept in memory. */
-const PAGE_CACHE_SIZE = 8;
+const PAGE_CACHE_SIZE = 12;
+/** Decoded coverage tiles kept, and for how long. */
+const TILE_CACHE_SIZE = 24;
+const TILE_CACHE_TTL_MS = 10 * 60_000;
 
 /** z14 near the street, z13 a little higher, nothing above. */
 export function kartaViewZoomFor(heightM) {
@@ -59,6 +62,30 @@ function createLru(limit) {
     },
     delete: (key) => map.delete(key),
     clear: () => map.clear(),
+  };
+}
+
+/**
+ * Loaded coverage tiles by `z/x/y`, at most `size`, each for `ttlMs`. KartaView
+ * sends tiles uncompressed and uncacheable (hundreds of kB, seconds each), so
+ * a pan back or a zoom across z13/z14 would fetch them all again.
+ */
+export function createTileCache({
+  load,
+  size = TILE_CACHE_SIZE,
+  ttlMs = TILE_CACHE_TTL_MS,
+  now = Date.now,
+}) {
+  const kept = createLru(size);
+  return {
+    async get(tile, options) {
+      const key = `${tile.z}/${tile.x}/${tile.y}`;
+      const entry = kept.get(key);
+      if (entry && now() - entry.at < ttlMs) return entry.tile;
+      const loaded = await load(tile, options);
+      kept.set(key, { at: now(), tile: loaded });
+      return loaded;
+    },
   };
 }
 
@@ -184,9 +211,21 @@ export function createKartaViewProvider({
       async function homePage(photo) {
         let number = pageOf(photo.sequenceIndex ?? 0);
         const index = photo.sequenceIndex ?? 0;
+        let page = await loadPage(photo.sequenceId, number);
+        if (!page.photos.length && number > 1) {
+          // Past the end (many photos deleted): find the last page by halving.
+          let low = 1;
+          let high = number - 1;
+          while (low < high) {
+            const middle = Math.ceil((low + high) / 2);
+            if ((await loadPage(photo.sequenceId, middle)).photos.length)
+              low = middle;
+            else high = middle - 1;
+          }
+          number = low;
+        }
         const seen = new Set();
-        let page = null;
-        while (!seen.has(number) && seen.size < 6) {
+        while (!seen.has(number) && seen.size < 8) {
           seen.add(number);
           page = await loadPage(photo.sequenceId, number);
           if (page.photos.some((p) => p.id === photo.id)) return page;
@@ -208,11 +247,18 @@ export function createKartaViewProvider({
       async function windowOf(photo) {
         const home = await homePage(photo);
         const list = home.photos;
-        const at = list.findIndex((p) => p.id === photo.id);
+        const found = list.findIndex((p) => p.id === photo.id);
+        // A photo no page lists sits where its index would.
+        const at =
+          found !== -1
+            ? found
+            : list.filter(
+                (p) => (p.sequenceIndex ?? 0) < (photo.sequenceIndex ?? 0),
+              ).length;
         const parts = [list];
-        if (at !== -1 && at < SEQUENCE_PAGE_EDGE && home.page > 1)
+        if (at < SEQUENCE_PAGE_EDGE && home.page > 1)
           parts.push((await loadPage(photo.sequenceId, home.page - 1)).photos);
-        if (at !== -1 && at >= list.length - SEQUENCE_PAGE_EDGE && home.hasMore)
+        if (at >= list.length - SEQUENCE_PAGE_EDGE && home.hasMore)
           parts.push((await loadPage(photo.sequenceId, home.page + 1)).photos);
         if (parts.length === 1) return { home: home.page, photos: list };
         const byId = new Map(parts.flat().map((p) => [p.id, p]));
@@ -224,18 +270,38 @@ export function createKartaViewProvider({
         };
       }
 
-      /** Photo id → whether its file answers (archived ones do not), per session. */
+      /**
+       * Photo id → whether its file is there (archived ones are not). Only
+       * a definite answer is kept: a storage hiccup is asked again next
+       * time, and meanwhile the photo is tried. A probe is shared, so it
+       * runs to its own timeout rather than any one caller's abort.
+       */
       const probes = createLru(PHOTO_CACHE_SIZE);
-      function showable(photo, { signal } = {}) {
+      function showable(photo) {
         if (!photo?.urls?.view) return Promise.resolve(false);
         let probe = probes.get(photo.id);
         if (!probe) {
-          probe = source.probeImage(photo.urls.view, { signal });
+          probe = source.probeImage(photo.urls.view).then(
+            (answer) => {
+              if (answer === null) probes.delete(photo.id);
+              return answer !== false;
+            },
+            () => {
+              probes.delete(photo.id);
+              return true;
+            },
+          );
           probes.set(photo.id, probe);
-          probe.catch(() => probes.delete(photo.id));
         }
         return probe;
       }
+
+      // Decoded coverage tiles, kept a while: panning back asks nothing.
+      const tiles = createTileCache({
+        load: async (tile, { signal }) =>
+          decodeCoverageTile(await source.getTile(tile, { signal }), tile),
+      });
+      const fetchTile = (tile, options) => tiles.get(tile, options);
 
       /**
        * The next showable photo `delta` along the sequence, or null at its
@@ -269,8 +335,7 @@ export function createKartaViewProvider({
 
       const coverage = createLineCoverage({
         state,
-        fetchTile: async (tile, { signal }) =>
-          decodeCoverageTile(await source.getTile(tile, { signal }), tile),
+        fetchTile,
         zoomFor: kartaViewZoomFor,
         colors: COLORS,
         pickPrefix: PICK_PREFIX.line,
@@ -307,20 +372,28 @@ export function createKartaViewProvider({
         passes: () => true,
       });
 
+      /** ‹ › open through the core (loading, errors, cones), camera still. */
+      function openStepped(photoId) {
+        context.actions.openImage(photoId, { frame: false });
+      }
+
       /**
-       * ‹ › open through the core (loading, errors, the sequence's cones),
-       * without moving the camera; the cones re-centre once ‹ › walk off the
-       * page they were drawn from.
+       * The cones show one page of a sequence: once a photo of the selected
+       * sequence opens on another page (‹ ›, a cone, a line), re-centre them.
        */
-      async function openStepped(photoId) {
-        const opened = await context.actions.openImage(photoId, {
-          frame: false,
-        });
-        const photo = photos.get(photoId);
-        if (!opened || !photo?.sequenceId) return;
-        if (drawnPage?.sequenceId !== photo.sequenceId) return;
+      async function recentreCones(photo) {
+        if (!photo?.sequenceId) return;
+        if (state.sequence.selectedId !== photo.sequenceId) return;
+        const drawn = drawnPage;
+        if (drawn?.sequenceId !== photo.sequenceId) return;
         const window = await windowOf(photo).catch(() => null);
-        if (window && window.home !== drawnPage.page)
+        // Still the drawn page and the latest photo once the page is in.
+        if (
+          window &&
+          drawnPage === drawn &&
+          window.home !== drawn.page &&
+          anchors.get(photo.sequenceId) === photo
+        )
           cones.select(photo.sequenceId, { force: true });
       }
 
@@ -332,6 +405,7 @@ export function createKartaViewProvider({
         },
         step,
         onStep: openStepped,
+        onShown: recentreCones,
         render: context.services?.render,
         ...viewerOptions,
       });
@@ -414,7 +488,9 @@ export function createKartaViewProvider({
           return false;
         },
 
-        selectSequence: (sequenceId) => cones.select(sequenceId),
+        // Never from the cache: it is keyed by sequence, the cones by page.
+        selectSequence: (sequenceId) =>
+          cones.select(sequenceId, { force: true }),
         clearSequence: () => {
           cones.clearSelection();
           drawnPage = null;

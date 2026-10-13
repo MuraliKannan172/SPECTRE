@@ -1,5 +1,6 @@
 import {
   IMAGE_PROBE_TIMEOUT_MS,
+  MAX_RESPONSE_BYTES,
   KARTAVIEW_API_HOST,
   NEAREST_LIMIT,
   NEAREST_SEARCH_ZOOM,
@@ -25,6 +26,8 @@ export class KartaViewSourceError extends Error {
 }
 
 const NO_ANSWER = 'KartaView did not answer in time — try again';
+/** Statuses that mean a photo file is gone, not that storage hiccupped. */
+const GONE_STATUSES = Object.freeze([403, 404, 409, 410]);
 
 /** Resolves after `ms`, or rejects when `signal` aborts first. */
 function wait(ms, signal) {
@@ -50,13 +53,18 @@ function retryAfterSeconds(response) {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-/** A first-in, first-out gate letting at most `limit` tasks run at once. */
-export function createLimiter(limit) {
+/**
+ * A gate letting at most `limit` tasks run at once, first in first out, or
+ * newest first with `lifo` (the last request is the one the user waits on).
+ */
+export function createLimiter(limit, { lifo = false } = {}) {
   let running = 0;
   const queue = [];
   function next() {
     while (running < limit && queue.length) {
-      const { task, resolve, reject, signal } = queue.shift();
+      const { task, resolve, reject, signal } = lifo
+        ? queue.pop()
+        : queue.shift();
       if (signal?.aborted) {
         reject(signal.reason);
         continue;
@@ -111,7 +119,7 @@ export function createKartaViewSource({
 } = {}) {
   const limiter = createLimiter(PHOTO_API_CONCURRENCY);
   const tileLimiter = createLimiter(TILE_CONCURRENCY);
-  const pageLimiter = createLimiter(PAGE_CONCURRENCY);
+  const pageLimiter = createLimiter(PAGE_CONCURRENCY, { lifo: true });
 
   /** GET JSON within `timeoutMs`; the caller's abort wins over the timeout. */
   async function getJson(url, { signal, timeoutMs }) {
@@ -135,6 +143,11 @@ export function createKartaViewSource({
           `KartaView answered HTTP ${response.status}`,
           { status: response.status },
         );
+      const length = Number(response.headers?.get?.('content-length'));
+      if (length > MAX_RESPONSE_BYTES)
+        throw new KartaViewSourceError('KartaView sent too much data', {
+          status: response.status,
+        });
       return await response.json();
     } catch (error) {
       if (signal?.aborted) throw signal.reason;
@@ -203,19 +216,27 @@ export function createKartaViewSource({
   return {
     /** A coverage tile: `{lines: [{track: [{lat, lng}]}]}`. */
     async getTile({ x, y, z }, { signal } = {}) {
-      return tileLimiter.run(
-        () =>
-          getJson(`${apiHost}/2.0/sequence/tiles/${x}/${y}/${z}.json`, {
-            signal,
-            timeoutMs: TILE_TIMEOUT_MS,
-          }),
-        { signal },
-      );
+      const url = `${apiHost}/2.0/sequence/tiles/${x}/${y}/${z}.json`;
+      const once = () =>
+        tileLimiter.run(
+          () => getJson(url, { signal, timeoutMs: TILE_TIMEOUT_MS }),
+          { signal },
+        );
+      try {
+        return await once();
+      } catch (error) {
+        // A cold dense tile can outlast the timeout; KartaView has it ready
+        // by the second ask.
+        if (signal?.aborted || error?.message !== NO_ANSWER) throw error;
+        return once();
+      }
     },
 
     /**
-     * Whether a photo file can be fetched. Archived photos answer 409 (and
-     * a HEAD says 200 regardless), so this GETs and stops at the headers.
+     * Whether a photo file is there: true, false when it is gone (archived
+     * photos answer 409, and a HEAD says 200 regardless), or null when the
+     * storage did not say (timeout, network, 5xx). It GETs and stops at the
+     * headers.
      */
     async probeImage(url, { signal } = {}) {
       if (!url) return false;
@@ -229,10 +250,11 @@ export function createKartaViewSource({
       );
       try {
         const response = await fetchImpl(url, { signal: controller.signal });
-        return response.ok;
+        if (response.ok) return true;
+        return GONE_STATUSES.includes(response.status) ? false : null;
       } catch {
         if (signal?.aborted) throw signal.reason;
-        return false;
+        return null;
       } finally {
         clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);

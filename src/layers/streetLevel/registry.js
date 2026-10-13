@@ -22,8 +22,8 @@ export function filtersOf(provider) {
  * @property {boolean} [defaultOn]     Default true.
  * @property {{kind: 'view-cone', color: string}} [marker]   Default: GEV's pin.
  * @property {Array<'pano'|'since'>} [filters]   Filters it honours (default both).
- * @property {{noun: string, action: string}} [coverageLabel]
- * @property {boolean} [highlightsSequence]   Its lines show the selected sequence (default true; the legend's "Selected" needs one).   How the panel counts its lines and says what a click does (default: sequences, "click a line for its photos").
+ * @property {{noun: string, action: string}} [coverageLabel]   How the panel counts its lines and says what a click does (default: sequences, "click a line for its photos").
+ * @property {boolean} [highlightsSequence]   Its lines show the selected sequence (default true; the legend's "Selected" needs one).
  * @property {(context: ProviderContext) => ProviderInstance} create
  *
  * @typedef {object} ProviderContext   Handed to `create()` once by the core.
@@ -67,6 +67,7 @@ export function filtersOf(provider) {
  * @property {() => void} resize
  * @property {(host: HTMLElement) => Promise<void>} [prewarm]
  * @property {(mode: 'letterbox'|'fill') => void} [setRenderMode]
+ * @property {() => boolean} [supportsRenderModes]   False while the image has no frame to fit (a panorama): FIT / FILL hide.
  * @property {(listener: (pose: StreetPose) => void) => () => void} onPose
  *
  * @typedef {object} StreetPose

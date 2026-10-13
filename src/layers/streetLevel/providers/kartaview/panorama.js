@@ -136,7 +136,8 @@ export function createPanoramaRenderer(canvas) {
   let frame = 0;
   const view = { yaw: 0, pitch: 0, fov: PANO_FOV_DEFAULT_DEG };
 
-  function resize() {
+  /** Match the drawing buffer to the canvas's laid-out size. */
+  function syncSize() {
     const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
     const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
     const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
@@ -144,12 +145,18 @@ export function createPanoramaRenderer(canvas) {
       canvas.width = width;
       canvas.height = height;
     }
+  }
+
+  function resize() {
+    syncSize();
     scheduleRender();
   }
 
   function draw() {
     frame = 0;
     if (gl.isContextLost()) return;
+    // Every frame: the canvas may have been laid out since the last one.
+    syncSize();
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);

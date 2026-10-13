@@ -51,12 +51,15 @@ const PHOTOS = {
   },
 };
 
-function fakeRenderer() {
+function fakeRenderer(canvas) {
   const view = { yaw: 0, pitch: 0, fov: 80 };
   return {
     images: [],
+    hiddenAtSetImage: [],
     setImage(image) {
       this.images.push(image.src);
+      // A hidden canvas measures 0×0: sizing it then gives a 1×1 buffer.
+      this.hiddenAtSetImage.push(canvas?.hidden);
     },
     setView(next) {
       Object.assign(view, next);
@@ -70,7 +73,12 @@ function fakeRenderer() {
   };
 }
 
-function setup({ failLoads = [], rendererThrows = false, steps = {} } = {}) {
+function setup({
+  failLoads = [],
+  rendererThrows = false,
+  steps = {},
+  failSteps = false,
+} = {}) {
   const loads = [];
   const renderers = [];
   const stepped = [];
@@ -79,7 +87,10 @@ function setup({ failLoads = [], rendererThrows = false, steps = {} } = {}) {
       if (!PHOTOS[id]) throw new Error('no such photo');
       return PHOTOS[id];
     },
-    step: async (photo, delta) => steps[`${photo.id}:${delta}`] ?? null,
+    step: async (photo, delta) => {
+      if (failSteps) throw new Error('KartaView did not answer in time');
+      return steps[`${photo.id}:${delta}`] ?? null;
+    },
     // The core opens what ‹ › chose; here the adapter is opened directly.
     onStep: (id) => {
       stepped.push(id);
@@ -91,9 +102,9 @@ function setup({ failLoads = [], rendererThrows = false, steps = {} } = {}) {
         throw new Error('The KartaView photo could not be loaded');
       return { src: url };
     },
-    createRenderer: () => {
+    createRenderer: (canvas) => {
       if (rendererThrows) throw new Error('WebGL is unavailable');
-      const renderer = fakeRenderer();
+      const renderer = fakeRenderer(canvas);
       renderers.push(renderer);
       return renderer;
     },
@@ -149,7 +160,11 @@ test('a flat photo shows its 1280 px version, then the sharp one, with a pose fa
     },
   );
   assert.match(pose.externalUrl, /^https:\/\/cdn\.kartaview\.org\/pr:sharp\//);
-  assert.equal(loads[0].url, PHOTOS.flat1.urls.view);
+  // The proxy's 1,280 px version first: KartaView's own can be 1.7 MB.
+  assert.match(
+    loads[0].url,
+    /^https:\/\/cdn\.kartaview\.org\/.*rs:fit:1280:1280/,
+  );
   assert.equal(loads[0].crossOrigin, false, 'an <img> needs no CORS');
   await settle();
   assert.match(
@@ -162,12 +177,13 @@ test('a flat photo shows its 1280 px version, then the sharp one, with a pose fa
   assert.equal(picture.style.objectFit, 'cover');
 });
 
-test('a missing 1280 px rendition falls back to the proxy-shrunk full photo', async () => {
-  const { viewer, host, loads } = setup({ failLoads: ['/lth/'] });
+test('a failing image proxy falls back to the photo on KartaView storage', async () => {
+  const { viewer, host, loads } = setup({ failLoads: ['cdn.kartaview.org'] });
   await viewer.mount(host);
   await viewer.open('flat1');
-  assert.match(loads[1].url, /rs:fit:2560:2560/);
+  assert.equal(loads[1].url, PHOTOS.flat1.urls.view);
   assert.equal(parts(host).picture.hidden, false);
+  assert.equal(parts(host).picture.src, PHOTOS.flat1.urls.view);
 });
 
 test('a 360° photo shows on the panorama, preview first; dragging turns the bearing', async () => {
@@ -290,4 +306,121 @@ test('a newer open wins; close hides the photo; unmount tears down the panorama'
   assert.equal(host.children.length, 0);
   assert.equal(renderers[0].destroyed, true);
   await assert.rejects(viewer.open('flat1'), /not mounted/);
+});
+
+test('a panorama is put on screen before its image is sized into the canvas', async () => {
+  const { viewer, host, renderers } = setup();
+  await viewer.mount(host);
+  await viewer.open('flat1');
+  await viewer.open('pano1');
+  await settle();
+  assert.deepEqual(renderers[0].hiddenAtSetImage, [false, false]);
+});
+
+test('a step that gets no answer is not the end of the sequence', async () => {
+  const { viewer, host, poses } = setup({ failSteps: true });
+  await viewer.mount(host);
+  await viewer.open('flat1');
+  const { next } = parts(host);
+  next.disabled = false;
+  next.fire('click');
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(next.disabled, false, 'still enabled: try again');
+  assert.equal(poses.at(-1).imageId, 'flat1');
+});
+
+test('the keyboard looks around a panorama: Shift+arrows turn, ↑ ↓ tilt, + − zoom', async (t) => {
+  globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+  t.after(() => delete globalThis.requestAnimationFrame);
+  const { viewer, host, renderers, stepped } = setup({
+    steps: { 'pano1:1': 'flat1' },
+  });
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  const { root } = parts(host);
+  const view = () => renderers[0].getView();
+  root.fire('keydown', { key: 'ArrowRight', shiftKey: true });
+  assert.ok(view().yaw > 0, 'turned right');
+  root.fire('keydown', { key: 'ArrowUp' });
+  assert.ok(view().pitch > 0, 'looked up');
+  const before = view().fov;
+  root.fire('keydown', { key: '+' });
+  assert.ok(view().fov < before, 'zoomed in');
+  root.fire('keydown', { key: '-' });
+  root.fire('keydown', { key: '-' });
+  assert.ok(view().fov > before, 'zoomed out');
+  for (let i = 0; i < 4; i++) await settle();
+  assert.deepEqual(stepped, [], 'none of those stepped');
+  root.fire('keydown', { key: 'ArrowRight' });
+  for (let i = 0; i < 4; i++) await settle();
+  assert.deepEqual(stepped, ['flat1'], 'a plain arrow still steps');
+});
+
+test('two fingers pinch the panorama’s zoom', async () => {
+  const { viewer, host, renderers } = setup();
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  const { canvas } = parts(host);
+  const before = renderers[0].getView().fov;
+  canvas.fire('pointerdown', {
+    pointerId: 1,
+    pointerType: 'touch',
+    clientX: 100,
+    clientY: 100,
+  });
+  canvas.fire('pointerdown', {
+    pointerId: 2,
+    pointerType: 'touch',
+    clientX: 140,
+    clientY: 100,
+  });
+  canvas.fire('pointermove', {
+    pointerId: 2,
+    pointerType: 'touch',
+    clientX: 180,
+    clientY: 100,
+  });
+  assert.ok(renderers[0].getView().fov < before, 'spread zooms in');
+  canvas.fire('pointerup', { pointerId: 1 });
+  canvas.fire('pointerup', { pointerId: 2 });
+});
+
+test('a lost WebGL context drops the panorama and shows the photo again on a new one', async () => {
+  const { viewer, host, renderers, poses } = setup();
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  parts(host).canvas.fire('webglcontextlost');
+  assert.equal(renderers[0].destroyed, true);
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(renderers.length, 2, 'a new renderer');
+  assert.equal(poses.at(-1).imageId, 'pano1');
+  assert.equal(parts(host).canvas.hidden, false);
+});
+
+test('a WebGL failure only lasts until the viewer is mounted again', async () => {
+  let fail = true;
+  const built = [];
+  const viewer = createKartaViewViewer({
+    getPhoto: async (id) => PHOTOS[id],
+    step: async () => null,
+    onStep() {},
+    load: async (url) => ({ src: url }),
+    createRenderer: (canvas) => {
+      if (fail) throw new Error('WebGL is unavailable');
+      const renderer = fakeRenderer(canvas);
+      built.push(renderer);
+      return renderer;
+    },
+  });
+  const host = fakeHost();
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  assert.equal(parts(host).picture.hidden, false, 'front view');
+  viewer.unmount();
+  fail = false;
+  const again = fakeHost();
+  await viewer.mount(again);
+  await viewer.open('pano1');
+  assert.equal(built.length, 1);
+  assert.equal(parts(again).canvas.hidden, false);
 });

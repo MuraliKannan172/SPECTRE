@@ -5,6 +5,7 @@ import {
 } from './panorama.js';
 import {
   FLAT_FULL_SIZE,
+  FLAT_VIEW_SIZE,
   IMAGE_TIMEOUT_MS,
   KARTAVIEW_PROVIDER_ID,
   PANO_FULL_SIZE,
@@ -50,6 +51,7 @@ export function loadImage(
  * @param {(photoId: string) => Promise<object>} options.getPhoto   A normalized photo (policy.js normalizePhoto).
  * @param {(photo: object, delta: -1|1) => Promise<string|null>} options.step   The photo `delta` along the sequence, or null at its end.
  * @param {(imageId: string) => void} options.onStep   Open the photo ‹ › chose (through the core, so loading and errors show).
+ * @param {(photo: object) => void} [options.onShown]   A photo is on screen.
  * @param {object} [options.render]   Render governor.
  * @param {(url: string, options?: object) => Promise<HTMLImageElement>} [options.load]
  * @param {(canvas: HTMLCanvasElement) => object} [options.createRenderer]
@@ -59,6 +61,7 @@ export function createKartaViewViewer({
   getPhoto,
   step,
   onStep,
+  onShown = () => {},
   render,
   load = loadImage,
   createRenderer = createPanoramaRenderer,
@@ -150,10 +153,16 @@ export function createKartaViewViewer({
     ])
       step(target, delta).then(
         (id) => {
-          if (photo === target && button && !id) button.disabled = true;
+          if (photo === target && button && !id) disable(button);
         },
         () => {},
       );
+  }
+
+  /** Disable a step button, keeping keyboard focus in the viewer. */
+  function disable(button) {
+    if (button.ownerDocument?.activeElement === button) root?.focus?.();
+    button.disabled = true;
   }
 
   function show(kind) {
@@ -181,6 +190,26 @@ export function createKartaViewViewer({
   }
 
   /**
+   * A lost WebGL context (GPU reset, memory pressure) takes the panorama
+   * with it: drop the renderer, and show the photo again on a new one.
+   */
+  function onContextLost(event) {
+    event.preventDefault?.();
+    const lost = renderer;
+    renderer = null;
+    try {
+      lost?.destroy();
+    } catch {
+      /* already gone */
+    }
+    if (showing === 'pano' && photo) {
+      const again = photo.id;
+      show(null);
+      adapter.open(again).catch(() => {});
+    }
+  }
+
+  /**
    * Step along the sequence from the photo showing, or from the one on its
    * way after an earlier press, and open it through the core.
    */
@@ -194,13 +223,14 @@ export function createKartaViewViewer({
         from = await getPhoto(fromId);
         if (from.sequenceId) nextId = await step(from, delta);
       } catch {
-        nextId = null;
+        // Not the end of the sequence, just no answer: the press is lost.
+        return;
       }
       // Closed, or another photo was opened meanwhile.
       if ((openingId ?? photo?.id) !== fromId) return;
       if (!nextId) {
         const button = delta < 0 ? prevButton : nextButton;
-        if (button && photo?.id === fromId) button.disabled = true;
+        if (button && photo?.id === fromId) disable(button);
         return;
       }
       openingId = nextId;
@@ -209,20 +239,42 @@ export function createKartaViewViewer({
     });
   }
 
+  /** Pointers on the panorama: one drags the view, two pinch the zoom. */
+  const pointers = new Map();
+  let pinch = null;
+
+  function pinchSpan() {
+    const [a, b] = [...pointers.values()];
+    return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+  }
+
   function onPointerDown(event) {
-    if (showing !== 'pano' || event.button !== 0) return;
+    if (showing !== 'pano' || !renderer) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    canvas.setPointerCapture?.(event.pointerId);
+    if (pointers.size === 2) {
+      drag = null;
+      pinch = { span: pinchSpan(), fov: renderer.getView().fov };
+      return;
+    }
     drag = {
       id: event.pointerId,
       x: event.clientX,
       y: event.clientY,
       view: renderer.getView(),
     };
-    canvas.setPointerCapture?.(event.pointerId);
     canvas.classList.add('sl-kv-dragging');
   }
 
   function onPointerMove(event) {
-    if (!drag || event.pointerId !== drag.id) return;
+    if (pointers.has(event.pointerId))
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinch && pointers.size === 2 && renderer) {
+      renderer.setView({ fov: pinch.fov * (pinch.span / pinchSpan()) });
+      return;
+    }
+    if (!drag || event.pointerId !== drag.id || !renderer) return;
     const { fov } = drag.view;
     const width = Math.max(1, canvas.clientWidth);
     const height = Math.max(1, canvas.clientHeight);
@@ -236,13 +288,15 @@ export function createKartaViewViewer({
   }
 
   function onPointerUp(event) {
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) pinch = null;
     if (!drag || event.pointerId !== drag.id) return;
     drag = null;
     canvas.classList.remove('sl-kv-dragging');
   }
 
   function onWheel(event) {
-    if (showing !== 'pano') return;
+    if (showing !== 'pano' || !renderer) return;
     event.preventDefault();
     const { fov } = renderer.getView();
     renderer.setView({ fov: fov * Math.exp(event.deltaY * 0.001) });
@@ -256,9 +310,30 @@ export function createKartaViewViewer({
       event.metaKey
     )
       return;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    const pano = showing === 'pano' && renderer;
+    const turn = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+    // Shift+← → look around a panorama; ← → step along the sequence.
+    if (turn && event.shiftKey && pano) {
       event.preventDefault();
-      stepBy(event.key === 'ArrowLeft' ? -1 : 1);
+      const { yaw, fov } = renderer.getView();
+      renderer.setView({ yaw: yaw + (turn * fov) / 4 });
+      emitSoon();
+    } else if (turn) {
+      event.preventDefault();
+      stepBy(turn);
+    } else if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && pano) {
+      event.preventDefault();
+      const { pitch, fov } = renderer.getView();
+      renderer.setView({
+        pitch: pitch + ((event.key === 'ArrowUp' ? 1 : -1) * fov) / 6,
+      });
+      emitSoon();
+    } else if (['+', '=', '-', '_'].includes(event.key) && pano) {
+      event.preventDefault();
+      const { fov } = renderer.getView();
+      renderer.setView({
+        fov: fov * (event.key === '+' || event.key === '=' ? 0.85 : 1 / 0.85),
+      });
     }
   }
 
@@ -277,7 +352,7 @@ export function createKartaViewViewer({
     root.setAttribute('role', 'group');
     root.setAttribute(
       'aria-label',
-      'KartaView photo. Drag to look around a 360° photo; ← and → step along the sequence',
+      'KartaView photo. ← and → step along the sequence. On a 360° photo, drag or use Shift+← →, ↑ ↓ to look around, and + − to zoom',
     );
     picture = doc.createElement('img');
     picture.className = 'sl-kv-photo';
@@ -310,11 +385,14 @@ export function createKartaViewViewer({
     listen(canvas, 'pointerup', onPointerUp);
     listen(canvas, 'pointercancel', onPointerUp);
     listen(canvas, 'wheel', onWheel, { passive: false });
+    listen(canvas, 'webglcontextlost', onContextLost);
     listen(root, 'keydown', onKeyDown);
     applyRenderMode();
   }
 
   function teardown() {
+    pointers.clear();
+    pinch = null;
     for (const remove of removeListeners) remove();
     removeListeners = [];
     if (poseFrame) cancelAnimationFrame(poseFrame);
@@ -355,25 +433,36 @@ export function createKartaViewViewer({
       resizedImageUrl(target.urls.pano, PANO_PREVIEW_SIZE),
       { crossOrigin: true },
     );
-    if (seq !== openSeq) return false;
+    if (seq !== openSeq || !renderer) return false;
     if (!keepView || showing !== 'pano')
       renderer.setView({ yaw: 0, pitch: 0, fov: PANO_FOV_DEFAULT_DEG });
-    renderer.setImage(image);
     photo = target;
+    // Shown first: a hidden canvas measures 0 and would be sized 1×1.
     show('pano');
+    renderer.setImage(image);
     return true;
   }
 
   async function showFlat(target, seq) {
+    // The proxy's 1,280 px version is a few hundred kB; KartaView's own
+    // "large thumbnail" can be 1.7 MB. Either serves when the other fails.
+    // A 360° photo's front view is only on storage.
+    const proxied = target.isPano
+      ? null
+      : resizedImageUrl(target.urls.full, FLAT_VIEW_SIZE);
+    const sources = [proxied, target.urls.view].filter(Boolean);
     let image;
-    try {
-      image = await load(target.urls.view, { crossOrigin: false });
-    } catch (error) {
-      // No 1280 px rendition: the proxy can shrink the full-size photo.
-      const fallback = resizedImageUrl(target.urls.full, FLAT_FULL_SIZE);
-      if (target.isPano || !fallback || seq !== openSeq) throw error;
-      image = await load(fallback, { crossOrigin: false });
+    let failure = null;
+    for (const url of sources) {
+      try {
+        image = await load(url, { crossOrigin: false });
+        break;
+      } catch (error) {
+        failure = error;
+        if (seq !== openSeq) return false;
+      }
     }
+    if (!image) throw failure || new Error(LOAD_FAILED);
     if (seq !== openSeq) return false;
     picture.src = image.src;
     photo = target;
@@ -396,6 +485,7 @@ export function createKartaViewViewer({
     } else shown = await showFlat(target, seq);
     if (!shown) return;
     emit();
+    onShown(target);
     upgrade(target, seq, showing);
   }
 
@@ -404,6 +494,7 @@ export function createKartaViewViewer({
       if (!host) throw new Error('Street Level viewer has no host element');
       if (root && root.parentNode === host) return;
       teardown();
+      rendererFailed = false;
       build(host);
     },
 

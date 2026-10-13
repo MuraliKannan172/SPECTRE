@@ -3192,28 +3192,49 @@ on `api.kartaview.org` (the documented `api.openstreetcam.org` answers but
 serves empty tiles), `cdn.kartaview.org` and `storage*.openstreetcam.org`.
 Its chip starts off. Coverage comes from z14 JSON tiles below 2.5 km above
 ground and z13 up to 6 km (lower zooms take seconds per tile; z10 does not
-answer), so higher up the hint says to zoom in. A tile's lines are OSM way
-segments with photos and carry no sequence, date or projection, so
-`decode.js` chains segments that meet end to start (about a quarter of the
-lines), they are drawn unselectable as `kv:line:<z/x/y/n>`, and the provider
-declares `filters: []` and `coverageLabel` ("N streets in view · click a line
-for its nearest photo"). A click on a line reaches `handlePick(id,
-{groundPoint})`, and the provider asks the core (`actions.openNearest`) for
-its photo nearest that point within 50 m, without framing. The open photo's
-sequence draws as cones from the 1,000-photo page holding it
-(`/2.0/sequence/{id}/photos`; a page with missing photos is found by stepping
-back), and ‹ › step across pages, re-centring the cones. The photo API answers
-429 to more than about three requests at once, so `source.js` keeps two in
-flight and retries a 429 with backoff. Photo URLs are built from `storage` and
-`filepath*`: the API's `fileurl*` always name storage1, where photos stored
-elsewhere 404. The viewer (`viewer.js`) shows a flat photo's 1280 px rendition,
-then a 2,560 px one from the image proxy (`pr:sharp/rs:fit:W:H/<base64url>`),
-and a 360° photo's equirectangular `wrapped_proc` image (13,000 px wide
-upstream) resized to 1,024 then 4,096 px on `panorama.js`, a single-triangle
-WebGL renderer (image centre = the camera heading; drag, wheel). Without WebGL
-a 360° photo shows its front view. FIT / FILL hide for panoramas
-(`supportsRenderModes`). The caption has no place name (KartaView's is where
-the drive began) and links to the full-size photo, since kartaview.org's photo
+answer), so higher up the hint says to zoom in, and an empty view says there
+are no KartaView photos in it. A tile's lines are OSM way segments with
+photos and carry no sequence, date or projection, so `decode.js` chains
+segments that meet end to start (about four times fewer lines), they are
+drawn as `kv:line:<z/x/y/n>`, up to 1,600 per tile, and never highlighted
+(`highlightsSequence: false`, so the legend has no "Selected"), and the
+provider declares `filters: []` and `coverageLabel` ("N streets in view ·
+click a line for its nearest photo"). Tiles come uncompressed and
+uncacheable, so the last 24 decoded tiles are kept for 10 minutes
+(`createTileCache`); one that does not answer in 20 s is asked once more,
+and one that is not a line list is not cached. A click on a line reaches
+`handlePick(id, {groundPoint})`, and the provider asks the core
+(`actions.openNearest`) for its nearest showable photo within 50 m, without
+framing: many photos are archived (their file answers 409, while a HEAD says
+200) or have no file, so the six nearest are probed at once with a GET cut
+off at the headers, and where all are gone the panel says KartaView's photos
+there are archived. Only a definite answer (403/404/409/410, or 200) is
+remembered; a storage timeout or 5xx is asked again. The open photo's
+sequence draws as cones from the 250-photo page holding it
+(`/2.0/sequence/{id}/photos`). Pages follow photo ids, which only roughly
+follow the index, so the page is found by search (both ways, halving past the
+end when many photos were deleted), a neighbour page joins within 12 photos
+of an edge, and the cones re-centre whenever a photo of the selected sequence
+opens on another page. ‹ › (and ← →) open through the core without framing,
+step on from the photo already on its way, skip archived photos, and disable
+up front at the ends. `api.kartaview.org` speaks HTTP/1.1, so of the
+browser's six connections to it tiles take three, lookups two and pages one
+(newest first), and a lookup never waits behind tiles; the photo API answers
+429 to more than about three requests at once, so a 429 is retried with
+backoff (at most 10 s) and a timed-out lookup once. Photo URLs are built from
+`storage` and `filepath*`: the API's `fileurl*` always name storage1, where
+photos stored elsewhere 404, and a `fileurl*` fallback must itself be an
+https storage host. The viewer (`viewer.js`) shows a flat photo at 1,280 px,
+then 2,560 px, from the image proxy (`pr:sharp/rs:fit:W:H/<base64url>`),
+with KartaView's own 1,280 px file as the fallback, and a 360° photo's
+equirectangular `wrapped_proc` image (13,000 px wide upstream) resized to
+1,024 then 4,096 px on `panorama.js`, a single-triangle WebGL renderer (image
+centre = the camera heading; drag, pinch, wheel, Shift+← →, ↑ ↓, + −; the
+canvas re-measures every frame). Without WebGL, or if the proxy fails within
+15 s, a 360° photo shows its front view; a lost context draws the photo again
+on a new one. FIT / FILL hide for panoramas (`supportsRenderModes`). The
+caption has no place name (KartaView's is where the drive began) and links to
+the full-size photo through the image proxy, since kartaview.org's photo
 pages fail for signed-out visitors.
 
 Street Level has two browser gates. `npm run qa:street-level -- --url <server>`

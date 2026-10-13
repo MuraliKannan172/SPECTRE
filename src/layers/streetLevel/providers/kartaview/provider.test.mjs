@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createKartaViewProvider, kartaViewZoomFor } from './index.js';
+import {
+  createKartaViewProvider,
+  createTileCache,
+  kartaViewZoomFor,
+} from './index.js';
 import { SEQUENCE_PAGE_SIZE } from './policy.js';
 import { validateProviders } from '../../registry.js';
 import { fakeHost } from '../../../../testSupport/kartaViewFakes.mjs';
@@ -46,7 +50,8 @@ function fakeSource({ nearest = [], sequences = {}, archived = [] } = {}) {
       calls.photo.push(id);
       for (const [seq, indexes] of Object.entries(sequences))
         for (const index of indexes)
-          if (`${seq}-${index}` === id) return photoRecord(id, { seq, index });
+          if (`${seq}-${index}` === id)
+            return photoRecord(id, { seq, index, metres: index * 5 });
       throw new Error('KartaView has no such photo');
     },
     getSequencePhotos: async (seq, { page, itemsPerPage }) => {
@@ -58,7 +63,7 @@ function fakeSource({ nearest = [], sequences = {}, archived = [] } = {}) {
       );
       return {
         photos: rows.map((index) =>
-          photoRecord(`${seq}-${index}`, { seq, index }),
+          photoRecord(`${seq}-${index}`, { seq, index, metres: index * 5 }),
         ),
         hasMore: page * itemsPerPage < indexes.length,
       };
@@ -161,8 +166,9 @@ test('the nearest photo is the closest within 50 m, and opening it asks nothing 
   await instance.viewer.open(id);
   assert.deepEqual(source.calls.photo, [], 'the lookup filled the cache');
   assert.equal(
-    loads[0],
-    'https://storage2.openstreetcam.org/files/photo/2016/8/24/lth/near.jpg',
+    Buffer.from(loads[0].split('/').at(-1), 'base64url').toString(),
+    'https://storage2.openstreetcam.org/files/photo/2016/8/24/proc/near.jpg',
+    'the proxy shrinks the photo on its real storage host',
   );
   const none = setup({ nearest: [photoRecord('far', { metres: 80 })] });
   assert.equal(
@@ -320,4 +326,132 @@ test('archived photos are skipped: by the nearest lookup, and by › and ‹', a
     null,
     'a record with no file is not a photo',
   );
+});
+
+/** A stand-in Cesium viewer the cones can draw on; `cones()` lists their photo indexes. */
+async function withCones(t, env) {
+  const Cesium = await import('cesium');
+  const drawing = new Proxy({}, { get: () => () => {}, set: () => true });
+  const saved = globalThis.document;
+  globalThis.document = {
+    createElement: () => ({ getContext: () => drawing }),
+  };
+  t.after(() => (globalThis.document = saved));
+  let collection = null;
+  env.instance.init({
+    scene: {
+      frameState: { mode: Cesium.SceneMode.SCENE3D },
+      updateHeight: () => () => {},
+      getHeight: () => undefined,
+      primitives: { add: (c) => (collection = c), remove() {} },
+      preRender: { addEventListener: () => () => {} },
+    },
+    camera: { positionWC: new Cesium.Cartesian3(0, 0, 1e8) },
+  });
+  return () => {
+    const indexes = [];
+    for (let i = 0; i < collection.length; i++)
+      indexes.push(Number(collection.get(i).id.split('-').at(-1)));
+    return [Math.min(...indexes), Math.max(...indexes)];
+  };
+}
+
+test('the cones follow the open photo to another page of a long sequence, cached or not', async (t) => {
+  const size = SEQUENCE_PAGE_SIZE;
+  const env = await mounted({
+    sequences: { s: Array.from({ length: size * 5 }, (_, i) => i) },
+  });
+  const cones = await withCones(t, env);
+  const settleLong = async () => {
+    for (let i = 0; i < 40; i++) await settle();
+  };
+  await env.instance.viewer.open('s-10');
+  await env.instance.selectSequence('s');
+  await settleLong();
+  assert.ok(cones()[1] < size, `first page: ${cones()}`);
+  // A line click further along the same drive: the core does not reselect.
+  await env.instance.viewer.open(`s-${size * 4 + 10}`);
+  await settleLong();
+  assert.ok(cones()[0] >= size * 3, `re-centred: ${cones()}`);
+  // Closed and reopened on another page: not the sequence's cached cones.
+  env.instance.clearSequence();
+  await env.instance.viewer.open(`s-${size * 2 + 10}`);
+  await env.instance.selectSequence('s');
+  await settleLong();
+  assert.ok(
+    cones()[0] <= size * 2 + 10 && cones()[1] >= size * 2 + 10,
+    `around the photo: ${cones()}`,
+  );
+});
+
+test('a storage hiccup is not remembered as an archived photo', async () => {
+  const env = setup({ nearest: [photoRecord('near', { metres: 3 })] });
+  let answer = null;
+  env.source.probeImage = async () => answer;
+  // No answer: the photo is tried rather than called archived.
+  assert.equal(
+    await env.instance.nearestImage({ lat: 42.3314, lon: -83.0458 }),
+    'near',
+  );
+  answer = false;
+  await assert.rejects(
+    env.instance.nearestImage({ lat: 42.3314, lon: -83.0458 }),
+    /archived/,
+    'asked again, and now it is gone',
+  );
+});
+
+test('a photo far past a run of deleted photos still finds its page and neighbours', async () => {
+  const indexes = [
+    ...Array.from({ length: 1000 }, (_, i) => i),
+    ...Array.from({ length: 20 }, (_, i) => 6000 + i),
+  ];
+  const { instance, poses, next, prev } = await mounted({
+    sequences: { s: indexes },
+  });
+  await instance.viewer.open('s-6005');
+  for (let i = 0; i < 12; i++) await settle();
+  assert.equal(next.disabled, false);
+  assert.equal(prev.disabled, false);
+  await press(next);
+  assert.equal(poses.at(-1), 's-6006');
+});
+
+test('coverage tiles are kept for a while: panning back asks KartaView nothing', async () => {
+  let now = 0;
+  const asked = [];
+  const tiles = createTileCache({
+    load: async (tile) => {
+      asked.push(`${tile.z}/${tile.x}/${tile.y}`);
+      return { sequences: [], overview: [] };
+    },
+    size: 2,
+    ttlMs: 1000,
+    now: () => now,
+  });
+  const a = { x: 1, y: 2, z: 14 };
+  const b = { x: 2, y: 2, z: 14 };
+  const c = { x: 3, y: 2, z: 14 };
+  const first = await tiles.get(a, {});
+  assert.equal(await tiles.get(a, {}), first, 'the same decoded tile');
+  await tiles.get(b, {});
+  await tiles.get(c, {});
+  await tiles.get(a, {});
+  assert.deepEqual(
+    asked,
+    ['14/1/2', '14/2/2', '14/3/2', '14/1/2'],
+    'oldest dropped',
+  );
+  now = 2000;
+  await tiles.get(a, {});
+  assert.equal(asked.length, 5, 'stale after the TTL');
+  // A failed load is not kept.
+  const failing = createTileCache({
+    load: async () => {
+      throw new Error('KartaView did not answer in time — try again');
+    },
+    size: 2,
+    ttlMs: 1000,
+  });
+  await assert.rejects(failing.get(a, {}), /did not answer/);
 });

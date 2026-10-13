@@ -68,6 +68,18 @@ test('photo files come from the storage host the record names, not the one its U
     Buffer.from(link.split('/').at(-1), 'base64url').toString(),
     photo.urls.full,
   );
+  // A fallback address must be on KartaView's storage, over https.
+  for (const fileurlLTh of [
+    'https://tracker.example/x.jpg',
+    'http://storage1.openstreetcam.org/a.jpg',
+    'javascript:alert(1)',
+  ]) {
+    const hostile = normalizePhoto(
+      record({ storage: '', filepathLTh: '', fileurlLTh, fileurl: fileurlLTh }),
+    );
+    assert.notEqual(hostile.urls.view, fileurlLTh);
+    assert.doesNotMatch(String(hostile.urls.view), /tracker|javascript|^http:/);
+  }
   // An unexpected storage value falls back to the URLs as given.
   const odd = normalizePhoto(record({ storage: 'https://evil.example' }));
   assert.match(odd.urls.view, /^https:\/\/storage1\.openstreetcam\.org\//);
