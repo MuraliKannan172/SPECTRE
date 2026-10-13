@@ -2042,7 +2042,6 @@
   "Box and images cleared": "Область и снимки сброшены",
   "Box is {size} wide · limit {limit}": "Область шириной {size} · предел {limit}",
   "View is {size} wide · limit {limit}": "Вид шириной {size} · предел {limit}",
-  "{mode} · {band} · {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}": "{mode} · {band} · {locality} | {region} | ALT {alt} | ОКНО {window} | SUN {sun}° | ONA {ona}° | {zone}",
   "Frame unavailable; previous observation retained": "Кадр недоступен; показано предыдущее наблюдение",
   "Weather imagery unavailable": "Погодные снимки недоступны",
   "Weather source unavailable; previous observation retained": "Источник погоды недоступен; показано предыдущее наблюдение",
@@ -2064,5 +2063,6 @@
   "Google 3D tiles unavailable — check the key's API restrictions, quota, or network": "Тайлы Google 3D недоступны — проверьте ограничения API ключа, квоту или сеть",
   "Needs {envVars} — add it in Provider Settings — or a Cesium ion token for the ion-hosted route": "Нужен {envVars} — добавьте его в «Настройках провайдеров» — или токен Cesium ion для маршрута через ion",
   "Comparison in use by another scene": "Сравнение занято другой сценой",
-  "A location reading needs a loaded forecast and the Earth at the center of the view.": "Для показания в точке нужен загруженный прогноз и Земля в центре вида."
+  "A location reading needs a loaded forecast and the Earth at the center of the view.": "Для показания в точке нужен загруженный прогноз и Земля в центре вида.",
+  "{mode} {band} {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}": "{mode} · {band} · {locality} | {region} | ALT {alt} | ОКНО {window} | SUN {sun}° | ONA {ona}° | {zone}"
 }

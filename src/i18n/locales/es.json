@@ -2010,7 +2010,6 @@
   "Box and images cleared": "Recuadro e imágenes borrados",
   "Box is {size} wide · limit {limit}": "El recuadro mide {size} · límite {limit}",
   "View is {size} wide · limit {limit}": "La vista mide {size} · límite {limit}",
-  "{mode} · {band} · {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}": "{mode} · {band} · {locality} | {region} | ALT {alt} | VENTANA {window} | SUN {sun}° | ONA {ona}° | {zone}",
   "Frame unavailable; previous observation retained": "Fotograma no disponible; se mantiene la observación anterior",
   "Weather imagery unavailable": "Imágenes meteorológicas no disponibles",
   "Weather source unavailable; previous observation retained": "Fuente meteorológica no disponible; se mantiene la observación anterior",
@@ -2032,5 +2031,6 @@
   "Google 3D tiles unavailable — check the key's API restrictions, quota, or network": "Teselas de Google 3D no disponibles: revisa las restricciones de API de la clave, la cuota o la red",
   "Needs {envVars} — add it in Provider Settings — or a Cesium ion token for the ion-hosted route": "Necesita {envVars} — añádela en Ajustes de proveedores — o un token de Cesium ion para la ruta alojada en ion",
   "Comparison in use by another scene": "La comparación está en uso por otra escena",
-  "A location reading needs a loaded forecast and the Earth at the center of the view.": "Una lectura en un punto necesita un pronóstico cargado y la Tierra en el centro de la vista."
+  "A location reading needs a loaded forecast and the Earth at the center of the view.": "Una lectura en un punto necesita un pronóstico cargado y la Tierra en el centro de la vista.",
+  "{mode} {band} {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}": "{mode} · {band} · {locality} | {region} | ALT {alt} | VENTANA {window} | SUN {sun}° | ONA {ona}° | {zone}"
 }

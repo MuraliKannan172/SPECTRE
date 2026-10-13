@@ -786,7 +786,7 @@ export class IntelHUD {
     );
     // ALT, SUN and ONA are sensor codes, as in the corner readouts.
     const line = t(
-      '{mode} · {band} · {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}',
+      '{mode} {band} {locality} | {region} | ALT {alt} | WINDOW {window} | SUN {sun}° | ONA {ona}° | {zone}',
       {
         mode: modeLabel,
         band: viewBandLabel(band),
