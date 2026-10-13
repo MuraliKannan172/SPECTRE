@@ -18,9 +18,8 @@ const CACHE_MS = 60_000;
 const CACHE_MAX = 64;
 /** Cooldown after a 429 or 5xx when upstream sends no usable Retry-After. */
 const COOLDOWN_MS = 60_000;
-/** Bounds for an upstream-supplied Retry-After. */
+/** Minimum backoff; a valid longer upstream deadline is never shortened. */
 const COOLDOWN_MIN_MS = 5_000;
-const COOLDOWN_MAX_MS = 120_000;
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 const TIMEOUT_MS = 10_000;
 
@@ -36,13 +35,14 @@ export function gnssIntegrityAnchor(url) {
 
 /** Cooldown (ms) an upstream 429 earns, honouring Retry-After when sane. */
 export function gnssRetryCooldownMs(raw, nowMs) {
-  const clamp = (ms) =>
-    Math.min(COOLDOWN_MAX_MS, Math.max(COOLDOWN_MIN_MS, ms));
   if (raw) {
     const seconds = Number(raw);
-    if (Number.isFinite(seconds) && seconds > 0) return clamp(seconds * 1000);
+    const ms = seconds * 1000;
+    if (Number.isFinite(ms) && seconds > 0)
+      return Math.max(COOLDOWN_MIN_MS, ms);
     const at = Date.parse(raw);
-    if (Number.isFinite(at) && at > nowMs) return clamp(at - nowMs);
+    if (Number.isFinite(at) && at > nowMs)
+      return Math.max(COOLDOWN_MIN_MS, at - nowMs);
   }
   return COOLDOWN_MS;
 }
@@ -75,9 +75,11 @@ export function gnssIntegrityProxy({
     if (!response.ok) {
       await response.body?.cancel();
       if (response.status === 429) {
-        cooldownUntil =
-          now() +
-          gnssRetryCooldownMs(response.headers.get('retry-after'), now());
+        const at = now();
+        cooldownUntil = Math.max(
+          cooldownUntil,
+          at + gnssRetryCooldownMs(response.headers.get('retry-after'), at),
+        );
         throw Object.assign(new Error('upstream_rate_limited'), {
           status: 429,
         });

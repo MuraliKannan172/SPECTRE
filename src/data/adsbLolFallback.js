@@ -94,8 +94,25 @@ export function normalizeAdsbLolPointResponse(payload) {
       : Math.floor(
           responseNow > 10_000_000_000 ? responseNow / 1000 : responseNow,
         );
-  const states = (Array.isArray(payload?.ac) ? payload.ac : [])
+  const aircraft = Array.isArray(payload?.ac) ? payload.ac : [];
+  const states = aircraft
     .map((aircraft) => normalizeAdsbLolAircraftState(aircraft, nowSeconds))
     .filter(Boolean);
-  return { time: nowSeconds, states };
+  // Keep the OpenSky vectors unchanged. The regional fallback's extra readsb
+  // status travels alongside them, keyed only to admitted aircraft.
+  const admitted = new Set(states.map((row) => row[0]));
+  const emergencyByIcao = Object.fromEntries(
+    aircraft.flatMap((row) => {
+      const id = String(row?.hex || '')
+        .trim()
+        .toLowerCase();
+      if (!admitted.has(id) || typeof row?.emergency !== 'string') return [];
+      return [[id, row.emergency.trim().toLowerCase()]];
+    }),
+  );
+  return {
+    time: nowSeconds,
+    states,
+    ...(Object.keys(emergencyByIcao).length ? { emergencyByIcao } : {}),
+  };
 }

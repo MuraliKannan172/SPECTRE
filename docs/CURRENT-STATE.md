@@ -834,9 +834,13 @@ else `ADS-B EMERGENCY · …` or `ADS-B PRIORITY · …`, in red. Analyst record
 the voice query fields expose `squawk`, `emergency` (flag), `emergencyKind` and
 `emergencySource` (`squawk` when the Mode A code names the status, `ads-b` for
 the readsb field), plus `emergencyBroadcast` (`broadcasting squawk 7700 (general
-emergency)` vs `ADS-B reports general emergency`) and `observedAtMs`, the epoch
-ms of the last transponder message. Voice results carry `observedAtMs` only for
-aircraft with a status.
+emergency)` vs `ADS-B reports general emergency`) and `lastContactAtMs`, the latest known general aircraft-message contact in epoch
+ms. Missing contact times retain the preceding known contact, or stay null if
+none is known. This does not timestamp the current emergency broadcast. Civil
+adsb.lol fallback preserves the readsb status in `emergencyByIcao` alongside
+unchanged OpenSky-compatible vectors, including clearing on subsequent polls.
+Compact voice results retain the emergency flag, source, phrase and named
+last-contact time; they do not label that time as the status receipt.
 `scripts/qa-emergency-squawk.mjs` proves the tint, HUD line and clearing.
 
 ## Browser live-source observations
@@ -5207,3 +5211,9 @@ datacenters, dams and the Nepal locator retain that shared credit while displaye
 
 Military fragments stitch by source identity. Different mapped parcels merge only
 when their footprints touch or contain one another, never across a seam tolerance gap.
+
+GNSS integration reserves share token `3`, retaining published Street Level `0`.
+It uses the catalog source contract and voice layer manifest. Upstream 429
+Retry-After seconds/HTTP dates retain their full deadlines; overlapping requests
+keep the longest cooldown. Live GNSS QA requires a successful dated response
+even when there are no qualifying cells.

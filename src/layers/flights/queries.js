@@ -225,7 +225,7 @@ export function createQueries({
    *   military: boolean, aircraftClass: string|null, originCountry: string|null,
    *   operator: string|null, squawk: string|null, emergency: boolean,
    *   emergencyKind: string|null, emergencySource: 'squawk'|'ads-b'|null,
-   *   emergencyBroadcast: string|null, observedAtMs: number|null, routeOrigin: string|null,
+   *   emergencyBroadcast: string|null, lastContactAtMs: number|null, routeOrigin: string|null,
    *   routeDestination: string|null}}
    */
 
@@ -271,9 +271,9 @@ export function createQueries({
       // when the Mode A code names the status, 'ads-b' for the readsb field.
       emergencySource: text(info?.emergency?.source),
       emergencyBroadcast: emergencyBroadcastPhrase(info?.emergency),
-      // Epoch ms of the last transponder message — when this squawk/status
-      // was heard (OpenSky time_contact; readsb snapshot time minus `seen`).
-      observedAtMs: num(info?.lastContactEpochMs),
+      // Latest known general aircraft-message contact, retained if a poll
+      // has no time. This is not the receipt time of the current status.
+      lastContactAtMs: num(info?.lastContactEpochMs),
       routeOrigin: routeOk ? text(info?.route?.origin?.code) : null,
       routeDestination: routeOk ? text(info?.route?.destination?.code) : null,
     };

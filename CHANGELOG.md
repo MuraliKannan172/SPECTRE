@@ -95,6 +95,15 @@
 
 ## [Unreleased]
 
+- Preserve full GNSS upstream retry deadlines and concurrent cooldowns; keep
+  published Street Level token `0` and assign GNSS token `3`. Live QA requires
+  a successful dated snapshot even in empty airspace.
+- Civil Flights fallback retains ADS-B-only emergency/priority status and clears
+  it on later polls. Analyst/voice results label the retained general aircraft
+  contact time as `lastContactAtMs`, not the time of the current status.
+  GNSS Integrity and aircraft emergency highlighting contributed by
+  [Leo Pechnicki](https://github.com/leopechnicki) (#855, #856).
+
 - Flights and Military Flights highlight aircraft broadcasting a transponder
   emergency. Squawk 7500 (unlawful interference), 7600 (radio failure) and
   7700 (general emergency) — or adsb.lol's ADS-B `emergency` status, which

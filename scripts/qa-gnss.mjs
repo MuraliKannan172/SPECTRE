@@ -329,8 +329,6 @@ async function main() {
       ? { executablePath }
       : {}),
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
       '--use-gl=angle',
       '--use-angle=swiftshader',
       '--disable-dev-shm-usage',
@@ -353,7 +351,7 @@ async function main() {
     const liveBodies = [];
     live.on('response', (res) => {
       if (res.url().includes('/api/gnss-integrity') && res.ok())
-        liveBodies.push(res.json().then((body) => body.rows ?? []));
+        liveBodies.push(res.json());
     });
     await boot(live, { lon: 19.5, lat: 52.5, height: 1_100_000 });
     const l = await enableAndSettle(live);
@@ -364,10 +362,29 @@ async function main() {
     const liveSnapshots = (await Promise.allSettled(liveBodies))
       .filter((r) => r.status === 'fulfilled')
       .map((r) => r.value);
-    const liveRows = liveSnapshots.reduce((sum, rows) => sum + rows.length, 0);
+    record(
+      'LIVE: a successful, dated integrity response was received',
+      liveSnapshots.length > 0 &&
+        liveSnapshots.every(
+          (body) =>
+            Array.isArray(body.rows) &&
+            Number.isFinite(body.ageMs) &&
+            body.ageMs >= 0 &&
+            body.classifier === 'gev-nic-nacp-v1',
+        ),
+      `successful responses=${liveSnapshots.length}`,
+    );
+    const liveRows = liveSnapshots.reduce(
+      (sum, body) => sum + (body.rows?.length || 0),
+      0,
+    );
     const expectedStore = new Map();
-    for (const rows of liveSnapshots)
-      accumulateGnssObservations(expectedStore, rows, Date.now());
+    for (const body of liveSnapshots) {
+      const at = Date.now();
+      accumulateGnssObservations(expectedStore, body.rows, at, {
+        observedAt: at - body.ageMs,
+      });
+    }
     const expectedCells = binGnssCells(expectedStore).length;
     record(
       'LIVE: no error, one entity per cell',

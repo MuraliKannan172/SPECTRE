@@ -87,7 +87,13 @@ export function openSkySnapshot(
 ) {
   const admitted = admitRecords(
     payload?.states,
-    normalizeOpenSkyAircraft,
+    (row) => {
+      const record = normalizeOpenSkyAircraft(row);
+      const statuses = payload?.emergencyByIcao;
+      if (record && statuses && Object.hasOwn(statuses, record.id))
+        record.emergency = cleanText(statuses[record.id]).toLowerCase() || null;
+      return record;
+    },
     'OpenSky',
   );
   const observedAtMs = epoch(payload?.time, 1000);

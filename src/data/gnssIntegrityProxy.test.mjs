@@ -205,11 +205,16 @@ test('an upstream 429 starts a cooldown with no further upstream calls', async (
   assert.equal(calls, 2);
 });
 
-test('Retry-After accepts seconds or an HTTP date, clamped to 5 s – 120 s', () => {
+test('Retry-After accepts seconds or an HTTP date, with a 5 s minimum and no truncated deadline', () => {
   const nowMs = Date.parse('2026-09-29T12:00:00Z');
   assert.equal(gnssRetryCooldownMs('30', nowMs), 30_000);
   assert.equal(gnssRetryCooldownMs('1', nowMs), 5_000);
-  assert.equal(gnssRetryCooldownMs('3600', nowMs), 120_000);
+  assert.equal(gnssRetryCooldownMs('3600', nowMs), 3_600_000);
+  assert.equal(
+    gnssRetryCooldownMs('Tue, 29 Sep 2026 13:00:00 GMT', nowMs),
+    3_600_000,
+  );
+  assert.equal(gnssRetryCooldownMs('1e309', nowMs), 60_000);
   assert.equal(
     gnssRetryCooldownMs('Tue, 29 Sep 2026 12:00:45 GMT', nowMs),
     45_000,
@@ -221,6 +226,40 @@ test('Retry-After accepts seconds or an HTTP date, clamped to 5 s – 120 s', ()
     60_000,
   );
   assert.equal(gnssRetryCooldownMs(null, nowMs), 60_000);
+});
+
+test('overlapping 429s preserve the longest shared deadline', async () => {
+  let clock = 0,
+    calls = 0;
+  const pending = [];
+  const request = install({
+    now: () => clock,
+    fetchImpl: () => {
+      calls += 1;
+      return new Promise((resolve) => pending.push(resolve));
+    },
+  });
+  const long = request('/?lat=1&lon=0'),
+    short = request('/?lat=2&lon=0');
+  await new Promise((resolve) => setImmediate(resolve));
+  pending[0](
+    new Response('', { status: 429, headers: { 'Retry-After': '3600' } }),
+  );
+  assert.equal((await long).headers['Retry-After'], '3600');
+  clock = 1000;
+  pending[1](
+    new Response('', { status: 429, headers: { 'Retry-After': '5' } }),
+  );
+  assert.equal((await short).headers['Retry-After'], '3599');
+  clock = 7000;
+  assert.equal((await request('/?lat=3&lon=0')).status, 429);
+  assert.equal(calls, 2);
+  clock = 3_600_001;
+  const resumed = request('/?lat=3&lon=0');
+  await new Promise((resolve) => setImmediate(resolve));
+  pending[2](Response.json(snapshot));
+  assert.equal((await resumed).status, 200);
+  assert.equal(calls, 3);
 });
 
 test('a cached anchor keeps serving its last snapshot as stale during a cooldown', async () => {
