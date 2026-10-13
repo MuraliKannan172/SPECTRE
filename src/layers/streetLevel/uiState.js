@@ -18,6 +18,7 @@ import { COLORS } from './policy.js';
  * @property {boolean} [groundClick]
  * @property {Array<'pano'|'since'>} [filters]
  * @property {{noun: string, action: string}|null} [coverageLabel]
+ * @property {boolean} [highlightsSequence]   Its lines turn cyan when their sequence is selected.
  */
 
 /**
@@ -95,7 +96,13 @@ export function composeUIState({
       label: provider.name,
       color: provider.color,
     }));
-  if (legend.length)
+  // "Selected" only beside a source whose lines turn cyan when selected.
+  if (
+    active.some(
+      (provider) =>
+        provider.groundClick !== true && provider.highlightsSequence !== false,
+    )
+  )
     legend.push({ key: 'selected', label: 'Selected', color: COLORS.selected });
   return {
     enabled,

@@ -60,7 +60,14 @@ test('photo files come from the storage host the record names, not the one its U
     photo.urls.full,
     'https://storage2.openstreetcam.org/files/photo/2016/8/24/proc/14010_ba53c_57bd1d23d50b7.jpg',
   );
-  assert.equal(kartaViewPhotoUrl(photo), photo.urls.full);
+  // The link goes through the image proxy, which serves photos whose
+  // storage host answers 502 directly.
+  const link = kartaViewPhotoUrl(photo);
+  assert.match(link, /^https:\/\/cdn\.kartaview\.org\/pr:sharp\/[\w-]+$/);
+  assert.equal(
+    Buffer.from(link.split('/').at(-1), 'base64url').toString(),
+    photo.urls.full,
+  );
   // An unexpected storage value falls back to the URLs as given.
   const odd = normalizePhoto(record({ storage: 'https://evil.example' }));
   assert.match(odd.urls.view, /^https:\/\/storage1\.openstreetcam\.org\//);
@@ -101,6 +108,14 @@ test('a 360° photo keeps its equirectangular image; the unmatched position is t
 
 test('records without an id or a position are dropped; a missing heading is null', () => {
   assert.equal(normalizePhoto(null), null);
+  // 0,0 is a missing fix.
+  assert.equal(
+    normalizePhoto(
+      record({ lat: '0', lng: '0', matchLat: '0', matchLng: '0' }),
+    ),
+    null,
+  );
+  assert.equal(normalizePhoto(record({ lat: '95', matchLat: '95' })), null);
   assert.equal(normalizePhoto(record({ id: undefined })), null);
   assert.equal(
     normalizePhoto(

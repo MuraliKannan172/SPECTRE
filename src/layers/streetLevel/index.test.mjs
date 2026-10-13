@@ -818,3 +818,23 @@ test('an empty provider composition enables and tears down without acquiring ima
   layer.enable(viewer);
   assert.deepEqual(layer.getUIState().providers, []);
 });
+
+test('a failed lookup’s error goes when another source is lit; a provider can open an image without framing', async (t) => {
+  const failing = fakeProvider({
+    nearestImage: async () => {
+      throw new Error('KartaView did not answer in time — try again');
+    },
+  });
+  const other = fakeProvider({ id: 'other', pickPrefix: 'oth:' });
+  const { layer, viewer } = await enabledLayer(t, [failing, other]);
+  layer.attachViewerHost({});
+  await layer.openNearest({ lat: 1, lon: 1 });
+  assert.match(layer.getUIState().street.error, /did not answer/);
+  layer.setProviderEnabled('other', true);
+  await settle();
+  assert.equal(layer.getUIState().street.error, null);
+  // A provider's own open (KartaView's ‹ ›) can leave the camera alone.
+  await other.context().actions.openImage('img-1', { frame: false });
+  assert.deepEqual(other.calls.open, ['img-1']);
+  assert.equal(viewer.flights.started, 0);
+});

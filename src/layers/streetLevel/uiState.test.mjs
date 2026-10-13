@@ -236,3 +236,25 @@ test('a key-gated layer offers the switched-off sources that would draw with a k
     [],
   );
 });
+
+test('a source whose lines never show a selection lists no Selected swatch, and names its own lines', () => {
+  const kartaView = provider({
+    id: 'kartaview',
+    name: 'KartaView',
+    color: '#635bff',
+    highlightsSequence: false,
+    coverageLabel: {
+      noun: 'streets',
+      action: 'click a line for its nearest photo',
+    },
+  });
+  const ui = composeUIState({ ...base, providers: [kartaView] });
+  assert.deepEqual(
+    ui.legend.map((entry) => entry.key),
+    ['kartaview'],
+  );
+  assert.deepEqual(ui.coverage.label, {
+    noun: 'streets',
+    action: 'click a line for its nearest photo',
+  });
+});

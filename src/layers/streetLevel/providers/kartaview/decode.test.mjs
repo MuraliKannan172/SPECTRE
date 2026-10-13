@@ -71,5 +71,17 @@ test('bad points, repeats and one-point tracks are skipped; an empty tile has no
     [2, 2],
   ]);
   assert.deepEqual(decodeCoverageTile({ lines: [] }, TILE).sequences, []);
-  assert.deepEqual(decodeCoverageTile(null, TILE).sequences, []);
+});
+
+test('a tile that is not a line list fails, so it is asked for again rather than kept empty', () => {
+  for (const payload of [
+    null,
+    {},
+    { lines: 'nope' },
+    { status: { apiCode: 690 } },
+  ])
+    assert.throws(
+      () => decodeCoverageTile(payload, TILE),
+      /unreadable coverage tile/,
+    );
 });

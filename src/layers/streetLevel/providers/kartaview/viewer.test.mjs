@@ -80,7 +80,11 @@ function setup({ failLoads = [], rendererThrows = false, steps = {} } = {}) {
       return PHOTOS[id];
     },
     step: async (photo, delta) => steps[`${photo.id}:${delta}`] ?? null,
-    onStepped: (id) => stepped.push(id),
+    // The core opens what ‹ › chose; here the adapter is opened directly.
+    onStep: (id) => {
+      stepped.push(id);
+      viewer.open(id).catch(() => {});
+    },
     load: async (url, options) => {
       loads.push({ url, crossOrigin: options?.crossOrigin });
       if (failLoads.some((part) => url.includes(part)))
@@ -108,7 +112,9 @@ const parts = (host) => {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 test('a flat photo shows its 1280 px version, then the sharp one, with a pose facing its heading', async () => {
-  const { viewer, poses, host, loads } = setup();
+  const { viewer, poses, host, loads } = setup({
+    steps: { 'flat1:1': 'flat2', 'flat1:-1': 'flat0' },
+  });
   await viewer.mount(host);
   const { picture, canvas, prev, next } = parts(host);
   assert.equal(prev.disabled, true, 'nothing to step through yet');
@@ -142,7 +148,7 @@ test('a flat photo shows its 1280 px version, then the sharp one, with a pose fa
       title: null,
     },
   );
-  assert.equal(pose.externalUrl, PHOTOS.flat1.urls.full);
+  assert.match(pose.externalUrl, /^https:\/\/cdn\.kartaview\.org\/pr:sharp\//);
   assert.equal(loads[0].url, PHOTOS.flat1.urls.view);
   assert.equal(loads[0].crossOrigin, false, 'an <img> needs no CORS');
   await settle();
@@ -222,26 +228,43 @@ test('without WebGL, or when the panorama fails, a 360° photo shows its front v
   assert.equal(broken.poses.at(-1).imageId, 'pano1');
 });
 
-test('‹ › and the arrow keys step along the sequence; the end disables the button', async () => {
+test('‹ › and the arrow keys step along the sequence; ends disable at once', async () => {
   const { viewer, poses, host, stepped } = setup({
-    steps: { 'flat1:1': 'flat2' },
+    steps: { 'flat1:1': 'flat2', 'flat2:-1': 'flat1' },
   });
   await viewer.mount(host);
   await viewer.open('flat1');
   const { root, prev, next } = parts(host);
+  await settle();
+  assert.equal(prev.disabled, true, 'flat1 is the first photo: known up front');
+  assert.equal(next.disabled, false);
   next.fire('click');
-  await settle();
-  await settle();
+  for (let i = 0; i < 4; i++) await settle();
   assert.equal(poses.at(-1).imageId, 'flat2');
-  assert.deepEqual(stepped, ['flat2']);
-  root.fire('keydown', { key: 'ArrowRight' });
-  await settle();
-  await settle();
+  assert.deepEqual(stepped, ['flat2'], 'the core is asked to open it');
   assert.equal(next.disabled, true, 'flat2 is the last photo');
+  assert.equal(prev.disabled, false);
   root.fire('keydown', { key: 'ArrowLeft', metaKey: true });
   await settle();
   assert.equal(poses.at(-1).imageId, 'flat2', 'modified arrows are not ours');
-  assert.equal(prev.disabled, false);
+  root.fire('keydown', { key: 'ArrowLeft' });
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(poses.at(-1).imageId, 'flat1');
+});
+
+test('quick presses each step on from the photo the last one chose', async () => {
+  const chain = { 'flat1:1': 'flat2', 'flat2:1': 'pano1' };
+  const { viewer, host, stepped } = setup({
+    steps: chain,
+    rendererThrows: true,
+  });
+  await viewer.mount(host);
+  await viewer.open('flat1');
+  const { next } = parts(host);
+  next.fire('click');
+  next.fire('click');
+  for (let i = 0; i < 8; i++) await settle();
+  assert.deepEqual(stepped, ['flat2', 'pano1']);
 });
 
 test('a newer open wins; close hides the photo; unmount tears down the panorama', async () => {

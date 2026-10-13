@@ -108,7 +108,9 @@ export function createStreetLevelLayer({
       getSurface: () => state.surface,
       notify,
       actions: {
-        openImage: (imageId) => openImage(entry.def.id, imageId),
+        /** `{frame: false}` opens it without moving the camera. */
+        openImage: (imageId, options) =>
+          openImage(entry.def.id, imageId, options),
         /** This provider's image nearest a point the user picked on the map. */
         openNearest: (point) =>
           layer.openNearest(point, {
@@ -345,6 +347,8 @@ export function createStreetLevelLayer({
       for (const other of state.providers.values())
         if (other !== entry && other.on) switchProvider(other, false);
     switchProvider(entry, next);
+    // A failed lookup's message was about the source just switched away.
+    if (!state.street.open) state.street.error = null;
     notify();
     return true;
   }
@@ -414,6 +418,7 @@ export function createStreetLevelLayer({
         error: stats.error || null,
         color: entry.def.colors.coverage,
         coverageLabel: entry.def.coverageLabel || null,
+        highlightsSequence: entry.def.highlightsSequence !== false,
         groundClick: entry.def.groundClick === true,
         filters: [...filtersOf(entry.def)],
       };

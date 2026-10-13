@@ -9,8 +9,11 @@
  * @returns {{sequences: Array<{id: string, parts: Array<Array<[number, number]>>, capturedAt: number, isPano: boolean}>, overview: Array<never>}}
  */
 export function decodeCoverageTile(payload, { x, y, z }) {
+  // Not cached as empty: an unreadable tile is asked for again.
+  if (!Array.isArray(payload?.lines))
+    throw new Error('KartaView sent an unreadable coverage tile');
   const segments = [];
-  for (const line of Array.isArray(payload?.lines) ? payload.lines : []) {
+  for (const line of payload.lines) {
     const points = [];
     for (const point of Array.isArray(line?.track) ? line.track : []) {
       const lon = Number(point?.lng);

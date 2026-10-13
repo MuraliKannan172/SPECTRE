@@ -22,7 +22,8 @@ export function filtersOf(provider) {
  * @property {boolean} [defaultOn]     Default true.
  * @property {{kind: 'view-cone', color: string}} [marker]   Default: GEV's pin.
  * @property {Array<'pano'|'since'>} [filters]   Filters it honours (default both).
- * @property {{noun: string, action: string}} [coverageLabel]   How the panel counts its lines and says what a click does (default: sequences, "click a line for its photos").
+ * @property {{noun: string, action: string}} [coverageLabel]
+ * @property {boolean} [highlightsSequence]   Its lines show the selected sequence (default true; the legend's "Selected" needs one).   How the panel counts its lines and says what a click does (default: sequences, "click a line for its photos").
  * @property {(context: ProviderContext) => ProviderInstance} create
  *
  * @typedef {object} ProviderContext   Handed to `create()` once by the core.
@@ -33,7 +34,7 @@ export function filtersOf(provider) {
  * @property {GroundCaster|null} groundCaster   Bare-earth heights for terrain mode (groundCast.js); null without a terrain service.
  * @property {{meshAt: (lon: number, lat: number) => number|undefined, request: (points: Array<[number, number]>) => void, onSampled: (listener: (cells: Array<[number, number]>) => void) => () => void}|null} meshSampler   Sampled Google 3D surface heights (meshSampler.js); pass `meshAt` to `castLine`.
  * @property {() => void} notify       Ask the core to publish a new UI snapshot.
- * @property {{openImage: (imageId: string) => Promise<void>, openNearest: (point: {lon: number, lat: number}) => Promise<boolean>, reportError: (message: string|null) => void}} actions
+ * @property {{openImage: (imageId: string, options?: {frame?: boolean}) => Promise<boolean>, openNearest: (point: {lon: number, lat: number}) => Promise<boolean>, reportError: (message: string|null) => void}} actions
  *
  * @typedef {object} ProviderInstance
  * @property {() => Promise<{configured: boolean}>} status

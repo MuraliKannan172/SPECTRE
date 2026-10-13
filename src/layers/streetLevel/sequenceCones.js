@@ -49,6 +49,8 @@ export function thinImages(images, spacingM = IMAGE_CONE_MIN_SPACING_M) {
  * @param {string} options.renderKey    Render-governor reason.
  * @param {(sequenceId: string, selected: boolean) => void} [options.onHighlight]
  *   Highlight (or stop highlighting) the sequence's coverage line.
+ * @param {(image: ConeImage, filter: object) => boolean} [options.passes]
+ *   Whether the imagery filter keeps a cone.
  */
 export function createSequenceCones({
   state,
@@ -58,6 +60,7 @@ export function createSequenceCones({
   spriteId,
   renderKey,
   onHighlight = () => {},
+  passes = passesImageryFilter,
 }) {
   const { render, sprites } = state.services;
 
@@ -154,7 +157,7 @@ export function createSequenceCones({
     // Resolved now, so a "since N days" window keeps up with the clock.
     const filter = state.context.getFilter();
     images.forEach((image, index) => {
-      if (!passesImageryFilter(image, filter)) return;
+      if (!passes(image, filter)) return;
       const height = heights?.[index] ?? null;
       const billboard = collection.add({
         id: `${pickPrefix}${image.id}`,

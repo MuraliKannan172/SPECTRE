@@ -1,11 +1,16 @@
 import {
+  IMAGE_PROBE_TIMEOUT_MS,
   KARTAVIEW_API_HOST,
   NEAREST_LIMIT,
   NEAREST_SEARCH_ZOOM,
+  PAGE_CONCURRENCY,
+  PAGE_TIMEOUT_MS,
   PHOTO_API_CONCURRENCY,
   PHOTO_API_RETRIES,
   PHOTO_API_RETRY_BASE_MS,
+  PHOTO_API_RETRY_MAX_MS,
   PHOTO_API_TIMEOUT_MS,
+  TILE_CONCURRENCY,
   TILE_TIMEOUT_MS,
 } from './policy.js';
 
@@ -19,7 +24,7 @@ export class KartaViewSourceError extends Error {
   }
 }
 
-const NO_ANSWER = 'KartaView did not answer — check the network and try again';
+const NO_ANSWER = 'KartaView did not answer in time — try again';
 
 /** Resolves after `ms`, or rejects when `signal` aborts first. */
 function wait(ms, signal) {
@@ -92,8 +97,11 @@ export function createLimiter(limit) {
 
 /**
  * KartaView's public API, browser-side and keyless (it allows any origin).
- * Coverage tiles are not rate-limited; photo lookups are, so they queue two
- * at a time and retry a 429.
+ * It speaks HTTP/1.1, so the browser opens six connections to it: tiles take
+ * at most three, photo lookups two and sequence pages one, so a lookup never
+ * waits behind slow tiles or pages. The photo API answers 429 to more than
+ * about three requests at once; a 429 (and a lookup that timed out) is
+ * retried.
  * @param {{fetchImpl?: typeof fetch, apiHost?: string, retryBaseMs?: number}} [options]
  */
 export function createKartaViewSource({
@@ -102,6 +110,8 @@ export function createKartaViewSource({
   retryBaseMs = PHOTO_API_RETRY_BASE_MS,
 } = {}) {
   const limiter = createLimiter(PHOTO_API_CONCURRENCY);
+  const tileLimiter = createLimiter(TILE_CONCURRENCY);
+  const pageLimiter = createLimiter(PAGE_CONCURRENCY);
 
   /** GET JSON within `timeoutMs`; the caller's abort wins over the timeout. */
   async function getJson(url, { signal, timeoutMs }) {
@@ -137,32 +147,52 @@ export function createKartaViewSource({
     }
   }
 
-  /** A photo-API call through the limiter, retrying 429s with backoff. */
-  async function photoApi(path, params, { signal } = {}) {
+  /**
+   * A photo-API call through `gate`, retrying 429s with backoff and, once, a
+   * call that timed out.
+   */
+  async function photoApi(
+    path,
+    params,
+    { signal } = {},
+    { gate = limiter, timeoutMs = PHOTO_API_TIMEOUT_MS } = {},
+  ) {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     const url = `${apiHost}${path}${query}`;
+    let timeouts = 0;
     for (let attempt = 0; ; attempt++) {
       try {
-        const payload = await limiter.run(
-          () => getJson(url, { signal, timeoutMs: PHOTO_API_TIMEOUT_MS }),
+        const payload = await gate.run(
+          () => getJson(url, { signal, timeoutMs }),
           { signal },
         );
         const code = Number(payload?.status?.apiCode);
         // 600 ok, 601 empty, 602 partial: anything else is a refusal.
         if (Number.isFinite(code) && (code < 600 || code > 603))
           throw new KartaViewSourceError(
-            String(
-              payload?.status?.apiMessage || 'KartaView refused the request',
-            ).trim(),
+            `KartaView refused the request (code ${code})`,
             { status: Number(payload?.status?.httpCode) || 0 },
           );
         return payload?.result ?? {};
       } catch (error) {
-        if (error?.status !== 429 || attempt >= PHOTO_API_RETRIES) throw error;
+        if (signal?.aborted) throw error;
+        const timedOut = error?.message === NO_ANSWER && error.status === 0;
+        if (timedOut && timeouts++ < 1) continue;
+        if (error?.status !== 429 || attempt >= PHOTO_API_RETRIES) {
+          if (error?.status === 429)
+            throw new KartaViewSourceError(
+              'KartaView is rate-limiting requests — try again in a moment',
+              { status: 429, retryAfterSec: error.retryAfterSec },
+            );
+          throw error;
+        }
         await wait(
-          Math.max(
-            retryBaseMs * 2 ** attempt,
-            (error.retryAfterSec ?? 0) * 1000,
+          Math.min(
+            PHOTO_API_RETRY_MAX_MS,
+            Math.max(
+              retryBaseMs * 2 ** attempt,
+              (error.retryAfterSec ?? 0) * 1000,
+            ),
           ),
           signal,
         );
@@ -173,10 +203,42 @@ export function createKartaViewSource({
   return {
     /** A coverage tile: `{lines: [{track: [{lat, lng}]}]}`. */
     async getTile({ x, y, z }, { signal } = {}) {
-      return getJson(`${apiHost}/2.0/sequence/tiles/${x}/${y}/${z}.json`, {
-        signal,
-        timeoutMs: TILE_TIMEOUT_MS,
-      });
+      return tileLimiter.run(
+        () =>
+          getJson(`${apiHost}/2.0/sequence/tiles/${x}/${y}/${z}.json`, {
+            signal,
+            timeoutMs: TILE_TIMEOUT_MS,
+          }),
+        { signal },
+      );
+    },
+
+    /**
+     * Whether a photo file can be fetched. Archived photos answer 409 (and
+     * a HEAD says 200 regardless), so this GETs and stops at the headers.
+     */
+    async probeImage(url, { signal } = {}) {
+      if (!url) return false;
+      const controller = new AbortController();
+      const onAbort = () => controller.abort(signal.reason);
+      if (signal?.aborted) throw signal.reason;
+      signal?.addEventListener('abort', onAbort, { once: true });
+      const timer = setTimeout(
+        () => controller.abort(),
+        IMAGE_PROBE_TIMEOUT_MS,
+      );
+      try {
+        const response = await fetchImpl(url, { signal: controller.signal });
+        return response.ok;
+      } catch {
+        if (signal?.aborted) throw signal.reason;
+        return false;
+      } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        // The body is not needed: drop it.
+        controller.abort();
+      }
     },
 
     /** Photo records around a point, nearest first. */
@@ -216,6 +278,7 @@ export function createKartaViewSource({
         `/2.0/sequence/${encodeURIComponent(sequenceId)}/photos`,
         { page: String(page), itemsPerPage: String(itemsPerPage) },
         { signal },
+        { gate: pageLimiter, timeoutMs: PAGE_TIMEOUT_MS },
       );
       return {
         photos: Array.isArray(result.data) ? result.data : [],

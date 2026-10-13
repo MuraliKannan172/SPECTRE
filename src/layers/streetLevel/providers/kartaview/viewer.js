@@ -49,7 +49,7 @@ export function loadImage(
  * @param {object} options
  * @param {(photoId: string) => Promise<object>} options.getPhoto   A normalized photo (policy.js normalizePhoto).
  * @param {(photo: object, delta: -1|1) => Promise<string|null>} options.step   The photo `delta` along the sequence, or null at its end.
- * @param {(imageId: string) => void} [options.onStepped]   A photo opened from ‹ ›, after its pose.
+ * @param {(imageId: string) => void} options.onStep   Open the photo ‹ › chose (through the core, so loading and errors show).
  * @param {object} [options.render]   Render governor.
  * @param {(url: string, options?: object) => Promise<HTMLImageElement>} [options.load]
  * @param {(canvas: HTMLCanvasElement) => object} [options.createRenderer]
@@ -58,7 +58,7 @@ export function loadImage(
 export function createKartaViewViewer({
   getPhoto,
   step,
-  onStepped = () => {},
+  onStep,
   render,
   load = loadImage,
   createRenderer = createPanoramaRenderer,
@@ -80,6 +80,12 @@ export function createKartaViewViewer({
   let drag = null;
   let poseFrame = 0;
   let removeListeners = [];
+  /** The photo an open is fetching: ‹ › step on from it, not the old one. */
+  let openingId = null;
+  /** ‹ › chose this photo: keep the panorama's look direction for it. */
+  let keepViewFor = null;
+  /** ‹ › presses run one after another, each from where the last one went. */
+  let steps = Promise.resolve();
 
   function requestRender() {
     render?.governorRequestRender?.('kartaview-viewer');
@@ -133,6 +139,21 @@ export function createKartaViewViewer({
     const enabled = Boolean(photo?.sequenceId) && showing !== null;
     if (prevButton) prevButton.disabled = !enabled;
     if (nextButton) nextButton.disabled = !enabled;
+    if (enabled) checkEnds(photo);
+  }
+
+  /** Disable ‹ or › at once where the sequence ends (it also warms the neighbours). */
+  function checkEnds(target) {
+    for (const [delta, button] of [
+      [-1, prevButton],
+      [1, nextButton],
+    ])
+      step(target, delta).then(
+        (id) => {
+          if (photo === target && button && !id) button.disabled = true;
+        },
+        () => {},
+      );
   }
 
   function show(kind) {
@@ -159,29 +180,33 @@ export function createKartaViewViewer({
     return renderer;
   }
 
-  /** Step along the sequence from the open photo. */
-  async function stepBy(delta) {
-    const from = photo;
-    if (!from?.sequenceId || !showing) return;
-    const seq = openSeq;
-    let nextId = null;
-    try {
-      nextId = await step(from, delta);
-    } catch {
-      nextId = null;
-    }
-    if (seq !== openSeq || photo !== from) return;
-    if (!nextId) {
-      const button = delta < 0 ? prevButton : nextButton;
-      if (button) button.disabled = true;
-      return;
-    }
-    try {
-      await adapter.open(nextId, { keepView: true });
-    } catch {
-      return;
-    }
-    if (photo?.id === nextId) onStepped(nextId);
+  /**
+   * Step along the sequence from the photo showing, or from the one on its
+   * way after an earlier press, and open it through the core.
+   */
+  function stepBy(delta) {
+    steps = steps.then(async () => {
+      const fromId = openingId ?? photo?.id;
+      if (!fromId || !root) return;
+      let from;
+      let nextId = null;
+      try {
+        from = await getPhoto(fromId);
+        if (from.sequenceId) nextId = await step(from, delta);
+      } catch {
+        nextId = null;
+      }
+      // Closed, or another photo was opened meanwhile.
+      if ((openingId ?? photo?.id) !== fromId) return;
+      if (!nextId) {
+        const button = delta < 0 ? prevButton : nextButton;
+        if (button && photo?.id === fromId) button.disabled = true;
+        return;
+      }
+      openingId = nextId;
+      keepViewFor = nextId;
+      onStep(nextId);
+    });
   }
 
   function onPointerDown(event) {
@@ -324,15 +349,12 @@ export function createKartaViewViewer({
   }
 
   async function showPano(target, seq, keepView) {
-    const preview = resizedImageUrl(target.urls.pano, PANO_PREVIEW_SIZE);
-    let image;
-    try {
-      image = await load(preview, { crossOrigin: true });
-    } catch {
-      image = await load(resizedImageUrl(target.urls.pano, PANO_FULL_SIZE), {
-        crossOrigin: true,
-      });
-    }
+    // Only the proxy can shrink a 13,000 px panorama: if it fails, the
+    // caller shows the front view rather than waiting on it twice.
+    const image = await load(
+      resizedImageUrl(target.urls.pano, PANO_PREVIEW_SIZE),
+      { crossOrigin: true },
+    );
     if (seq !== openSeq) return false;
     if (!keepView || showing !== 'pano')
       renderer.setView({ yaw: 0, pitch: 0, fov: PANO_FOV_DEFAULT_DEG });
@@ -359,6 +381,24 @@ export function createKartaViewViewer({
     return true;
   }
 
+  async function openPhoto(id, seq, keepView) {
+    const target = await getPhoto(id);
+    if (seq !== openSeq) return;
+    let shown = false;
+    if (target.isPano && target.urls.pano && ensureRenderer()) {
+      try {
+        shown = await showPano(target, seq, keepView);
+      } catch {
+        // The panorama failed: its front view is better than nothing.
+        if (seq !== openSeq) return;
+        shown = await showFlat(target, seq);
+      }
+    } else shown = await showFlat(target, seq);
+    if (!shown) return;
+    emit();
+    upgrade(target, seq, showing);
+  }
+
   const adapter = {
     async mount(host) {
       if (!host) throw new Error('Street Level viewer has no host element');
@@ -368,28 +408,24 @@ export function createKartaViewViewer({
     },
 
     /** Resolves once the photo is on screen and its pose was emitted. */
-    async open(imageId, { keepView = false } = {}) {
+    async open(imageId) {
       if (!root) throw new Error('KartaView viewer is not mounted');
+      const id = String(imageId);
       const seq = ++openSeq;
-      const target = await getPhoto(String(imageId));
-      if (seq !== openSeq) return;
-      let shown = false;
-      if (target.isPano && target.urls.pano && ensureRenderer()) {
-        try {
-          shown = await showPano(target, seq, keepView);
-        } catch {
-          // The panorama failed: its front view is better than nothing.
-          if (seq !== openSeq) return;
-          shown = await showFlat(target, seq);
-        }
-      } else shown = await showFlat(target, seq);
-      if (!shown) return;
-      emit();
-      upgrade(target, seq, showing);
+      const keepView = keepViewFor === id;
+      keepViewFor = null;
+      openingId = id;
+      try {
+        await openPhoto(id, seq, keepView);
+      } finally {
+        if (openingId === id && seq === openSeq) openingId = null;
+      }
     },
 
     close() {
       openSeq++;
+      openingId = null;
+      keepViewFor = null;
       photo = null;
       show(null);
       if (picture) picture.removeAttribute('src');
@@ -398,6 +434,8 @@ export function createKartaViewViewer({
 
     unmount() {
       openSeq++;
+      openingId = null;
+      keepViewFor = null;
       teardown();
     },
 

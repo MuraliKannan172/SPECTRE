@@ -5,6 +5,7 @@ import { decodeCoverageTile } from './decode.js';
 import { createKartaViewSource } from './source.js';
 import { createKartaViewViewer } from './viewer.js';
 import {
+  ARCHIVED_MESSAGE,
   COLORS,
   COVERAGE_MAX_HEIGHT_M,
   COVERAGE_NOUN,
@@ -15,9 +16,12 @@ import {
   KARTAVIEW_NAME,
   KARTAVIEW_PROVIDER_ID,
   LINE_CLICK_HINT,
+  NEAREST_PROBES,
   NEAREST_RADIUS_M,
+  NO_COVERAGE_HINT,
   PICK_PREFIX,
   RATE_LIMITED_MESSAGE,
+  SEQUENCE_PAGE_EDGE,
   SEQUENCE_PAGE_SIZE,
   TOO_HIGH_HINT,
   normalizePhoto,
@@ -85,6 +89,8 @@ export function createKartaViewProvider({
     defaultOn: false,
     // Coverage lines carry no date or projection: no filter could thin them.
     filters: [],
+    // Its lines are streets, not sequences: a selected drive shows as cones.
+    highlightsSequence: false,
     coverageLabel: Object.freeze({
       noun: COVERAGE_NOUN,
       action: LINE_CLICK_HINT,
@@ -169,42 +175,94 @@ export function createKartaViewProvider({
         return entry;
       }
 
-      /** The page holding `photo` (an earlier one when photos are missing). */
-      async function windowOf(photo) {
-        let page = pageOf(photo.sequenceIndex ?? 0);
-        for (let tries = 0; tries < 3; tries++) {
-          const window = await loadPage(photo.sequenceId, page);
-          const first = window.photos[0];
-          if (
-            window.photos.some((p) => p.id === photo.id) ||
-            page === 1 ||
-            !first ||
-            (first.sequenceIndex ?? 0) <= (photo.sequenceIndex ?? 0)
-          )
-            return window;
-          page--;
+      /**
+       * The page holding `photo`. Pages follow photo ids, which only roughly
+       * follow the index, and photos go missing, so the page the index
+       * suggests is a first guess: step towards the photo until a page holds
+       * it, or the pages straddle where it would be.
+       */
+      async function homePage(photo) {
+        let number = pageOf(photo.sequenceIndex ?? 0);
+        const index = photo.sequenceIndex ?? 0;
+        const seen = new Set();
+        let page = null;
+        while (!seen.has(number) && seen.size < 6) {
+          seen.add(number);
+          page = await loadPage(photo.sequenceId, number);
+          if (page.photos.some((p) => p.id === photo.id)) return page;
+          const first = page.photos[0]?.sequenceIndex;
+          const last = page.photos.at(-1)?.sequenceIndex;
+          // Past the last page, or before this page's photos: go back.
+          if ((first === undefined || index < first) && number > 1) number--;
+          else if (last !== undefined && index > last && page.hasMore) number++;
+          else break;
         }
-        return loadPage(photo.sequenceId, page);
+        return page;
       }
 
+      /**
+       * The photos around `photo` in index order: its page, plus a
+       * neighbour page when it sits near an edge (pages overlap in index).
+       * @returns {Promise<{home: number, photos: Array<object>}>}
+       */
+      async function windowOf(photo) {
+        const home = await homePage(photo);
+        const list = home.photos;
+        const at = list.findIndex((p) => p.id === photo.id);
+        const parts = [list];
+        if (at !== -1 && at < SEQUENCE_PAGE_EDGE && home.page > 1)
+          parts.push((await loadPage(photo.sequenceId, home.page - 1)).photos);
+        if (at !== -1 && at >= list.length - SEQUENCE_PAGE_EDGE && home.hasMore)
+          parts.push((await loadPage(photo.sequenceId, home.page + 1)).photos);
+        if (parts.length === 1) return { home: home.page, photos: list };
+        const byId = new Map(parts.flat().map((p) => [p.id, p]));
+        return {
+          home: home.page,
+          photos: [...byId.values()].sort(
+            (a, b) => (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0),
+          ),
+        };
+      }
+
+      /** Photo id → whether its file answers (archived ones do not), per session. */
+      const probes = createLru(PHOTO_CACHE_SIZE);
+      function showable(photo, { signal } = {}) {
+        if (!photo?.urls?.view) return Promise.resolve(false);
+        let probe = probes.get(photo.id);
+        if (!probe) {
+          probe = source.probeImage(photo.urls.view, { signal });
+          probes.set(photo.id, probe);
+          probe.catch(() => probes.delete(photo.id));
+        }
+        return probe;
+      }
+
+      /**
+       * The next showable photo `delta` along the sequence, or null at its
+       * end. Archived photos are skipped, a few at most.
+       */
       async function step(photo, delta) {
         if (!photo?.sequenceId) return null;
-        const window = await windowOf(photo);
-        const list = window.photos;
-        let at = list.findIndex((p) => p.id === photo.id);
-        if (at === -1)
-          at = list.findIndex(
-            (p) => (p.sequenceIndex ?? 0) >= (photo.sequenceIndex ?? 0),
-          );
-        const next = at === -1 ? -1 : at + delta;
-        if (next >= 0 && next < list.length) return list[next].id;
-        if (next < 0 && window.page > 1) {
-          const before = await loadPage(photo.sequenceId, window.page - 1);
-          return before.photos.at(-1)?.id ?? null;
-        }
-        if (next >= list.length && window.hasMore) {
-          const after = await loadPage(photo.sequenceId, window.page + 1);
-          return after.photos[0]?.id ?? null;
+        let from = photo;
+        for (let skipped = 0; skipped <= NEAREST_PROBES; skipped++) {
+          const { photos: list } = await windowOf(from);
+          let at = list.findIndex((p) => p.id === from.id);
+          if (at === -1) {
+            // Not found anywhere: the nearest index on the right side.
+            const index = from.sequenceIndex ?? 0;
+            const later = list.findIndex((p) => (p.sequenceIndex ?? 0) > index);
+            if (delta > 0 && later === -1) return null;
+            at =
+              delta > 0
+                ? later - 1
+                : later === -1
+                  ? list.length
+                  : list.findIndex((p) => (p.sequenceIndex ?? 0) >= index);
+          }
+          const next = list[at + delta];
+          if (!next) return null;
+          if (await showable(next)) return next.id;
+          from = next;
         }
         return null;
       }
@@ -229,7 +287,7 @@ export function createKartaViewProvider({
           if (!anchor) return [];
           const window = await windowOf(anchor);
           signal?.throwIfAborted();
-          drawnPage = { sequenceId, page: window.page };
+          drawnPage = { sequenceId, page: window.home };
           return thinImages(
             window.photos.map((photo) => ({
               id: photo.id,
@@ -245,16 +303,24 @@ export function createKartaViewProvider({
         pickPrefix: PICK_PREFIX.image,
         spriteId: 'street-level:kartaview-cones',
         renderKey: 'kartaview-sequence',
+        // The filters are hidden for KartaView: one left set must not hide cones.
+        passes: () => true,
       });
 
-      /** Re-centre the cones when ‹ › walked off the page they show. */
-      async function followStep(photoId) {
+      /**
+       * ‹ › open through the core (loading, errors, the sequence's cones),
+       * without moving the camera; the cones re-centre once ‹ › walk off the
+       * page they were drawn from.
+       */
+      async function openStepped(photoId) {
+        const opened = await context.actions.openImage(photoId, {
+          frame: false,
+        });
         const photo = photos.get(photoId);
-        if (!photo?.sequenceId) return;
-        anchors.set(photo.sequenceId, photo);
+        if (!opened || !photo?.sequenceId) return;
         if (drawnPage?.sequenceId !== photo.sequenceId) return;
         const window = await windowOf(photo).catch(() => null);
-        if (window && window.page !== drawnPage.page)
+        if (window && window.home !== drawnPage.page)
           cones.select(photo.sequenceId, { force: true });
       }
 
@@ -265,7 +331,7 @@ export function createKartaViewProvider({
           return photo;
         },
         step,
-        onStepped: followStep,
+        onStep: openStepped,
         render: context.services?.render,
         ...viewerOptions,
       });
@@ -316,12 +382,18 @@ export function createKartaViewProvider({
         coverageStats() {
           const { hint } = state.coverage;
           const count = coverage.sequenceCount();
+          const loading = state.coverage.pending.size > 0;
+          const empty =
+            state.coverage.zoom !== null &&
+            !loading &&
+            count === 0 &&
+            !state.coverage.lastError;
           return {
             count,
             zoom: state.coverage.zoom,
             kind: state.coverage.kind,
-            loading: state.coverage.pending.size > 0,
-            hint: hint || '',
+            loading,
+            hint: hint || (empty ? NO_COVERAGE_HINT : ''),
             error: state.coverage.lastError,
             keyRequired: false,
             keyRejected: false,
@@ -353,18 +425,25 @@ export function createKartaViewProvider({
           loading: state.sequence.loading,
         }),
 
-        /** The nearest photo within the search radius, or null. */
+        /**
+         * The nearest photo within the search radius that can be shown, or
+         * null. Many photos are archived (their files answer 409) or have no
+         * file at all, so the nearest few are tried in turn.
+         */
         async nearestImage({ lat, lon }, { signal } = {}) {
           const records = await source.nearestPhotos({ lat, lon }, { signal });
-          let best = null;
+          const near = [];
           for (const record of records) {
             const photo = remember(record);
-            if (!photo) continue;
+            if (!photo?.urls.view) continue;
             const metres = metresBetween({ lat, lon }, photo);
-            if (metres <= NEAREST_RADIUS_M && (!best || metres < best.metres))
-              best = { photo, metres };
+            if (metres <= NEAREST_RADIUS_M) near.push({ photo, metres });
           }
-          return best ? best.photo.id : null;
+          near.sort((a, b) => a.metres - b.metres);
+          for (const { photo } of near.slice(0, NEAREST_PROBES))
+            if (await showable(photo, { signal })) return photo.id;
+          if (near.length) throw new Error(ARCHIVED_MESSAGE);
+          return null;
         },
 
         viewer,

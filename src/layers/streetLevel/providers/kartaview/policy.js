@@ -47,6 +47,7 @@ export const COVERAGE_TUNING = Object.freeze({
   viewNearM: 1_000,
 });
 export const TOO_HIGH_HINT = 'zoom in to see KartaView coverage';
+export const NO_COVERAGE_HINT = 'no KartaView photos in view';
 export const RATE_LIMITED_MESSAGE =
   'KartaView is rate-limiting requests — they resume on their own';
 
@@ -57,10 +58,23 @@ export const RATE_LIMITED_MESSAGE =
 export const PHOTO_API_CONCURRENCY = 2;
 export const PHOTO_API_RETRIES = 3;
 export const PHOTO_API_RETRY_BASE_MS = 800;
+/** A Retry-After longer than this is not waited out. */
+export const PHOTO_API_RETRY_MAX_MS = 10_000;
+/** The API is HTTP/1.1 (six connections): tiles 3, lookups 2, pages 1. */
+export const TILE_CONCURRENCY = 3;
+export const PAGE_CONCURRENCY = 1;
 export const TILE_TIMEOUT_MS = 20_000;
 export const PHOTO_API_TIMEOUT_MS = 15_000;
+/** A sequence page is about a megabyte of JSON. */
+export const PAGE_TIMEOUT_MS = 30_000;
 /** A photo download (tens of kilobytes to a few megabytes). */
-export const IMAGE_TIMEOUT_MS = 30_000;
+export const IMAGE_TIMEOUT_MS = 15_000;
+/** Whether a photo file is there (not archived): headers only. */
+export const IMAGE_PROBE_TIMEOUT_MS = 8_000;
+/** Nearest photos tried before giving up on archived ones. */
+export const NEAREST_PROBES = 4;
+export const ARCHIVED_MESSAGE =
+  'KartaView’s photos here are archived and cannot be shown';
 
 /** Photos asked for around a point; the API returns them nearest first. */
 export const NEAREST_LIMIT = 10;
@@ -69,9 +83,12 @@ export const NEAREST_SEARCH_ZOOM = 18;
 
 /**
  * Photos of a sequence fetched at once, around the open one. Records are
- * ~2 kB each, so a page is ~2 MB; the cones and prev/next use it.
+ * ~2.4 kB each, so a page is ~1.2 MB; the cones and ‹ › use it. Pages are in
+ * photo-id order, which only roughly follows the sequence index.
  */
-export const SEQUENCE_PAGE_SIZE = 1000;
+export const SEQUENCE_PAGE_SIZE = 500;
+/** Within this many photos of a page's edge, its neighbour page joins it. */
+export const SEQUENCE_PAGE_EDGE = 12;
 
 /** Equirectangular panorama sizes: a quick preview, then the sharp one. */
 export const PANO_PREVIEW_SIZE = Object.freeze([1024, 512]);
@@ -161,6 +178,9 @@ export function normalizePhoto(record) {
   if (!record || record.id == null) return null;
   const { lat, lon } = positionOf(record);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  // 0,0 is a missing fix, not a photo in the Gulf of Guinea.
+  if (lat === 0 && lon === 0) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
   const heading =
     record.heading === '' || record.heading == null
       ? NaN
@@ -195,9 +215,13 @@ export function normalizePhoto(record) {
 
 /**
  * Where the image link goes. KartaView's photo pages fail for signed-out
- * visitors ("Sequence cannot be loaded"), so it is the full-size photo on
- * KartaView's own storage.
+ * visitors ("Sequence cannot be loaded"), so it is the full-size photo
+ * through KartaView's image proxy, which also serves photos whose storage
+ * host answers 502 directly.
  */
 export function kartaViewPhotoUrl(photo) {
-  return photo?.urls?.full || photo?.urls?.view || 'https://kartaview.org';
+  const url = photo?.urls?.full || photo?.urls?.view;
+  return url
+    ? `${KARTAVIEW_CDN_HOST}/pr:sharp/${base64Url(url)}`
+    : 'https://kartaview.org';
 }
