@@ -3231,12 +3231,17 @@ https storage host. The viewer (`viewer.js`) shows a flat photo at 1,280 px,
 then 2,560 px, from the image proxy (`pr:sharp/rs:fit:W:H/<base64url>`),
 with KartaView's own 1,280 px file as the fallback, and a 360° photo's
 equirectangular `wrapped_proc` image (13,000 px wide upstream) resized to
-1,024 then 4,096 px on `panorama.js`, a single-triangle WebGL renderer (image
-centre = the camera heading; drag, pinch, wheel, Shift+← →, ↑ ↓, + −; the
-canvas re-measures every frame). Without WebGL, or if the proxy fails within
-15 s, a 360° photo shows its front view; a lost context draws the photo again
-on a new canvas (a lost canvas only gives back its lost context), through the
-core and only if no newer photo is opening. FIT / FILL hide for panoramas (`supportsRenderModes`). The
+1,024 px, then 2,048 (docked) or 4,096 px (expanded, or once the viewer
+grows), decoded off the main thread into an ImageBitmap and uploaded as RGBA
+(about 90 ms → 15 ms for 4,096 px on a phone-class CPU), on `panorama.js`, a
+single-triangle WebGL renderer (image centre = the camera heading; drag,
+pinch, wheel, Shift+← →, ↑ ↓, + −; the canvas re-measures every frame; a
+closed viewer keeps a 1×1 texture). Without WebGL, or if the proxy fails
+within 15 s, a 360° photo shows its front view. A lost context draws the
+photo again on a new canvas (a lost canvas only gives back its lost
+context), through the core and facing where the user was looking; a newer
+photo that was opening is drawn on the new canvas instead. FIT / FILL hide
+for panoramas (`supportsRenderModes`). The
 caption has no place name (KartaView's is where the drive began) and links to
 the full-size photo through the image proxy, since kartaview.org's photo
 pages fail for signed-out visitors.

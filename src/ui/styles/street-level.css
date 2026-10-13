@@ -4,6 +4,9 @@
 #street-level-panel,
 .sl-viewer-wrap {
   --sl-green: #05cb63;
+  /* KartaView's purple for lines; a lighter one where it is text (WCAG AA). */
+  --sl-kartaview: #635bff;
+  --sl-kartaview-text: #8f8aff;
   --sl-text: 0.62rem;
   --sl-text-small: 0.6rem;
 }
@@ -172,6 +175,11 @@ button.sl-status:focus-visible {
     var(--chip-color, var(--accent)) 14%,
     transparent
   );
+}
+
+/* #635bff text on its own tint is 3.7:1 at this size; the lighter one is ~6:1. */
+.sl-chips .data-toggle-chip.active[data-chip-id='kartaview'] {
+  color: var(--sl-kartaview-text);
 }
 
 .sl-chips .data-toggle-chip.active::before {
@@ -623,7 +631,18 @@ button.sl-status:focus-visible {
 }
 
 .sl-kv-viewer:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--sl-kartaview, #635bff);
+  outline: none;
+}
+
+/* The photo and canvas fill the viewer and would cover a ring drawn on it:
+   draw the ring on a layer above them (clicks pass through). */
+.sl-kv-viewer:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 2px solid var(--sl-kartaview-text);
+  pointer-events: none;
 }
 
 .sl-kv-photo,
@@ -679,7 +698,7 @@ button.sl-status:focus-visible {
 
 .sl-kv-step:hover:not(:disabled),
 .sl-kv-step:focus-visible {
-  background: rgba(99, 91, 255, 0.85);
+  background: color-mix(in srgb, var(--sl-kartaview) 85%, transparent);
   outline: none;
 }
 

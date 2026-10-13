@@ -12,14 +12,37 @@ import {
   PHOTO_API_RETRIES,
   PHOTO_API_FIRST_TIMEOUT_MS,
   PHOTO_API_TIMEOUT_MS,
+  PAGE_TIMEOUT_MS,
   TILE_CONCURRENCY,
 } from './policy.js';
 
+/** A body streamed as browsers do, in `size`-byte chunks. */
+function streamed(text, size = 16_384) {
+  const bytes = new TextEncoder().encode(text);
+  let at = 0;
+  return {
+    getReader: () => ({
+      read: async () => {
+        if (at >= bytes.length) return { done: true };
+        const value = bytes.slice(at, at + size);
+        at += size;
+        return { done: false, value };
+      },
+      cancel: async () => {},
+    }),
+  };
+}
+
+// A 200 as browsers deliver it: streamed, so the code under test reads it
+// the way it does in production (`json` is there only to fail loudly).
 const ok = (body) => ({
   ok: true,
   status: 200,
   headers: new Map(),
-  json: async () => body,
+  body: streamed(JSON.stringify(body)),
+  json: async () => {
+    throw new Error('a browser answer is read from its stream');
+  },
 });
 const status = (code, headers = new Map()) => ({
   ok: false,
@@ -358,7 +381,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
  * Run `call` on the mocked clock in 100 ms steps until it settles (60 s at
  * most). `stamp()` reads the clock, for a fetch to record when it was asked.
  */
-async function onMockClock(t, call) {
+async function onMockClock(t, call, { until = 60_000 } = {}) {
   let now = 0;
   const stamp = () => now;
   let outcome = null;
@@ -367,7 +390,7 @@ async function onMockClock(t, call) {
     (value) => (outcome = { value, at: now }),
     (error) => (outcome = { error, at: now }),
   );
-  while (!outcome && now < 60_000) {
+  while (!outcome && now < until) {
     await flush();
     if (outcome) break;
     t.mock.timers.tick(100);
@@ -485,4 +508,47 @@ test('a chunked answer with no length is cut off once it grows past the cap', as
     },
   });
   assert.deepEqual(await small.getTile({ x: 1, y: 2, z: 13 }), { lines: [] });
+});
+
+test('a chunked answer split mid-character is reassembled in order', async () => {
+  const payload = {
+    lines: [
+      {
+        track: [{ lat: '1', lng: '2' }],
+        name: 'Strada Memorandumului — Cluj-Napoca 😀',
+      },
+    ],
+    note: 'ăîşţ'.repeat(200),
+  };
+  const source = createKartaViewSource({
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      // 3-byte chunks cut multi-byte characters in two.
+      body: streamed(JSON.stringify(payload), 3),
+    }),
+  });
+  assert.deepEqual(await source.getTile({ x: 1, y: 2, z: 13 }), payload);
+});
+
+test('a sequence page gets the full 30 s on its first try, then 30 s once more', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const asked = [];
+  const outcome = await onMockClock(
+    t,
+    (stamp) =>
+      createKartaViewSource({
+        fetchImpl: (url, { signal }) => {
+          asked.push(stamp());
+          return new Promise((resolve, reject) =>
+            signal.addEventListener('abort', () => reject(signal.reason)),
+          );
+        },
+      }).getSequencePhotos('9', { page: 1, itemsPerPage: 250 }),
+    { until: 120_000 },
+  );
+  assert.deepEqual(asked, [0, PAGE_TIMEOUT_MS]);
+  assert.match(String(outcome?.error?.message), /did not answer in time/);
+  assert.equal(outcome.at, 2 * PAGE_TIMEOUT_MS);
 });

@@ -342,15 +342,34 @@ export function createStreetLevelLayer({
   function setProviderEnabled(providerId, on) {
     const entry = state.providers.get(providerId);
     if (!entry) return false;
+    const before = litIds();
     const next = on !== false;
     if (next)
       for (const other of state.providers.values())
         if (other !== entry && other.on) switchProvider(other, false);
     switchProvider(entry, next);
-    // A failed lookup's message was about the source just switched away.
-    if (!state.street.open) state.street.error = null;
+    sourceChanged(before);
     notify();
     return true;
+  }
+
+  const litIds = () =>
+    [...state.providers]
+      .filter(([, entry]) => entry.on)
+      .map(([id]) => id)
+      .join();
+
+  /**
+   * After a chip, voice or a link changed the lit source: a lookup still
+   * running and its spinner or error were about the source switched away
+   * (an open photo keeps its own state).
+   */
+  function sourceChanged(before) {
+    if (litIds() === before) return;
+    abortNearest();
+    if (state.street.open) return;
+    state.street.error = null;
+    state.street.loading = false;
   }
 
   function switchProvider(entry, on) {
@@ -618,9 +637,11 @@ export function createStreetLevelLayer({
         filter: state.filter,
       });
       const lit = litByParams(decoded.providers);
+      const before = litIds();
       for (const [id, entry] of state.providers)
         if (id !== lit) switchProvider(entry, false);
       if (lit) switchProvider(state.providers.get(lit), true);
+      sourceChanged(before);
       notify();
       setCoverageFilter(decoded.filter);
       return true;

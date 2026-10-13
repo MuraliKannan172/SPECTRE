@@ -179,7 +179,17 @@ export function createPanoramaRenderer(canvas) {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+      // RGBA: the format a decoded ImageBitmap uploads without conversion.
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        image,
+      );
+      // The pixels are on the GPU now; a bitmap's copy can go.
+      image.close?.();
       // Linear only: a mipmapped lookup draws a seam where longitude wraps.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -205,6 +215,19 @@ export function createPanoramaRenderer(canvas) {
     hasImage: () => loaded,
     clear() {
       loaded = false;
+      // Hand the 32 MB texture back: a closed viewer keeps only 1×1.
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        1,
+        1,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        new Uint8Array(4),
+      );
       scheduleRender();
     },
     destroy() {

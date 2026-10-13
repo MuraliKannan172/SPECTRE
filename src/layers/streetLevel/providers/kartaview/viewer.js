@@ -9,6 +9,7 @@ import {
   IMAGE_TIMEOUT_MS,
   KARTAVIEW_PROVIDER_ID,
   PANO_FULL_SIZE,
+  PANO_MID_SIZE,
   PANO_PREVIEW_SIZE,
   kartaViewPhotoUrl,
   resizedImageUrl,
@@ -16,11 +17,23 @@ import {
 
 const LOAD_FAILED = 'The KartaView photo could not be loaded';
 
-/** Load an image (CORS-clean, for WebGL) within the timeout. */
+/**
+ * Load an image within the timeout. A CORS-clean one (for WebGL) is decoded
+ * off the main thread into an ImageBitmap where the browser can: uploading
+ * a decoded bitmap costs a fraction of uploading an <img> (90 ms → 15 ms for
+ * 4096×2048 on a phone-class CPU).
+ */
 export function loadImage(
   url,
   { crossOrigin = true, timeoutMs = IMAGE_TIMEOUT_MS } = {},
 ) {
+  if (
+    crossOrigin &&
+    url &&
+    typeof globalThis.createImageBitmap === 'function' &&
+    typeof globalThis.fetch === 'function'
+  )
+    return loadBitmap(url, timeoutMs);
   return new Promise((resolve, reject) => {
     if (!url) return reject(new Error(LOAD_FAILED));
     const image = new Image();
@@ -40,6 +53,29 @@ export function loadImage(
     };
     image.src = url;
   });
+}
+
+async function loadBitmap(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      mode: 'cors',
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(LOAD_FAILED);
+    return await createImageBitmap(await response.blob());
+  } catch {
+    throw new Error(LOAD_FAILED);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The panorama size a canvas this wide can show sharply at this field of view. */
+export function panoSizeFor(canvasPixels, fovDeg) {
+  const needed = (Math.max(1, canvasPixels) * 360) / Math.max(1, fovDeg);
+  return needed > PANO_MID_SIZE[0] ? PANO_FULL_SIZE : PANO_MID_SIZE;
 }
 
 /**
@@ -85,6 +121,10 @@ export function createKartaViewViewer({
   let removeListeners = [];
   /** The document the viewer was built in (new canvases come from it). */
   let documentOf = null;
+  /** A context loss's look direction, for the reopen of that photo. */
+  let restoreView = null;
+  /** Width of the panorama texture on screen (0: the preview). */
+  let panoWidth = 0;
   /** The photo an open is fetching: ‹ › step on from it, not the old one. */
   let openingId = null;
   /** ‹ › chose this photo: keep the panorama's look direction for it. */
@@ -199,6 +239,9 @@ export function createKartaViewViewer({
     event.preventDefault?.();
     const lost = renderer;
     renderer = null;
+    // The new renderer starts facing the photo's heading: keep the user's look.
+    if (showing === 'pano' && photo && lost)
+      restoreView = { id: photo.id, view: lost.getView() };
     try {
       lost?.destroy();
     } catch {
@@ -213,7 +256,6 @@ export function createKartaViewViewer({
     if (showing === 'pano' && photo && openingId === null) {
       const again = photo.id;
       show(null);
-      keepViewFor = again;
       openingId = again;
       onStep(again);
     }
@@ -427,20 +469,32 @@ export function createKartaViewViewer({
   async function upgrade(target, seq, kind) {
     // A 360° photo shown flat (no WebGL) keeps its front view.
     if (kind === 'flat' && target.isPano) return;
+    const size = kind === 'pano' ? panoSizeNow() : FLAT_FULL_SIZE;
+    if (kind === 'pano' && size[0] <= panoWidth) return;
     const url =
       kind === 'pano'
-        ? resizedImageUrl(target.urls.pano, PANO_FULL_SIZE)
-        : resizedImageUrl(target.urls.full, FLAT_FULL_SIZE);
+        ? resizedImageUrl(target.urls.pano, size)
+        : resizedImageUrl(target.urls.full, size);
     if (!url) return;
     try {
       const image = await load(url, { crossOrigin: kind === 'pano' });
       if (seq !== openSeq || photo !== target || showing !== kind) return;
-      if (kind === 'pano') renderer.setImage(image);
-      else picture.src = image.src;
+      if (kind === 'pano') {
+        if (!renderer || size[0] <= panoWidth) return;
+        renderer.setImage(image);
+        panoWidth = size[0];
+      } else picture.src = image.src;
       requestRender();
     } catch {
       /* the first version stays */
     }
+  }
+
+  /** The sharp panorama this viewer needs now: 2,048 docked, 4,096 expanded. */
+  function panoSizeNow() {
+    const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
+    const width = (canvas?.clientWidth || 0) * ratio;
+    return panoSizeFor(width, renderer?.getView().fov ?? PANO_FOV_DEFAULT_DEG);
   }
 
   async function showPano(target, seq, keepView) {
@@ -450,13 +504,20 @@ export function createKartaViewViewer({
       resizedImageUrl(target.urls.pano, PANO_PREVIEW_SIZE),
       { crossOrigin: true },
     );
-    if (seq !== openSeq || !renderer) return false;
-    if (!keepView || showing !== 'pano')
+    if (seq !== openSeq) return false;
+    // The context may have been lost while this loaded: build on the new
+    // canvas, or let the caller show the front view.
+    if (!ensureRenderer()) throw new Error(LOAD_FAILED);
+    const restore = restoreView?.id === target.id ? restoreView.view : null;
+    restoreView = null;
+    if (restore) renderer.setView(restore);
+    else if (!keepView || showing !== 'pano')
       renderer.setView({ yaw: 0, pitch: 0, fov: PANO_FOV_DEFAULT_DEG });
     photo = target;
     // Shown first: a hidden canvas measures 0 and would be sized 1×1.
     show('pano');
     renderer.setImage(image);
+    panoWidth = 0;
     return true;
   }
 
@@ -549,6 +610,9 @@ export function createKartaViewViewer({
 
     resize() {
       renderer?.resize();
+      // Expanded: a docked viewer's 2,048 px panorama is now too soft.
+      if (showing === 'pano' && photo && panoSizeNow()[0] > panoWidth)
+        upgrade(photo, openSeq, 'pano');
     },
 
     /** FIT / FILL frame a flat photo; a panorama has no frame to fit. */

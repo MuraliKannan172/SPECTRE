@@ -42,7 +42,9 @@ import {
   describeKartaViewCall,
   KV_LINE,
   KV_SEQUENCE_ID,
+  kartaViewLookups,
   kartaViewPhotos,
+  resetKartaViewFixture,
 } from './fixtures/street-level/kartaView.mjs';
 
 const PANEL_ID = 'street-level-panel';
@@ -751,6 +753,8 @@ async function main() {
      * draped map so a line is where it is drawn; leaves Mapillary lit.
      */
     async function kartaViewSteps() {
+      // The first lookup from here on is the rate-limited one.
+      resetKartaViewFixture();
       const ui = () =>
         page.evaluate(() =>
           window.__godsEyeView.dataManager.layers
@@ -895,6 +899,11 @@ async function main() {
           const street = (await ui()).street;
           if (!fixtures && /No street-level imagery/.test(street.error || ''))
             return skip('no KartaView photo near the line');
+          if (fixtures)
+            assert.ok(
+              kartaViewLookups() >= 2,
+              `the rate-limited lookup was asked again (${kartaViewLookups()} lookups)`,
+            );
           assert.equal(street.error, null, `viewer error: ${street.error}`);
           assert.equal(street.providerId, 'kartaview');
           assert.equal(street.renderModes, true, 'FIT / FILL for a flat photo');
@@ -964,7 +973,7 @@ async function main() {
       );
       if (fixtures)
         await step(
-          'KartaView: a 360° photo opens on the panorama without FIT / FILL, and dragging turns it',
+          'KartaView: a 360° photo opens on the panorama without FIT / FILL, dragging turns it, and it survives a lost WebGL context',
           async () => {
             const pano = photos.find((photo) => photo.isPano);
             await page.evaluate((id) => {
@@ -1004,12 +1013,56 @@ async function main() {
               await uiUntil((v, was) => v.street.bearing !== was, bearing),
               'dragging the panorama turned its bearing',
             );
+            // A GPU reset: the panorama comes back on a new canvas, and drags.
+            assert.ok(
+              await page.evaluate(() => {
+                const canvas = document.querySelector('.sl-kv-pano');
+                window.__kvLostCanvas = canvas;
+                const lose = canvas
+                  .getContext('webgl')
+                  ?.getExtension('WEBGL_lose_context');
+                lose?.loseContext();
+                return Boolean(lose);
+              }),
+              'the browser can lose a WebGL context on purpose',
+            );
+            assert.ok(
+              await settle(
+                page,
+                () => {
+                  const canvas = document.querySelector('.sl-kv-pano');
+                  return (
+                    canvas &&
+                    canvas !== window.__kvLostCanvas &&
+                    !canvas.hidden &&
+                    canvas.width > 1
+                  );
+                },
+                null,
+                { timeout: 30_000 },
+              ),
+              'the panorama is drawn again on a new canvas',
+            );
+            const after = await ui();
+            assert.equal(after.street.imageId, pano.id);
+            assert.equal(after.street.isPano, true);
+            assert.equal(after.street.error, null);
+            const turned = after.street.bearing;
+            await page.mouse.move(box.x, box.y);
+            await page.mouse.down();
+            for (let i = 1; i <= 8; i++)
+              await page.mouse.move(box.x + i * 15, box.y);
+            await page.mouse.up();
+            assert.ok(
+              await uiUntil((v, was) => v.street.bearing !== was, turned),
+              'the new canvas drags',
+            );
           },
         );
       else
         await skipStep(
           'fixtures only',
-          'KartaView: a 360° photo opens on the panorama without FIT / FILL, and dragging turns it',
+          'KartaView: a 360° photo opens on the panorama without FIT / FILL, dragging turns it, and it survives a lost WebGL context',
         );
       await page.evaluate(() =>
         window.__godsEyeView.dataManager.layers

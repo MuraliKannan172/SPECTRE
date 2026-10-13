@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createKartaViewViewer } from './viewer.js';
+import { createKartaViewViewer, loadImage, panoSizeFor } from './viewer.js';
 import { fakeHost, until } from '../../../../testSupport/kartaViewFakes.mjs';
 
 const PHOTOS = {
@@ -88,6 +88,17 @@ function fakeRenderer(canvas) {
     },
   };
 }
+
+PHOTOS.pano2 = {
+  ...PHOTOS.pano1,
+  id: 'pano2',
+  sequenceIndex: 8,
+  urls: {
+    view: 'https://storage13.openstreetcam.org/lth/p2.jpg',
+    full: 'https://storage13.openstreetcam.org/wrapped_proc/p2.jpg',
+    pano: 'https://storage13.openstreetcam.org/wrapped_proc/p2.jpg',
+  },
+};
 
 function setup({
   failLoads = [],
@@ -228,7 +239,8 @@ test('a 360° photo shows on the panorama, preview first; dragging turns the bea
   assert.equal(poses.at(-1).bearing, 150);
   assert.equal(viewer.supportsRenderModes(), false, 'no frame to fit');
   await settle();
-  assert.match(renderers[0].images.at(-1), /rs:fit:4096:2048/);
+  // Docked (400 px at 80°), 2,048 px is all it can show.
+  assert.match(renderers[0].images.at(-1), /rs:fit:2048:1024/);
   // Drag left by a quarter of the width: the view turns right.
   const frames = [];
   globalThis.requestAnimationFrame = (callback) => {
@@ -748,4 +760,147 @@ test('› to another 360° photo keeps the look direction; opening one afresh fa
   assert.equal(renderers[0].getView().yaw, yaw, 'still looking the same way');
   await viewer.open('pano1');
   assert.equal(renderers[0].getView().yaw, 0, 'a fresh open faces ahead');
+});
+
+/** A viewer whose loads for `held` URLs wait until `release()`. */
+function heldPanoSetup(held) {
+  const renderers = [];
+  const stepped = [];
+  let release;
+  const gate = new Promise((resolve) => (release = resolve));
+  const viewer = createKartaViewViewer({
+    getPhoto: async (id) => PHOTOS[id],
+    step: async () => null,
+    onStep: (id) => {
+      stepped.push(id);
+      viewer.open(id).catch(() => {});
+    },
+    load: async (url) => {
+      if (held.some((part) => url.includes(part))) await gate;
+      return { src: url };
+    },
+    createRenderer: (canvas) => {
+      const renderer = fakeRenderer(canvas);
+      renderers.push(renderer);
+      return renderer;
+    },
+  });
+  const poses = [];
+  viewer.onPose((pose) => poses.push(pose));
+  return { viewer, renderers, stepped, poses, host: fakeHost(), release };
+}
+
+const pano2Preview = Buffer.from(
+  'https://storage13.openstreetcam.org/wrapped_proc/p2.jpg',
+).toString('base64url');
+
+test('a context lost while a newer panorama loads shows that one on a new canvas, not a black viewer', async () => {
+  const { viewer, renderers, poses, host, release, stepped } = heldPanoSetup([
+    pano2Preview,
+  ]);
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  const opening = viewer.open('pano2');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  parts(host).canvas.fire('webglcontextlost');
+  release();
+  await opening;
+  assert.equal(
+    poses.at(-1).imageId,
+    'pano2',
+    'the newer panorama is on screen',
+  );
+  assert.equal(poses.at(-1).isPano, true);
+  assert.deepEqual(stepped, [], 'its own open, not a reopen of the old one');
+  assert.equal(renderers.length, 2, 'drawn by a new renderer');
+  assert.equal(renderers[1].canvas, parts(host).canvas);
+  assert.equal(parts(host).canvas.hidden, false);
+});
+
+test('a second context loss, on the new canvas, reopens again; the new canvas still drags', async (t) => {
+  globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+  t.after(() => delete globalThis.requestAnimationFrame);
+  const { viewer, host, renderers, stepped, poses } = setup();
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  parts(host).canvas.fire('webglcontextlost');
+  assert.ok(await until(() => renderers.length === 2));
+  parts(host).canvas.fire('webglcontextlost');
+  assert.ok(await until(() => renderers.length === 3), 'reopened twice');
+  assert.deepEqual(stepped, ['pano1', 'pano1']);
+  assert.equal(renderers[2].canvas, parts(host).canvas);
+  const canvas = parts(host).canvas;
+  const before = poses.at(-1).bearing;
+  canvas.fire('pointerdown', {
+    button: 0,
+    pointerId: 7,
+    pointerType: 'mouse',
+    clientX: 200,
+    clientY: 100,
+  });
+  canvas.fire('pointermove', { pointerId: 7, clientX: 100, clientY: 100 });
+  canvas.fire('pointerup', { pointerId: 7 });
+  assert.ok(await until(() => poses.at(-1).bearing !== before), 'dragged');
+});
+
+test('a context loss keeps where the user was looking', async () => {
+  const { viewer, host, renderers } = setup();
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  renderers[0].setView({ yaw: 70, pitch: 12, fov: 60 });
+  parts(host).canvas.fire('webglcontextlost');
+  assert.ok(await until(() => renderers.length === 2));
+  assert.deepEqual(renderers[1].getView(), { yaw: 70, pitch: 12, fov: 60 });
+});
+
+test('the panorama is as sharp as the viewer needs: 2,048 docked, 4,096 once expanded', async () => {
+  assert.deepEqual(panoSizeFor(400, 80), [2048, 1024]);
+  assert.deepEqual(panoSizeFor(1400, 80), [4096, 2048]);
+  const { viewer, host, renderers } = setup();
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  assert.ok(await until(() => renderers[0].images.length === 2));
+  assert.match(renderers[0].images[1], /rs:fit:2048:1024/);
+  // Expanded: the panel tells the viewer it resized.
+  parts(host).canvas.clientWidth = 1400;
+  viewer.resize();
+  assert.ok(await until(() => renderers[0].images.length === 3));
+  assert.match(renderers[0].images[2], /rs:fit:4096:2048/);
+  viewer.resize();
+  for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+  assert.equal(renderers[0].images.length, 3, 'not again once sharp');
+});
+
+test('a CORS image is decoded off the main thread into an ImageBitmap where the browser can', async (t) => {
+  const saved = {
+    fetch: globalThis.fetch,
+    bitmap: globalThis.createImageBitmap,
+  };
+  t.after(() => {
+    globalThis.fetch = saved.fetch;
+    globalThis.createImageBitmap = saved.bitmap;
+  });
+  const fetched = [];
+  globalThis.fetch = async (url, init) => {
+    fetched.push({ url, mode: init.mode });
+    return url.includes('gone')
+      ? { ok: false, status: 409 }
+      : { ok: true, blob: async () => 'blob' };
+  };
+  globalThis.createImageBitmap = async (blob) => ({
+    blob,
+    width: 4096,
+    height: 2048,
+  });
+  const bitmap = await loadImage('https://cdn.kartaview.org/a', {
+    crossOrigin: true,
+  });
+  assert.deepEqual(bitmap, { blob: 'blob', width: 4096, height: 2048 });
+  assert.deepEqual(fetched, [
+    { url: 'https://cdn.kartaview.org/a', mode: 'cors' },
+  ]);
+  await assert.rejects(
+    loadImage('https://cdn.kartaview.org/gone', { crossOrigin: true }),
+    /could not be loaded/,
+  );
 });

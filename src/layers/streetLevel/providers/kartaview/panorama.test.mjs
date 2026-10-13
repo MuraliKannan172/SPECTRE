@@ -140,3 +140,30 @@ test('the canvas is measured again when it draws, not only when its image arrive
   runFrames();
   assert.deepEqual([canvas.width, canvas.height], [400, 250]);
 });
+
+test('an image uploads as RGBA and its bitmap is released; closing hands the texture back as 1×1', (t) => {
+  const { gl, renderer } = stubPanorama(t);
+  const uploads = [];
+  gl.texImage2D = (...args) => uploads.push(args);
+  let closed = false;
+  renderer.setImage({
+    width: 2048,
+    height: 1024,
+    close: () => (closed = true),
+  });
+  assert.equal(uploads.length, 1);
+  assert.equal(
+    uploads[0][2],
+    'RGBA',
+    'the format a decoded bitmap uploads without conversion',
+  );
+  assert.equal(closed, true, 'the decoded copy is freed once on the GPU');
+  renderer.clear();
+  const last = uploads.at(-1);
+  assert.deepEqual(
+    [last[3], last[4]],
+    [1, 1],
+    'a closed viewer keeps a 1×1 texture',
+  );
+  assert.equal(renderer.hasImage(), false);
+});
