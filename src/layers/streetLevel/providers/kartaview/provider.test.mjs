@@ -859,3 +859,104 @@ test('the marker is KartaView’s own cone, and it points along the drive, not a
     `then along the drive: ${bearings}`,
   );
 });
+
+/** Hold `seq`'s page `page` until the returned function is called. */
+function holdPage(source, seq, page) {
+  const getPage = source.getSequencePhotos;
+  let release;
+  const gate = new Promise((resolve) => (release = resolve));
+  source.getSequencePhotos = async (id, options) => {
+    if (id === seq && options.page === page) await gate;
+    return getPage(id, options);
+  };
+  return () => release();
+}
+
+test('a photo opened while the cones first load is the one they centre on', async (t) => {
+  const size = SEQUENCE_PAGE_SIZE;
+  const env = await mounted({
+    sequences: { s: Array.from({ length: size * 5 }, (_, i) => i) },
+  });
+  const cones = await withCones(t, env);
+  const release = holdPage(env.source, 's', 1);
+  await env.instance.viewer.open('s-10');
+  const selected = env.instance.selectSequence('s');
+  // A line click further along the drive while page 1 is still loading:
+  // nothing is drawn yet for its re-centre to move.
+  await env.instance.viewer.open(`s-${size * 4 + 10}`);
+  release();
+  await selected;
+  assert.ok(
+    await until(
+      () => !env.instance.sequenceStats().loading && cones.count() > 0,
+    ),
+  );
+  assert.ok(
+    cones()[0] <= size * 4 + 10 && cones()[1] >= size * 4 + 10,
+    `around the newer photo, not the first: ${cones()}`,
+  );
+});
+
+test('a sequence page that lands while a lost GPU context recovers still draws its cones', async (t) => {
+  const env = setup({ sequences: { p: [0, 1, 2, 3] } });
+  const sphere = (record) => ({
+    ...record,
+    projection: 'SPHERE',
+    fieldOfView: '360',
+    filepathProc: `2022/10/6/wrapped_proc/${record.id}.jpg`,
+  });
+  const getPhoto = env.source.getPhoto;
+  env.source.getPhoto = async (id) => sphere(await getPhoto(id));
+  const getPage = env.source.getSequencePhotos;
+  env.source.getSequencePhotos = async (...args) => {
+    const page = await getPage(...args);
+    return { ...page, photos: page.photos.map(sphere) };
+  };
+  const release = holdPage(env.source, 'p', 1);
+  let holdImages = false;
+  let releaseImage = null;
+  const view = { yaw: 0, pitch: 0, fov: 80 };
+  const definition = createKartaViewProvider({
+    source: env.source,
+    viewerOptions: {
+      load: async (url) => {
+        if (holdImages) await new Promise((r) => (releaseImage = r));
+        return { src: url };
+      },
+      createRenderer: () => ({
+        setImage() {},
+        setView: (next) => Object.assign(view, next),
+        getView: () => ({ ...view }),
+        resize() {},
+        clear() {},
+        destroy() {},
+      }),
+    },
+  });
+  const { context, actions } = fakeContext();
+  const errors = [];
+  context.actions.reportError = (message) => errors.push(message);
+  const instance = definition.create(context);
+  actions.instance = instance;
+  const cones = await withCones(t, { instance });
+  const host = fakeHost();
+  await instance.viewer.mount(host);
+  await instance.viewer.open('p-0');
+  // › to the next panorama; the GPU resets while it loads.
+  holdImages = true;
+  const opening = instance.viewer.open('p-1');
+  assert.ok(await until(() => releaseImage !== null));
+  host.children[0].children[1].fire('webglcontextlost');
+  const selected = instance.selectSequence('p');
+  release();
+  await selected;
+  assert.ok(
+    await until(() => !instance.sequenceStats().loading && cones.count() > 0),
+    'the page is drawn, not dropped',
+  );
+  releaseImage();
+  await opening;
+  assert.equal(host.children[0].dataset.kind, 'pano', 'p-1 shows');
+  // reportError(null) clears; nothing was reported.
+  assert.deepEqual(errors.filter(Boolean), []);
+});

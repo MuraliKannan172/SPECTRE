@@ -145,8 +145,10 @@ export function createKartaViewSource({
         ),
       timeoutMs,
     );
+    let response = null;
+    let read = false;
     try {
-      const response = await fetchImpl(url, { signal: controller.signal });
+      response = await fetchImpl(url, { signal: controller.signal });
       if (response.status === 429)
         throw new KartaViewSourceError('KartaView is rate-limiting requests', {
           status: 429,
@@ -166,6 +168,7 @@ export function createKartaViewSource({
       // KartaView answers chunked, without a length: count while reading.
       const reader = response.body?.getReader?.();
       if (!reader) {
+        read = true;
         try {
           return await response.json();
         } catch (error) {
@@ -175,6 +178,7 @@ export function createKartaViewSource({
           });
         }
       }
+      read = true;
       const chunks = [];
       let bytes = 0;
       for (;;) {
@@ -209,6 +213,13 @@ export function createKartaViewSource({
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
+      // An answer turned away unread (429, an error, too long) still holds
+      // its connection, one of the six the browser has: let it go.
+      if (response && !read) {
+        controller.abort();
+        if (response.body && !response.body.locked)
+          response.body.cancel?.().catch?.(() => {});
+      }
     }
   }
 

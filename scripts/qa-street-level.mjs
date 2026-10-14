@@ -507,6 +507,7 @@ async function assertKeylessKartaView(page) {
  * Runs in the page. Find a point where a real click picks `prefix` + `id` (any
  * id when null), searched around `points` ([lon, lat]), the aimed billboards,
  * or else a grid mid-screen. Only points where the canvas is topmost count.
+ * Each call picks for at most `budgetMs`; the next call resumes the search.
  * @returns {{x: number, y: number, id: string}|null} client coordinates
  */
 export function findPickPoint({
@@ -515,6 +516,7 @@ export function findPickPoint({
   points,
   billboardIds,
   billboardPrefix = null,
+  budgetMs = 4000,
 }) {
   const viewer = window.__godsEyeView.viewer;
   const scene = viewer.scene;
@@ -569,24 +571,54 @@ export function findPickPoint({
       centres.push([at.x, at.y]);
     }
   }
-  for (const [cx, cy] of centres)
-    for (let r = 0; r <= 16; r += 2)
+  // A pick is a render of the scene (0.5–2 s each under SwiftShader): try
+  // the centres the canvas is on top of first, nearest the screen centre,
+  // so the first pick usually hits.
+  const uncovered = ([x, y]) =>
+    document.elementFromPoint(rect.left + x, rect.top + y) === canvas;
+  const fromMiddle = ([x, y]) =>
+    (x - rect.width / 2) ** 2 + (y - rect.height / 2) ** 2;
+  centres.sort(
+    (a, b) =>
+      Number(uncovered(b)) - Number(uncovered(a)) ||
+      fromMiddle(a) - fromMiddle(b),
+  );
+  const candidates = [];
+  for (const [cx, cy] of centres) {
+    candidates.push([cx, cy]);
+    for (let r = 2; r <= 16; r += 2)
       for (const [dx, dy] of [
-        [0, 0],
         [r, 0],
         [-r, 0],
         [0, r],
         [0, -r],
-      ]) {
-        const hit = tryAt(cx + dx, cy + dy);
-        if (hit) return hit;
-      }
-  if (points || billboardIds) return null;
-  for (let y = rect.height * 0.25; y < rect.height * 0.8; y += 18)
-    for (let x = rect.width * 0.25; x < rect.width * 0.7; x += 6) {
-      const hit = tryAt(x, y);
-      if (hit) return hit;
+      ])
+        candidates.push([cx + dx, cy + dy]);
+  }
+  // Aimed at known places: never fall back to a scan of the whole screen.
+  if (!points && !billboardIds && billboardPrefix === null)
+    for (let y = rect.height * 0.25; y < rect.height * 0.8; y += 18)
+      for (let x = rect.width * 0.25; x < rect.width * 0.7; x += 6)
+        candidates.push([x, y]);
+  // One evaluation stays well inside the caller's wait: past the budget it
+  // returns null, and the next poll carries on from where this one stopped.
+  const key = JSON.stringify([prefix, id, billboardPrefix]);
+  const cursors = (window.__qaPickCursors ??= {});
+  const deadline = performance.now() + budgetMs;
+  let at = cursors[key] ?? 0;
+  if (at >= candidates.length) at = 0;
+  for (; at < candidates.length; at++) {
+    const hit = tryAt(...candidates[at]);
+    if (hit) {
+      delete cursors[key];
+      return hit;
     }
+    if (performance.now() > deadline) {
+      cursors[key] = at + 1;
+      return null;
+    }
+  }
+  delete cursors[key];
   return null;
 }
 
@@ -1542,22 +1574,28 @@ async function main() {
           );
           if (fixtures)
             assert.equal(sequence.images, fixture.images.length, 'every photo');
-          // The cones are on the globe: one of them picks as an image.
+          // The cones are on the globe: one of them picks as an image. Aim at
+          // where each cone billboard is drawn (its ground position at
+          // height 0 can sit a few pixels off, and every missed pick costs a
+          // render); the same 30 s as the line pick above.
           const cone = await page.waitForFunction(
             findPickPoint,
-            { timeout: 15_000, polling: 250 },
+            { timeout: 30_000, polling: 250 },
             {
               prefix: 'mly:img:',
               id: null,
-              points: fixtures
-                ? fixture.images.map((image) => [image.lon, image.lat])
-                : null,
+              points: null,
               billboardIds: null,
-              // Live: the cones' positions are only known from the globe.
-              billboardPrefix: fixtures ? null : 'mly:img:',
+              billboardPrefix: 'mly:img:',
             },
           );
-          assert.ok(await cone.jsonValue(), 'an image cone is pickable');
+          const picked = await cone.jsonValue();
+          assert.ok(picked, 'an image cone is pickable');
+          if (fixtures)
+            assert.ok(
+              fixture.images.some((image) => image.id === picked.id),
+              `the cone is a photo of the drive: ${picked.id}`,
+            );
           await page.evaluate(() =>
             window.__godsEyeView.dataManager.layers
               .get('street-level')
@@ -1685,7 +1723,9 @@ async function main() {
             assert.ok(neighbour, 'a neighbour of the other camera type');
             const handle = await page.waitForFunction(
               findPickPoint,
-              { timeout: 15_000, polling: 250 },
+              // A pick is a render; under SwiftShader on a busy machine one
+              // evaluation can take seconds.
+              { timeout: 30_000, polling: 250 },
               {
                 prefix: 'mly:img:',
                 id: neighbour.id,

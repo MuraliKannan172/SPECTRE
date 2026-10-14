@@ -105,8 +105,11 @@ function setup({
   rendererThrows = false,
   steps = {},
   failSteps = false,
+  hold = () => false,
 } = {}) {
   const loads = [];
+  const held = [];
+  const closed = [];
   const renderers = [];
   const stepped = [];
   const asked = [];
@@ -130,7 +133,10 @@ function setup({
       loads.push({ url, crossOrigin: options?.crossOrigin });
       if (failLoads.some((part) => url.includes(part)))
         throw new Error('The KartaView photo could not be loaded');
-      return { src: url };
+      // A decoded bitmap: close() frees it.
+      const image = { src: url, close: () => closed.push(url) };
+      if (!hold(url)) return image;
+      return new Promise((resolve) => held.push(() => resolve(image)));
     },
     createRenderer: (canvas) => {
       attempts.renderer++;
@@ -152,6 +158,8 @@ function setup({
     stepped,
     asked,
     attempts,
+    held,
+    closed,
   };
 }
 
@@ -922,4 +930,55 @@ test('a docked viewer keeps the 1,280 px photo; expanding it brings the 2,560 px
   viewer.resize();
   for (let i = 0; i < 4; i++) await settle();
   assert.equal(loads.length, 2, 'once only');
+});
+
+test('resizes while a sharper panorama loads start no second load; the last size wins once it lands', async () => {
+  let first = true;
+  const { viewer, host, loads, renderers, held } = setup({
+    hold: (url) => {
+      const holdIt = first && url.includes('rs:fit:2048');
+      if (holdIt) first = false;
+      return holdIt;
+    },
+  });
+  await viewer.mount(host);
+  await viewer.open('pano1');
+  assert.ok(await until(() => held.length === 1));
+  // The panel animates open: a burst of resizes while 2,048 px loads.
+  parts(host).canvas.clientWidth = 1400;
+  for (let i = 0; i < 5; i++) viewer.resize();
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(loads.length, 2, 'the preview and the one 2,048 px load');
+  held[0]();
+  assert.ok(await until(() => renderers[0].images.length === 3));
+  assert.match(renderers[0].images[1], /rs:fit:2048:1024/);
+  assert.match(renderers[0].images[2], /rs:fit:4096:2048/);
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(loads.length, 3, 'one more load, for the size asked last');
+});
+
+test('a preview or sharper version nobody will draw is freed, not left decoded', async () => {
+  const { viewer, host, renderers, held, closed } = setup({
+    hold: (url) => /rs:fit:(1024|2048):/.test(url),
+  });
+  await viewer.mount(host);
+  // pano1's preview is still loading when flat1 opens over it.
+  const overtaken = viewer.open('pano1');
+  assert.ok(await until(() => held.length === 1));
+  await viewer.open('flat1');
+  held[0]();
+  await overtaken;
+  assert.deepEqual(closed.length, 1);
+  assert.match(closed[0], /rs:fit:1024/, 'the overtaken preview');
+  // pano1 shows; its sharp version lands after flat1 replaced it.
+  const shown = viewer.open('pano1');
+  assert.ok(await until(() => held.length === 2));
+  held[1]();
+  await shown;
+  assert.ok(await until(() => held.length === 3));
+  await viewer.open('flat1');
+  held[2]();
+  assert.ok(await until(() => closed.length === 2));
+  assert.match(closed[1], /rs:fit:2048/, 'the overtaken sharp version');
+  assert.equal(renderers[0].images.length, 1, 'only the preview was drawn');
 });

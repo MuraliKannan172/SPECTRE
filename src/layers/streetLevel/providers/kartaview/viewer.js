@@ -73,6 +73,11 @@ async function loadBitmap(url, timeoutMs) {
   }
 }
 
+/** Free a decoded bitmap nobody will draw (an <img> has nothing to free). */
+function release(image) {
+  image?.close?.();
+}
+
 /** The panorama size a canvas this wide can show sharply at this field of view. */
 export function panoSizeFor(canvasPixels, fovDeg) {
   const needed = (Math.max(1, canvasPixels) * 360) / Math.max(1, fovDeg);
@@ -130,6 +135,10 @@ export function createKartaViewViewer({
   let panoWidth = 0;
   /** The flat photo on screen is the 2,560 px version. */
   let flatSharp = false;
+  /** The sharper version loading ({seq, kind}): a resize starts no second one. */
+  let upgrading = null;
+  /** A resize came while it loaded: look again once it lands. */
+  let upgradeAgain = false;
   /** The photo an open is fetching: ‹ › step on from it, not the old one. */
   let openingId = null;
   /** ‹ › chose this photo: keep the panorama's look direction for it. */
@@ -143,6 +152,9 @@ export function createKartaViewViewer({
 
   function emit() {
     if (!photo || !showing) return;
+    // A lost GPU context, still being recovered: the open that redraws the
+    // panorama poses once it is on screen.
+    if (showing === 'pano' && !renderer) return;
     const view = showing === 'pano' ? renderer.getView() : null;
     const heading = cameraBearing(photo);
     const pose = {
@@ -485,20 +497,40 @@ export function createKartaViewViewer({
         ? resizedImageUrl(target.urls.pano, size)
         : resizedImageUrl(target.urls.full, size);
     if (!url) return;
+    // Resizes come in bursts while the panel animates: one load at a time
+    // for this photo, and one more look once it lands.
+    if (upgrading?.seq === seq && upgrading.kind === kind) {
+      upgradeAgain = true;
+      return;
+    }
+    const pending = (upgrading = { seq, kind });
+    upgradeAgain = false;
+    let image = null;
     try {
-      const image = await load(url, { crossOrigin: kind === 'pano' });
+      image = await load(url, { crossOrigin: kind === 'pano' });
       if (seq !== openSeq || photo !== target || showing !== kind) return;
       if (kind === 'pano') {
         if (!renderer || size[0] <= panoWidth) return;
         renderer.setImage(image);
+        image = null;
         panoWidth = size[0];
       } else {
         picture.src = image.src;
+        image = null;
         flatSharp = true;
       }
       requestRender();
     } catch {
       /* the first version stays */
+    } finally {
+      release(image);
+      if (upgrading === pending) {
+        upgrading = null;
+        if (upgradeAgain && seq === openSeq && photo === target) {
+          upgradeAgain = false;
+          upgrade(target, seq, showing);
+        }
+      }
     }
   }
 
@@ -524,10 +556,16 @@ export function createKartaViewViewer({
       resizedImageUrl(target.urls.pano, PANO_PREVIEW_SIZE),
       { crossOrigin: true },
     );
-    if (seq !== openSeq) return false;
+    if (seq !== openSeq) {
+      release(image);
+      return false;
+    }
     // The context may have been lost while this loaded: build on the new
     // canvas, or let the caller show the front view.
-    if (!ensureRenderer()) throw new Error(LOAD_FAILED);
+    if (!ensureRenderer()) {
+      release(image);
+      throw new Error(LOAD_FAILED);
+    }
     const restore = restoreView?.id === target.id ? restoreView.view : null;
     restoreView = null;
     if (restore) renderer.setView(restore);

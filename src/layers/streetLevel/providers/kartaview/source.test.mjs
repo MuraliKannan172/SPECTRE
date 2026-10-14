@@ -595,3 +595,62 @@ test('a sequence page gets the full 30 s on its first try, then 30 s once more',
   assert.match(String(outcome?.error?.message), /did not answer in time/);
   assert.equal(outcome.at, 2 * PAGE_TIMEOUT_MS);
 });
+
+test('an answer turned away unread (an error, a 429, a length past the cap) lets its connection go', async () => {
+  /** A response whose body is never read: records its cancel and the abort. */
+  const unread = (answer) => {
+    const seen = { cancelled: false, signal: null };
+    const fetchImpl = async (url, { signal }) => {
+      seen.signal = signal;
+      return {
+        ...answer,
+        body: {
+          locked: false,
+          getReader: () => {
+            throw new Error('not read');
+          },
+          cancel: async () => {
+            seen.cancelled = true;
+          },
+        },
+      };
+    };
+    return { seen, fetchImpl };
+  };
+  const cases = [
+    [{ ok: false, status: 503, headers: new Map() }, /HTTP 503/],
+    [
+      {
+        ok: true,
+        status: 200,
+        headers: new Map([['content-length', String(64 * 1024 * 1024)]]),
+      },
+      /too much data/,
+    ],
+  ];
+  for (const [answer, message] of cases) {
+    const { seen, fetchImpl } = unread(answer);
+    const source = createKartaViewSource({ fetchImpl });
+    await assert.rejects(source.getTile({ x: 1, y: 2, z: 13 }), message);
+    assert.equal(seen.signal.aborted, true, `${message}: request aborted`);
+    assert.equal(seen.cancelled, true, `${message}: body cancelled`);
+  }
+  // A 429 is let go before its retry is asked.
+  const { seen, fetchImpl } = unread({
+    ok: false,
+    status: 429,
+    headers: new Map([['retry-after', '0']]),
+  });
+  const signals = [];
+  const source = createKartaViewSource({
+    fetchImpl: async (url, init) => {
+      signals.push(init.signal);
+      if (signals.length === 1) return fetchImpl(url, init);
+      return ok(photoPayload([]));
+    },
+  });
+  await source.getPhoto('1');
+  assert.equal(signals[0].aborted, true);
+  assert.equal(seen.cancelled, true);
+  assert.equal(signals[1].aborted, false, 'a read answer is left alone');
+});

@@ -206,8 +206,13 @@ export function createKartaViewProvider({
                   ),
                 metresBetween,
               );
-              // The open photo may have just learnt which way it looked.
-              viewer.refreshPose?.();
+              // The open photo may have just learnt which way it looked. The
+              // page is good whatever the viewer is doing.
+              try {
+                viewer.refreshPose?.();
+              } catch {
+                /* the next pose carries the direction */
+              }
               return { page, hasMore, photos: list };
             });
           pages.set(key, entry);
@@ -362,10 +367,17 @@ export function createKartaViewProvider({
       const cones = createSequenceCones({
         state,
         async loadImages(sequenceId, { signal }) {
-          const anchor = anchors.get(sequenceId);
+          let anchor = anchors.get(sequenceId);
           if (!anchor) return [];
-          const window = await windowOf(anchor);
+          let window = await windowOf(anchor);
           signal?.throwIfAborted();
+          // Another photo of the drive opened while that page loaded (its
+          // re-centre found nothing drawn yet): centre on the newest one.
+          while (anchors.get(sequenceId) !== anchor) {
+            anchor = anchors.get(sequenceId);
+            window = await windowOf(anchor);
+            signal?.throwIfAborted();
+          }
           drawnPage = { sequenceId, page: window.home };
           countPhotos(sequenceId);
           return thinImages(
