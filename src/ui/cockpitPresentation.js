@@ -124,7 +124,21 @@ export function formatCockpitCoordinate(value, positive, negative) {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
   });
-  return `${amount}°${compassPointLabel(value >= 0 ? positive : negative)}`;
+  const code = value >= 0 ? positive : negative;
+  // Russian writes the hemisphere out ("30,203° с. ш."): a lone «С» after a
+  // degree sign reads as Celsius.
+  switch (code) {
+    case 'N':
+      return t('{value}°N', { value: amount });
+    case 'S':
+      return t('{value}°S', { value: amount });
+    case 'E':
+      return t('{value}°E', { value: amount });
+    case 'W':
+      return t('{value}°W', { value: amount });
+    default:
+      return `${amount}°${compassPointLabel(code)}`;
+  }
 }
 
 /**

@@ -5,6 +5,7 @@
     "ANIME",
     "ASIA",
     "AUTO",
+    "Ambient",
     "Anime",
     "BRG {value}°",
     "BRG —",
@@ -122,7 +123,6 @@
     "R&B",
     "REC",
     "VS",
-    "WHOT/BHOT",
-    "mini"
+    "WHOT/BHOT"
   ]
 }

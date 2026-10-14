@@ -652,6 +652,9 @@
 html:not([lang='en']) .data-name {
   overflow-wrap: break-word;
   hyphens: auto;
+  /* No two-letter pieces such as "es-paciales": a word hyphenates only when
+     at least four letters stay on each side. */
+  hyphenate-limit-chars: 8 4 4;
 }
 
 .data-toggle-right {

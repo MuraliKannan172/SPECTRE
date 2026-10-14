@@ -132,6 +132,53 @@ function directionWord(modifier) {
   }
 }
 
+/**
+ * The side to keep at a fork. English reuses the turn words; a language may
+ * need another form here ("держитесь левее", not "держитесь налево").
+ */
+function forkWord(modifier) {
+  switch (modifier) {
+    case 'left':
+      return t('left', { context: 'fork direction' });
+    case 'right':
+      return t('right', { context: 'fork direction' });
+    case 'slight left':
+      return t('slightly left', { context: 'fork direction' });
+    case 'slight right':
+      return t('slightly right', { context: 'fork direction' });
+    case 'sharp left':
+      return t('sharply left', { context: 'fork direction' });
+    case 'sharp right':
+      return t('sharply right', { context: 'fork direction' });
+    case 'straight':
+      return t('straight', { context: 'fork direction' });
+    default:
+      return directionWord(modifier);
+  }
+}
+
+/** The lane to use, as an adjective where a language needs one ("левую полосу"). */
+function laneWord(modifier) {
+  switch (modifier) {
+    case 'left':
+      return t('left', { context: 'lane direction' });
+    case 'right':
+      return t('right', { context: 'lane direction' });
+    case 'slight left':
+      return t('slightly left', { context: 'lane direction' });
+    case 'slight right':
+      return t('slightly right', { context: 'lane direction' });
+    case 'sharp left':
+      return t('sharply left', { context: 'lane direction' });
+    case 'sharp right':
+      return t('sharply right', { context: 'lane direction' });
+    case 'straight':
+      return t('straight', { context: 'lane direction' });
+    default:
+      return directionWord(modifier);
+  }
+}
+
 /** "1st", "2nd", … for a roundabout exit. */
 function exitOrdinal(exit) {
   const number = formatNumber(exit);
@@ -211,10 +258,12 @@ export function directionsInstruction(step) {
         ? t('At the end of the road, continue onto {road}', values)
         : t('At the end of the road, continue');
     case 'fork':
-      if (direction)
+      if (direction) {
+        const fork = { road, direction: forkWord(modifier) };
         return road
-          ? t('Keep {direction} at the fork onto {road}', values)
-          : t('Keep {direction} at the fork', values);
+          ? t('Keep {direction} at the fork onto {road}', fork)
+          : t('Keep {direction} at the fork', fork);
+      }
       return road
         ? t('Continue at the fork onto {road}', values)
         : t('Continue at the fork');
@@ -266,10 +315,12 @@ export function directionsInstruction(step) {
         ? t('Exit the roundabout onto {road}', values)
         : t('Exit the roundabout');
     case 'use lane':
-      if (direction)
+      if (direction) {
+        const lane = { road, direction: laneWord(modifier) };
         return road
-          ? t('Use the {direction} lane onto {road}', values)
-          : t('Use the {direction} lane', values);
+          ? t('Use the {direction} lane onto {road}', lane)
+          : t('Use the {direction} lane', lane);
+      }
       return road
         ? t('Continue onto {road}', values)
         : t('Continue', { context: 'maneuver' });

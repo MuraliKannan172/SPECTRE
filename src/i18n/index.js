@@ -164,6 +164,32 @@ export function formatDate(value, options) {
   return cachedFormatter('date', Intl.DateTimeFormat, options).format(value);
 }
 
+const UTC_DAY_MONTH = Object.freeze({
+  day: '2-digit',
+  month: '2-digit',
+  timeZone: 'UTC',
+});
+
+/**
+ * The UTC day and month of a time, for "MM-DD HH:MM UTC" readouts: "10-13" in
+ * English (as before), "13.10" in Russian, "13/10" in Spanish, never read as a
+ * range. Takes an ISO string (its date part is used as written) or a time.
+ * @param {string|number|Date} value
+ * @returns {string} '' when the value is not a time.
+ */
+export function formatUtcDayMonth(value) {
+  const written =
+    typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
+  const time = written
+    ? Date.UTC(Number(written[1]), Number(written[2]) - 1, Number(written[3]))
+    : new Date(value).getTime();
+  if (!Number.isFinite(time)) return '';
+  if (currentLocale === 'en') return new Date(time).toISOString().slice(5, 10);
+  return cachedFormatter('date', Intl.DateTimeFormat, UTC_DAY_MONTH).format(
+    time,
+  );
+}
+
 /**
  * Locale-aware relative time (Intl.RelativeTimeFormat), e.g.
  * formatRelativeTime(-5, 'minute') → '5 minutes ago' / '5 минут назад'.

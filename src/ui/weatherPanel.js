@@ -1,4 +1,4 @@
-import { t } from '../i18n/index.js';
+import { formatUtcDayMonth, t } from '../i18n/index.js';
 import { createRailCards } from './railCards.js';
 import { createRailTimeline } from './railTimeline.js';
 
@@ -15,7 +15,7 @@ const ORDER = [
 const OBSERVED = new Set(ORDER.slice(2));
 const utc = (time) =>
   Number.isFinite(Date.parse(time))
-    ? `${new Date(time).toISOString().slice(5, 16).replace('T', ' ')} UTC`
+    ? `${formatUtcDayMonth(time)} ${new Date(time).toISOString().slice(11, 16)} UTC`
     : t('Unavailable');
 const age = (time) => {
   const minutes = Math.max(

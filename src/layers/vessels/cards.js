@@ -2,7 +2,7 @@ import {
   accentForVesselType,
   normalizeVesselType,
 } from '../../data/vesselLabels.js';
-import { t } from '../../i18n/index.js';
+import { formatNumber, t } from '../../i18n/index.js';
 
 export function createCards({
   vesselState,
@@ -161,7 +161,14 @@ export function createCards({
 
   function formatSpeed(speed) {
     return t('{speed}KT', {
-      speed: speed === null ? '--' : speed.toFixed(1),
+      speed:
+        speed === null
+          ? '--'
+          : formatNumber(speed, {
+              minimumFractionDigits: 1,
+              maximumFractionDigits: 1,
+              useGrouping: false,
+            }),
     });
   }
 

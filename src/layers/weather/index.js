@@ -7,7 +7,7 @@ import {
   GLOBAL_INFRARED_MAX_GAP_MS,
   LIGHTNING_MAX_GAP_MS,
 } from './clock.js';
-import { t, msg } from '../../i18n/index.js';
+import { formatUtcDayMonth, t, msg } from '../../i18n/index.js';
 import { formatScaleLabel } from '../../ui/unitLabels.js';
 
 const STOPS = [
@@ -31,7 +31,9 @@ const LIGHTNING_STOPS = [
   ['300+', '#00FF00'],
 ];
 const utc = (value) =>
-  value ? `${value.slice(5, 16).replace('T', ' ')} UTC` : t('Unavailable');
+  value
+    ? `${formatUtcDayMonth(value)} ${value.slice(11, 16)} UTC`
+    : t('Unavailable');
 
 /** A per-application observation layer, using the existing layer lifecycle and
  * row controls. History is transient: shared links always open latest imagery. */

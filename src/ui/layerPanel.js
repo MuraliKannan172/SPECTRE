@@ -185,7 +185,12 @@ function sourceLabel(source) {
   if (typeof source !== 'string') return source;
   if (source === 'Local') return t('Local', { context: 'data source' });
   const key = SOURCE_LABEL_KEYS.get(source);
-  return key ? t(key) : source;
+  if (key) return t(key);
+  // A layer with several providers joins their names ("Mapillary · Google
+  // Street View"); a name with a translation shows it.
+  return source.includes(' · ')
+    ? source.split(' · ').map(translateKnown).join(' · ')
+    : translateKnown(source);
 }
 
 /**

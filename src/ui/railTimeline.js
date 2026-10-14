@@ -1,10 +1,10 @@
-import { t } from '../i18n/index.js';
+import { formatUtcDayMonth, t } from '../i18n/index.js';
 const set = (node, key, value) => {
   if (node[key] !== value) node[key] = value;
 };
 const utc = (tick) =>
   Number.isFinite(Date.parse(tick))
-    ? `${new Date(tick).toISOString().slice(5, 16).replace('T', ' ')} UTC`
+    ? `${formatUtcDayMonth(tick)} ${new Date(tick).toISOString().slice(11, 16)} UTC`
     : '';
 
 /** Stable native transport with local preview and a coalesced 150 ms drag commit. */
