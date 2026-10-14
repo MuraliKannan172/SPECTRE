@@ -41,7 +41,9 @@ export function cameraAtProgress(fromCamera, toCamera, progress) {
   const lerp = (from, to) => Number(from) + (Number(to) - Number(from)) * eased;
   const lerpAngle = (from, to) => {
     const start = Number(from) || 0;
-    const delta = ((Number(to) - start + 540) % 360) - 180;
+    // Double modulo keeps the delta in [-180, 180) for any authored angles,
+    // as sampleCameraMove does; a single % goes negative below -540.
+    const delta = ((((Number(to) - start + 540) % 360) + 360) % 360) - 180;
     return start + delta * eased;
   };
   return {
