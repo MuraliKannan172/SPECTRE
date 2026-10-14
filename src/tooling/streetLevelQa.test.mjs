@@ -810,6 +810,18 @@ test('Panoramax fixtures: two sequences on one street, searches honour sequence 
     true,
     'the second sequence is older',
   );
+  // A box has every picture in it, those looking away included; a place
+  // search leaves out pictures the point is behind (all look east).
+  const d = 0.0002;
+  const boxed = ask(
+    `bbox=${at.lon - d},${at.lat - d},${at.lon + d},${at.lat + d}&limit=100`,
+  );
+  assert.ok(boxed.some((p) => p.lon < at.lon) && boxed.some((p) => p.lon > at.lon));
+  const placed = ask(
+    `place_position=${at.lon},${at.lat}&place_distance=0-30&limit=50`,
+  );
+  assert.ok(placed.length > 0);
+  assert.ok(placed.every((p) => p.lon <= at.lon + 1e-7), 'none it is behind');
   const one = ask(`ids=${at.id}&limit=1`);
   assert.equal(one[0].id, at.id);
   // Its pictures, and only those, are served; HD downloads are counted.

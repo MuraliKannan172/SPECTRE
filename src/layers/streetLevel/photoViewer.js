@@ -7,6 +7,10 @@ import {
 /** A photo download (tens of kilobytes to a few megabytes). */
 export const IMAGE_TIMEOUT_MS = 15_000;
 
+/** A picture file or decoded side past these is refused (a photo is a few MB). */
+export const MAX_IMAGE_BYTES = 48 * 1024 * 1024;
+export const MAX_IMAGE_SIDE = 16_384;
+
 /** Panorama texture widths: enough for a docked viewer, and for an expanded one. */
 export const PANO_MID_SIZE = Object.freeze([2048, 1024]);
 export const PANO_FULL_SIZE = Object.freeze([4096, 2048]);
@@ -27,6 +31,7 @@ export function loadImage(
     timeoutMs = IMAGE_TIMEOUT_MS,
     resize = null,
     failure = 'The photo could not be loaded',
+    signal = null,
   } = {},
 ) {
   if (
@@ -35,7 +40,7 @@ export function loadImage(
     typeof globalThis.createImageBitmap === 'function' &&
     typeof globalThis.fetch === 'function'
   )
-    return loadBitmap(url, timeoutMs, resize, failure);
+    return loadBitmap(url, timeoutMs, resize, failure, signal);
   return new Promise((resolve, reject) => {
     if (!url) return reject(new Error(failure));
     const image = new Image();
@@ -57,27 +62,42 @@ export function loadImage(
   });
 }
 
-async function loadBitmap(url, timeoutMs, resize, failure) {
+async function loadBitmap(url, timeoutMs, resize, failure, signal) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // The caller's abort (the photo changed) stops a multi-megabyte download.
+  const onAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener?.('abort', onAbort, { once: true });
   try {
     const response = await fetch(url, {
       mode: 'cors',
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(failure);
+    // Picture hosts are not ours: refuse a file or an image past any real
+    // photo's size before it is decoded.
+    const length = Number(response.headers?.get?.('content-length'));
+    if (length > MAX_IMAGE_BYTES) throw new Error(failure);
     const blob = await response.blob();
-    return await (resize
+    if (blob.size > MAX_IMAGE_BYTES) throw new Error(failure);
+    const bitmap = await (resize
       ? createImageBitmap(blob, {
           resizeWidth: resize[0],
           resizeHeight: resize[1],
           resizeQuality: 'high',
         })
       : createImageBitmap(blob));
+    if (bitmap.width > MAX_IMAGE_SIDE || bitmap.height > MAX_IMAGE_SIDE) {
+      bitmap.close?.();
+      throw new Error(failure);
+    }
+    return bitmap;
   } catch {
     throw new Error(failure);
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener?.('abort', onAbort);
   }
 }
 
@@ -92,8 +112,8 @@ export function panoSizeFor(canvasPixels, fovDeg) {
  * @property {(photo: object) => boolean} hasPano   A 360° photo with an equirectangular image.
  * @property {(photo: object) => {url: string, width: number, resize?: [number, number]|null}|null} panoFirst
  *   The panorama shown first, its texture width (0 when it is only a preview), and a size to shrink it to.
- * @property {(photo: object, size: [number, number]) => {url: string, resize?: [number, number]|null, timeoutMs?: number}|null} panoSharp
- *   A sharper panorama for a canvas that needs `size`, or null.
+ * @property {(photo: object, size: [number, number], view: {expanded: boolean}) => {url: string, resize?: [number, number]|null, timeoutMs?: number}|null} panoSharp
+ *   A sharper panorama for a canvas that needs `size`, or null; `expanded` while the viewer is.
  * @property {(photo: object) => Array<string>} flatFirst   Flat versions to try in turn.
  * @property {(photo: object, pixels: number) => string|null} flatSharp
  *   A sharper flat version for a picture this many device pixels wide, or null.
@@ -411,6 +431,24 @@ export function createPhotoViewer({
     renderer.setView({ fov: fov * Math.exp(event.deltaY * 0.001) });
   }
 
+  /**
+   * Docked, Esc anywhere in the viewer's box (the photo, its toolbar, its
+   * caption) is the provider's before the panel's, which would collapse;
+   * expanded, the dialog's own Esc shrinks it.
+   */
+  function onEscapeKey(event) {
+    if (
+      event.key !== 'Escape' ||
+      event.shiftKey ||
+      event.defaultPrevented ||
+      root?.closest?.('.sl-viewer-wrap-expanded') ||
+      !onEscape()
+    )
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   function onKeyDown(event) {
     if (
       event.defaultPrevented ||
@@ -419,18 +457,6 @@ export function createPhotoViewer({
       event.metaKey
     )
       return;
-    // Docked, Esc is the viewer's before the panel's (which would collapse);
-    // expanded, the dialog's own Esc shrinks it.
-    if (
-      event.key === 'Escape' &&
-      !event.shiftKey &&
-      !root?.closest?.('.sl-viewer-wrap-expanded') &&
-      onEscape()
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
     const pano = showing === 'pano' && renderer;
     const turn = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
     // Shift+← → look around a panorama; ← → step along the sequence.
@@ -502,6 +528,7 @@ export function createPhotoViewer({
     root.append(picture, canvas, prevButton, nextButton);
     host.append(root);
     listen(root, 'keydown', onKeyDown);
+    listen(host.closest?.('.sl-viewer-wrap') ?? root, 'keydown', onEscapeKey);
     applyRenderMode();
   }
 
@@ -536,13 +563,18 @@ export function createPhotoViewer({
       const size = panoSizeNow();
       if (size[0] <= panoWidth) return;
       if (panoComing?.seq === seq && size[0] <= panoComing.width) return;
-      const sharp = sources.panoSharp(target, size);
+      const sharp = sources.panoSharp(target, size, {
+        expanded: Boolean(
+          root?.closest?.('.sl-viewer-wrap-expanded'),
+        ),
+      });
       if (!sharp?.url) return;
-      const coming = { seq, width: size[0] };
+      const coming = { seq, width: size[0], controller: new AbortController() };
       panoComing = coming;
       try {
         const image = await loadAs(sharp.url, {
           crossOrigin: true,
+          signal: coming.controller.signal,
           resize: sharp.resize ?? null,
           ...(sharp.timeoutMs ? { timeoutMs: sharp.timeoutMs } : {}),
         });
@@ -578,6 +610,12 @@ export function createPhotoViewer({
     }
   }
 
+  /** Another photo, or none: a sharper panorama still on its way is not needed. */
+  function dropSharpPanorama() {
+    panoComing?.controller?.abort();
+    panoComing = null;
+  }
+
   /** The sharp panorama this viewer needs now: 2,048 docked, 4,096 expanded. */
   function panoSizeNow() {
     const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
@@ -600,7 +638,10 @@ export function createPhotoViewer({
     }
     // The context may have been lost while this loaded: build on the new
     // canvas, or let the caller show the front view.
-    if (!ensureRenderer()) throw new Error(LOAD_FAILED);
+    if (!ensureRenderer()) {
+      image.close?.();
+      throw new Error(LOAD_FAILED);
+    }
     const restore = restoreView?.id === target.id ? restoreView.view : null;
     restoreView = null;
     if (restore) renderer.setView(restore);
@@ -670,6 +711,7 @@ export function createPhotoViewer({
       if (!root) throw new Error(`${name} viewer is not mounted`);
       const id = String(imageId);
       const seq = ++openSeq;
+      dropSharpPanorama();
       const keepView = keepViewFor === id;
       keepViewFor = null;
       openingId = id;
@@ -682,6 +724,7 @@ export function createPhotoViewer({
 
     close() {
       openSeq++;
+      dropSharpPanorama();
       openingId = null;
       keepViewFor = null;
       photo = null;
@@ -693,6 +736,7 @@ export function createPhotoViewer({
 
     unmount() {
       openSeq++;
+      dropSharpPanorama();
       openingId = null;
       keepViewFor = null;
       flatSharpUrl = null;

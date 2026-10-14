@@ -226,17 +226,34 @@ test('hostile item data: a malformed link escape, null coordinates, a huge produ
   );
 });
 
-test('a picture whose producer is hidden is credited to the instance holding it', () => {
-  const item = stacItem({
-    id: 'a',
-    lon: 1,
-    lat: 2,
-    producer: 'someone@ign.example.fr',
-  });
+test('the instance holding a picture is named (its via host), never as its author', () => {
+  const item = stacItem({ id: 'a', lon: 1, lat: 2, producer: 'someone@ign.example.fr' });
   item.links.push({ rel: 'via', href: 'https://panoramax.ign.fr' });
-  assert.equal(normalizeItem(item).creator, 'panoramax.ign.fr');
+  assert.equal(normalizeItem(item).creator, null);
+  assert.equal(normalizeItem(item).via, 'panoramax.ign.fr');
   item.links.at(-1).href = 'http://insecure.example';
-  assert.equal(normalizeItem(item).creator, null);
+  assert.equal(normalizeItem(item).via, null);
   item.links.at(-1).href = 'not a url';
-  assert.equal(normalizeItem(item).creator, null);
+  assert.equal(normalizeItem(item).via, null);
+});
+
+test('every producer is credited once: the uploading app and its photographer', () => {
+  const item = stacItem({ id: 'a', lon: 1, lat: 2, producer: 'mapcomplete' });
+  item.providers = [
+    { name: 'mapcomplete', roles: ['producer'] },
+    { name: 'pyrog', roles: ['producer'] },
+    { name: 'MapComplete', roles: ['producer'] },
+    { name: 'someone@example.org', roles: ['producer'] },
+    { name: 'host', roles: ['host'] },
+  ];
+  assert.equal(normalizeItem(item).creator, 'mapcomplete, pyrog');
+  const hidden = stacItem({ id: 'b', lon: 1, lat: 2, producer: 'a@b.org' });
+  hidden.providers = [{ name: 'c@d.org', roles: ['producer'] }];
+  assert.equal(normalizeItem(hidden).creator, null);
+  const many = stacItem({ id: 'c', lon: 1, lat: 2 });
+  many.providers = Array.from({ length: 50 }, (_, i) => ({
+    name: `producer-${i}`,
+    roles: ['producer'],
+  }));
+  assert.ok(normalizeItem(many).creator.length <= 120);
 });

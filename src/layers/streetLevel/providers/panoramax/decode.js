@@ -1,7 +1,49 @@
 import { PbfReader } from 'pbf';
 import { VectorTile } from '@mapbox/vector-tile';
 import { tileLocalToLonLat } from '../../tileMath.js';
-import { OVERVIEW_BINS_PER_AXIS, panoramaxTimeMs } from './policy.js';
+import {
+  OVERVIEW_BINS_PER_AXIS,
+  SIMPLIFY_TOLERANCE_UNITS,
+  panoramaxTimeMs,
+} from './policy.js';
+
+/**
+ * Douglas–Peucker in tile units: the points of `line` ({x, y}) that keep
+ * it within `tolerance` of the original, first and last always kept.
+ * Iterative, so a long track cannot overflow the stack.
+ */
+export function simplifyLine(line, tolerance) {
+  if (line.length < 3 || !(tolerance > 0)) return line;
+  const keep = new Uint8Array(line.length);
+  keep[0] = 1;
+  keep[line.length - 1] = 1;
+  const spans = [[0, line.length - 1]];
+  while (spans.length) {
+    const [from, to] = spans.pop();
+    const a = line[from];
+    const b = line[to];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const span = Math.hypot(dx, dy);
+    let far = -1;
+    let farthest = tolerance;
+    for (let i = from + 1; i < to; i++) {
+      const p = line[i];
+      // Distance to the chord, or to `a` where the chord has no length.
+      const d = span
+        ? Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / span
+        : Math.hypot(p.x - a.x, p.y - a.y);
+      if (d > farthest) {
+        farthest = d;
+        far = i;
+      }
+    }
+    if (far === -1) continue;
+    keep[far] = 1;
+    spans.push([from, far], [far, to]);
+  }
+  return line.filter((_, i) => keep[i]);
+}
 
 /** Epoch ms of a sequence's day ('2025-08-11'), or 0 when undated. */
 function dayMs(value) {
@@ -36,6 +78,8 @@ export function decodeCoverageTile(bytes, address) {
       const props = feature.properties || {};
       const parts = [];
       let length = 0;
+      const tolerance =
+        (SIMPLIFY_TOLERANCE_UNITS * sequences.extent) / 4096;
       for (const line of feature.loadGeometry()) {
         if (line.length < 2) continue;
         for (let k = 1; k < line.length; k++)
@@ -43,8 +87,10 @@ export function decodeCoverageTile(bytes, address) {
             line[k].x - line[k - 1].x,
             line[k].y - line[k - 1].y,
           );
+        // Simplified before anything else: GPS tracks carry a point every
+        // few metres, and each becomes ~8 ground-line vertices on the GPU.
         parts.push(
-          line.map((point) =>
+          simplifyLine(line, tolerance).map((point) =>
             tileLocalToLonLat(point.x, point.y, sequences.extent, x, y, z),
           ),
         );

@@ -1255,7 +1255,30 @@ async function main() {
               .catch(() => null);
             if (!handle && !fixtures) return skip('no Panoramax line in view');
             assert.ok(handle, 'a Panoramax line is pickable');
-            const at = await handle.jsonValue();
+            let at = await handle.jsonValue();
+            if (fixtures) {
+              // Click the top line where the other sequence's pictures are:
+              // the nearest picture is then the other's, and only the line
+              // click's own-sequence lookup opens the clicked line's.
+              const others = panoramaxPictures()
+                .filter((p) => p.sequenceId !== at.id)
+                .slice(40, 100)
+                .map((p) => [p.lon, p.lat]);
+              const aimed = await page
+                .waitForFunction(
+                  findPickPoint,
+                  { timeout: 60_000, polling: 500 },
+                  {
+                    prefix: 'pnx:seq:',
+                    id: at.id,
+                    points: others,
+                    billboardIds: null,
+                  },
+                )
+                .catch(() => null);
+              assert.ok(aimed, 'the line is pickable over the other’s pictures');
+              at = await aimed.jsonValue();
+            }
             const parked = await camera();
             await page.mouse.click(at.x, at.y);
             await page.waitForFunction(
@@ -1298,8 +1321,8 @@ async function main() {
               else
                 assert.equal(
                   caption,
-                  'Licence Ouverte 2.0',
-                  'an account named by an email address is not shown',
+                  'via panoramax.openstreetmap.fr · Licence Ouverte 2.0',
+                  'an account named by an email address is not shown; the instance is',
                 );
               const pictures = panoramaxPictures().filter(
                 (p) => p.sequenceId === street.sequenceId,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeCoverageTile, decodePictures } from './decode.js';
+import { decodeCoverageTile, decodePictures, simplifyLine } from './decode.js';
 import { OVERVIEW_BINS_PER_AXIS } from './policy.js';
 import { encodePanoramaxTile } from '../../../../testSupport/panoramaxFixtures.mjs';
 import { tileCentre } from '../../../../testSupport/streetLevelFakes.mjs';
@@ -188,4 +188,39 @@ test('a z15 tile’s pictures of one sequence become cones; other sequences’ a
     ],
   });
   assert.deepEqual(decodePictures(lines, tile, 's1'), []);
+});
+
+test('lines are simplified within a few tile units, ends and corners kept', () => {
+  const zigzag = Array.from({ length: 1000 }, (_, i) => ({ x: i, y: i % 2 ? 1 : 0 }));
+  assert.deepEqual(simplifyLine(zigzag, 4), [zigzag[0], zigzag.at(-1)], 'a 1-unit wobble goes');
+  const corner = [
+    { x: 0, y: 0 },
+    { x: 50, y: 1 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+  ];
+  assert.deepEqual(simplifyLine(corner, 4), [corner[0], corner[2], corner[3]]);
+  assert.equal(simplifyLine(corner.slice(0, 2), 4).length, 2);
+  // A loop back to its start (no chord) keeps its far point.
+  const loop = [
+    { x: 0, y: 0 },
+    { x: 40, y: 0 },
+    { x: 0, y: 0 },
+  ];
+  assert.equal(simplifyLine(loop, 4).length, 3);
+  assert.equal(simplifyLine(zigzag, 0).length, 1000, 'no tolerance, no change');
+});
+
+test('a decoded GPS track keeps a fraction of its points', () => {
+  const { tile, lon, lat } = tileCentre(2.35, 48.85);
+  const track = Array.from({ length: 500 }, (_, i) => [
+    lon - 0.004 + i * 0.000016,
+    lat + Math.sin(i / 40) * 0.0004,
+  ]);
+  const [sequence] = decodeCoverageTile(
+    encodePanoramaxTile(tile, { sequences: [{ id: 'gps', parts: [track] }] }),
+    tile,
+  ).sequences;
+  assert.ok(sequence.parts[0].length < 100, `${sequence.parts[0].length} points`);
+  assert.ok(sequence.parts[0].length > 5);
 });

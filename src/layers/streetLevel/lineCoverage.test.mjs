@@ -25,7 +25,15 @@ const TUNING = Object.freeze({
  */
 function setup(
   t,
-  { zoomFor, messages = { rateLimited: 'busy' }, passes, fail } = {},
+  {
+    zoomFor,
+    messages = { rateLimited: 'busy' },
+    passes,
+    fail,
+    decoded = null,
+    tuning = TUNING,
+    overviewPointSize = null,
+  } = {},
 ) {
   const centre = tileCentre(-121.4944, 38.5816);
   const viewer = coverageViewer(
@@ -68,6 +76,7 @@ function setup(
     fetchTile: async (tile) => {
       asked.push(tile);
       if (fail) throw fail;
+      if (decoded) return decoded(centre);
       return {
         sequences: [
           {
@@ -94,9 +103,10 @@ function setup(
     colors: { coverage: '#635bff', selected: '#00e5ff' },
     pickPrefix: 'test:line:',
     renderKey: 'test-coverage',
-    tuning: TUNING,
+    tuning,
     messages,
     ...(passes ? { passes } : {}),
+    ...(overviewPointSize ? { overviewPointSize } : {}),
   });
   t.after(() => {
     coverage.clear();
@@ -139,4 +149,89 @@ test('a refused key without its own message keeps the error it came with', async
   coverage.refresh();
   assert.ok(await until(() => state.keyRejected === true));
   assert.equal(state.coverage.lastError, 'the source refused the key');
+});
+
+/** Three lines in one tile: an old long one, then two newer short ones. */
+function threeLines(centre) {
+  const line = (id, capturedAt, span) => ({
+    id,
+    parts: [
+      [
+        [centre.lon - span, centre.lat],
+        [centre.lon + span, centre.lat],
+      ],
+    ],
+    capturedAt,
+    isPano: false,
+  });
+  return {
+    sequences: [
+      line('old-long', 1, 0.002),
+      line('new-short', 2, 0.0002),
+      line('newer-short', 3, 0.0001),
+    ],
+    overview: [],
+  };
+}
+
+test('the per-tile cap keeps the newest lines, or the provider’s own order with keepOrder', async (t) => {
+  const capped = { ...TUNING, maxTiles: 1, maxSequences: 2 };
+  const drawnIds = (state) =>
+    [...state.coverage.tiles.values()].flatMap((tile) => [
+      ...tile.sequences.keys(),
+    ]);
+  const newest = setup(t, { decoded: threeLines, tuning: capped });
+  newest.coverage.refresh();
+  assert.ok(await until(() => newest.state.coverage.tiles.size === 1));
+  assert.deepEqual(drawnIds(newest.state).sort(), ['new-short', 'newer-short']);
+  const kept = setup(t, {
+    decoded: threeLines,
+    tuning: { ...capped, keepOrder: true },
+  });
+  kept.coverage.refresh();
+  assert.ok(await until(() => kept.state.coverage.tiles.size === 1));
+  assert.deepEqual(drawnIds(kept.state), ['old-long', 'new-short']);
+});
+
+test('overview points take the provider’s size, each its own', async (t) => {
+  const { state, coverage, viewer } = setup(t, {
+    zoomFor: () => ({ zoom: 3, kind: 'overview' }),
+    tuning: { ...TUNING, overviewMaxTiles: 4 },
+    decoded: (centre) => ({
+      sequences: [],
+      overview: [
+        { id: 'a', lon: centre.lon, lat: centre.lat, weight: 1 },
+        { id: 'b', lon: centre.lon + 0.01, lat: centre.lat, weight: 50_000 },
+      ],
+    }),
+    overviewPointSize: (point) => (point.weight > 1 ? 7 : 3),
+  });
+  coverage.refresh();
+  assert.ok(await until(() => state.coverage.tiles.size > 0));
+  const sizes = [];
+  for (const primitive of viewer.scene.primitives.items)
+    for (let i = 0; i < (primitive.length ?? 0); i++)
+      sizes.push(primitive.get(i).pixelSize);
+  assert.deepEqual(sizes.sort(), [3, 7]);
+});
+
+test('a point budget skips lines past it, and a shorter one later may still fit', async (t) => {
+  const { state, coverage } = setup(t, {
+    tuning: { ...TUNING, maxTiles: 1, maxSequences: 10, maxPoints: 5, keepOrder: true },
+    decoded: (centre) => {
+      const line = (id, n) => ({
+        id,
+        parts: [
+          Array.from({ length: n }, (_, i) => [centre.lon - 0.001 + i * 0.0001, centre.lat]),
+        ],
+        capturedAt: 0,
+        isPano: false,
+      });
+      return { sequences: [line('three', 3), line('four', 4), line('two', 2)], overview: [] };
+    },
+  });
+  coverage.refresh();
+  assert.ok(await until(() => state.coverage.tiles.size === 1));
+  const [tile] = state.coverage.tiles.values();
+  assert.deepEqual([...tile.sequences.keys()], ['three', 'two']);
 });

@@ -1,4 +1,7 @@
 import { createLimiter } from '../../limiter.js';
+
+/** Longest wait a Retry-After is honoured for. */
+const RETRY_AFTER_MAX_SEC = 300;
 import {
   API_CONCURRENCY,
   API_TIMEOUT_MS,
@@ -8,6 +11,7 @@ import {
   NEAREST_LIMIT,
   NEAREST_RADIUS_M,
   PANORAMAX_API,
+  PICTURE_TILE_CONCURRENCY,
   TILE_CONCURRENCY,
   TILE_TIMEOUT_MS,
 } from './policy.js';
@@ -23,12 +27,15 @@ export class PanoramaxSourceError extends Error {
 }
 
 const NO_ANSWER = 'Panoramax did not answer in time — try again';
+const UNREACHABLE = 'Panoramax could not be reached — check the connection';
 
 /** Seconds from a Retry-After header, or null. */
 function retryAfterSeconds(response) {
   const header = response.headers?.get?.('retry-after');
   const value = header == null || header === '' ? NaN : Number(header);
-  return Number.isFinite(value) && value >= 0 ? value : null;
+  if (!Number.isFinite(value) || value < 0) return null;
+  // A maintenance page's hour must not freeze coverage for an hour.
+  return Math.min(RETRY_AFTER_MAX_SEC, Math.max(1, value));
 }
 
 /** The body as bytes, refusing more than MAX_RESPONSE_BYTES whatever the headers say. */
@@ -79,6 +86,11 @@ export function createPanoramaxSource({
   const root = api.replace(/\/+$/, '');
   const apiLimiter = createLimiter(API_CONCURRENCY, { lifo: true });
   const tileLimiter = createLimiter(TILE_CONCURRENCY);
+  // The cones' z15 tiles have their own connection: a selection never
+  // waits behind coverage tiles.
+  const pictureLimiter = createLimiter(PICTURE_TILE_CONCURRENCY, {
+    lifo: true,
+  });
 
   /** GET within `timeoutMs`; the caller's abort wins over the timeout. */
   async function get(url, { signal, timeoutMs, empty = [] }) {
@@ -108,7 +120,8 @@ export function createPanoramaxSource({
       if (signal?.aborted) throw signal.reason;
       if (controller.signal.aborted) throw controller.signal.reason;
       if (error instanceof PanoramaxSourceError) throw error;
-      throw new PanoramaxSourceError(NO_ANSWER);
+      // Offline, or a CORS or TLS failure: not a timeout, not worth a retry.
+      throw new PanoramaxSourceError(UNREACHABLE);
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
@@ -146,9 +159,10 @@ export function createPanoramaxSource({
     api: root,
 
     /** Raw vector-tile bytes; an empty array where there is no coverage. */
-    async getTile({ x, y, z }, { signal } = {}) {
+    async getTile({ x, y, z }, { signal, lane = 'coverage' } = {}) {
       const url = `${root}/map/${z}/${x}/${y}.mvt`;
-      const bytes = await tileLimiter.run(
+      const gate = lane === 'pictures' ? pictureLimiter : tileLimiter;
+      const bytes = await gate.run(
         () =>
           get(url, { signal, timeoutMs: TILE_TIMEOUT_MS, empty: [204, 404] }),
         { signal },
@@ -193,27 +207,51 @@ export function createPanoramaxSource({
       const dLat = metres / 111_320;
       const dLon =
         metres / (111_320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
-      const box = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map((v) =>
-        v.toFixed(7),
-      );
-      const [facing, around] = await Promise.all([
-        search(
-          {
+      // Clamped to the map: the API finds nothing in a box past ±180°.
+      const box = [
+        Math.max(-180, lon - dLon),
+        Math.max(-90, lat - dLat),
+        Math.min(180, lon + dLon),
+        Math.min(90, lat + dLat),
+      ].map((v) => v.toFixed(7));
+      // One search failing (busy, no answer) leaves the other's pictures;
+      // only both failing fails the lookup. The caller's abort stops both.
+      const both = new AbortController();
+      const onAbort = () => both.abort(signal.reason);
+      if (signal?.aborted) throw signal.reason;
+      signal?.addEventListener('abort', onAbort, { once: true });
+      const run = (params) =>
+        search(params, { signal: both.signal }).catch((error) => {
+          if (!both.signal.aborted && !signal?.aborted) failures.push(error);
+          throw error;
+        });
+      const failures = [];
+      let settled;
+      try {
+        settled = await Promise.allSettled([
+          run({
             place_position: `${Number(lon).toFixed(7)},${Number(lat).toFixed(7)}`,
             place_distance: `0-${metres}`,
             place_fov_tolerance: String(NEAREST_FOV_TOLERANCE_DEG),
             limit: String(Math.min(100, Math.max(1, limit))),
             ...shared,
-          },
-          { signal },
-        ),
-        search(
-          { bbox: box.join(','), limit: String(NEAREST_BOX_LIMIT), ...shared },
-          { signal },
-        ),
-      ]);
+          }),
+          run({
+            bbox: box.join(','),
+            limit: String(NEAREST_BOX_LIMIT),
+            ...shared,
+          }),
+        ]);
+      } finally {
+        signal?.removeEventListener('abort', onAbort);
+      }
+      if (signal?.aborted) throw signal.reason;
+      const found = settled
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value);
+      if (!found.length) throw failures[0] ?? settled[0].reason;
       const byId = new Map();
-      for (const item of [...facing, ...around])
+      for (const item of found.flat())
         if (item?.id != null && !byId.has(String(item.id)))
           byId.set(String(item.id), item);
       return [...byId.values()];

@@ -535,22 +535,55 @@ test('the cones come in capture order, and a broken neighbour tile only thins th
   assert.ok(await until(() => cones.count() === 5));
   assert.deepEqual(cones.ids(), ['s-4', 's-3', 's-2', 's-1', 's-0']);
   // A neighbour answers with garbage: the home tile's cones still draw.
-  const home = new Set();
-  env.source.getTile = async (tile) => {
-    const key = `${tile.z}/${tile.x}/${tile.y}`;
-    if (!home.size) home.add(key);
-    if (!home.has(key)) return new TextEncoder().encode('<html>oops</html>');
-    return tiles(tile);
-  };
-  await env.instance.viewer.open('s-0');
-  await env.instance.selectSequence('s');
+});
+
+test('a broken neighbour z15 tile only thins the cones; an unreadable home tile reads as such', async (t) => {
+  // At a tile corner: the home tile and three neighbours are asked.
+  const home = tileCentre(ORIGIN.lon, ORIGIN.lat, 15);
+  const box = tileBounds(home.tile.x, home.tile.y, 15);
+  const at = { lon: box.west + 0.0003, lat: box.north - 0.0002 };
+  const items = [0, 1, 2].map((i) =>
+    stacItem({ id: `c-${i}`, sequenceId: 'c', lon: at.lon + i * 0.00005, lat: at.lat }),
+  );
+  const tiles = pictureTiles(items);
+  const broken = new TextEncoder().encode('<html>oops</html>');
+  const homeKey = `15/${home.tile.x}/${home.tile.y}`;
+  const env = await mounted({
+    items,
+    tiles: (tile) =>
+      `${tile.z}/${tile.x}/${tile.y}` === homeKey ? tiles(tile) : broken,
+  });
+  const cones = await withCones(t, env);
+  await env.instance.viewer.open('c-0');
+  await env.instance.selectSequence('c');
   assert.ok(await until(() => !env.instance.sequenceStats().loading));
-  // The home tile itself unreadable: a readable error, not a parser's.
-  env.source.getTile = async () =>
-    new TextEncoder().encode('<html>oops</html>');
-  await env.instance.selectSequence('s');
-  assert.ok(await until(() => env.actions.errors.some(Boolean)));
-  assert.match(env.actions.errors.filter(Boolean).at(-1), /could not be read/);
+  assert.equal(cones.count(), 3, 'the home tile’s cones draw');
+  assert.ok(env.source.calls.tiles.length > 1, 'neighbours were asked');
+  // Another sequence whose home tile is unreadable too.
+  const env2 = await mounted({ items, tiles: () => broken });
+  await withCones(t, env2);
+  await env2.instance.viewer.open('c-0');
+  await env2.instance.selectSequence('c');
+  assert.ok(await until(() => env2.actions.errors.some(Boolean)));
+  assert.match(env2.actions.errors.filter(Boolean).at(-1), /could not be read/);
+});
+
+test('cones re-centred into tiles already read do not read them again', async (t) => {
+  const items = sequence('long', 400);
+  const env = await mounted({ items, tiles: pictureTiles(items) });
+  await withCones(t, env);
+  await env.instance.viewer.open('long-0');
+  await env.instance.selectSequence('long');
+  assert.ok(await until(() => env.instance.sequenceStats().images > 0));
+  await env.instance.viewer.open('long-399');
+  assert.ok(await until(() => !env.instance.sequenceStats().loading));
+  const asked = env.source.calls.tiles.length;
+  // Back to the start: its tiles are kept.
+  await env.instance.viewer.open('long-0');
+  assert.ok(await until(() => !env.instance.sequenceStats().loading));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(env.source.calls.tiles.length, asked);
+  assert.ok(env.instance.sequenceStats().images > 0);
 });
 
 test('› within the tiles the cones came from reloads nothing', async (t) => {
@@ -748,15 +781,18 @@ test('Esc in the docked viewer clears the selected sequence before the panel can
   await env.instance.selectSequence('s');
   assert.ok(await until(() => env.instance.sequenceStats().images === 3));
   const root = env.next.parentNode;
-  const event = {
+  const flags = { stopped: false, prevented: false };
+  root.fire('keydown', {
     key: 'Escape',
-    stopped: false,
-    stopPropagation() {
-      this.stopped = true;
-    },
-  };
-  root.fire('keydown', event);
+    stopPropagation: () => (flags.stopped = true),
+    preventDefault: () => (flags.prevented = true),
+  });
   assert.equal(env.instance.sequenceStats().selectedId, null);
+  assert.deepEqual(
+    flags,
+    { stopped: true, prevented: true },
+    'consumed: the panel never sees it',
+  );
   // Nothing selected: Esc goes on to the panel.
   const again = { key: 'Escape', defaultPrevented: false };
   const result = { prevented: false };
@@ -767,4 +803,133 @@ test('Esc in the docked viewer clears the selected sequence before the panel can
     },
   });
   assert.equal(result.prevented, false);
+});
+
+test('cones near the east and south edges read those neighbours; near both edges of a narrow tile, both sides', () => {
+  const home = tileCentre(ORIGIN.lon, ORIGIN.lat, 15);
+  const box = tileBounds(home.tile.x, home.tile.y, 15);
+  const { x, y } = home.tile;
+  const keys = (point) => pictureTilesAround(point).map((t) => `${t.x}/${t.y}`);
+  assert.deepEqual(keys({ lon: box.east - 0.0002, lat: box.south + 0.0002 }), [
+    `${x}/${y}`,
+    `${x + 1}/${y}`,
+    `${x}/${y + 1}`,
+    `${x + 1}/${y + 1}`,
+  ]);
+  // Svalbard: a z15 tile is ~250 m wide, so its middle is near both sides.
+  const north = tileCentre(15.6, 78.22, 15);
+  const around = keys(north);
+  for (const dx of [-1, 1])
+    assert.ok(
+      around.includes(`${north.tile.x + dx}/${north.tile.y}`),
+      `${dx} in ${around}`,
+    );
+  assert.equal(around[0], `${north.tile.x}/${north.tile.y}`, 'its own first');
+});
+
+test('a search hit outside the radius (a bounding box’s corner) is not the nearest', async () => {
+  const corner = stacItem({ id: 'corner', sequenceId: 'c', ...east(65) });
+  const { instance, source } = setup({ items: [corner] });
+  source.nearestItems = async () => [corner];
+  assert.equal(await instance.nearestImage(east(0)), null);
+});
+
+test('a line clicked from low down still searches its own sequence within 50 m', async () => {
+  const items = [...sequence('other', 1, { offset: 2 }), ...sequence('clicked', 1, { offset: 30 })];
+  const { instance, source } = setup({ items });
+  instance.init({
+    camera: { positionCartographic: { height: 300 } },
+    scene: {
+      primitives: { add() {}, remove() {} },
+      preRender: { addEventListener: () => () => {} },
+    },
+  });
+  instance.handlePick(`${PICK_PREFIX.sequence}clicked`, {
+    groundPoint: () => east(0),
+  });
+  assert.equal(await instance.nearestImage(east(0)), 'clicked-0');
+  assert.equal(source.calls.nearest[0].radius, 50);
+});
+
+test('cones re-centre on a picture that opens while they are still loading', async (t) => {
+  const items = sequence('long', 400);
+  const tiles = pictureTiles(items);
+  let release = null;
+  const env = await mounted({ items, tiles });
+  await withCones(t, env);
+  await env.instance.viewer.open('long-0');
+  env.source.getTile = async (tile) => {
+    env.source.calls.tiles.push(`${tile.z}/${tile.x}/${tile.y}`);
+    if (release === null) await new Promise((go) => (release = go));
+    return tiles(tile);
+  };
+  const first = env.instance.selectSequence('long');
+  assert.ok(await until(() => release !== null), 'the first load is held');
+  // The far end opens while the cones around long-0 still load.
+  await env.instance.viewer.open('long-399');
+  release();
+  await first;
+  assert.ok(await until(() => !env.instance.sequenceStats().loading));
+  const [lon, lat] = items[399].geometry.coordinates;
+  const [far] = pictureTilesAround({ lon, lat });
+  assert.ok(
+    env.source.calls.tiles.includes(`15/${far.x}/${far.y}`),
+    `the far picture's tile was read: ${env.source.calls.tiles}`,
+  );
+});
+
+test('a filter that hides every density dot says so', async (t) => {
+  const env = coverageSetup(t, {
+    height: 200_000,
+    filter: { pano: 'pano', sinceMs: null },
+    grid: [{ lon: ORIGIN.lon, lat: ORIGIN.lat, pano: 0, flat: 5 }],
+  });
+  env.instance.activate(env.viewer);
+  assert.ok(await until(() => env.instance.coverageStats().hint === FILTERED_HINT));
+});
+
+test('dots are drawn at their own sizes, and the busiest is the biggest', async (t) => {
+  const env = coverageSetup(t, {
+    height: 200_000,
+    grid: [
+      { lon: ORIGIN.lon, lat: ORIGIN.lat, pano: 0, flat: 1 },
+      { lon: ORIGIN.lon + 3, lat: ORIGIN.lat, pano: 30_000, flat: 20_000 },
+    ],
+  });
+  env.instance.activate(env.viewer);
+  const sizes = () => {
+    const out = [];
+    for (const primitive of env.viewer.scene.primitives.items)
+      for (let i = 0; i < (primitive.length ?? 0); i++)
+        if (primitive.get(i).pixelSize) out.push(primitive.get(i).pixelSize);
+    return out.sort((a, b) => a - b);
+  };
+  assert.ok(await until(() => sizes().length === 2));
+  assert.deepEqual(sizes(), [
+    overviewPointSize({ weight: 1 }),
+    overviewPointSize({ weight: 50_000 }),
+  ]);
+});
+
+test('lines keep the decoded (longest-first) order under a budget of points', async () => {
+  const { COVERAGE_TUNING } = await import('./policy.js');
+  assert.equal(COVERAGE_TUNING.keepOrder, true);
+  assert.ok(COVERAGE_TUNING.maxPoints > 0);
+});
+
+test('a coverage tile decoded a moment ago is not fetched or decoded again', async (t) => {
+  const env = coverageSetup(t, { sequences: [line('a')] });
+  let asked = 0;
+  const getTile = env.source.getTile;
+  env.source.getTile = (tile, options) => {
+    asked++;
+    return getTile(tile, options);
+  };
+  env.instance.activate(env.viewer);
+  assert.ok(await until(() => env.instance.coverageStats().count === 1));
+  const first = asked;
+  env.instance.deactivate();
+  env.instance.activate(env.viewer);
+  assert.ok(await until(() => env.instance.coverageStats().count === 1));
+  assert.equal(asked, first);
 });

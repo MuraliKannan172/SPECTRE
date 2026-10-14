@@ -217,7 +217,7 @@ test('the caller’s abort wins; a silent API times out with a readable message'
   await assert.rejects(slow, /did not answer in time/);
 });
 
-test('a network failure reads as no answer, not as a stack trace', async () => {
+test('a network failure reads as unreachable, not as a stack trace', async () => {
   const source = createPanoramaxSource({
     fetchImpl: async () => {
       throw new TypeError('Failed to fetch');
@@ -225,7 +225,7 @@ test('a network failure reads as no answer, not as a stack trace', async () => {
   });
   await assert.rejects(source.getTile({ x: 0, y: 0, z: 0 }), (error) => {
     assert.ok(error instanceof PanoramaxSourceError);
-    assert.match(error.message, /did not answer/);
+    assert.match(error.message, /could not be reached/);
     return true;
   });
 });
@@ -292,4 +292,69 @@ test('the HTTP/1.1 API never gets more than five requests at once: three tiles, 
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
   assert.equal(most, 5, 'never more');
+});
+
+test('one of the two nearest searches failing leaves the other’s pictures; both failing fails the lookup', async () => {
+  const half = createPanoramaxSource({
+    fetchImpl: fakeFetch((url) =>
+      url.includes('bbox')
+        ? { status: 503 }
+        : json({ features: [{ id: 'facing' }] }),
+    ).fetchImpl,
+  });
+  assert.deepEqual(
+    (await half.nearestItems({ lat: 1, lon: 2 })).map((i) => i.id),
+    ['facing'],
+  );
+  const none = createPanoramaxSource({
+    fetchImpl: fakeFetch(() => ({ status: 503 })).fetchImpl,
+  });
+  await assert.rejects(none.nearestItems({ lat: 1, lon: 2 }), /busy/);
+});
+
+test('only a timeout is asked again: a busy or failing API is asked once, an unreachable one says so', async () => {
+  for (const status of [429, 500, 503]) {
+    const { urls, fetchImpl } = fakeFetch(() => ({ status }));
+    const source = createPanoramaxSource({ fetchImpl });
+    await assert.rejects(source.getItem('a'));
+    assert.equal(urls.length, 1, `HTTP ${status}: one fetch`);
+  }
+  let calls = 0;
+  const offline = createPanoramaxSource({
+    fetchImpl: async () => {
+      calls++;
+      throw new TypeError('Failed to fetch');
+    },
+  });
+  await assert.rejects(offline.getItem('a'), /could not be reached/);
+  assert.equal(calls, 1, 'not retried');
+});
+
+test('a Retry-After is honoured up to five minutes', async () => {
+  const wait = async (header) => {
+    const source = createPanoramaxSource({
+      fetchImpl: fakeFetch(() => ({
+        status: 503,
+        headers: { 'retry-after': header },
+      })).fetchImpl,
+    });
+    return source.getTile({ x: 0, y: 0, z: 0 }).catch((error) => error.retryAfterSec);
+  };
+  assert.equal(await wait('3600'), 300);
+  assert.equal(await wait('99999999999'), 300);
+  assert.equal(await wait('0'), 1);
+  assert.equal(await wait('12'), 12);
+});
+
+test('a lookup near the antimeridian keeps its box on the map', async () => {
+  const { urls, fetchImpl } = fakeFetch(() => json({ features: [] }));
+  const source = createPanoramaxSource({ fetchImpl });
+  await source.nearestItems({ lat: -16, lon: 179.9999 });
+  const box = urls
+    .map((u) => new URL(u).searchParams.get('bbox'))
+    .find(Boolean)
+    .split(',')
+    .map(Number);
+  assert.equal(box[2], 180);
+  assert.ok(box[0] < 180);
 });

@@ -8,6 +8,7 @@ import {
   tileBounds,
 } from '../../tileMath.js';
 import { metresBetween } from '../../view.js';
+import { createLru, createTileCache } from '../../tileCache.js';
 import { decodeCoverageTile, decodePictures } from './decode.js';
 import { createPanoramaxSource } from './source.js';
 import { createPanoramaxViewer } from './viewer.js';
@@ -70,6 +71,10 @@ export function overviewPointSize(point) {
 const PHOTO_CACHE_SIZE = 2000;
 /** Sequences whose cone centre is remembered. */
 const ANCHOR_CACHE_SIZE = 50;
+/** Decoded coverage tiles kept (a simplified dense z10 tile is ~4 MB). */
+const COVERAGE_TILE_CACHE_SIZE = 16;
+/** One sequence's pictures in a z15 tile, kept for re-centring. */
+const PICTURE_LIST_CACHE_SIZE = 32;
 
 /**
  * Sequence lines at z10–14 below 60 km; above, the density grid at z5 and
@@ -116,26 +121,6 @@ export function passesCoverage(record, filter) {
   });
 }
 
-/** Least-recently-used map: reading an entry renews it. */
-function createLru(limit) {
-  const map = new Map();
-  return {
-    get(key) {
-      if (!map.has(key)) return undefined;
-      const value = map.get(key);
-      map.delete(key);
-      map.set(key, value);
-      return value;
-    },
-    set(key, value) {
-      map.delete(key);
-      map.set(key, value);
-      while (map.size > limit) map.delete(map.keys().next().value);
-    },
-    delete: (key) => map.delete(key),
-  };
-}
-
 /** The z15 tile holding a point. */
 function pictureTileOf({ lon, lat }) {
   const z = PICTURE_TILE_ZOOM;
@@ -143,29 +128,29 @@ function pictureTileOf({ lon, lat }) {
 }
 
 /**
- * The z15 tiles whose pictures surround a point: its own, and the
- * neighbours it sits within PICTURE_TILE_EDGE_M of (at most four).
+ * The z15 tiles whose pictures surround a point: its own first, and the
+ * neighbours it sits within PICTURE_TILE_EDGE_M of (at most nine).
  */
 export function pictureTilesAround(point) {
   const home = pictureTileOf(point);
   const box = tileBounds(home.x, home.y, home.z);
   const near = (lon, lat) =>
     metresBetween(point, { lon, lat }) <= PICTURE_TILE_EDGE_M;
-  const dx = near(box.west, point.lat) ? -1 : near(box.east, point.lat) ? 1 : 0;
-  const dy = near(point.lon, box.north)
-    ? -1
-    : near(point.lon, box.south)
-      ? 1
-      : 0;
+  // Near both edges at once where tiles are narrow (high latitudes).
+  const dxs = [0];
+  if (near(box.west, point.lat)) dxs.push(-1);
+  if (near(box.east, point.lat)) dxs.push(1);
+  const dys = [0];
+  if (near(point.lon, box.north)) dys.push(-1);
+  if (near(point.lon, box.south)) dys.push(1);
   const max = 2 ** home.z;
-  const tiles = [home];
-  const add = (x, y) => {
-    if (y < 0 || y >= max) return;
-    tiles.push({ x: (x + max) % max, y, z: home.z });
-  };
-  if (dx) add(home.x + dx, home.y);
-  if (dy) add(home.x, home.y + dy);
-  if (dx && dy) add(home.x + dx, home.y + dy);
+  const tiles = [];
+  for (const dy of dys)
+    for (const dx of dxs) {
+      const y = home.y + dy;
+      if (y < 0 || y >= max) continue;
+      tiles.push({ x: (home.x + dx + max) % max, y, z: home.z });
+    }
   return tiles;
 }
 
@@ -290,12 +275,36 @@ export function createPanoramaxProvider({
         return (delta < 0 ? photo.prevId : photo.nextId) || null;
       }
 
-      const coverage = createLineCoverage({
-        state,
-        fetchTile: async (tile, { signal }) =>
+      // Decoded tiles, kept a while: panning back, or across a zoom band and
+      // back, neither fetches nor decodes them again.
+      const coverageTiles = createTileCache({
+        size: COVERAGE_TILE_CACHE_SIZE,
+        load: (tile, { signal }) =>
           readable(async () =>
             decodeCoverageTile(await source.getTile(tile, { signal }), tile),
           ),
+      });
+      /** A z15 tile's pictures of one sequence, by `z/x/y:sequence`. */
+      const pictureLists = createLru(PICTURE_LIST_CACHE_SIZE);
+      function picturesIn(tile, sequenceId, signal) {
+        const key = `${tileKey(tile)}:${sequenceId}`;
+        const kept = pictureLists.get(key);
+        if (kept) return kept;
+        const list = readable(async () =>
+          decodePictures(
+            await source.getTile(tile, { signal, lane: 'pictures' }),
+            tile,
+            sequenceId,
+          ),
+        );
+        pictureLists.set(key, list);
+        list.catch(() => pictureLists.delete(key));
+        return list;
+      }
+
+      const coverage = createLineCoverage({
+        state,
+        fetchTile: (tile, options) => coverageTiles.get(tile, options),
         zoomFor: panoramaxZoomFor,
         colors: COLORS,
         pickPrefix: PICK_PREFIX.sequence,
@@ -312,21 +321,15 @@ export function createPanoramaxProvider({
           const anchor = anchors.get(sequenceId);
           if (!anchor) return [];
           const tiles = pictureTilesAround(anchor);
+          // Known from the start: a picture opening while these load is
+          // judged against them (re-centred if outside, left alone inside).
+          drawn = { sequenceId, tiles: new Set(tiles.map(tileKey)) };
           // The home tile must load; a neighbour that fails only thins the cones.
           const lists = await Promise.allSettled(
-            tiles.map((tile) =>
-              readable(async () =>
-                decodePictures(
-                  await source.getTile(tile, { signal }),
-                  tile,
-                  sequenceId,
-                ),
-              ),
-            ),
+            tiles.map((tile) => picturesIn(tile, sequenceId, signal)),
           );
           signal?.throwIfAborted();
           if (lists[0].status === 'rejected') throw lists[0].reason;
-          drawn = { sequenceId, tiles: new Set(tiles.map(tileKey)) };
           const byId = new Map(
             lists
               .flatMap((list) => list.value ?? [])
@@ -445,13 +448,18 @@ export function createPanoramaxProvider({
           const count = lines ? drawn : 0;
           const loading = state.coverage.pending.size > 0;
           const settled = !loading && !state.coverage.lastError;
-          // Lines in view that the filter hid all of: say so, not "none here".
-          const filteredOut =
-            lines &&
-            [...state.coverage.tiles.values()].some((tile) => tile.total > 0);
           let fallback = '';
+          // Tiles that held something the filter hid all of.
+          const filteredOut = [...state.coverage.tiles.values()].some(
+            (tile) => tile.total > 0,
+          );
           if (kind === 'overview')
-            fallback = drawn > 0 || !settled ? OVERVIEW_HINT : NO_COVERAGE_HINT;
+            fallback =
+              drawn > 0 || !settled
+                ? OVERVIEW_HINT
+                : filteredOut
+                  ? FILTERED_HINT
+                  : NO_COVERAGE_HINT;
           else if (lines && settled && count === 0)
             fallback = filteredOut ? FILTERED_HINT : NO_COVERAGE_HINT;
           return {

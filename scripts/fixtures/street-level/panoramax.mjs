@@ -112,7 +112,11 @@ function item(picture, pictures) {
       sd: { href: `${files}/sd.jpg` },
       thumb: { href: `${files}/thumb.jpg` },
     },
-    links: [...link('prev', sibling(-1)), ...link('next', sibling(1))],
+    links: [
+      ...link('prev', sibling(-1)),
+      ...link('next', sibling(1)),
+      { rel: 'via', href: HOST },
+    ],
   };
 }
 
@@ -231,11 +235,9 @@ export function answerPanoramaxRequest({ method, url }) {
         .map((p) => item(p, pictures)),
     });
   }
-  const [lon, lat] = (q.get('place_position') || '').split(',').map(Number);
-  const radius = Number((q.get('place_distance') || '0-50').split('-')[1]);
   const filter = q.get('filter') || '';
   const since = q.get('datetime')?.split('/')[0];
-  const near = pictures
+  const kept = pictures
     .filter(
       (p) => !q.get('collections') || p.sequenceId === q.get('collections'),
     )
@@ -246,7 +248,29 @@ export function answerPanoramaxRequest({ method, url }) {
           ? !p.isPano
           : true,
     )
-    .filter((p) => !since || Date.parse(p.datetime) >= Date.parse(since))
+    .filter((p) => !since || Date.parse(p.datetime) >= Date.parse(since));
+  // A box: every picture in it, in no particular order (id order here).
+  if (q.has('bbox')) {
+    const [west, south, east, north] = q.get('bbox').split(',').map(Number);
+    return json({
+      type: 'FeatureCollection',
+      features: kept
+        .filter(
+          (p) =>
+            p.lon >= west && p.lon <= east && p.lat >= south && p.lat <= north,
+        )
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .slice(0, Number(q.get('limit')) || 10)
+        .map((p) => item(p, pictures)),
+    });
+  }
+  const [lon, lat] = (q.get('place_position') || '').split(',').map(Number);
+  const radius = Number((q.get('place_distance') || '0-50').split('-')[1]);
+  // As the API does, even at the widest tolerance: a place behind a
+  // picture (every one looks east) is not in it.
+  const facing = (p) => lon >= p.lon - 1e-7;
+  const near = kept
+    .filter(facing)
     .map((p) => ({ p, metres: metresApart({ lon, lat }, p) }))
     .filter(({ metres }) => metres <= radius)
     .sort((a, b) => a.metres - b.metres)

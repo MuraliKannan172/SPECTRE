@@ -36,9 +36,11 @@ export const PANORAMAX_SOURCES = Object.freeze({
     const width = Math.min(photo.width, PANO_FULL_SIZE[0]);
     return { url: photo.urls.hd, width, resize: [width, width / 2] };
   },
-  panoSharp: (photo, size) => {
+  // The original is several megabytes with no server to shrink it: only
+  // for the expanded viewer (a docked one on a dense screen asks too).
+  panoSharp: (photo, size, { expanded = false } = {}) => {
     const width = photo.width || 0;
-    if (!photo.urls.hd || !photo.urls.sd) return null;
+    if (!expanded || !photo.urls.hd || !photo.urls.sd) return null;
     // An original no wider than the SD one adds nothing; a huge one would
     // take hundreds of megabytes to decode.
     if (width <= SD_WIDTH || width > PANO_HD_MAX_WIDTH) return null;
@@ -59,7 +61,8 @@ export const PANORAMAX_SOURCES = Object.freeze({
   flatSharp: (photo, pixels) =>
     photo.urls.sd && photo.urls.hd && pixels > SD_WIDTH ? photo.urls.hd : null,
   describe: (photo) => ({
-    title: null,
+    // Where no author can be named, the instance holding the photo is.
+    title: !photo.creator && photo.via ? `via ${photo.via}` : null,
     creator: photo.creator,
     license: photo.license,
     externalUrl: panoramaxPictureUrl(photo.id),

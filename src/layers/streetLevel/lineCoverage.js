@@ -73,6 +73,7 @@ export function meshBoxInRange(box, centre) {
  * @property {number} viewRangePerHeight  …or camera height times this.
  * @property {number} viewNearM           Ground always covered around a tilted camera.
  * @property {boolean} [keepOrder]        Cap a tile's lines in the order decoded (default: newest first).
+ * @property {number} [maxPoints]         Line points drawn at once, over every tile (default: no limit).
  */
 
 /**
@@ -111,6 +112,9 @@ export function createLineCoverage({
 }) {
   const { render } = state.services;
   const perTileSequenceCap = Math.floor(tuning.maxSequences / tuning.maxTiles);
+  const perTilePointCap = tuning.maxPoints
+    ? Math.floor(tuning.maxPoints / tuning.maxTiles)
+    : Infinity;
 
   /** Colour for a line: the provider's, GEV cyan while selected. */
   function sequenceColor({ selected = false } = {}) {
@@ -151,11 +155,23 @@ export function createLineCoverage({
   function drawnSequences(entry) {
     const drawn = [];
     const current = filter();
+    let points = 0;
     for (const sequence of entry.sequenceList) {
       if (drawn.length >= perTileSequenceCap) break;
-      if (passes(sequence, current)) drawn.push(sequence);
+      if (!passes(sequence, current)) continue;
+      // A line past the point budget is skipped; a shorter one may still fit.
+      const size = pointsOf(sequence);
+      if (points + size > perTilePointCap) continue;
+      points += size;
+      drawn.push(sequence);
     }
     return drawn;
+  }
+
+  function pointsOf(sequence) {
+    let count = 0;
+    for (const part of sequence.parts) count += part.length;
+    return count;
   }
 
   /**

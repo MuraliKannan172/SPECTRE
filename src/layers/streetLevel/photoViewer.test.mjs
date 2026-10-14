@@ -164,3 +164,144 @@ test('Esc: the docked viewer offers it to the provider first; expanded, it is th
   assert.equal(asked, 1, 'not asked while expanded');
   assert.equal(expanded.prevented, false);
 });
+
+test('a sharp panorama still downloading when another photo opens is aborted', async (t) => {
+  const signals = [];
+  const viewer = createPhotoViewer({
+    providerId: 'test',
+    name: 'Test',
+    sources: SOURCES,
+    getPhoto: async (id) => PHOTOS[id],
+    step: async () => null,
+    onStep() {},
+    load: (url, options) =>
+      url.endsWith('-sharp')
+        ? new Promise((_, reject) => {
+            signals.push(options.signal);
+            options.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          })
+        : Promise.resolve({ src: url }),
+    createRenderer: () => ({
+      setImage() {},
+      setView() {},
+      getView: () => ({ yaw: 0, pitch: 0, fov: 80 }),
+      resize() {},
+      clear() {},
+      destroy() {},
+    }),
+  });
+  t.after(() => delete globalThis.devicePixelRatio);
+  globalThis.devicePixelRatio = 1;
+  const host = fakeHost();
+  await viewer.mount(host);
+  parts(host).canvas.clientWidth = 1800;
+  await viewer.open('a');
+  await tick();
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].aborted, false);
+  await viewer.open('f');
+  assert.equal(signals[0].aborted, true, 'not needed any more');
+});
+
+test('a lost WebGL context while the first panorama loads releases its bitmap', async () => {
+  let closed = false;
+  let built = 0;
+  let land = null;
+  const viewer = createPhotoViewer({
+    providerId: 'test',
+    name: 'Test',
+    sources: SOURCES,
+    getPhoto: async (id) => PHOTOS[id],
+    step: async () => null,
+    onStep() {},
+    load: (url) =>
+      new Promise((resolve) => {
+        land = () => resolve({ src: url, close: () => (closed = true) });
+      }),
+    // The first renderer is lost mid-load; a new one cannot be built.
+    createRenderer: () => {
+      built++;
+      if (built > 1) throw new Error('context lost');
+      return {
+        setImage() {},
+        setView() {},
+        getView: () => ({ yaw: 0, pitch: 0, fov: 80 }),
+        resize() {},
+        clear() {},
+        destroy() {},
+      };
+    },
+  });
+  const host = fakeHost();
+  await viewer.mount(host);
+  const opening = viewer.open('a');
+  assert.ok(await until(() => land !== null), 'the panorama is loading');
+  parts(host).canvas.fire('webglcontextlost', {});
+  const first = land;
+  first();
+  // The panorama failed: the front view is loaded flat instead.
+  assert.ok(await until(() => land !== first), 'the flat fallback loads');
+  land();
+  await opening;
+  assert.equal(built, 2, 'a new renderer was tried');
+  assert.equal(closed, true, 'the bitmap no renderer took is closed');
+});
+
+test('docked, Esc anywhere in the viewer’s box (toolbar, caption) is offered to the provider', async () => {
+  let asked = 0;
+  const viewer = createPhotoViewer({
+    providerId: 'test',
+    name: 'Test',
+    sources: SOURCES,
+    getPhoto: async (id) => PHOTOS[id],
+    step: async () => null,
+    onStep() {},
+    onEscape: () => ++asked > 0,
+    load: async (url) => ({ src: url }),
+  });
+  const host = fakeHost();
+  const wrap = fakeHost();
+  host.closest = (selector) => (selector === '.sl-viewer-wrap' ? wrap : null);
+  await viewer.mount(host);
+  const flags = { stopped: false, prevented: false };
+  // Focus back on EXPAND after a shrink: the key reaches the wrap, not the photo.
+  wrap.fire('keydown', {
+    key: 'Escape',
+    stopPropagation: () => (flags.stopped = true),
+    preventDefault: () => (flags.prevented = true),
+  });
+  assert.equal(asked, 1);
+  assert.deepEqual(flags, { stopped: true, prevented: true });
+  viewer.unmount();
+  wrap.fire('keydown', { key: 'Escape' });
+  assert.equal(asked, 1, 'unmounted: the listener is gone');
+});
+
+test('a picture file or bitmap past any real photo’s size is refused', async (t) => {
+  const { loadImage, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE } = await import(
+    './photoViewer.js'
+  );
+  const saved = {
+    fetch: globalThis.fetch,
+    createImageBitmap: globalThis.createImageBitmap,
+  };
+  t.after(() => Object.assign(globalThis, saved));
+  let closed = 0;
+  const bitmap = (width, height) => ({ width, height, close: () => closed++ });
+  globalThis.createImageBitmap = async (blob) => blob.bitmap;
+  const respond = ({ length, size, width = 100, height = 50 }) =>
+    (globalThis.fetch = async () => ({
+      ok: true,
+      headers: new Map([['content-length', String(length ?? '')]]),
+      blob: async () => ({ size: size ?? 10, bitmap: bitmap(width, height) }),
+    }));
+  respond({ length: MAX_IMAGE_BYTES + 1 });
+  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  respond({ size: MAX_IMAGE_BYTES + 1 });
+  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  respond({ width: MAX_IMAGE_SIDE + 1 });
+  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  assert.equal(closed, 1, 'the oversize bitmap is released');
+  respond({});
+  assert.equal((await loadImage('https://x/a.jpg')).width, 100);
+});

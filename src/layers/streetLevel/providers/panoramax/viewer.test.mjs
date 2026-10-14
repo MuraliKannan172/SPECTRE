@@ -150,7 +150,15 @@ test('a 360° picture shows its SD equirectangular image, then HD shrunk to 4,09
   assert.equal(poses.at(-1).bearing, 100);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(loads.length, 1, 'docked: the 2,048 px SD is enough');
+  // Docked on a dense screen the canvas wants more, but the original is
+  // megabytes: not until the viewer is expanded.
   canvas.clientWidth = 1800;
+  viewer.resize();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(loads.length, 1, 'docked: still SD only');
+  const root = canvas.parentNode;
+  root.closest = (selector) =>
+    selector.includes('sl-viewer-wrap-expanded') ? {} : null;
   // EXPAND resizes more than once while the panel settles.
   viewer.resize();
   viewer.resize();
@@ -165,14 +173,19 @@ test('a 360° picture shows its SD equirectangular image, then HD shrunk to 4,09
   assert.equal(hd.url, PHOTOS.pano.urls.hd);
   assert.deepEqual(hd.resize, [4096, 2048]);
   assert.equal(hd.timeoutMs, 30_000);
+  assert.ok(hd.signal, 'abortable');
 });
 
-test('HD panoramas too big to decode, or no bigger than SD, are never fetched', () => {
+test('HD panoramas too big to decode, or no bigger than SD, are never fetched; nor while docked', () => {
   const size = [4096, 2048];
-  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.bigPano, size), null);
-  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.smallPano, size), null);
+  const expanded = { expanded: true };
+  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.pano, size, { expanded: false }), null);
+  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.pano, size), null);
+  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.bigPano, size, expanded), null);
+  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.smallPano, size, expanded), null);
   assert.deepEqual(
-    PANORAMAX_SOURCES.panoSharp({ ...PHOTOS.pano, width: 3000 }, size).resize,
+    PANORAMAX_SOURCES.panoSharp({ ...PHOTOS.pano, width: 3000 }, size, expanded)
+      .resize,
     [3000, 1500],
     'never enlarged',
   );
@@ -190,7 +203,7 @@ test('HD panoramas too big to decode, or no bigger than SD, are never fetched', 
   assert.deepEqual(PANORAMAX_SOURCES.flatFirst(hugeOnly).filter(Boolean), [
     hugeOnly.urls.thumb,
   ]);
-  assert.equal(PANORAMAX_SOURCES.panoSharp(hdOnly, size), null);
+  assert.equal(PANORAMAX_SOURCES.panoSharp(hdOnly, size, expanded), null);
   assert.equal(PANORAMAX_SOURCES.flatSharp(PHOTOS.flat, 2048), null);
   assert.equal(
     PANORAMAX_SOURCES.flatSharp(PHOTOS.flat, 2049),
@@ -257,4 +270,19 @@ test('a picture whose SD fails falls back to HD, then the thumbnail', async () =
     PHOTOS.flat.urls.thumb,
   ]);
   assert.equal(parts(host).picture.src, PHOTOS.flat.urls.thumb);
+});
+
+test('a photo with no author to name is captioned with the instance holding it', () => {
+  const photo = normalizeItem(
+    stacItem({ id: 'x', lon: 1, lat: 2, producer: 'someone@city.example.fr' }),
+  );
+  photo.via = 'panoramax.ign.fr';
+  assert.deepEqual(PANORAMAX_SOURCES.describe(photo), {
+    title: 'via panoramax.ign.fr',
+    creator: null,
+    license: 'CC BY-SA 4.0',
+    externalUrl: 'https://api.panoramax.xyz/#pic=x&focus=pic',
+  });
+  const named = { ...photo, creator: 'Robot8A' };
+  assert.equal(PANORAMAX_SOURCES.describe(named).title, null);
 });

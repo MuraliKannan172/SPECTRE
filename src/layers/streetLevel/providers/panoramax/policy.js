@@ -49,6 +49,10 @@ export const COVERAGE_TUNING = Object.freeze({
   // looking emptier than its suburbs. (KartaView draws as many.)
   maxSequences: 14_400,
   keepOrder: true,
+  // Points drawn at most, over every tile (each becomes ~8 ground-line
+  // vertices, ~1.4 kB of geometry): the simplified Paris z10 tile alone
+  // holds 57,000, unsimplified 750,000, which hung the tab.
+  maxPoints: 90_000,
   lineWidthPx: 2.5,
   overviewPointPx: 4,
   moveDebounceMs: 320,
@@ -56,6 +60,12 @@ export const COVERAGE_TUNING = Object.freeze({
   viewRangePerHeight: 10,
   viewNearM: 1_000,
 });
+/**
+ * Lines are simplified (Douglas–Peucker) to this many tile units of a
+ * 4,096 extent: under a pixel at every height lines are drawn from, and
+ * 6–10% of the points GPS tracks carry.
+ */
+export const SIMPLIFY_TOLERANCE_UNITS = 4;
 /**
  * Grid cells per overview tile, at most: a z0 tile holds ~70,000 cells
  * (1.9 MB), drawn as this many binned points.
@@ -69,9 +79,9 @@ export const NO_COVERAGE_HINT = 'no Panoramax photos in view';
 export const FILTERED_HINT = 'no Panoramax photos here match the filters';
 export const UNREADABLE_TILE_MESSAGE =
   'Panoramax sent a map tile that could not be read';
-export const GONE_MESSAGE = 'This Panoramax picture is no longer available';
+export const GONE_MESSAGE = 'This Panoramax photo is no longer available';
 /** From high up the dots are where pictures are, not sequences to click. */
-export const OVERVIEW_HINT = 'zoom in to see Panoramax sequences';
+export const OVERVIEW_HINT = 'zoom in to see Panoramax coverage';
 
 /** Cones come from z15 tiles' `pictures` layer (~110 bytes a picture). */
 export const PICTURE_TILE_ZOOM = 15;
@@ -84,11 +94,14 @@ export const API_TIMEOUT_MS = 12_000;
 export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 /**
  * The meta-catalogue speaks HTTP/1.1 only, so the browser opens six
- * connections to it: tiles take three, searches two, so a click's lookup
- * never queues behind megabyte tiles (it timed out doing so).
+ * connections to it: coverage tiles take three, searches two and the
+ * cones' tiles one, so a click's lookup never queues behind megabyte tiles
+ * (it timed out doing so).
  */
 export const API_CONCURRENCY = 2;
 export const TILE_CONCURRENCY = 3;
+/** The selected sequence's z15 tiles (cones) take the sixth. */
+export const PICTURE_TILE_CONCURRENCY = 1;
 
 /** Pictures asked for around a point; the API returns them nearest first. */
 export const NEAREST_LIMIT = 10;
@@ -201,10 +214,18 @@ function creatorOf(item) {
           .map((p) => p.name)
       : []),
   ];
-  const name = names.find((value) => typeof value === 'string' && value.trim());
-  if (name && !looksLikeEmail(name)) return name.trim().slice(0, 80);
-  // Licences ask for the source to be named: the instance that holds it.
-  return instanceOf(item);
+  // Every producer is credited (an uploading app and its photographer),
+  // each name once, none that is an email address.
+  const credited = [];
+  for (const value of names) {
+    if (typeof value !== 'string') continue;
+    const name = value.trim().slice(0, 80);
+    if (!name || looksLikeEmail(value)) continue;
+    if (credited.some((other) => other.toLowerCase() === name.toLowerCase()))
+      continue;
+    credited.push(name);
+  }
+  return credited.length ? credited.join(', ').slice(0, 120) : null;
 }
 
 /** The federated instance holding a picture (its `via` link's host), or null. */
@@ -259,6 +280,9 @@ export function normalizeItem(item) {
     isPano: isEquirectangular(item),
     capturedAt: panoramaxTimeMs(props.datetime),
     creator: creatorOf(item),
+    // Licences ask for the source to be named: the instance holding it is
+    // named beside an author, or alone where the author is hidden.
+    via: instanceOf(item),
     license: licenseLabel(props.license),
     width: Number.isFinite(width) && width > 0 ? width : null,
     prevId: linkedId(item, 'prev'),

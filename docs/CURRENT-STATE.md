@@ -3275,16 +3275,22 @@ SINCE; a line with no camera type or day stays drawn. Lines keep the
 decoded longest-first order under the per-tile cap (`keepOrder`). Once the picture is on screen
 its sequence is highlighted and drawn as cones from the z15 tiles around it
 (their `pictures` layer, ~110 bytes a picture, against ~7.5 kB for a STAC
-item), plus a neighbour within 150 m of an edge; the cones re-centre when a
-picture opens outside them. ‹ › follow the picture's own `prev`/`next`
+item), plus the neighbours within 150 m of an edge, on their own connection
+(coverage tiles take three, searches two); each tile's list for the sequence
+is kept, and the cones re-centre when a picture opens outside the tiles
+they were drawn from, judged from the moment their load starts. ‹ › follow the picture's own `prev`/`next`
 links, so stepping costs one small search per picture. The viewer shows the
 2,048 px SD derivative (equirectangular for a 360° picture) and swaps in the
-HD original only when the viewer is wider than SD (flat) or needs a 4,096 px
-panorama (expanded), once, shrunk while it decodes; originals wider than
-8,192 px are never fetched. The caption names the author (not an account
-named by an email address) and the picture's licence (CC BY-SA 4.0, Licence
+HD original only when the viewer is wider than SD (flat) or, for a
+panorama, expanded; once, shrunk while it decodes, and aborted if another
+photo opens; originals wider than 8,192 px are never fetched, and any
+picture file over 48 MB or 16,384 px is refused. The caption names every
+producer (an uploading app and its photographer; never an account named by
+an email address), or else the instance holding the picture ("via
+panoramax.ign.fr"), and the picture's licence (CC BY-SA 4.0, Licence
 Ouverte 2.0…; StreetPose `license`), and links to the picture in the
-Panoramax viewer. The MCP globe panel allows the meta-catalogue and the
+Panoramax viewer. Esc anywhere in the docked viewer clears the selected
+sequence before the panel can take it (KartaView too). The MCP globe panel allows the meta-catalogue and the
 three biggest instances; a picture on another instance shows only in the
 app.
 

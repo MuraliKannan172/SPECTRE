@@ -106,7 +106,11 @@
   and licence (CC BY-SA 4.0, Licence Ouverte 2.0…) and links to it in the
   Panoramax viewer; HD originals load only for an expanded viewer, once.
   Share links carry it as `0.m.0_0.r.panoramax-1`. KartaView's photo viewer
-  is now shared (`photoViewer.js`, `panorama.js`).
+  is now shared (`photoViewer.js`, `panorama.js`); in it, for KartaView too,
+  Esc clears the selected drive before it collapses the panel. Lines are
+  simplified and drawn within a point budget (a tile's unsimplified lines
+  over Paris hung the tab), decoded tiles are kept, and the cones' tiles
+  have their own connection.
 
 - Street Level: KartaView is the third provider, keyless. Light its chip
   (purple; off by default, one provider at a time) and zoom in below about

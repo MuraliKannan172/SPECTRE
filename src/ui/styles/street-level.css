@@ -651,7 +651,7 @@ button.sl-status:focus-visible {
   pointer-events: none;
 }
 
-/* White on #ff6f00 is 2.9:1; the darker orange behind ‹ › is 4.6:1. */
+/* White on #ff6f00 is 2.8:1; on the darker orange behind ‹ › it is 5.1:1. */
 .sl-photo-viewer[data-provider='panoramax'] {
   --sl-photo-ring: var(--sl-panoramax);
   --sl-photo-fill: var(--sl-panoramax-fill);
@@ -720,7 +720,8 @@ button.sl-status:focus-visible {
 }
 
 /* Nothing to step through until a photo shows. */
-.sl-photo-viewer:not([data-kind='flat']):not([data-kind='pano']) .sl-photo-step {
+.sl-photo-viewer:not([data-kind='flat']):not([data-kind='pano'])
+  .sl-photo-step {
   display: none;
 }
 
