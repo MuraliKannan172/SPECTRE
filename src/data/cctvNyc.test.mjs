@@ -321,53 +321,59 @@ const runCatalogWithMockedUpstreams = async (t) => {
   return { requested, sources };
 };
 
-test('the NYC lane is wired into the catalog and its loader runs', async (t) => {
+/** Run one catalog refresh with CCTV_NYC_ENABLED set to `flag` (undefined
+ * leaves it unset), restoring the environment afterwards. */
+const runCatalogWithNycFlag = async (t, flag) => {
   const saved = { ...process.env };
   try {
     delete process.env.CCTV_SOURCES_FILE;
     delete process.env.CCTV_SOURCES_JSON;
-    delete process.env.CCTV_NYC_ENABLED;
-    const { requested, sources } = await runCatalogWithMockedUpstreams(t);
-    assert.ok(
-      requested.includes(NYC_CAMERAS_URL),
-      'the catalog refresh invokes the NYC loader',
-    );
-    assert.deepEqual(
-      sources.filter((s) => s.cityId === 'nyc').map((s) => s.id),
-      [`nyc-${MIDTOWN_ID}`, `nyc-${BROOKLYN_ID}`],
-      'NYC cameras reach the served catalog through the registered lane',
-    );
+    if (flag === undefined) delete process.env.CCTV_NYC_ENABLED;
+    else process.env.CCTV_NYC_ENABLED = flag;
+    return await runCatalogWithMockedUpstreams(t);
   } finally {
     for (const key of Object.keys(process.env)) {
       if (!(key in saved)) delete process.env[key];
     }
     Object.assign(process.env, saved);
   }
+};
+
+test('CCTV_NYC_ENABLED=1 wires the NYC lane into the catalog', async (t) => {
+  const { requested, sources } = await runCatalogWithNycFlag(t, '1');
+  assert.ok(
+    requested.includes(NYC_CAMERAS_URL),
+    'the catalog refresh invokes the NYC loader',
+  );
+  assert.deepEqual(
+    sources.filter((s) => s.cityId === 'nyc').map((s) => s.id),
+    [`nyc-${MIDTOWN_ID}`, `nyc-${BROOKLYN_ID}`],
+    'NYC cameras reach the served catalog through the registered lane',
+  );
 });
 
-test('CCTV_NYC_ENABLED=0 keeps the lane from being loaded at all', async (t) => {
-  const saved = { ...process.env };
-  try {
-    delete process.env.CCTV_SOURCES_FILE;
-    delete process.env.CCTV_SOURCES_JSON;
-    process.env.CCTV_NYC_ENABLED = '0';
-    const { requested, sources } = await runCatalogWithMockedUpstreams(t);
+// NYC DOT requires a data-sharing agreement for this feed, so an install that
+// has not opted in must never contact it.
+for (const [label, flag] of [
+  ['an unset CCTV_NYC_ENABLED', undefined],
+  ['an empty CCTV_NYC_ENABLED', ''],
+  ['CCTV_NYC_ENABLED=0', '0'],
+  ['CCTV_NYC_ENABLED=true', 'true'],
+]) {
+  test(`${label} makes no NYC request`, async (t) => {
+    const { requested, sources } = await runCatalogWithNycFlag(t, flag);
+    assert.ok(requested.length > 0, 'the other packs still refreshed');
     assert.equal(
-      requested.includes(NYC_CAMERAS_URL),
+      requested.some((href) => href.includes('nyctmc.org')),
       false,
-      'the disabled lane never reaches its upstream',
+      'the lane never reaches its upstream',
     );
     assert.deepEqual(
       sources.filter((s) => s.cityId === 'nyc'),
       [],
     );
-  } finally {
-    for (const key of Object.keys(process.env)) {
-      if (!(key in saved)) delete process.env[key];
-    }
-    Object.assign(process.env, saved);
-  }
-});
+  });
+}
 
 test('the shipped catalog ceiling is not raised to make room for this pack', () => {
   assert.equal(DEFAULT_CCTV_MAX_SOURCES, 4000);
