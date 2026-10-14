@@ -25,10 +25,11 @@ export function assertNode24AllocationRuntime(version = process.versions.node) {
  * Directories this runner searches for `*.test.mjs`, in stable order.
  *
  * `server/` belongs here because provider modules own tests of their own: a
- * suite placed beside the module it covers must run, and `npm test` is the only
- * thing CI invokes, so a directory missing from this list is a suite that never
- * runs anywhere. `unitTestRunner.test.mjs` asserts the list covers every test
- * file in the repository, so adding a tree without adding it here fails.
+ * suite placed beside the module it covers must run, and CI's unit-test job runs
+ * `npm test`, so a directory missing from this list is a suite that never runs
+ * there. `unitTestRunner.test.mjs` asserts the list covers every `*.test.mjs`
+ * outside dependencies, build output and dot-directories, so adding a tree
+ * without adding it here fails.
  */
 export const UNIT_TEST_ROOTS = Object.freeze(['src', 'server']);
 

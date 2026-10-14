@@ -64,11 +64,12 @@ test('unit runner serializes only GC-bracketed allocation microbenchmarks', () =
 });
 
 test('the runner discovers every test file in the repository', () => {
-  // `npm test` is the only suite CI runs, and it runs exactly what this
-  // function returns. A `*.test.mjs` outside the searched roots therefore never
-  // executes anywhere, while still reading — in review and to its author — like
-  // covered code. Compare the two sets rather than their sizes, so the failure
-  // names the files instead of only disagreeing about a count.
+  // CI's unit-test job runs `npm test`, which runs exactly what this function
+  // returns. A `*.test.mjs` outside the searched roots therefore never runs
+  // there, while still reading — in review and to its author — like covered
+  // code. Compare the two sets rather than their sizes, so the failure names the
+  // files instead of only disagreeing about a count. The final equality also
+  // catches the reverse: files the runner finds that this walk skips.
   const discovered = discoverUnitTestFiles(repositoryRoot);
   const onDisk = testFilesOnDisk(repositoryRoot);
   const undiscovered = onDisk.filter((file) => !discovered.includes(file));
