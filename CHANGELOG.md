@@ -1,5 +1,9 @@
 # Changelog
 
+- Bing Aerial and Bing Labels request HTTPS tiles on HTTP localhost through
+  their ion-backed providers, retaining ion and per-tile attribution without
+  widening the Content Security Policy.
+
 - Add New York City traffic cameras from the NYC DOT Traffic Management Center
   as an opt-in CCTV pack. NYC DOT requires a data-sharing agreement for the
   camera feed, so the pack is off unless `CCTV_NYC_ENABLED=1` is set by an
