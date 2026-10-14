@@ -303,6 +303,20 @@ test('a picture file or bitmap past any real photo’s size is refused', async (
   respond({ width: MAX_IMAGE_SIDE + 1 });
   await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
   assert.equal(closed, 1, 'the oversize bitmap is released');
+  // No length given, a body that keeps coming: cut off while it streams.
+  let pulled = 0;
+  globalThis.fetch = async () => ({
+    ok: true,
+    headers: new Map(),
+    body: new ReadableStream({
+      pull(controller) {
+        pulled++;
+        controller.enqueue(new Uint8Array(8 * 1024 * 1024));
+      },
+    }),
+  });
+  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  assert.ok(pulled * 8 * 1024 * 1024 <= MAX_IMAGE_BYTES + 16 * 1024 * 1024);
   respond({});
   assert.equal((await loadImage('https://x/a.jpg')).width, 100);
 });

@@ -216,6 +216,13 @@ test('lines are simplified within a few tile units, ends and corners kept', () =
   ];
   assert.equal(simplifyLine(loop, 4).length, 3);
   assert.equal(simplifyLine(zigzag, 0).length, 1000, 'no tolerance, no change');
+  // A dead end: out to 100 and back to 50 keeps its far end.
+  const deadEnd = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 50, y: 0 },
+  ];
+  assert.deepEqual(simplifyLine(deadEnd, 4), deadEnd);
 });
 
 test('a decoded GPS track keeps a fraction of its points', () => {

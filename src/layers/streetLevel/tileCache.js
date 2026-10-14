@@ -44,5 +44,7 @@ export function createTileCache({
       kept.set(key, { at: now(), tile: loaded });
       return loaded;
     },
+    /** Forget every tile (the layer is off: its memory goes back). */
+    clear: () => kept.clear(),
   };
 }

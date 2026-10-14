@@ -155,17 +155,83 @@ export function createLineCoverage({
   function drawnSequences(entry) {
     const drawn = [];
     const current = filter();
+    const selectedId = state.sequence.selectedId ?? null;
+    const cap = entry.pointCap ?? perTilePointCap;
     let points = 0;
+    let demand = 0;
     for (const sequence of entry.sequenceList) {
-      if (drawn.length >= perTileSequenceCap) break;
       if (!passes(sequence, current)) continue;
-      // A line past the point budget is skipped; a shorter one may still fit.
       const size = pointsOf(sequence);
-      if (points + size > perTilePointCap) continue;
+      demand += size;
+      // The selected sequence is always drawn: its highlight is the answer
+      // to a click, whatever the caps leave out.
+      if (sequence.id === selectedId) {
+        points += size;
+        drawn.push(sequence);
+        continue;
+      }
+      if (drawn.length >= perTileSequenceCap) continue;
+      // A line past the point budget is skipped; a shorter one may still fit.
+      if (points + size > cap) continue;
       points += size;
       drawn.push(sequence);
     }
+    // What every passing line would take: the budget is shared by it.
+    entry.pointDemand = demand;
+    entry.pointsDrawn = points;
     return drawn;
+  }
+
+  /**
+   * Share the point budget across the tiles in view (water-filling): a
+   * sparse tile keeps what it needs and the rest goes to the dense ones,
+   * so a city centre is not drawn thinner than its suburbs. Sets each
+   * tile's cap; returns the tiles whose cap changes what they draw.
+   */
+  function shareCaps() {
+    const changed = [];
+    if (!tuning.maxPoints) return changed;
+    const entries = [...state.coverage.tiles.values()].filter(
+      (entry) => entry.kind === 'sequence',
+    );
+    const byDemand = [...entries].sort(
+      (a, b) => (a.pointDemand || 0) - (b.pointDemand || 0),
+    );
+    let left = tuning.maxPoints;
+    byDemand.forEach((entry, i) => {
+      const share = left / (byDemand.length - i);
+      const cap = Math.floor(Math.min(entry.pointDemand || 0, share));
+      left -= cap;
+      const before = entry.pointCap ?? perTilePointCap;
+      entry.pointCap = cap;
+      // Only a change that alters what is drawn: more room for a tile that
+      // had lines left out, or less than it draws now.
+      if (
+        (cap > before && entry.pointsDrawn < entry.pointDemand) ||
+        cap < entry.pointsDrawn
+      )
+        changed.push(entry);
+    });
+    return changed;
+  }
+
+  /** Once loading settles: redraw the tiles the shared budget changes. */
+  function shareBudget() {
+    const changed = shareCaps();
+    for (const entry of changed) redrawEntry(entry);
+    if (changed.length) {
+      requestRender();
+      notify();
+    }
+  }
+
+  /** Draw one tile again from its decoded lines (caps or selection changed). */
+  function redrawEntry(entry) {
+    cancelCast(entry);
+    entry.castRequested = false;
+    entry.meshParts = null;
+    detachPrimitive(entry);
+    attachPrimitive(entry);
   }
 
   function pointsOf(sequence) {
@@ -616,7 +682,10 @@ export function createLineCoverage({
       // must not drop a newer request's entry (which is what counts as loading).
       if (state.coverage.pending.get(key) === controller) {
         state.coverage.pending.delete(key);
-        if (!state.coverage.pending.size) purgeStale();
+        if (!state.coverage.pending.size) {
+          purgeStale();
+          shareBudget();
+        }
       }
       notify();
     }
@@ -809,13 +878,12 @@ export function createLineCoverage({
   /** Rebuild every loaded tile from its decoded cache (after a filter change). */
   function rebuild() {
     purgeStale();
-    for (const entry of state.coverage.tiles.values()) {
-      cancelCast(entry);
-      entry.castRequested = false;
-      entry.meshParts = null;
-      detachPrimitive(entry);
-      attachPrimitive(entry);
-    }
+    // What each tile's lines need under the new filter, then the shares,
+    // then one redraw each.
+    for (const entry of state.coverage.tiles.values())
+      if (entry.kind === 'sequence') drawnSequences(entry);
+    shareCaps();
+    for (const entry of state.coverage.tiles.values()) redrawEntry(entry);
     requestRender();
     notify();
   }
@@ -860,6 +928,15 @@ export function createLineCoverage({
 
   /** Recolour one sequence, every part of it, in place (selection highlight). */
   function recolorSequence(id, selected) {
+    // Selected but left out by a cap: draw it (it is always admitted).
+    if (selected && (tuning.maxPoints || 0) > 0)
+      for (const entry of state.coverage.tiles.values())
+        if (
+          entry.kind === 'sequence' &&
+          !entry.sequences.has(id) &&
+          entry.sequenceList.some((sequence) => sequence.id === id)
+        )
+          redrawEntry(entry);
     for (const entry of drawnEntries()) {
       const sequence = entry.sequences.get(id);
       if (!sequence) continue;

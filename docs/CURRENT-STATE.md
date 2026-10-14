@@ -3256,7 +3256,16 @@ IGN, MapComplete…; IGN's redirect to its OVH object storage). Its chip
 vector tiles (`/api/map/{z}/{x}/{y}.mvt`, an hour's HTTP cache): sequence
 lines from z14 below 1.8 km above ground, z13 to 5 km, z12 to 12 km, z11
 to 30 km and z10 to 60 km, as Mapillary's (a dense z10 tile over Paris is
-~2.1 MB and 8,600 sequences; each tile draws its 1,600 longest), and above
+~2.1 MB and 8,600 sequences, 750,000 points). `decode.js` simplifies each
+line (Douglas–Peucker to the segment, 4 units of a 4,096 tile: about a
+pixel where it is drawn, 6–10% of a GPS track's points), and the tiles in
+view draw their longest lines within 90,000 points (`maxPoints`,
+`keepOrder`), shared out once loading settles so a sparse tile keeps all
+it has and a dense one (a city centre) takes the rest; the selected
+sequence is always drawn. Every point becomes ~8 ground-line vertices:
+unsimplified, the lines hung the tab. Decoded tiles are kept while the
+provider is on (16, ten minutes, `tileCache.js`, shared with KartaView),
+and above
 60 km the `grid` layer's 0.1°
 density cells, binned to at most 96×96 points a tile (a z0 tile holds
 ~70,000 cells) and not counted as sequences: the panel says to zoom in. Both

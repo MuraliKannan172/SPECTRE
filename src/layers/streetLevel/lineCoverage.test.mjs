@@ -76,7 +76,7 @@ function setup(
     fetchTile: async (tile) => {
       asked.push(tile);
       if (fail) throw fail;
-      if (decoded) return decoded(centre);
+      if (decoded) return decoded(centre, tile);
       return {
         sequences: [
           {
@@ -246,4 +246,95 @@ test('a point budget skips lines past it, and a shorter one later may still fit'
   assert.ok(await until(() => state.coverage.tiles.size === 1));
   const [tile] = state.coverage.tiles.values();
   assert.deepEqual([...tile.sequences.keys()], ['three', 'two']);
+});
+
+/** A line of `n` points, its id unique to the tile. */
+function pointsLine(id, n, tile, centre) {
+  return {
+    id,
+    parts: [
+      Array.from({ length: n }, (_, i) => [
+        centre.lon - 0.001 + i * 0.00001,
+        centre.lat,
+      ]),
+    ],
+    capturedAt: 0,
+    isPano: false,
+  };
+}
+
+test('the point budget is shared: a sparse tile keeps its few, a dense one gets the rest', async (t) => {
+  const tuning = {
+    ...TUNING,
+    maxTiles: 9,
+    maxSequences: 900,
+    maxPoints: 90,
+    keepOrder: true,
+  };
+  const { state, coverage } = setup(t, {
+    // Street zoom far enough in that several tiles are in view.
+    zoomFor: () => ({ zoom: 18, kind: 'sequence' }),
+    tuning,
+    decoded: (centre, tile) => {
+      const dense = tile.x % 2 === 0 && tile.y % 2 === 0;
+      const lines = dense
+        ? Array.from({ length: 30 }, (_, i) =>
+            pointsLine(`d${tile.x}/${tile.y}/${i}`, 5, tile, centre),
+          )
+        : [pointsLine(`s${tile.x}/${tile.y}`, 2, tile, centre)];
+      return { sequences: lines, overview: [] };
+    },
+  });
+  coverage.refresh();
+  assert.ok(
+    await until(
+      () => state.coverage.tiles.size > 1 && !state.coverage.pending.size,
+    ),
+  );
+  const entries = [...state.coverage.tiles.values()];
+  const drawn = (entry) => entry.pointsDrawn;
+  const total = entries.reduce((sum, entry) => sum + drawn(entry), 0);
+  assert.ok(total <= tuning.maxPoints, `within the budget: ${total}`);
+  const sparse = entries.filter((entry) => entry.pointDemand === 2);
+  const dense = entries.filter((entry) => entry.pointDemand === 150);
+  assert.ok(sparse.length && dense.length, 'both kinds in view');
+  for (const entry of sparse)
+    assert.equal(drawn(entry), 2, 'a sparse tile keeps all');
+  const fair = Math.floor(tuning.maxPoints / tuning.maxTiles);
+  const left = tuning.maxPoints - sparse.length * 2;
+  for (const entry of dense)
+    assert.ok(
+      drawn(entry) > fair || dense.length * fair >= left,
+      `a dense tile gets more than the even share: ${drawn(entry)}`,
+    );
+  assert.ok(
+    total > tuning.maxPoints - 5 * dense.length,
+    'little budget unused',
+  );
+});
+
+test('a selected sequence the budget left out is drawn, highlighted', async (t) => {
+  const { state, coverage } = setup(t, {
+    tuning: {
+      ...TUNING,
+      maxTiles: 1,
+      maxSequences: 10,
+      maxPoints: 5,
+      keepOrder: true,
+    },
+    decoded: (centre, tile) => ({
+      sequences: [
+        pointsLine('long', 5, tile, centre),
+        pointsLine('short', 3, tile, centre),
+      ],
+      overview: [],
+    }),
+  });
+  coverage.refresh();
+  assert.ok(await until(() => state.coverage.tiles.size === 1));
+  const [tile] = state.coverage.tiles.values();
+  assert.deepEqual([...tile.sequences.keys()], ['long']);
+  state.sequence.selectedId = 'short';
+  coverage.recolorSequence('short', true);
+  assert.deepEqual([...tile.sequences.keys()].sort(), ['long', 'short']);
 });

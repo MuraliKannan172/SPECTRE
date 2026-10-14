@@ -79,8 +79,7 @@ async function loadBitmap(url, timeoutMs, resize, failure, signal) {
     // photo's size before it is decoded.
     const length = Number(response.headers?.get?.('content-length'));
     if (length > MAX_IMAGE_BYTES) throw new Error(failure);
-    const blob = await response.blob();
-    if (blob.size > MAX_IMAGE_BYTES) throw new Error(failure);
+    const blob = await boundedBlob(response, failure);
     const bitmap = await (resize
       ? createImageBitmap(blob, {
           resizeWidth: resize[0],
@@ -88,6 +87,7 @@ async function loadBitmap(url, timeoutMs, resize, failure, signal) {
           resizeQuality: 'high',
         })
       : createImageBitmap(blob));
+    // (A resized decode reports its new size: this guards unresized ones.)
     if (bitmap.width > MAX_IMAGE_SIDE || bitmap.height > MAX_IMAGE_SIDE) {
       bitmap.close?.();
       throw new Error(failure);
@@ -99,6 +99,34 @@ async function loadBitmap(url, timeoutMs, resize, failure, signal) {
     clearTimeout(timer);
     signal?.removeEventListener?.('abort', onAbort);
   }
+}
+
+/**
+ * The body as a Blob, read with a running count so a host that sends no
+ * length (or a false one) cannot fill memory before the cap is checked.
+ */
+async function boundedBlob(response, failure) {
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    const blob = await response.blob();
+    if (blob.size > MAX_IMAGE_BYTES) throw new Error(failure);
+    return blob;
+  }
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_IMAGE_BYTES) {
+      reader.cancel().catch(() => {});
+      throw new Error(failure);
+    }
+    chunks.push(value);
+  }
+  return new Blob(chunks, {
+    type: response.headers?.get?.('content-type') || 'image/jpeg',
+  });
 }
 
 /** The panorama size a canvas this wide can show sharply at this field of view. */

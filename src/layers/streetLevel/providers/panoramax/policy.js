@@ -62,8 +62,8 @@ export const COVERAGE_TUNING = Object.freeze({
 });
 /**
  * Lines are simplified (Douglas–Peucker) to this many tile units of a
- * 4,096 extent: under a pixel at every height lines are drawn from, and
- * 6–10% of the points GPS tracks carry.
+ * 4,096 extent: about a pixel where each zoom is drawn (1.6 m at z14,
+ * within GPS noise), and 6–10% of the points GPS tracks carry.
  */
 export const SIMPLIFY_TOLERANCE_UNITS = 4;
 /**
@@ -280,8 +280,8 @@ export function normalizeItem(item) {
     isPano: isEquirectangular(item),
     capturedAt: panoramaxTimeMs(props.datetime),
     creator: creatorOf(item),
-    // Licences ask for the source to be named: the instance holding it is
-    // named beside an author, or alone where the author is hidden.
+    // Licences ask for the source to be named: where no author can be
+    // named, the caption names the instance holding the picture.
     via: instanceOf(item),
     license: licenseLabel(props.license),
     width: Number.isFinite(width) && width > 0 ? width : null,

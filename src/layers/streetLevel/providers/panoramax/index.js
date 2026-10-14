@@ -286,11 +286,15 @@ export function createPanoramaxProvider({
       });
       /** A z15 tile's pictures of one sequence, by `z/x/y:sequence`. */
       const pictureLists = createLru(PICTURE_LIST_CACHE_SIZE);
-      function picturesIn(tile, sequenceId, signal) {
+      /**
+       * Only finished lists are kept: a load in flight belongs to its own
+       * selection, whose abort (a re-centre) must not empty the next one's.
+       */
+      async function picturesIn(tile, sequenceId, signal) {
         const key = `${tileKey(tile)}:${sequenceId}`;
         const kept = pictureLists.get(key);
         if (kept) return kept;
-        const list = readable(async () =>
+        const list = await readable(async () =>
           decodePictures(
             await source.getTile(tile, { signal, lane: 'pictures' }),
             tile,
@@ -298,7 +302,6 @@ export function createPanoramaxProvider({
           ),
         );
         pictureLists.set(key, list);
-        list.catch(() => pictureLists.delete(key));
         return list;
       }
 
@@ -418,6 +421,9 @@ export function createPanoramaxProvider({
           cones.setVisible(false);
           drawn = null;
           preferred = null;
+          // Off: decoded tiles and lists go (several MB each over a city).
+          coverageTiles.clear();
+          pictureLists.clear();
         },
 
         destroy(cesiumViewer) {

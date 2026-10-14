@@ -9,7 +9,8 @@ import {
 
 /**
  * Douglas–Peucker in tile units: the points of `line` ({x, y}) that keep
- * it within `tolerance` of the original, first and last always kept.
+ * it within `tolerance` of the original (measured to each segment, so
+ * dead ends and U-turns stay), first and last always kept.
  * Iterative, so a long track cannot overflow the stack.
  */
 export function simplifyLine(line, tolerance) {
@@ -24,15 +25,20 @@ export function simplifyLine(line, tolerance) {
     const b = line[to];
     const dx = b.x - a.x;
     const dy = b.y - a.y;
-    const span = Math.hypot(dx, dy);
+    const span2 = dx * dx + dy * dy;
     let far = -1;
     let farthest = tolerance;
     for (let i = from + 1; i < to; i++) {
       const p = line[i];
-      // Distance to the chord, or to `a` where the chord has no length.
-      const d = span
-        ? Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / span
-        : Math.hypot(p.x - a.x, p.y - a.y);
+      // Distance to the segment, not the infinite line: a dead end or a
+      // U-turn (a point beyond the chord's ends) is kept.
+      const t = span2
+        ? Math.max(
+            0,
+            Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / span2),
+          )
+        : 0;
+      const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
       if (d > farthest) {
         farthest = d;
         far = i;

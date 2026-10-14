@@ -927,19 +927,89 @@ test('lines keep the decoded (longest-first) order under a budget of points', as
   assert.ok(COVERAGE_TUNING.maxPoints > 0);
 });
 
-test('a coverage tile decoded a moment ago is not fetched or decoded again', async (t) => {
+test('a coverage tile decoded a moment ago is not fetched again; switched off, the tiles are let go', async (t) => {
   const env = coverageSetup(t, { sequences: [line('a')] });
-  let asked = 0;
+  const asked = [];
   const getTile = env.source.getTile;
   env.source.getTile = (tile, options) => {
-    asked++;
+    asked.push(`${tile.z}/${tile.x}/${tile.y}`);
     return getTile(tile, options);
   };
   env.instance.activate(env.viewer);
   assert.ok(await until(() => env.instance.coverageStats().count === 1));
-  const first = asked;
+  const z14 = asked.length;
+  // Up a zoom band and back down: the z14 tile comes from memory.
+  env.viewer.view.height = 3_000;
+  env.instance.refreshCoverage();
+  assert.ok(await until(() => env.instance.coverageStats().zoom === 13));
+  assert.ok(await until(() => !env.instance.coverageStats().loading));
+  const withZ13 = asked.length;
+  env.viewer.view.height = 900;
+  env.instance.refreshCoverage();
+  assert.ok(await until(() => env.instance.coverageStats().zoom === 14));
+  assert.ok(await until(() => env.instance.coverageStats().count === 1));
+  assert.equal(asked.length, withZ13, 'nothing fetched again');
+  assert.ok(z14 > 0);
+  // Off and on: the memory went back, so the tile is fetched again.
   env.instance.deactivate();
   env.instance.activate(env.viewer);
   assert.ok(await until(() => env.instance.coverageStats().count === 1));
-  assert.equal(asked, first);
+  assert.ok(asked.length > withZ13);
+});
+
+test('a re-centre while the cones still load does not inherit the aborted load’s tiles', async (t) => {
+  const items = sequence('long', 400);
+  const tiles = pictureTiles(items);
+  const env = await mounted({ items, tiles });
+  const cones = await withCones(t, env);
+  let hold = null;
+  env.source.getTile = async (tile, { signal } = {}) => {
+    env.source.calls.tiles.push(`${tile.z}/${tile.x}/${tile.y}`);
+    if (hold) await hold.promise;
+    signal?.throwIfAborted();
+    return tiles(tile);
+  };
+  await env.instance.viewer.open('long-0');
+  const tileOf = (item) => {
+    const [lon, lat] = item.geometry.coordinates;
+    return pictureTilesAround({ lon, lat })[0];
+  };
+  const first = new Set(
+    pictureTilesAround({
+      lon: items[0].geometry.coordinates[0],
+      lat: items[0].geometry.coordinates[1],
+    }).map((tile) => `${tile.x}/${tile.y}`),
+  );
+  const out = items.findIndex((item) => {
+    const tile = tileOf(item);
+    return !first.has(`${tile.x}/${tile.y}`);
+  });
+  hold = {};
+  hold.promise = new Promise((resolve) => (hold.release = resolve));
+  const loading = env.instance.selectSequence('long');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  // The far picture opens while the first load is held: the cones re-centre.
+  await env.instance.viewer.open(`long-${out}`);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const release = hold.release;
+  hold = null;
+  release();
+  await loading;
+  assert.ok(await until(() => !env.instance.sequenceStats().loading));
+  // Every picture in the tiles the second load covers has its cone.
+  const [lon, lat] = items[out].geometry.coordinates;
+  const second = new Set(
+    pictureTilesAround({ lon, lat }).map((tile) => `${tile.x}/${tile.y}`),
+  );
+  const ids = new Set(cones.ids());
+  const covered = items.filter((item) => {
+    const tile = tileOf(item);
+    return second.has(`${tile.x}/${tile.y}`);
+  });
+  assert.ok(covered.length > 0);
+  assert.equal(
+    covered.filter((item) => ids.has(item.id)).length,
+    covered.length,
+    'every picture in the re-centred tiles has its cone (the shared ones too)',
+  );
 });
