@@ -26,6 +26,10 @@
 
 - Weather records keep missing conditions unknown and refuse summaries without a measured temperature.
 
+- Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
+
+- Director timeline seeks cross the dateline along the short longitude arc.
+
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
 

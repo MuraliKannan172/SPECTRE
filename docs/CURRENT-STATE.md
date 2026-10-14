@@ -73,6 +73,8 @@ Windows/Claude Desktop Cowork confirmation remains outstanding (#927).
 
 ## Tools and local MCP server — October 1, 2026
 
+Tool argument string lengths follow JSON Schema Unicode code-point counts, so supplementary characters count once rather than as two UTF-16 units.
+
 `gods-eye-view/tools` defines queries that answer questions from the app's data,
 and `gods-eye-view/tools/mcp` exposes a composed catalog over the Model Context
 Protocol. `npm run mcp` serves Core's tools over stdio to a local MCP client,
@@ -399,6 +401,9 @@ camera moves with easing, duration and holds. Playback and seek share one
 coordinate sampler; navigation/manual input revokes authored motion and pending
 holds. Anchor heights and explicit endpoints require the WGS84 ellipsoid
 reference. Legacy projects retain their ordinary flights, content and edits.
+Seeking between ordinary camera poses uses the shortest longitude arc across the
+dateline while preserving both authored endpoint longitudes, and turns heading
+and roll the short way for any authored angles.
 See [camera directions](DIRECTOR-CAMERA.md).
 
 Realtime voice composes separate connection, response/tool, Radio handoff, input
