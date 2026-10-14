@@ -7,6 +7,7 @@ import {
   kartaViewPhotoUrl,
   kartaViewTimeMs,
   normalizePhoto,
+  passesKartaViewFilter,
   photoFilterParams,
   resizedImageUrl,
   tileFilterQuery,
@@ -306,4 +307,42 @@ test('the imagery filter becomes KartaView’s tile query and photo-search param
   assert.deepEqual(photoFilterParams({ pano: 'flat', sinceMs: null }), {
     projection: 'PLANE',
   });
+});
+
+test('KartaView’s SINCE is the upload date, from the start of the cut-off’s UTC day', () => {
+  const photo = normalizePhoto(
+    record({
+      shotDate: '2016-08-23 20:17:47.000',
+      dateAdded: '2026-03-05 00:10:00',
+    }),
+  );
+  assert.equal(photo.uploadedAt, Date.UTC(2026, 2, 5, 0, 10));
+  const since = (iso) => ({ pano: 'all', sinceMs: Date.parse(iso) });
+  // Taken in 2016, uploaded on the cut-off day: it passes, as KartaView's
+  // startDate=2026-03-05 keeps it.
+  assert.equal(
+    passesKartaViewFilter(photo, since('2026-03-05T23:00:00Z')),
+    true,
+  );
+  assert.equal(
+    passesKartaViewFilter(photo, since('2026-03-06T00:00:00Z')),
+    false,
+  );
+  assert.equal(
+    passesKartaViewFilter(photo, { pano: 'pano', sinceMs: null }),
+    false,
+  );
+  assert.equal(
+    passesKartaViewFilter(photo, { pano: 'flat', sinceMs: null }),
+    true,
+  );
+  assert.equal(passesKartaViewFilter(photo, null), true);
+  assert.equal(
+    passesKartaViewFilter(
+      { ...photo, uploadedAt: null },
+      since('2020-01-01T00:00:00Z'),
+    ),
+    false,
+    'no upload date passes no SINCE',
+  );
 });

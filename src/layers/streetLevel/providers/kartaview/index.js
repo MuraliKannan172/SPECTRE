@@ -1,4 +1,3 @@
-import { passesImageryFilter } from '../../filter.js';
 import { createLineCoverage } from '../../lineCoverage.js';
 import { createSequenceCones, thinImages } from '../../sequenceCones.js';
 import { metresBetween } from '../../view.js';
@@ -34,6 +33,7 @@ import {
   assignCourses,
   cameraBearing,
   normalizePhoto,
+  passesKartaViewFilter,
   tileFilterQuery,
 } from './policy.js';
 
@@ -133,6 +133,8 @@ export function createKartaViewProvider({
     // 360° / flat and SINCE, as Mapillary: KartaView filters the lines on
     // its server (see tileFilterQuery), the photos by their own record.
     filters: Object.freeze(['pano', 'since']),
+    // SINCE is the upload date for KartaView: the panel notes it.
+    sinceBasis: 'upload',
     // Its lines are streets, not sequences: a selected drive shows as cones.
     highlightsSequence: false,
     coverageLabel: Object.freeze({
@@ -417,6 +419,7 @@ export function createKartaViewProvider({
               lat: photo.lat,
               compassAngle: cameraBearing(photo) ?? 0,
               capturedAt: photo.capturedAt ?? 0,
+              uploadedAt: photo.uploadedAt,
               isPano: photo.isPano,
             })),
           );
@@ -425,7 +428,8 @@ export function createKartaViewProvider({
         pickPrefix: PICK_PREFIX.image,
         spriteId: 'street-level:kartaview-cones',
         renderKey: 'kartaview-sequence',
-        // The imagery filter applies to cones as to Mapillary's (capture date).
+        // By projection and upload date, as the lines.
+        passes: passesKartaViewFilter,
       });
 
       /** Sequence id → its photo count from KartaView (asked once). */
@@ -621,8 +625,7 @@ export function createKartaViewProvider({
             if (!photo?.urls.view) continue;
             const metres = metresBetween({ lat, lon }, photo);
             if (metres > NEAREST_RADIUS_M) continue;
-            // KartaView filtered by upload date: hold it to the capture date.
-            if (!passesImageryFilter(photo, filter)) filteredOut++;
+            if (!passesKartaViewFilter(photo, filter)) filteredOut++;
             else near.push({ photo, metres });
           }
           near.sort((a, b) => a.metres - b.metres);

@@ -224,6 +224,7 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
       since: state.filterControls?.since !== false,
     },
     since: presentSince(filter.sinceDays, now),
+    sinceNote: state.sinceNote || null,
     legend: state.legend || [],
     viewer: presentViewer(state),
     meta: presentMeta(state),

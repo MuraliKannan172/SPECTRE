@@ -888,7 +888,7 @@ async function main() {
         await sleep(1000);
       }
       await step(
-        'KartaView: its chip draws keyless coverage, credits KartaView and offers Mapillary’s filters',
+        'KartaView: its chip draws keyless coverage, credits KartaView and offers Mapillary’s filters, SINCE noted as its upload date',
         async () => {
           await clickPanelControl(page, kvChip);
           assert.ok(await lit('kartaview'), 'KartaView alone is lit');
@@ -896,6 +896,14 @@ async function main() {
           const u = await ui();
           assert.equal(u.keyRequired, false);
           assert.deepEqual(u.filterControls, { pano: true, since: true });
+          // KartaView's SINCE is its upload date: the panel says so.
+          assert.equal(u.sinceNote, 'KartaView: by upload date');
+          assert.equal(
+            await page.$eval('#sl-since-note', (node) =>
+              node.hidden ? null : node.textContent,
+            ),
+            'KartaView: by upload date',
+          );
           assert.equal(
             await page.$eval(kvChip, (chip) =>
               chip.style.getPropertyValue('--chip-color'),
@@ -1613,9 +1621,10 @@ async function main() {
               ((i + 2) / 13) * (PHOTO_LINE.north - PHOTO_LINE.south),
           ]);
           // Ground primitives are built over a few frames: poll for a pick.
+          // A loaded machine renders a frame in seconds: 60 s, not 30.
           const handle = await page.waitForFunction(
             findPickPoint,
-            { timeout: 30_000, polling: 250 },
+            { timeout: 60_000, polling: 250 },
             {
               prefix: 'mly:seq:',
               id: target,
@@ -1643,10 +1652,10 @@ async function main() {
           // The cones are on the globe: one of them picks as an image. Aim at
           // where each cone billboard is drawn (its ground position at
           // height 0 can sit a few pixels off, and every missed pick costs a
-          // render); the same 30 s as the line pick above.
+          // render); the same 60 s as the line pick above.
           const cone = await page.waitForFunction(
             findPickPoint,
-            { timeout: 30_000, polling: 250 },
+            { timeout: 60_000, polling: 250 },
             {
               prefix: 'mly:img:',
               id: null,

@@ -117,9 +117,9 @@ export const KARTAVIEW_CREDIT_HTML =
  * filter is asked for. So a filtered PNG tile is a mask, and a JSON line is
  * kept where it lies on the mask's drawn pixels.
  *
- * KartaView's date filter is the upload date, never before the capture
- * date: the lines are the streets with photos uploaded since the cut-off,
- * and a photo opened from them is held to its capture date.
+ * KartaView's date filter is the upload date, and SINCE goes by it
+ * throughout (lines, the photo a click opens, the cones), as KartaView's own
+ * map does; the panel says so under the slider.
  */
 export const MASK_TIMEOUT_MS = 20_000;
 /**
@@ -139,6 +139,8 @@ export const MASK_SLOW_MESSAGE =
   'KartaView did not filter this area in time — move the map to ask again';
 export const FILTERED_OUT_MESSAGE =
   'None of KartaView’s photos here pass the imagery filter';
+/** Under the SINCE slider while KartaView is lit. */
+export const SINCE_NOTE = 'KartaView: by upload date';
 
 /** The UTC calendar day of `ms`, as KartaView's startDate reads it. */
 function utcDay(ms) {
@@ -147,6 +149,23 @@ function utcDay(ms) {
 
 const filtersSince = (filter) =>
   Number.isFinite(filter?.sinceMs) && filter.sinceMs > 0;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Whether a photo passes the resolved imagery filter by its projection and
+ * upload date, the cut-off taken as its UTC day, as KartaView's startDate.
+ * @param {{isPano: boolean, uploadedAt: number|null}} photo
+ * @param {{pano: string, sinceMs: number|null}|null} filter
+ */
+export function passesKartaViewFilter(photo, filter) {
+  if (!filter) return true;
+  if (filter.pano === 'pano' && !photo.isPano) return false;
+  if (filter.pano === 'flat' && photo.isPano) return false;
+  if (!filtersSince(filter)) return true;
+  const day = Math.floor(filter.sinceMs / DAY_MS) * DAY_MS;
+  return (photo.uploadedAt ?? 0) >= day;
+}
 
 /**
  * The query of a filtered PNG coverage tile, or '' when nothing is
@@ -164,7 +183,7 @@ export function tileFilterQuery(filter) {
 
 /**
  * The photo search's own filter: projection and upload date (its
- * `fieldOfView` is ignored). The capture date is checked on the answers.
+ * `fieldOfView` is ignored).
  * @param {{pano: string, sinceMs: number|null}|null} filter  resolved
  * @returns {Record<string, string>}
  */
@@ -349,6 +368,8 @@ export function normalizePhoto(record) {
     isPano,
     capturedAt:
       kartaViewTimeMs(record.shotDate) ?? kartaViewTimeMs(record.dateAdded),
+    // KartaView's SINCE goes by this (its server filters by upload date).
+    uploadedAt: kartaViewTimeMs(record.dateAdded),
     urls: {
       // A 1280 px rendition; for a 360° photo it is the front view only.
       view:

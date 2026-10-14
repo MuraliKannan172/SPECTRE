@@ -3225,13 +3225,15 @@ until the new ones are in), keeps the JSON segments, and caches masks per
 filter and tile. A dense filtered PNG can take KartaView over a minute the
 first time (it answers 504 at 60 s and keeps drawing), so a timeout or 5xx is
 asked again 4 s later, four tries in all; then the panel says it did not
-filter the area in time. KartaView's `startDate` is the upload date, never
-before the capture date, so the lines are a superset of what passes; the
-nearest lookup asks the photo API for the projection (`SPHERE`/`PLANE`; it
-ignores `fieldOfView`) and upload date, then holds each photo to its capture
-date (when photos are near but none passes, the panel says so), and the
-cones pass the filter on each photo's projection and capture date, as
-Mapillary's do. Tiles come uncompressed and
+filter the area in time. KartaView's `startDate` is the upload date (its
+server filters by nothing else), so SINCE goes by upload date throughout,
+the cut-off taken as its UTC day (`passesKartaViewFilter`): the nearest
+lookup asks the photo API for the projection (`SPHERE`/`PLANE`; it ignores
+`fieldOfView`) and upload date and checks each answer the same way (when
+photos are near but none passes, the panel says so), and the cones pass on
+each photo's projection and upload date. The provider declares
+`sinceBasis: 'upload'`, so while it is lit the panel shows "KartaView: by
+upload date" under the SINCE slider (`sinceNote` in the UI state). Tiles come uncompressed and
 uncacheable, so the last 24 decoded tiles are kept for 10 minutes while
 KartaView is lit (`createTileCache`, dropped when it is switched off); one
 that does not answer in 20 s is asked once more, and one that is not a line

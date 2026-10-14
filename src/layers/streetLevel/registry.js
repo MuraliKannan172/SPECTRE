@@ -24,6 +24,7 @@ export function filtersOf(provider) {
  * @property {Array<'pano'|'since'>} [filters]   Filters it honours (default both).
  * @property {{noun: string, action: string}} [coverageLabel]   How the panel counts its lines and says what a click does (default: sequences, "click a line for its photos").
  * @property {boolean} [highlightsSequence]   Its lines show the selected sequence (default true; the legend's "Selected" needs one).
+ * @property {'capture'|'upload'} [sinceBasis]   What SINCE compares (default 'capture'); 'upload' puts a note under the slider while the provider is lit.
  * @property {(context: ProviderContext) => ProviderInstance} create
  *
  * @typedef {object} ProviderContext   Handed to `create()` once by the core.
@@ -159,6 +160,14 @@ export function validateProviders(providers) {
     )
       throw new TypeError(
         `Street Level provider ${label}: filters must list ${IMAGERY_FILTERS.join(' or ')}`,
+      );
+    if (
+      provider.sinceBasis !== undefined &&
+      provider.sinceBasis !== 'capture' &&
+      provider.sinceBasis !== 'upload'
+    )
+      throw new TypeError(
+        `Street Level provider ${label}: sinceBasis must be 'capture' or 'upload'`,
       );
     ids.add(provider.id);
     prefixes.push(provider.pickPrefix);

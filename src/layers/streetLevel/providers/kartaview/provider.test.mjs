@@ -149,6 +149,11 @@ test('KartaView registers keyless, off by default, with Mapillary’s filters an
   assert.equal(definition.defaultOn, false);
   assert.deepEqual(definition.filters, ['pano', 'since']);
   assert.equal(
+    definition.sinceBasis,
+    'upload',
+    'SINCE is KartaView’s upload date',
+  );
+  assert.equal(
     definition.highlightsSequence,
     false,
     'its lines are streets: a selected drive shows as cones',
@@ -209,36 +214,44 @@ test('the nearest photo is the closest within 50 m, and opening it asks nothing 
   );
 });
 
-test('the nearest photo passes the imagery filter by its capture date; none passing says so', async () => {
+test('the nearest photo passes the imagery filter by its upload date, as KartaView filters; none passing says so', async () => {
   const since = Date.now() - 86_400_000;
   const filter = { pano: 'pano', sinceMs: since };
-  // KartaView filters the search by upload date: an old capture uploaded
-  // today still comes back, and is held to its capture date here.
-  const pano = (id, metres, shot) => ({
+  const pano = (id, metres, uploaded) => ({
     ...photoRecord(id, { metres }),
     projection: 'SPHERE',
     fieldOfView: '360',
-    shotDate: shot,
+    shotDate: '2016-08-23 20:17:47.000',
+    dateAdded: uploaded,
   });
+  // Both taken in 2016; only the second was uploaded since yesterday.
   const { instance, source } = setup(
     {
       nearest: [
-        pano('old', 5, '2016-08-23 20:17:47.000'),
-        pano('new', 20, shotAgo(3_600_000)),
+        pano('stale', 5, '2016-08-24 04:01:07'),
+        pano('fresh', 20, shotAgo(3_600_000).slice(0, 19)),
       ],
     },
     { filter },
   );
   const at = { lat: 42.3314, lon: -83.0458 };
-  assert.equal(await instance.nearestImage(at), 'new');
+  assert.equal(await instance.nearestImage(at), 'fresh');
   assert.deepEqual(source.calls.nearestFilters, [filter]);
-  const old = setup(
-    { nearest: [pano('old', 5, '2016-08-23 20:17:47.000')] },
+  const stale = setup(
+    { nearest: [pano('stale', 5, '2016-08-24 04:01:07')] },
     { filter },
   );
-  await assert.rejects(old.instance.nearestImage(at), {
+  await assert.rejects(stale.instance.nearestImage(at), {
     message: FILTERED_OUT_MESSAGE,
   });
+  // Uploaded earlier on the cut-off's UTC day: KartaView's startDate keeps
+  // it, and so does the check.
+  const day = new Date(since).toISOString().slice(0, 10);
+  const sameDay = setup(
+    { nearest: [pano('early', 5, `${day} 00:00:01`)] },
+    { filter },
+  );
+  assert.equal(await sameDay.instance.nearestImage(at), 'early');
 });
 
 test('a cone opens its photo; a line opens the photo nearest the click', () => {
@@ -663,21 +676,22 @@ test('the cones re-centre when ‹ › walk off the page they were drawn from', 
   );
 });
 
-test('the imagery filter thins the cones by each photo’s capture date and projection', async (t) => {
+test('the imagery filter thins the cones by each photo’s upload date and projection', async (t) => {
   const env = await mounted(
     { sequences: { s: [0, 1, 2, 3] } },
     { filter: { pano: 'pano', sinceMs: Date.now() - 86_400_000 } },
   );
-  // 0 and 1: 360° photos taken an hour ago; 2 and 3: flat ones from 2016.
+  // 0 and 1: 360° photos uploaded an hour ago (taken in 2016, as all);
+  // 2 and 3: flat ones uploaded in 2016.
   const shaped = (record) =>
     Number(record.sequenceIndex) < 2
       ? {
           ...record,
           projection: 'SPHERE',
           fieldOfView: '360',
-          shotDate: shotAgo(3_600_000),
+          dateAdded: shotAgo(3_600_000).slice(0, 19),
         }
-      : record;
+      : { ...record, dateAdded: '2016-08-24 04:01:07' };
   const getPhoto = env.source.getPhoto;
   env.source.getPhoto = async (id) => shaped(await getPhoto(id));
   const getPage = env.source.getSequencePhotos;
@@ -690,7 +704,7 @@ test('the imagery filter thins the cones by each photo’s capture date and proj
   await env.instance.selectSequence('s');
   assert.ok(await until(() => !env.instance.sequenceStats().loading));
   assert.equal(env.instance.sequenceStats().images, 4, 'the drive is whole');
-  assert.equal(cones.count(), 2, 'the recent 360° photos');
+  assert.equal(cones.count(), 2, 'the 360° photos uploaded since yesterday');
   assert.deepEqual(cones(), [0, 1]);
   env.actions.filter = { pano: 'flat', sinceMs: null };
   env.instance.setFilter();

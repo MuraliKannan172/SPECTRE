@@ -116,9 +116,11 @@
   cone pointing along the drive (KartaView's own compass headings are often
   0 or far off). The IMAGERY (ALL / 360° / FLAT) and SINCE filters apply to
   KartaView as to Mapillary: its lines are filtered by KartaView's own
-  server (its filtered PNG tiles, as a mask over the JSON lines; SINCE goes
-  by upload date there), and the photo a click opens, and the cones, by
-  each photo's projection and capture date.
+  server (its filtered PNG tiles, as a mask over the JSON lines), and the
+  photo a click opens, and the cones, by each photo's projection and upload
+  date. KartaView's SINCE is the upload date (all its server can filter by);
+  a note under the slider says so while KartaView is lit (`sinceBasis:
+  'upload'` in the provider contract).
   Mapillary's line coverage and sequence cones are now shared by both
   (`lineCoverage.js`, `sequenceCones.js`).
 
