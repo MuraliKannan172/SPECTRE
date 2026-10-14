@@ -102,6 +102,13 @@ try {
     });
     window.__qaStyleSnapshot = (source) => {
       const now = viewer.clock.currentTime;
+      const images = new Map();
+      const imageValue = (p) => {
+        const value = p?.getValue(now);
+        if (value?.tagName !== 'CANVAS') return value;
+        if (!images.has(value)) images.set(value, value.toDataURL());
+        return images.get(value);
+      };
       const color = (p) => p?.getValue(now)?.toCssColorString();
       const positions = (p) => p?.getValue(now)?.map((v) => [v.x, v.y, v.z]);
       return source.entities.values
@@ -110,7 +117,7 @@ try {
           point: e.position?.getValue(now),
           scale: e.billboard?.scale?.getValue(now),
           rotation: e.billboard?.rotation?.getValue(now),
-          image: e.billboard?.image?.getValue(now),
+          image: imageValue(e.billboard?.image),
           color: color(e.billboard?.color),
           width: e.polyline?.width?.getValue(now),
           lineColor: color(e.polyline?.material?.color),

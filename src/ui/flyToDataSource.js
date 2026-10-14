@@ -1,5 +1,5 @@
 /**
- * Fly to everything in a data source (an imported file, a live feed) without
+ * Fly to everything in an imported file without
  * trusting Cesium's own framing of ground-clamped points: before the
  * destination's terrain has streamed in, a clamped billboard reports a
  * bounding sphere kilometers below the surface, and `viewer.flyTo` follows it
@@ -10,11 +10,13 @@
 import * as Cesium from 'cesium';
 import { guardCameraAboveGround } from '../cameraGroundGuard.js';
 
-const MAX_POINTS = 5000;
+const SAMPLE_TARGET_POINTS = 5000;
 
 /**
  * Longitude/latitude pairs of every entity's position, line and polygon,
- * thinned to at most `MAX_POINTS`. Long tracks are walked by index, never
+ * sampling long paths toward `SAMPLE_TARGET_POINTS` while retaining each
+ * geometry's endpoints. Separate point features stay in the footprint so
+ * distant outliers are not lost. Long tracks are walked by index, never
  * spread into a call, so a file with hundreds of thousands of vertices cannot
  * overflow the stack; only the kept points are converted.
  */
@@ -38,7 +40,7 @@ export function dataSourcePoints(dataSource, time = Cesium.JulianDate.now()) {
       total += ring.length;
     }
   }
-  const stride = Math.max(1, Math.ceil(total / MAX_POINTS));
+  const stride = Math.max(1, Math.ceil(total / SAMPLE_TARGET_POINTS));
   const points = [];
   let index = 0;
   for (const part of parts) {

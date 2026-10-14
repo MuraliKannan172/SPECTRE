@@ -657,6 +657,22 @@ test('KML placemarks and coordinate tuples are counted before loading', () => {
   assert.equal(countKmlGeometry(doc, { maxFeatures: 1 }).over, 'features');
 });
 
+test('KML vertex counting recognizes the Unicode whitespace Cesium accepts', () => {
+  for (const separator of ['\u00a0', '\u2003', '\ufeff']) {
+    const doc = xmlDoc(
+      xmlEl('kml', {}, [
+        xmlEl('Placemark', {}, [
+          xmlEl('LineString', {}, [
+            xmlEl('coordinates', {}, ['1,2', '3,4', '5,6'].join(separator)),
+          ]),
+        ]),
+      ]),
+    );
+    assert.equal(countKmlGeometry(doc).positions, 3);
+    assert.equal(countKmlGeometry(doc, { maxPositions: 2 }).over, 'positions');
+  }
+});
+
 test('KML multipart geometries count every Cesium entity before loading', () => {
   const doc = xmlDoc(
     xmlEl('kml', {}, [
@@ -786,6 +802,67 @@ test('imported entities keep only a short plain-text name: no description, label
   assert.equal(importFeatureName('   '), undefined);
 });
 
+test('generated pin canvases are encoded once and shared without changing authored image URLs', () => {
+  const ds = new Cesium.CustomDataSource('pins');
+  let encoded = 0;
+  const canvas = {
+    tagName: 'CANVAS',
+    toDataURL: () => {
+      encoded++;
+      return 'data:image/png;base64,shared-pin';
+    },
+  };
+  for (let i = 0; i < 1000; i++)
+    ds.entities.add({
+      billboard: { image: canvas },
+      label: { text: 'discard' },
+      properties: { discard: true },
+    });
+  const authored = ds.entities.add({
+    billboard: { image: 'blob:packed-image' },
+  });
+  const dynamicImage = new Cesium.CallbackProperty(() => canvas, false);
+  const dynamic = ds.entities.add({ billboard: { image: dynamicImage } });
+  let notifications = 0;
+  ds.entities.collectionChanged.addEventListener(() => notifications++);
+  scrubImportedEntities(ds);
+  assert.equal(encoded, 1);
+  assert.equal(
+    notifications,
+    1,
+    'normalization publishes one complete collection change',
+  );
+  for (const e of ds.entities.values.slice(0, 1000))
+    assert.equal(
+      e.billboard.image.getValue(),
+      'data:image/png;base64,shared-pin',
+    );
+  assert.equal(authored.billboard.image.getValue(), 'blob:packed-image');
+  assert.equal(
+    dynamic.billboard.image,
+    dynamicImage,
+    'time-dependent image properties stay intact',
+  );
+});
+
+test('unused KML time and camera metadata is removed before loading without changing geometry', () => {
+  const coordinates = xmlEl('coordinates', {}, '1,2,0 3,4,0');
+  const placemark = xmlEl('Placemark', {}, [
+    xmlEl('TimeSpan'),
+    xmlEl('TimeStamp'),
+    xmlEl('LookAt'),
+    xmlEl('Camera'),
+    xmlEl('LineString', {}, [coordinates]),
+  ]);
+  const doc = xmlDoc(xmlEl('kml', {}, [placemark]));
+  sanitizeKmlDocument(doc);
+  assert.deepEqual(
+    placemark.childNodes.map((el) => el.localName),
+    ['LineString'],
+  );
+  assert.equal(coordinates.textContent, '1,2,0 3,4,0');
+});
+
 test('a dated import exposes no clock and draws for all time', () => {
   // A data source with its own clock, as KmlDataSource has for a dated file.
   class DatedSource extends Cesium.CustomDataSource {
@@ -800,15 +877,15 @@ test('a dated import exposes no clock and draws for all time', () => {
   const span = new Cesium.TimeIntervalCollection([
     new Cesium.TimeInterval({ start, stop }),
   ]);
-  const track = new Cesium.SampledPositionProperty();
-  track.addSample(start, Cesium.Cartesian3.fromDegrees(10, 10));
-  track.addSample(stop, Cesium.Cartesian3.fromDegrees(10.1, 10.1));
-  const mover = ds.entities.add({
+  // KML tracks become their original static vertices before Cesium loading.
+  const track = ds.entities.add({
     availability: span,
-    position: track,
-    path: {},
-    billboard: {},
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArray([10, 10, 10.1, 10.1]),
+      clampToGround: true,
+    },
   });
+  const recorded = track.polyline.positions;
   const pin = ds.entities.add({
     availability: span,
     position: Cesium.Cartesian3.fromDegrees(1, 1),
@@ -821,12 +898,8 @@ test('a dated import exposes no clock and draws for all time', () => {
   assert.equal(ds.clock, undefined);
   assert.equal(pin.availability, undefined);
   assert.ok(pin.isAvailable(Cesium.JulianDate.now()));
-  // The moving marker became the line it travels, visible now.
-  assert.equal(mover.availability, undefined);
-  assert.equal(mover.position, undefined);
-  assert.equal(mover.path, undefined);
-  assert.equal(mover.billboard, undefined);
-  const line = mover.polyline.positions.getValue(Cesium.JulianDate.now());
-  assert.ok(line.length > 100);
-  assert.ok(mover.polyline.clampToGround.getValue());
+  assert.equal(track.availability, undefined);
+  assert.equal(track.polyline.positions, recorded);
+  assert.equal(recorded.getValue(Cesium.JulianDate.now()).length, 2);
+  assert.ok(track.polyline.clampToGround.getValue());
 });

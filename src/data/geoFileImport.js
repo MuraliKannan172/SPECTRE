@@ -68,14 +68,22 @@ const KMZ_IMAGE_TYPES = Object.freeze({
   webp: 'image/webp',
   bmp: 'image/bmp',
 });
-// KML elements that fetch, embed or execute something outside the file.
-const KML_REMOVED_ELEMENTS = Object.freeze([
+// External content and metadata the session-local import does not use.
+const KML_REMOVED_ELEMENTS = new Set([
   'NetworkLink',
   'NetworkLinkControl',
   'ScreenOverlay',
   'PhotoOverlay',
   'Model',
   'Tour',
+  'description',
+  'BalloonStyle',
+  'Snippet',
+  'ExtendedData',
+  'TimeSpan',
+  'TimeStamp',
+  'LookAt',
+  'Camera',
 ]);
 
 /** An error whose message is meant for the person who chose the file. */
@@ -222,7 +230,7 @@ export function countGeoJsonGeometry(
 }
 
 /** The refusal for a file over a size limit, in the person's terms. */
-function overLimitError({ over, features, positions }) {
+function overLimitError({ over, features }) {
   if (over === 'entities')
     return new GeoImportError(
       `That file creates more than ${MAX_IMPORT_ENTITIES.toLocaleString()} map objects (the limit).`,
@@ -486,8 +494,11 @@ export function sanitizeKmlDocument(doc, resolveLocal = () => null) {
       removed += 1;
     }
   };
-  for (const name of KML_REMOVED_ELEMENTS)
-    elementsNamed(doc, name).forEach(drop);
+  // One snapshot and pass, rather than rescanning the whole XML tree for
+  // every discarded element type. Strip unused metadata before the loader
+  // constructs descriptions, availability intervals and camera objects.
+  for (const el of [...doc.getElementsByTagName('*')])
+    if (KML_REMOVED_ELEMENTS.has(el.localName)) drop(el);
   for (const href of elementsNamed(doc, 'href')) {
     const value = (href.textContent || '').trim();
     const local = resolveLocal(value);
@@ -511,10 +522,6 @@ export function sanitizeKmlDocument(doc, resolveLocal = () => null) {
   for (const styleUrl of elementsNamed(doc, 'styleUrl')) {
     if (!(styleUrl.textContent || '').trim().startsWith('#')) drop(styleUrl);
   }
-  // Placemark balloons are HTML; the app shows no info box, and keeping their
-  // <img>/<iframe> sources out means no future surface can load them either.
-  for (const name of ['description', 'BalloonStyle', 'Snippet', 'ExtendedData'])
-    elementsNamed(doc, name).forEach(drop);
   // Draw recorded KML paths as their original static vertices. Letting the
   // loader build time-dynamic tracks would expand each into thousands of
   // interpolated points later and exceed the checked geometry budget.
@@ -735,7 +742,10 @@ export function countKmlGeometry(
       // a large string into a large array.
       let inTuple = false;
       for (let i = 0; i < text.length; i++) {
-        const space = text.charCodeAt(i) <= 32;
+        const code = text.charCodeAt(i);
+        // Match Cesium's whitespace splitting, keeping the common ASCII
+        // path cheap and avoiding a large token array during preflight.
+        const space = code <= 32 || (code > 127 && /\s/.test(text[i]));
         if (!space && !inTuple) {
           positions += 1;
           if (positions > maxPositions) return result('positions');
@@ -854,47 +864,61 @@ export function importFeatureName(value) {
 /**
  * Make every entity of an imported data source inert: no description,
  * balloon, extended data or properties, no native label, and a name that is
- * short plain text. Returns how many entities were touched.
+ * short plain text. Generated pin canvases share a data URL so Cesium uploads
+ * each image once, rather than allocating a texture entry for every entity.
+ * Returns how many entities were touched.
  * @param {{entities: {values: object[]}}} dataSource
  * @returns {number}
  */
 export function scrubImportedEntities(dataSource) {
-  const list = dataSource?.entities?.values || [];
-  for (let i = 0; i < list.length; i++) {
-    const entity = list[i];
-    let name;
-    try {
-      name = importFeatureName(
-        typeof entity.name === 'string' ? entity.name : undefined,
-      );
-    } catch {
-      name = undefined;
+  const collection = dataSource?.entities;
+  const list = collection?.values || [];
+  const images = new Map();
+  collection?.suspendEvents?.();
+  try {
+    for (let i = 0; i < list.length; i++) {
+      const entity = list[i];
+      let name;
+      try {
+        name = importFeatureName(
+          typeof entity.name === 'string' ? entity.name : undefined,
+        );
+      } catch {
+        name = undefined;
+      }
+      entity.name = name;
+      entity.description = undefined;
+      entity.label = undefined;
+      entity.properties = undefined;
+      if (entity.kml && typeof entity.kml === 'object') entity.kml = undefined;
+      const property = entity.billboard?.image;
+      if (property?.isConstant === false) continue;
+      const image = property?.getValue?.();
+      if (image?.tagName === 'CANVAS') {
+        let url = images.get(image);
+        if (!url) {
+          url = image.toDataURL();
+          images.set(image, url);
+        }
+        entity.billboard.image = url;
+      }
     }
-    entity.name = name;
-    entity.description = undefined;
-    entity.label = undefined;
-    entity.properties = undefined;
-    if (entity.kml && typeof entity.kml === 'object') entity.kml = undefined;
+  } finally {
+    collection?.resumeEvents?.();
   }
   return list.length;
 }
-
-const TRACK_SAMPLES = 2000;
 
 /**
  * Take time out of an imported data source so adding it cannot move the app's
  * shared clock: the data source reports no clock (the viewer adopts the clock
  * of every added source that has one), every entity is available for all
- * time, and a time-dynamic position (a KML gx:Track) is drawn as the line it
- * travels instead of a moving marker.
+ * time. KML tracks have already become their original static vertices in
+ * `sanitizeKmlDocument`, so no sampled-position fallback is needed here.
  * @param {object} dataSource
- * @param {{Cesium?: object, color?: object}} [options]
  * @returns {object} The same data source.
  */
-export function detachImportedTime(
-  dataSource,
-  { Cesium: C = Cesium, color } = {},
-) {
+export function detachImportedTime(dataSource) {
   Object.defineProperty(dataSource, 'clock', {
     configurable: true,
     enumerable: false,
@@ -904,42 +928,6 @@ export function detachImportedTime(
   const list = dataSource?.entities?.values || [];
   for (let i = 0; i < list.length; i++) {
     const entity = list[i];
-    const span = entity.availability;
-    const position = entity.position;
-    if (position && position.isConstant === false) {
-      const start = span?.start;
-      const stop = span?.stop;
-      const line = [];
-      if (start && stop && C.JulianDate.lessThan(start, stop)) {
-        const seconds = C.JulianDate.secondsDifference(stop, start);
-        for (let n = 0; n <= TRACK_SAMPLES; n++) {
-          const t = C.JulianDate.addSeconds(
-            start,
-            (seconds * n) / TRACK_SAMPLES,
-            new C.JulianDate(),
-          );
-          const at = position.getValue(t);
-          if (at) line.push(at);
-        }
-      }
-      entity.path = undefined;
-      entity.model = undefined;
-      if (line.length >= 2 && !entity.polyline) {
-        entity.billboard = undefined;
-        entity.point = undefined;
-        entity.position = undefined;
-        entity.polyline = new C.PolylineGraphics({
-          positions: line,
-          clampToGround: true,
-          width: 3,
-          material: color || C.Color.WHITE,
-        });
-      } else {
-        entity.position = line.length
-          ? new C.ConstantPositionProperty(line[0])
-          : undefined;
-      }
-    }
     entity.availability = undefined;
   }
   return dataSource;
@@ -1050,8 +1038,8 @@ export async function loadGeoFile(file, { viewer, color = '#39d0ff' }) {
     throw new GeoImportError('That file has nothing to draw.');
   }
   scrubImportedEntities(dataSource);
-  // Only KML has time-dynamic positions (GPX is read without times); its
-  // track line is drawn in KML's default white, like its other unstyled lines.
+  // Keep the clock invariant explicit even though unused KML dates have
+  // already been stripped and all supported geometries are static.
   detachImportedTime(dataSource);
   // The display name travels beside the data source (the file name, not
   // anything the document says about itself).

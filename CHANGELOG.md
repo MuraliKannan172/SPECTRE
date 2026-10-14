@@ -176,7 +176,10 @@
   are shared before the style limit is applied, allowing large files with many
   copies of the same style to load without changing their graphics. Blocked
   remote icons now fall back to local pins instead of leaving point markers
-  invisible, including USGS earthquake exports.
+  invisible, including USGS earthquake exports. Generated pins share one image
+  in the GPU atlas; unused time/view metadata is pruned before loading, and
+  obsolete track resampling code is removed. KML vertex counting follows
+  the loader's whitespace rules.
 
 ## [0.2.1] — 2026-10-02 — God's Eye View through Your Agent (with security fixes and other features)
 
