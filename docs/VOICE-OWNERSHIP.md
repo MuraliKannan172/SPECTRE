@@ -26,8 +26,8 @@ The backend is replaceable per deployment: `realtimeController.js` accepts it as
 `backend` option and falls back to `createRealtimeBackend()`. Its two method
 signatures live with [application construction](APPLICATION.md); what belongs here
 is the ownership. The connection is the backend's only consumer in the application.
-The resolved credential is opaque to the connection and is handed to `negotiate`
-whole. Client-secret expiry is refused inside the backend, not by the connection.
+The connection reads credential metadata for diagnostics and cost accounting,
+then passes the complete credential unchanged to `negotiate`. Client-secret expiry is refused inside the backend, not by the connection.
 `realtimeOwners.test.mjs` drives whole sessions through a substitute that
 implements only those two methods.
 
