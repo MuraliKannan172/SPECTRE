@@ -341,10 +341,10 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
   assert.throws(
     () =>
       validateLayerStateAllocations(
-        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '3' },
-        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '3', competing: '3' },
+        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '4' },
+        { ...LAYER_STATE_TOKEN_RESERVATIONS, merged: '4', competing: '4' },
       ),
-    /next free token 4/,
+    /next free token 5/,
   );
   assert.throws(
     () => validateLayerStateAllocations({ future: '00' }, { future: '01' }),
@@ -2643,11 +2643,11 @@ test('GNSS interference uses digit 3 without colliding with other digit tokens',
   const decoded = decodeLayerStateParams(new URLSearchParams('v=2&l=3.2.1'));
   assert.deepEqual(decoded.enabledLayerIds, [
     'fire-perimeters',
-    'gnss-interference',
+    'gnss-integrity',
     'recent-imagery',
   ]);
   assert.equal(
-    LAYER_STATE_REGISTRY.find(({ id }) => id === 'gnss-interference').token,
+    LAYER_STATE_REGISTRY.find(({ id }) => id === 'gnss-integrity').token,
     '3',
   );
   assert.deepEqual(

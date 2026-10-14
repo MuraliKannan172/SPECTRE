@@ -26,12 +26,16 @@ function harness(
   const sources = [];
   const viewer = {
     camera: { moveEnd: new Cesium.Event(), changed: new Cesium.Event() },
-    dataSources: {
-      add(value) {
-        sources.push(value);
-      },
-      remove(value) {
-        sources.splice(sources.indexOf(value), 1);
+    scene: {
+      globe: { show: true },
+      groundPrimitives: {
+        add(value) {
+          sources.push(value);
+        },
+        remove(value) {
+          sources.splice(sources.indexOf(value), 1);
+          value.destroy();
+        },
       },
     },
   };
@@ -50,6 +54,7 @@ function harness(
       return anchor;
     },
     now: () => clock,
+    monotonicNow: () => clock,
   });
   if (initialize) layer.init(viewer);
   return {
@@ -87,7 +92,9 @@ test('a globe-wide rectangle uses the visible screen centre as the query anchor'
         assert.deepEqual(pixel, new Cesium.Cartesian2(500, 400));
         return Cesium.Cartesian3.fromDegrees(-97, 30);
       },
-      computeViewRectangle: () => Cesium.Rectangle.MAX_VALUE,
+      computeViewRectangle: () => {
+        throw new Error('centre hit must not compute a rectangle');
+      },
     },
   });
   assert.ok(Math.abs(anchor.latitude - 30) < 1e-8);
@@ -208,10 +215,11 @@ test('an enabled refresh bins the snapshot into coloured ground cells', async ()
   layer.enable();
   assert.equal(sources[0].show, true);
   assert.equal(await layer.update(), true);
-  const entities = sources[0].entities.values;
+  const entities = sources[0].get(0).geometryInstances;
   assert.equal(entities.length, 1, 'the one-aircraft cell is withheld');
-  assert.equal(entities[0].id, 'gnss-interference:280:420');
-  assert.ok(entities[0].rectangle);
+  assert.equal(entities[0].id, 'gnss-integrity:280:420');
+  assert.ok(entities[0].geometry instanceof Cesium.RectangleGeometry);
+  assert.equal(sources[0].get(0).allowPicking, false);
   const stats = layer.getStats();
   assert.equal(stats.count, 1);
   assert.equal(stats.error, null);
@@ -222,35 +230,32 @@ test('an enabled refresh bins the snapshot into coloured ground cells', async ()
     [1, 0, 0],
   );
   assert.match(legend[0].blurb, /not a detection/);
-  assert.match(legend[0].blurb, /fewer than 3 aircraft are not drawn/);
+  assert.match(legend[0].blurb, /need 3 aircraft/);
 });
 
 test('the visible layer leads with low navigation accuracy and exposes its provenance', async () => {
   const { layer } = harness(async () => ({ rows: [], stale: false }));
-  assert.equal(layer.id, 'gnss-interference', 'the share-link id is unchanged');
+  assert.equal(
+    layer.id,
+    'gnss-integrity',
+    'the unpublished id describes the measured state',
+  );
   assert.equal(layer.name, 'GNSS Integrity');
   assert.doesNotMatch(layer.name, /interference|jamming/i);
   const { legend } = layer.getRowControls();
   assert.deepEqual(
     legend.map(({ label }) => label),
-    ['Over 10% low accuracy', '2–10% low accuracy', 'Under 2% low accuracy'],
+    [
+      'Low-accuracy score > 10%',
+      'Low-accuracy score 2–10%',
+      'Low-accuracy score < 2%',
+    ],
   );
   const { blurb } = legend[0];
-  assert.match(
-    blurb,
-    /^Share of ADS-B aircraft reporting low navigation accuracy/,
-  );
-  assert.match(blurb, /NIC < 7 or NACp < 8/);
-  assert.match(blurb, /GEV threshold/);
-  assert.match(blurb, /not a published interference test/);
-  assert.match(blurb, /gpsjam\.org's formula and 2% \/ 10% bands/);
-  assert.match(blurb, /navigation-integrity anomalies/);
-  // Interference appears only as the secondary, hedged reading.
-  assert.ok(
-    blurb.indexOf('navigation-integrity anomalies') <
-      blurb.indexOf('Suspected jamming or spoofing'),
-  );
-  assert.equal(layer.provenance.classifier.id, 'gev-nic-nacp-v1');
+  assert.match(blurb, /one aircraft is discounted/);
+  assert.match(blurb, /not the raw share/);
+  assert.match(blurb, /not a detection/);
+  assert.equal(layer.provenance.classifier.id, 'gev-nic-nacp-v2');
   assert.equal(layer.provenance.classifier.definedBy, 'GEV');
   assert.equal(layer.provenance.classifier.validated, false);
   assert.equal(layer.provenance.aggregation.source, 'https://gpsjam.org/faq');
@@ -283,7 +288,7 @@ test('a failed refresh keeps the last cells and reports the error', async () => 
   assert.equal(layer.getStats().stale, true);
   fail = true;
   assert.equal(await layer.update(), true);
-  assert.equal(sources[0].entities.values.length, 1);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 1);
   assert.equal(layer.getStats().error, 'adsb.lol HTTP 502');
   assert.equal(layer.getStats().count, 1);
 });
@@ -310,7 +315,7 @@ test('observations expire with the window, and disable aborts the request in fli
   pending.resolve({ rows: [] });
   assert.equal(await result, true);
   assert.equal(layer.getStats().count, 0);
-  assert.equal(sources[0].entities.values.length, 0);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 0);
 
   result = layer.update();
   layer.disable();
@@ -364,7 +369,7 @@ test('a replayed stale snapshot keeps its observation age and expires on time', 
     0,
     'the replay did not restart the window',
   );
-  assert.equal(sources[0].entities.values.length, 0);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 0);
 });
 
 test('cells expire during prolonged fetch failures', async () => {
@@ -382,7 +387,7 @@ test('cells expire during prolonged fetch failures', async () => {
   advance(11 * MIN);
   assert.equal(await layer.update(), true);
   assert.equal(layer.getStats().count, 0);
-  assert.equal(sources[0].entities.values.length, 0);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 0);
   assert.equal(layer.getStats().error, 'adsb.lol HTTP 502');
 });
 
@@ -402,7 +407,7 @@ test('cells expire while no view anchor is available', async () => {
   assert.equal(await layer.update(), true);
   assert.equal(calls, 1, 'no anchor means no request');
   assert.equal(layer.getStats().count, 0);
-  assert.equal(sources[0].entities.values.length, 0);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 0);
   assert.equal(layer.getStats().error, null);
 });
 
@@ -412,12 +417,12 @@ test('re-enabling after a long disable does not show cells past the window', asy
   }));
   layer.enable();
   await layer.update();
-  assert.equal(sources[0].entities.values.length, 1);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 1);
   layer.disable();
   advance(31 * MIN);
   layer.enable();
   assert.equal(layer.getStats().count, 0);
-  assert.equal(sources[0].entities.values.length, 0);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 0);
 });
 
 const threeCells = () => ({
@@ -428,10 +433,10 @@ test('an identical snapshot leaves the drawn entities untouched', async () => {
   const { layer, sources } = harness(async () => threeCells());
   layer.enable();
   await layer.update();
-  const [first] = sources[0].entities.values;
+  const first = sources[0].get(0);
   await layer.update();
-  assert.equal(sources[0].entities.values.length, 1);
-  assert.equal(sources[0].entities.values[0], first);
+  assert.equal(sources[0].get(0)?.geometryInstances.length ?? 0, 1);
+  assert.equal(sources[0].get(0), first);
 });
 
 test('an initial feed failure stays enabled, reports unavailable, and recovers automatically', async (t) => {
@@ -554,4 +559,142 @@ test('repeated acquisition failures back off, while genuine non-retryable failur
   assert.equal(await fatal.layer.update(), false);
   assert.equal(fatal.layer.getStats().retryInSec, null);
   fatal.layer.destroy();
+});
+
+test('GERMAN: stale snapshot keeps the source observation age in row stats', async () => {
+  const h = harness(async () => ({
+    rows: threeHealthy(),
+    ageMs: 120000,
+    stale: true,
+  }));
+  h.layer.enable();
+  await h.layer.update();
+  assert.equal(h.layer.getStats().lastUpdate, h.now() - 120000);
+  h.layer.destroy();
+});
+
+test('GERMAN: camera debounce and minimum request gap are pinned', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let calls = 0;
+  const h = harness(async () => {
+    calls++;
+    return { rows: [] };
+  });
+  h.layer.enable();
+  await h.layer.update();
+  h.setAnchor({ latitude: 51, longitude: 31 });
+  h.viewer.camera.changed.raiseEvent();
+  h.advance(2499);
+  t.mock.timers.tick(2499);
+  await flush();
+  assert.equal(calls, 1);
+  h.advance(1);
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(calls, 2);
+  h.advance(3000);
+  h.setAnchor({ latitude: 52, longitude: 32 });
+  h.viewer.camera.changed.raiseEvent();
+  h.advance(599);
+  t.mock.timers.tick(599);
+  await flush();
+  assert.equal(calls, 2);
+  h.advance(1);
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(calls, 3);
+  h.layer.destroy();
+});
+
+test('camera movement during initial activation waits for acquisition before following up', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls = [];
+  let resolve;
+  const h = harness((anchor) => {
+    calls.push(anchor);
+    return calls.length === 1
+      ? new Promise((r) => (resolve = r))
+      : Promise.resolve({ rows: threeHealthy() });
+  });
+  h.layer.enable();
+  const initial = h.layer.update();
+  h.setAnchor({ latitude: 51, longitude: 31 });
+  h.viewer.camera.changed.raiseEvent();
+  h.advance(2500);
+  t.mock.timers.tick(2500);
+  await flush();
+  assert.equal(calls.length, 1);
+  resolve({ rows: threeHealthy() });
+  assert.equal(await initial, true);
+  h.advance(600);
+  t.mock.timers.tick(600);
+  await flush();
+  assert.equal(calls.length, 2);
+  h.layer.destroy();
+});
+
+test('monotonic camera scheduling is unaffected by wall-clock rollback', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(async () => ({ rows: [] }));
+  h.layer.destroy();
+  let wall = 1800000000000,
+    mono = 0,
+    anchor = { latitude: 50, longitude: 30 },
+    calls = 0;
+  const layer = createGnssIntegrityLayer({
+    source: {
+      getSnapshot: async () => {
+        calls++;
+        return { rows: [], ageMs: 0 };
+      },
+    },
+    viewAnchor: () => anchor,
+    now: () => wall,
+    monotonicNow: () => mono,
+  });
+  layer.init(h.viewer);
+  layer.enable();
+  await layer.update();
+  wall -= 3600000;
+  mono = 3000;
+  anchor = { latitude: 51, longitude: 31 };
+  h.viewer.camera.changed.raiseEvent();
+  mono += 600;
+  t.mock.timers.tick(600);
+  await flush();
+  assert.equal(calls, 2);
+  layer.destroy();
+});
+
+test('GNSS fill emits no pick-pass commands but keeps normal rendering', async (t) => {
+  const h = harness(async () => ({ rows: threeHealthy() }));
+  h.layer.enable();
+  await h.layer.update();
+  const fill = h.sources[0].get(0);
+  let updates = 0;
+  t.mock.method(Cesium.GroundPrimitive.prototype, 'update', () => updates++);
+  fill.update({ passes: { pick: true } });
+  assert.equal(updates, 0);
+  fill.update({ passes: { render: true, pick: false } });
+  assert.equal(updates, 1);
+  h.layer.destroy();
+  assert.equal(fill.isDestroyed(), true);
+});
+
+test('view anchor falls back to rectangle, then nadir, then no camera', () => {
+  assert.equal(defaultGnssViewAnchor({}), null);
+  const viewer = {
+    camera: {
+      computeViewRectangle: () => Cesium.Rectangle.fromDegrees(20, 40, 22, 42),
+    },
+  };
+  const rectangleAnchor = defaultGnssViewAnchor(viewer);
+  assert.ok(Math.abs(rectangleAnchor.latitude - 41) < 1e-10);
+  assert.ok(Math.abs(rectangleAnchor.longitude - 21) < 1e-10);
+  viewer.camera = {
+    positionCartographic: Cesium.Cartographic.fromDegrees(21, 41),
+  };
+  const nadirAnchor = defaultGnssViewAnchor(viewer);
+  assert.ok(Math.abs(nadirAnchor.latitude - 41) < 1e-10);
+  assert.ok(Math.abs(nadirAnchor.longitude - 21) < 1e-10);
 });

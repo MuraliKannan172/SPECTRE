@@ -26,16 +26,21 @@ const aircraft = (overrides = {}) => ({
   ...overrides,
 });
 
-test('normalization keeps only airborne self-reported ADS-B v1/v2 positions', () => {
+test('normalization keeps airborne decoded ADS-B v1/v2 quality with current positions', () => {
   const rows = normalizeGnssAircraft({
     ac: [
       aircraft(),
-      aircraft({ hex: '000001', type: 'mlat', nic: 0 }),
+      aircraft({
+        hex: '000001',
+        type: 'mlat',
+        nic: undefined,
+        nac_p: undefined,
+      }),
       aircraft({ hex: '000002', type: 'tisb_icao' }),
       aircraft({ hex: '000003', version: 0 }),
       aircraft({ hex: '000004', alt_baro: 'ground' }),
       aircraft({ hex: '000005', seen_pos: 120 }),
-      aircraft({ hex: '000006', nic: undefined }),
+      aircraft({ hex: '000006', nic: undefined, nac_p: undefined }),
       aircraft({ hex: '000007', lat: 95 }),
       aircraft({ hex: '000008', version: undefined }),
       // Only DO-260A/B (versions 1 and 2) define NIC and NACp.
@@ -166,8 +171,8 @@ test('the primary state is a navigation-integrity anomaly; interference is only 
 
 test('provenance separates the GEV classifier from the gpsjam aggregation and the GEV window', () => {
   assert.deepEqual(GNSS_PROVENANCE.classifier, {
-    id: 'gev-nic-nacp-v1',
-    rule: 'gpsOkBefore set || NIC < 7 || NACp < 8',
+    id: 'gev-nic-nacp-v2',
+    rule: 'gpsOkBefore set || aircraft-reported NACp < 8 || (aircraft-reported NIC < 7 && !(NIC === 0 && NACp >= 10))',
     basis: '14 CFR 91.227(c) ADS-B Out performance minima (US regulation)',
     definedBy: 'GEV',
     validated: false,
@@ -176,7 +181,7 @@ test('provenance separates the GEV classifier from the gpsjam aggregation and th
   assert.deepEqual(GNSS_PROVENANCE.aggregation, {
     id: 'gpsjam-cell-bands',
     formula: '100 * max(0, bad - 1) / total',
-    bands: [0.02, 0.1],
+    bands: [2, 10],
     source: 'https://gpsjam.org/faq',
     definedBy: 'gpsjam.org',
   });
@@ -197,9 +202,9 @@ test('provenance separates the GEV classifier from the gpsjam aggregation and th
   assert.ok(Object.isFrozen(GNSS_PROVENANCE.aggregation.bands));
   // The bands in provenance are the ones the level function applies.
   const [medium, high] = GNSS_PROVENANCE.aggregation.bands;
-  assert.equal(gnssIntegrityLevel(100, 1 + 100 * medium).level, 'medium');
-  assert.equal(gnssIntegrityLevel(100, 1 + 100 * high).level, 'medium');
-  assert.equal(gnssIntegrityLevel(100, 2 + 100 * high).level, 'high');
+  assert.equal(gnssIntegrityLevel(100, 1 + medium).level, 'medium');
+  assert.equal(gnssIntegrityLevel(100, 1 + high).level, 'medium');
+  assert.equal(gnssIntegrityLevel(100, 2 + high).level, 'high');
   assert.equal(gnssProvenance({ windowMs: 10 * 60_000 }).window.minutes, 10);
 });
 
@@ -405,4 +410,82 @@ test('cells below the minimum aircraft count are withheld', () => {
   const [cell] = binGnssCells(store, { minAircraft: 2 });
   assert.equal(cell.level, 'high');
   assert.equal(cell.percentDegraded, 50);
+});
+
+test('MLAT GPS-loss evidence uses the last good GNSS location and ignores MLAT NIC', () => {
+  const [row] = normalizeGnssAircraft({
+    ac: [
+      aircraft({
+        type: 'mlat',
+        nac_p: 0,
+        nic: 0,
+        mlat: ['lat', 'lon', 'nic'],
+        gpsOkBefore: 1800000000,
+        gpsOkLat: 54.2,
+        gpsOkLon: 19.3,
+      }),
+    ],
+  });
+  assert.ok(row);
+  assert.equal(row.lat, 54.2);
+  assert.equal(row.lon, 19.3);
+  assert.equal(row.nic, null);
+  assert.equal(row.degraded, true);
+  const [healthy] = normalizeGnssAircraft({
+    ac: [aircraft({ type: 'mlat', nic: 0, mlat: ['nic'] })],
+  });
+  assert.equal(healthy.degraded, false);
+});
+
+test('TIS-B accuracy fields and unknown containment do not manufacture anomalies', () => {
+  const rows = normalizeGnssAircraft({
+    ac: [
+      aircraft({ hex: 'a00001', nac_p: 0, tisb: ['nac_p'] }),
+      aircraft({ hex: 'a00002', nic: 0, tisb: ['nic'] }),
+      aircraft({ hex: 'a00003', nic: 0, nac_p: 10 }),
+      aircraft({ hex: 'a00004', nic: 0, nac_p: 8 }),
+      aircraft({ hex: 'a00005', nic: 6, nac_p: 10 }),
+    ],
+  });
+  assert.deepEqual(
+    rows.map((r) => r.degraded),
+    [false, false, false, true, true],
+  );
+});
+
+// Quality-field subsets captured from public adsb.lol US point responses on
+// 2026-10-14 (34,-118 and 41,-73, radius 250 nm), ODbL 1.0 / adsb.lol contributors.
+// Only field provenance is reused; the airborne ADS-B envelopes are synthetic.
+test('public US quality-field fixtures do not turn rebroadcast accuracy into own accuracy', () => {
+  const tisbQuality = {
+    nic: 0,
+    nac_p: 0,
+    tisb: [
+      'altitude',
+      'alt_baro',
+      'gs',
+      'track',
+      'geom_rate',
+      'lat',
+      'lon',
+      'nic',
+      'rc',
+      'nac_p',
+      'nac_v',
+      'sil',
+      'sil_type',
+    ],
+    mlat: [],
+  };
+  assert.deepEqual(normalizeGnssAircraft({ ac: [aircraft(tisbQuality)] }), []);
+  const unknownContainment = {
+    nic: 0,
+    nac_p: 10,
+    tisb: ['callsign'],
+    mlat: [],
+  };
+  assert.equal(
+    normalizeGnssAircraft({ ac: [aircraft(unknownContainment)] })[0].degraded,
+    false,
+  );
 });

@@ -10,6 +10,8 @@
  *   (i)   TINT — a civil 7600 and a military ADS-B `general` emergency are
  *         drawn red; a normal civil flight stays white, a normal military
  *         flight stays amber, and a military `minfuel` priority stays amber.
+ *         POLL/MODELS verify existing untracked billboards and 3D models
+ *         repaint when emergency status starts and clears.
  *   (ii)  HUD — tracking the military emergency and entering Cockpit names
  *         the broadcast code on the aircraft-meta line, in red.
  *   (iii) CLEAR — the next poll drops the code: the HUD line returns to its
@@ -20,6 +22,7 @@
  * Screenshots saved to qa-shots/emergency-*.png (gitignored).
  *
  * Run:  node scripts/qa-emergency-squawk.mjs --url http://localhost:4173
+ * Optional: --timeout-ms 180000 for a slow boot.
  * Exits non-zero on any FAIL. Does not commit anything.
  */
 
@@ -39,6 +42,7 @@ const getOpt = (name, dflt) => {
 };
 const APP_URL = getOpt('--url', 'http://localhost:4173');
 const HEADFUL = argv.includes('--headful');
+const TIMEOUT_MS = Number(getOpt('--timeout-ms', '60000'));
 const CENTER = { lon: 4.0, lat: 53.5 };
 
 const results = [];
@@ -232,7 +236,7 @@ async function main() {
           civilRow('4847a2', 'KLM1234 ', lon - 0.6, lat - 0.25, '2000'),
         ],
         mil: [
-          milRow('ae7700', 'RCH7700', lon + 0.6, lat + 0.25, '7700', 'general'),
+          milRow('ae7700', 'RCH7700', lon + 0.6, lat + 0.25, '1200', 'general'),
           milRow('ae0f01', 'RCH0F01', lon + 0.6, lat - 0.25, '1234', 'minfuel'),
           milRow('ae0001', 'RCH0001', lon, lat - 0.5, '4520', 'none'),
         ],
@@ -243,11 +247,11 @@ async function main() {
     await page.evaluateOnNewDocument(installStubs);
     await page.goto(`${APP_URL}/?welcome=0`, {
       waitUntil: 'domcontentloaded',
-      timeout: 60000,
+      timeout: TIMEOUT_MS,
     });
     await page.waitForFunction(
       () => window.__godsEyeView?.viewer && window.__godsEyeView?.dataManager,
-      { timeout: 60000 },
+      { timeout: TIMEOUT_MS },
     );
     await sleep(5000);
     await page.keyboard.press('Escape');
@@ -287,7 +291,7 @@ async function main() {
     const probe = `(${billboardColors})(${JSON.stringify(ids)})`;
     await page
       .waitForFunction(`Object.keys(${probe}).length === ${ids.length}`, {
-        timeout: 60000,
+        timeout: TIMEOUT_MS,
         polling: 500,
       })
       .catch(() => {});
@@ -321,6 +325,79 @@ async function main() {
     );
     await shoot(page, 'globe-tint');
 
+    // Existing untracked billboards and models must repaint in both directions.
+    await page.evaluate(async () => {
+      window.__squawkQaPhase = 'cleared';
+      await window.__godsEyeView.dataManager.refreshLayer('military');
+    });
+    record(
+      'POLL: existing military billboard clears to amber',
+      isAmber((await page.evaluate(probe)).ae7700),
+    );
+    await page.evaluate(async () => {
+      window.__squawkQaPhase = 'emergency';
+      await window.__godsEyeView.dataManager.refreshLayer('military');
+    });
+    record(
+      'POLL: existing military billboard turns red again',
+      isRed((await page.evaluate(probe)).ae7700),
+    );
+    const modelProbe = () => {
+      const found = {};
+      const visit = (items) => {
+        for (let i = 0; i < items.length; i++) {
+          const item = items.get(i);
+          if (item.ready && item.color && typeof item.id === 'string')
+            found[item.id] = {
+              r: Math.round(item.color.red * 255),
+              g: Math.round(item.color.green * 255),
+              b: Math.round(item.color.blue * 255),
+            };
+          else if (item.get) visit(item);
+        }
+      };
+      visit(window.__godsEyeView.viewer.scene.primitives);
+      return found;
+    };
+    await page.waitForFunction(
+      `(${modelProbe})()['4847a1'] && (${modelProbe})().ae7700`,
+      { timeout: TIMEOUT_MS, polling: 250 },
+    );
+    const beforeModels = await page.evaluate(modelProbe);
+    record(
+      'MODELS: civil and military emergency models are red',
+      isRed(beforeModels['4847a1']) && isRed(beforeModels.ae7700),
+      JSON.stringify(beforeModels),
+    );
+    await page.evaluate(async () => {
+      window.__squawkQaFixtures.civil[0][14] = '2000';
+      window.__squawkQaFixtures.civil[1][14] = '7600';
+      window.__squawkQaPhase = 'cleared';
+      const dm = window.__godsEyeView.dataManager;
+      await dm.refreshLayer('flights');
+      await dm.refreshLayer('military');
+    });
+    await page.waitForFunction(
+      `(${modelProbe})()['4847a1']?.g > 220 && (${modelProbe})()['4847a2']?.g < 110 && (${modelProbe})().ae7700?.g > 110`,
+      { timeout: TIMEOUT_MS, polling: 250 },
+    );
+    const afterModels = await page.evaluate(modelProbe);
+    record(
+      'MODELS: existing civil models start and clear, military clears',
+      isWhite(afterModels['4847a1']) &&
+        isRed(afterModels['4847a2']) &&
+        isAmber(afterModels.ae7700),
+      JSON.stringify(afterModels),
+    );
+    await page.evaluate(async () => {
+      window.__squawkQaFixtures.civil[0][14] = '7600';
+      window.__squawkQaFixtures.civil[1][14] = '2000';
+      window.__squawkQaFixtures.mil[0].squawk = '7700';
+      window.__squawkQaPhase = 'emergency';
+      const dm = window.__godsEyeView.dataManager;
+      await dm.refreshLayer('flights');
+      await dm.refreshLayer('military');
+    });
     // ── (ii) HUD ──────────────────────────────────────────────────────────
     console.log('\n(ii) HUD — track the emergency and enter Cockpit...');
     const tracked = await page.evaluate(() =>
@@ -384,6 +461,17 @@ async function main() {
       'HUD: meta line is styled as an emergency',
       hud.emergencyClass && /255,\s*68,\s*68/.test(hud.color || ''),
       `class=${hud.emergencyClass} color=${hud.color}`,
+    );
+    const trackedBroadcast = await page.evaluate(
+      () =>
+        window.__godsEyeView.dataManager.layers
+          .get('military')
+          .module.getTrackedInfo().emergencyBroadcast,
+    );
+    record(
+      'TRACKED: voice-facing status quotes the broadcast',
+      trackedBroadcast === 'broadcasting squawk 7700 (general emergency)',
+      trackedBroadcast,
     );
     await shoot(page, 'cockpit-hud');
 

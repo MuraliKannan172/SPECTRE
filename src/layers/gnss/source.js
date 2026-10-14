@@ -4,9 +4,12 @@ function retryDelay(raw, nowMs) {
   if (!raw) return null;
   const seconds = Number(raw);
   const ms = seconds * 1000;
-  if (Number.isFinite(ms) && seconds > 0) return Math.max(5000, ms);
+  if (Number.isFinite(ms) && seconds > 0)
+    return Math.min(3600000, Math.max(5000, ms));
   const at = Date.parse(raw);
-  return Number.isFinite(at) && at > nowMs ? Math.max(5000, at - nowMs) : null;
+  return Number.isFinite(at) && at > nowMs
+    ? Math.min(3600000, Math.max(5000, at - nowMs))
+    : null;
 }
 
 /** Request integrity facts around a view anchor through the same-origin adsb.lol proxy. */
@@ -20,8 +23,8 @@ export function createAdsbGnssSource({
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
         throw new Error('GNSS snapshot needs a view anchor');
       const params = new URLSearchParams({
-        lat: latitude.toFixed(2),
-        lon: longitude.toFixed(2),
+        lat: String(Math.round(latitude)),
+        lon: String(Math.round(longitude)),
       });
       const response = await fetchImpl(`/api/gnss-integrity?${params}`, {
         signal,
@@ -35,8 +38,8 @@ export function createAdsbGnssSource({
         throw Object.assign(
           new Error(
             limited
-              ? 'adsb.lol rate limited (HTTP 429)'
-              : `adsb.lol feed unavailable (HTTP ${response.status})`,
+              ? 'GNSS feed rate limited (HTTP 429)'
+              : `GNSS feed unavailable (HTTP ${response.status})`,
           ),
           {
             status: response.status,

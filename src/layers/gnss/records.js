@@ -11,7 +11,8 @@
  * state.
  *
  * Three separately sourced parts make up the method (see `gnssProvenance`):
- * - Per-aircraft classifier, defined by GEV: NIC < 7 or NACp < 8 (borrowed
+ * - Per-aircraft classifier, defined by GEV: aircraft-reported NIC < 7
+ *   (except unknown NIC 0 with NACp >= 10) or NACp < 8 (borrowed
  *   from the US 14 CFR 91.227(c) ADS-B Out performance minima, which are not
  *   a published interference classifier) or the readsb/tar1090 `gpsOkBefore`
  *   flag. gpsjam.org does not publish its per-aircraft threshold.
@@ -19,9 +20,9 @@
  * - Window: a GEV-defined rolling 30 minutes over the views the user visits.
  */
 
-/** Direct 1090ES ADS-B only: MLAT, TIS-B and ADS-R positions are not self-reported. */
-const QUALIFYING_TYPES = new Set(['adsb_icao']);
-/** DO-260A (1) and DO-260B (2) define NIC and NACp; version 0 and unknown versions do not. */
+/** Position source can switch to MLAT after GPS loss; quality must remain aircraft-reported. */
+const QUALIFYING_TYPES = new Set(['adsb_icao', 'mlat']);
+/** Restrict to decoded DO-260A/B quality fields; readsb does not decode v3 quality as v3. */
 const QUALIFYING_VERSIONS = new Set([1, 2]);
 /** NIC below 7: containment radius of 0.2 NM or more (below the US 91.227 ADS-B Out minimum). GEV threshold. */
 export const GNSS_NIC_THRESHOLD = 7;
@@ -31,7 +32,7 @@ export const GNSS_NACP_THRESHOLD = 8;
 const MAX_POSITION_AGE_S = 60;
 /** Cell edge in degrees: roughly 55 km north-south, similar in area to an H3 res-4 cell. */
 export const GNSS_CELL_DEG = 0.5;
-/** Fewer aircraft than this in a cell cannot distinguish one faulty transponder from interference. */
+/** Hide sparse one- and two-aircraft cells; the aggregation separately discounts one bad report. */
 export const GNSS_MIN_AIRCRAFT = 3;
 /** Rolling window over which aircraft seen in a cell are counted. */
 export const GNSS_WINDOW_MS = 30 * 60_000;
@@ -47,8 +48,8 @@ export const GNSS_INTERPRETATION = 'suspected-gnss-interference';
 
 /** The per-aircraft rule; GEV-defined and not validated against known events. */
 export const GNSS_CLASSIFIER = Object.freeze({
-  id: 'gev-nic-nacp-v1',
-  rule: `gpsOkBefore set || NIC < ${GNSS_NIC_THRESHOLD} || NACp < ${GNSS_NACP_THRESHOLD}`,
+  id: 'gev-nic-nacp-v2',
+  rule: `gpsOkBefore set || aircraft-reported NACp < ${GNSS_NACP_THRESHOLD} || (aircraft-reported NIC < ${GNSS_NIC_THRESHOLD} && !(NIC === 0 && NACp >= 10))`,
   basis: '14 CFR 91.227(c) ADS-B Out performance minima (US regulation)',
   definedBy: 'GEV',
   validated: false,
@@ -66,10 +67,7 @@ export function gnssProvenance({ windowMs = GNSS_WINDOW_MS } = {}) {
     aggregation: Object.freeze({
       id: 'gpsjam-cell-bands',
       formula: '100 * max(0, bad - 1) / total',
-      bands: Object.freeze([
-        GNSS_MEDIUM_PERCENT / 100,
-        GNSS_HIGH_PERCENT / 100,
-      ]),
+      bands: Object.freeze([GNSS_MEDIUM_PERCENT, GNSS_HIGH_PERCENT]),
       source: 'https://gpsjam.org/faq',
       definedBy: 'gpsjam.org',
     }),
@@ -104,7 +102,7 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
  * facts the layer needs. Returns null when the payload has no aircraft array.
  *
  * @param {{ac?: object[], now?: number}} payload - readsb-style snapshot.
- * @returns {{hex: string, lat: number, lon: number, nic: number, nacp: number, gpsLost: boolean, degraded: boolean}[]|null}
+ * @returns {{hex: string, lat: number, lon: number, nic: number|null, nacp: number|null, gpsLost: boolean, degraded: boolean}[]|null}
  */
 export function normalizeGnssAircraft(payload) {
   if (!Array.isArray(payload?.ac)) return null;
@@ -117,18 +115,33 @@ export function normalizeGnssAircraft(payload) {
     if (!QUALIFYING_TYPES.has(aircraft.type)) continue;
     if (!QUALIFYING_VERSIONS.has(aircraft.version)) continue;
     if (aircraft.alt_baro === 'ground' || !finite(aircraft.alt_baro)) continue;
-    const { lat, lon, nic, nac_p: nacp } = aircraft;
+    let { lat, lon } = aircraft;
+    const derived = (field) =>
+      aircraft.tisb?.includes(field) || aircraft.mlat?.includes(field);
+    const nic = finite(aircraft.nic) && !derived('nic') ? aircraft.nic : null;
+    const nacp =
+      finite(aircraft.nac_p) && !derived('nac_p') ? aircraft.nac_p : null;
     if (!finite(lat) || Math.abs(lat) > 90) continue;
     if (!finite(lon) || Math.abs(lon) > 180) continue;
-    if (!finite(nic) || !finite(nacp)) continue;
     // Only a position confirmed within the last minute is current evidence; a
     // missing, invalid or negative age confirms nothing.
     const age = aircraft.seen_pos;
     if (!finite(age) || age < 0 || age > MAX_POSITION_AGE_S) continue;
-    // readsb sets gpsOkBefore when an aircraft's integrity collapses and keeps
-    // it for roughly 15 minutes after GPS recovers, so it can outlast the
-    // current NIC/NACp; the rolling window treats that as recent evidence.
-    const gpsLost = aircraft.gpsOkBefore != null;
+    // readsb exposes the flag while GPS is lost (15 s–15 min after the
+    // last good position), and removes it on recovery. Locate that evidence
+    // at the last good GNSS position, rather than a later MLAT estimate.
+    const gpsLost = finite(aircraft.gpsOkBefore) && aircraft.gpsOkBefore > 0;
+    if (nic === null && nacp === null && !gpsLost) continue;
+    if (
+      gpsLost &&
+      finite(aircraft.gpsOkLat) &&
+      Math.abs(aircraft.gpsOkLat) <= 90 &&
+      finite(aircraft.gpsOkLon) &&
+      Math.abs(aircraft.gpsOkLon) <= 180
+    ) {
+      lat = aircraft.gpsOkLat;
+      lon = aircraft.gpsOkLon;
+    }
     seen.add(hex);
     rows.push({
       hex,
@@ -138,7 +151,11 @@ export function normalizeGnssAircraft(payload) {
       nacp,
       gpsLost,
       degraded:
-        gpsLost || nic < GNSS_NIC_THRESHOLD || nacp < GNSS_NACP_THRESHOLD,
+        gpsLost ||
+        (nacp !== null && nacp < GNSS_NACP_THRESHOLD) ||
+        (nic !== null &&
+          nic < GNSS_NIC_THRESHOLD &&
+          !(nic === 0 && nacp !== null && nacp >= 10)),
     });
   }
   return rows;

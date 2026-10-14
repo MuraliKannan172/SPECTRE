@@ -106,28 +106,16 @@
 
 ## [Unreleased]
 
-- Preserve full GNSS upstream retry deadlines and concurrent cooldowns; keep
-  published Street Level token `0` and assign GNSS token `3`. Live QA requires
-  a successful dated snapshot even in empty airspace.
-- Civil Flights fallback retains ADS-B-only emergency/priority status and clears
-  it on later polls. Analyst/voice results label the retained general aircraft
-  contact time as `lastContactAtMs`, not the time of the current status.
-  GNSS Integrity and aircraft emergency highlighting contributed by
-  [Leo Pechnicki](https://github.com/leopechnicki) (#855, #856).
+- Flights and Military Flights highlight emergency transponder broadcasts in
+  fleet billboards, 3D models and Cockpit contacts. Colors update when a status
+  starts or clears. Emergency squawks outrank ADS-B priority statuses; GEV
+  reports minimum fuel and lifeguard without red tint. Cockpit names the code
+  or ADS-B status, and analyst/voice results retain broadcast provenance and
+  the latest known contact time. One omitted ADS-B status poll during a source
+  switch may retain the previous status if the squawk is unchanged; an explicit
+  clear takes effect immediately. Broadcasts are not confirmed incidents.
+  Contributed by [Leo Pechnicki](https://github.com/leopechnicki) (#856).
 
-- Flights and Military Flights highlight aircraft broadcasting a transponder
-  emergency. Squawk 7500 (unlawful interference), 7600 (radio failure) and
-  7700 (general emergency) — or adsb.lol's ADS-B `emergency` status, which
-  also reports downed aircraft — tint the aircraft red on the globe, in
-  Cockpit contacts and in snapshots, and name the code on the Cockpit HUD.
-  Minimum-fuel and lifeguard statuses are reported but not tinted. The status
-  follows the latest poll instead of sticking, so a cleared code stops
-  highlighting on the next refresh. The analyst and voice query engine can
-  filter by `squawk`, `emergency`, `emergencyKind` and `emergencySource`
-  (whether the squawk or the ADS-B field named the status), and each result
-  says when the transponder was last heard, so answers read "broadcasting
-  squawk 7700" or "ADS-B reports general emergency". No new source or
-  request: OpenSky already carries the squawk and adsb.lol carries both.
 - Street Level: KartaView is the third provider, keyless. Light its chip
   (purple; off by default, one provider at a time) and zoom in below about
   6 km: the lines are the streets KartaView has photos of (z13–14 tiles from
@@ -211,35 +199,16 @@
   largest cities) and `CCTV_VEGVESEN_VIDEO=0` keeps stills only. Attributed
   under NLOD 2.0.
 
-- GNSS Integrity layer (Events group, share id `gnss-interference`): cells of
-  low navigation accuracy reported by ADS-B aircraft. The method is a GEV
-  threshold plus gpsjam.org aggregation, not "the gpsjam method": an aircraft
-  counts as low when it reports NIC < 7 or NACp < 8 (borrowed from the US
-  14 CFR 91.227 ADS-B Out minima, not a published interference classifier) or
-  readsb's GPS-loss flag; aircraft are binned into 0.5° cells over a
-  GEV-defined rolling 30-minute window around visited views and scored with
-  gpsjam.org's published formula and 2% / 10% bands. Medium and high cells
-  are navigation-integrity anomalies; suspected GNSS interference is a
-  secondary, unvalidated interpretation. The layer and the proxy expose
-  machine-readable provenance (`provenance`, `classifier: gev-nic-nacp-v1`).
-  Transient feed failures no longer reject GNSS activation: the layer stays
-  enabled, explains unavailable/degraded feed health and retries automatically.
-  Provider Retry-After deadlines survive movement and toggling; other failures
-  back off for 30/60/120 seconds. Disable/destroy cancels retry work.
-  Automatically refreshes after camera pan/zoom without toggling, coalesces
-  nearby views, and uses the Earth point under the screen centre at globe scale.
-  Keyless regional sampling wherever adsb.lol has receivers; the row labels
-  the 250 nm radius, which remains regional when zoomed out. Reads
-  a capped 250 nm snapshot around the camera through `/api/gnss-integrity`,
-  which returns integrity fields only and serves the last snapshot (with its
-  original observation time and `ageMs`, for at most 30 minutes) when the
-  upstream fails.
-  Only ADS-B versions 1 and 2 with a known position age of 0-60 s count. A
-  degraded report keeps an aircraft degraded for 30 minutes after that report,
-  not after its latest healthy one; replayed snapshots keep their age, and
-  cells expire on schedule during fetch failures or without a view anchor.
-
-## [0.2.1] — 2026-10-02 — God's Eye View through Your Agent (with security fixes and other features)
+- GNSS Integrity (Events, voice-addressable, share token `3`) draws navigation
+  accuracy scores from a keyless regional adsb.lol sample; aircraft-level analyst
+  queries are unavailable for these aggregate cells. Cells do not intercept
+  map clicks. Pan/zoom refreshes automatically; feed failures retain the display
+  and explain the next retry. Aircraft-reported quality includes MLAT-positioned
+  contacts after GPS loss, excludes TIS-B/MLAT-derived quality, and locates GPS-loss
+  evidence at the last good GNSS position when available. Scores discount one
+  bad aircraft per cell and retain 30 minutes of visited-view evidence; they
+  do not confirm jamming. See [method and limits](DATA_SOURCES.md#gnss-integrity).
+  Contributed by [Leo Pechnicki](https://github.com/leopechnicki) (#855).
 
 - Ship each bundled data pack once. The region, marine, admin-boundary,
   county, military-name and neighborhood packs were emitted twice by the

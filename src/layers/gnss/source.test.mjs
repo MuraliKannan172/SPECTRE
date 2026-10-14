@@ -11,7 +11,7 @@ test('the source asks the same-origin proxy for the view anchor', async () => {
       return Response.json({
         fetchedAt: 5,
         ageMs: 0,
-        classifier: 'gev-nic-nacp-v1',
+        classifier: 'gev-nic-nacp-v2',
         rows: [{ hex: 'abc123' }],
       });
     },
@@ -20,13 +20,13 @@ test('the source asks the same-origin proxy for the view anchor', async () => {
     { latitude: 50.06143, longitude: 19.93658 },
     { signal: new AbortController().signal },
   );
-  assert.deepEqual(calls, ['/api/gnss-integrity?lat=50.06&lon=19.94']);
+  assert.deepEqual(calls, ['/api/gnss-integrity?lat=50&lon=20']);
   assert.deepEqual(snapshot, {
     rows: [{ hex: 'abc123' }],
     ageMs: 0,
     fetchedAt: 5,
     stale: false,
-    classifier: 'gev-nic-nacp-v1',
+    classifier: 'gev-nic-nacp-v2',
   });
 });
 

@@ -1,8 +1,11 @@
-// src/data/aircraftEmergencyAnalyst.test.mjs
-// Source-to-analyst fixture: an OpenSky state vector squawking 7700 and an
-// adsb.lol (readsb) aircraft whose ADS-B `emergency` field says `general`
-// on an ordinary code must reach the analyst with the same kind but distinct
-// provenance, so a summary never flattens one into the other.
+import * as Cesium from 'cesium';
+import { TRACKED_ICON_COLOR } from '../layers/military/policy.js';
+import { createRendering as civilRendering } from '../layers/flights/rendering.js';
+import { createRendering as militaryRendering } from '../layers/military/rendering.js';
+import { createMilitarySnapshotRenderer } from '../layers/military/snapshotRenderer.js';
+import { aircraftEmergency } from './aircraftEmergency.js';
+// Source-to-voice provenance, status retention/clearing, contact-time contracts,
+// and civil/military billboard, Cockpit and model tint regressions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openSkySnapshot, readsbSnapshot } from '../sources/live/index.js';
@@ -30,7 +33,7 @@ test('fallback status belongs to the first valid admitted aircraft row', () => {
     });
     const snapshot = openSkySnapshot(payload, { now: NOW_MS });
     assert.equal(snapshot.records.length, 1);
-    assert.equal(snapshot.records[0].emergency, status ?? null);
+    assert.equal(snapshot.records[0].emergency, status);
     assert.equal(snapshot.records[0].latitude, 30);
   }
 });
@@ -353,4 +356,169 @@ test('military status changes retain only the latest known general contact', () 
   );
   assert.equal(changed.emergencyKind, 'nordo');
   assert.equal(changed.lastContactAtMs, NOW_MS - 1500);
+});
+
+test('fallback missing contact age retains known contact through the real converter', () => {
+  const store = civilStore();
+  const row = {
+    hex: 'a1b2c3',
+    lat: 30,
+    lon: -97,
+    squawk: '1200',
+    emergency: 'general',
+    seen: 3,
+    seen_pos: 1,
+  };
+  const receive = (row) =>
+    store.receive(
+      openSkySnapshot(
+        normalizeAdsbLolPointResponse({ now: NOW_MS, ac: [row] }),
+        { now: NOW_MS },
+      ).records[0],
+      receiveContext,
+    ).meta;
+  const first = receive(row);
+  const second = receive({ ...row, seen: undefined, seen_pos: undefined });
+  assert.equal(second.lastContactEpochMs, first.lastContactEpochMs);
+});
+
+test('one omitted ADS-B status poll is retained; explicit none and changed squawk clear immediately', () => {
+  const store = civilStore();
+  const row = {
+    hex: 'a1b2c3',
+    lat: 30,
+    lon: -97,
+    squawk: '1200',
+    emergency: 'general',
+    seen: 3,
+  };
+  const receive = (row) =>
+    store.receive(
+      openSkySnapshot(
+        normalizeAdsbLolPointResponse({ now: NOW_MS, ac: [row] }),
+        { now: NOW_MS },
+      ).records[0],
+      receiveContext,
+    ).meta;
+  assert.equal(receive(row).emergency.kind, 'general');
+  assert.equal(
+    receive({ ...row, emergency: undefined }).emergency?.kind,
+    'general',
+  );
+  assert.equal(receive({ ...row, emergency: undefined }).emergency, null);
+  receive(row);
+  assert.equal(receive({ ...row, emergency: 'none' }).emergency, null);
+  receive(row);
+  assert.equal(
+    receive({ ...row, emergency: undefined, squawk: '2000' }).emergency,
+    null,
+  );
+});
+
+function renderHarness(factory) {
+  const flightState = { records: { data: new Map() }, _trackedIcao: null };
+  const rendering = factory({
+    flightState,
+    services: {
+      militaryRegistry: { isMilitaryIcao: (id) => id === 'mil' },
+      aircraftPresentation: {},
+      camera: {},
+      focus: {},
+      recession: {},
+    },
+    parts: {},
+  });
+  return { flightState, rendering };
+}
+
+test('tint priorities cover normal, priority, emergency, tracking and Cockpit dots', () => {
+  for (const factory of [civilRendering, militaryRendering]) {
+    const { flightState, rendering } = renderHarness(factory);
+    const normal = rendering._fleetBillboardColor('civil', {});
+    assert.equal(
+      rendering._fleetBillboardColor('civil', {
+        emergency: aircraftEmergency({ emergency: 'minfuel' }),
+      }),
+      normal,
+    );
+    const red = rendering._fleetBillboardColor('civil', {
+      emergency: aircraftEmergency({ squawk: '7700' }),
+    });
+    assert.ok(red.red > 0.9 && red.green < 0.5);
+    flightState.records.data.set('civil', {
+      emergency: aircraftEmergency({ squawk: '7700' }),
+    });
+    assert.equal(rendering._modelColor('civil'), red);
+    if (rendering._cockpitContactColor)
+      assert.equal(rendering._cockpitContactColor('civil'), red);
+    flightState._trackedIcao = 'civil';
+    assert.equal(
+      rendering._modelColor('civil'),
+      factory === civilRendering ? Cesium.Color.CYAN : TRACKED_ICON_COLOR,
+    );
+    flightState._trackedIcao = null;
+    flightState.records.data.set('civil', { emergency: null });
+    assert.equal(rendering._modelColor('civil'), normal);
+  }
+});
+
+test('GERMAN: an existing untracked military billboard repaints each poll without alpha loss', () => {
+  const { flightState, rendering } = renderHarness(militaryRendering);
+  const bb = {
+    color: rendering._fleetBillboardColor('abc123').withAlpha(0.65),
+  };
+  Object.assign(flightState, {
+    _billboards: new Map([['abc123', bb]]),
+    _models: new Map(),
+    _positionHistory: new Map(),
+    _cullPositions: new Map(),
+    _groundSnap: { forget() {} },
+    _cockpitContactMode: false,
+  });
+  const records = new MilitaryFlightRecords({
+    geoidHeight: () => 0,
+    cachedGroundFloor: () => null,
+    floorAltitudeM: (value) => value,
+  });
+  flightState.records = records;
+  const apply = createMilitarySnapshotRenderer({
+    flightState,
+    records,
+    groundFloor: { warmGroundFloor() {}, cachedGroundFloor: () => null },
+    meshFloor: { sampleMeshFloorCells() {} },
+    militaryRegistry: { registerMilitaryIcaos() {} },
+    rendering: {
+      ...rendering,
+      _syncModelToClass() {},
+      _applyFleetBillboardPresentation() {},
+    },
+    motion: {},
+    tracking: {},
+    queries: {},
+  });
+  for (const [emergency, red] of [
+    ['general', true],
+    ['none', false],
+    ['general', true],
+  ]) {
+    const snapshot = readsbSnapshot(
+      {
+        ac: [
+          {
+            hex: 'abc123',
+            lat: 30,
+            lon: -97,
+            alt_baro: 10000,
+            squawk: '1200',
+            emergency,
+            seen_pos: 1,
+          },
+        ],
+      },
+      { observedAtMs: NOW_MS },
+    );
+    apply(snapshot, {});
+    assert.equal(bb.color.green < 0.5, red);
+    assert.equal(bb.color.alpha, 0.65);
+  }
 });

@@ -60,7 +60,7 @@ test('catalogs construct distinct layers and classification from their supplied 
       '2026-09-21T12:00:00.000Z',
     );
   assert.ok(first.get('fire-perimeters'));
-  assert.ok(first.get('gnss-interference'));
+  assert.ok(first.get('gnss-integrity'));
   assert.ok(first.get('transit'));
   const order = first.layers.map(({ id }) => id);
   assert.deepEqual(

@@ -44,7 +44,7 @@ const AIRCRAFT_FIELDS = {
 
 const layers = [
   {
-    id: 'gnss-interference',
+    id: 'gnss-integrity',
     aliases: [
       'gnss integrity',
       'navigation integrity',

@@ -54,7 +54,7 @@ export function normalizeAdsbLolAircraftState(aircraft, nowSeconds) {
 
   const seenPosition = Math.max(
     0,
-    finiteNumber(aircraft?.seen_pos) ?? finiteNumber(aircraft?.seen) ?? 0,
+    finiteNumber(aircraft?.seen_pos) ?? finiteNumber(aircraft?.seen) ?? NaN,
   );
   const seen = Math.max(0, finiteNumber(aircraft?.seen) ?? seenPosition);
   const onGround = aircraft?.alt_baro === 'ground';
@@ -69,8 +69,10 @@ export function normalizeAdsbLolAircraftState(aircraft, nowSeconds) {
     hex,
     String(aircraft?.flight || aircraft?.r || '').trim() || null,
     null,
-    Math.max(0, nowSeconds - seenPosition),
-    Math.max(0, nowSeconds - seen),
+    Number.isFinite(seenPosition)
+      ? Math.max(0, nowSeconds - seenPosition)
+      : null,
+    Number.isFinite(seen) ? Math.max(0, nowSeconds - seen) : null,
     longitude,
     latitude,
     barometricFeet === null ? null : barometricFeet * FOOT_TO_M,

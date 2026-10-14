@@ -230,7 +230,19 @@ export class FlightRecords {
       // Per poll, NOT sticky: an emergency code clears when the crew resets
       // it, so a blank squawk must not hold a stale 7700 on screen.
       squawk: observation.squawk ?? null,
-      emergency: aircraftEmergency(observation),
+      // One source-switch omission may retain an ADS-B status, while an
+      // explicit clear or changed squawk always takes effect immediately.
+      emergency:
+        observation.emergency === undefined &&
+        observation.squawk === prevMeta?.squawk &&
+        prevMeta?.emergency?.source === 'ads-b' &&
+        (prevMeta?.missingEmergencyPolls ?? 0) < 1
+          ? prevMeta.emergency
+          : aircraftEmergency(observation),
+      missingEmergencyPolls:
+        observation.emergency === undefined
+          ? (prevMeta?.missingEmergencyPolls ?? 0) + 1
+          : 0,
       // OpenSky distinguishes the last position epoch from the last
       // transponder message. The fleet coast horizon uses this actual
       // contact time so a temporarily old position does not hard-freeze

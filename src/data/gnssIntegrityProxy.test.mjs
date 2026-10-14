@@ -7,7 +7,7 @@ import {
 } from '../../server/providers/gnssIntegrity.js';
 
 const snapshot = {
-  now: 1,
+  now: 4_000_000_000_000,
   ac: [
     {
       hex: '4ca7b5',
@@ -28,7 +28,7 @@ const snapshot = {
 
 function install(options = {}, hook = 'configureServer') {
   let handler;
-  const plugin = gnssIntegrityProxy(options);
+  const plugin = gnssIntegrityProxy({ monotonicNow: options.now, ...options });
   assert.equal(plugin.name, 'gnss-integrity');
   plugin[hook]({
     middlewares: {
@@ -89,7 +89,7 @@ for (const hook of ['configureServer', 'configurePreviewServer']) {
       ageMs: 0,
       anchor: { lat: 50, lon: 20 },
       radiusNm: 250,
-      classifier: 'gev-nic-nacp-v1',
+      classifier: 'gev-nic-nacp-v2',
       rows: [
         {
           hex: '4ca7b5',
@@ -205,7 +205,7 @@ test('an upstream 429 starts a cooldown with no further upstream calls', async (
   assert.equal(calls, 2);
 });
 
-test('Retry-After accepts seconds or an HTTP date, with a 5 s minimum and no truncated deadline', () => {
+test('Retry-After accepts sane seconds or HTTP dates up to one hour', () => {
   const nowMs = Date.parse('2026-09-29T12:00:00Z');
   assert.equal(gnssRetryCooldownMs('30', nowMs), 30_000);
   assert.equal(gnssRetryCooldownMs('1', nowMs), 5_000);
@@ -309,9 +309,121 @@ test('the route rejects other methods, paths, bad anchors, a malformed feed and 
   assert.equal((await request('/other?lat=1&lon=1')).status, 404);
   assert.equal((await request('/?lat=1')).status, 400);
   assert.equal((await request('/?lat=1&lon=1')).status, 502);
+  const flood = install({ fetchImpl: async () => Response.json(snapshot) });
   let limited = 0;
   for (let i = 0; i < 40; i += 1)
-    if ((await request('/?lat=1&lon=1', 'GET', 'flood')).status === 429)
+    if ((await flood(`/?lat=${i}&lon=1`, 'GET', 'flood')).status === 429)
       limited += 1;
   assert.ok(limited > 0);
+});
+
+test('GERMAN: pathological retry deadlines are bounded', () => {
+  const at = Date.parse('2026-10-14T12:00:00Z');
+  assert.ok(gnssRetryCooldownMs('1e305', at) <= 3600000);
+  assert.equal(gnssRetryCooldownMs('9999999999999999999999', at), 3600000);
+  assert.equal(
+    gnssRetryCooldownMs('Wed, 14 Oct 2099 12:00:00 GMT', at),
+    3600000,
+  );
+  assert.equal(gnssRetryCooldownMs('0x10', at), 60000);
+});
+
+test('GERMAN: 5xx, network timeouts and malformed JSON share a short cooldown', async () => {
+  for (const fail of [
+    async () => new Response('', { status: 503 }),
+    async () => {
+      throw new DOMException('timeout', 'TimeoutError');
+    },
+    async () => new Response('bad JSON'),
+  ]) {
+    let clock = 0,
+      calls = 0;
+    const request = install({
+      now: () => clock,
+      fetchImpl: async () => {
+        calls++;
+        return fail();
+      },
+    });
+    assert.equal((await request()).status, 502);
+    clock = 14000;
+    assert.equal((await request('/?lat=1&lon=1')).status, 502);
+    assert.equal(calls, 1);
+    clock = 15001;
+    await request('/?lat=2&lon=2');
+    assert.equal(calls, 2);
+  }
+});
+
+test('GERMAN: source timestamp dates evidence; frozen old snapshots are rejected', async () => {
+  const now = 1800000000000;
+  const request = install({
+    now: () => now,
+    fetchImpl: async () =>
+      Response.json({ ...snapshot, now: (now - 120000) / 1000 }),
+  });
+  const res = await request();
+  assert.equal(res.body.ageMs, 120000);
+  assert.equal(res.body.stale, true);
+  for (const sourceNow of [(now - 1800001) / 1000, undefined, NaN]) {
+    const missing = install({
+      now: () => now,
+      fetchImpl: async () => Response.json({ ...snapshot, now: sourceNow }),
+    });
+    assert.equal((await missing()).status, 502);
+  }
+});
+
+test('GERMAN: cache age and cooldown remain stable across a wall-clock rollback', async () => {
+  let wall = 1800000000000,
+    mono = 0,
+    calls = 0;
+  const request = install({
+    now: () => wall,
+    monotonicNow: () => mono,
+    fetchImpl: async () => {
+      calls++;
+      return calls === 1
+        ? Response.json({ ...snapshot, now: wall / 1000 })
+        : new Response('', { status: 429, headers: { 'Retry-After': '60' } });
+    },
+  });
+  await request();
+  wall -= 3600000;
+  mono = 61000;
+  const stale = await request();
+  assert.equal(stale.body.ageMs, 61000);
+  assert.equal(stale.body.stale, true);
+  mono += 1000;
+  assert.equal((await request('/?lat=1&lon=1')).headers['Retry-After'], '59');
+  assert.equal(calls, 2);
+});
+
+test('GERMAN: cache hits and coalesced reads do not consume upstream admission', async () => {
+  let calls = 0;
+  const request = install({
+    now: () => 1800000000000,
+    fetchImpl: async () => {
+      calls++;
+      return Response.json(snapshot);
+    },
+  });
+  for (let i = 0; i < 100; i++) assert.equal((await request()).status, 200);
+  assert.equal((await request('/?lat=1&lon=1')).status, 200);
+  assert.equal(calls, 2);
+});
+
+test('GERMAN: distinct concurrent upstream reads are bounded', async () => {
+  const pending = [];
+  const request = install({
+    fetchImpl: () => new Promise((resolve) => pending.push(resolve)),
+  });
+  const jobs = Array.from({ length: 30 }, (_, i) =>
+    request(`/?lat=${i}&lon=1`),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(pending.length <= 8);
+  pending.forEach((resolve) => resolve(Response.json(snapshot)));
+  const results = await Promise.all(jobs);
+  assert.ok(results.some((result) => result.status === 429));
 });

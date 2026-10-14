@@ -122,7 +122,7 @@ export function createApplicationCatalog({
           source: sources['fire-perimeters'],
         }),
         createApplicationGnssIntegrity({
-          source: sources['gnss-interference'],
+          source: sources['gnss-integrity'],
         }),
         createApplicationAlpr({ surface, source: sources.alpr }),
         createApplicationStreetLevel({

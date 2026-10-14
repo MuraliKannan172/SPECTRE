@@ -314,11 +314,11 @@ test('identity lookup validates its response and honors body-parse cancellation'
   });
 });
 
-test('transponder squawk and ADS-B emergency status are carried, blanks stay null', () => {
+test('squawks are validated and omitted OpenSky status differs from an explicit ADS-B clear', () => {
   const squawking = [...aircraft, '7700'];
   const civil = openSkySnapshot({ states: [squawking] }, { now }).records[0];
   assert.equal(civil.squawk, '7700');
-  assert.equal(civil.emergency, null);
+  assert.equal(civil.emergency, undefined);
   assert.equal(openSkySnapshot({ states: [aircraft] }).records[0].squawk, null);
   const mil = normalizeReadsbAircraft(
     { hex: 'abc123', lat: 30, lon: -97, squawk: '7600', emergency: 'NORDO' },

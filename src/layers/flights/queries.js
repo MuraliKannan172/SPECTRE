@@ -171,6 +171,7 @@ export function createQueries({
       // This poll's transponder broadcast (not sticky; see records.js).
       squawk: info?.squawk ?? null,
       emergency: info?.emergency ? { ...info.emergency } : null,
+      emergencyBroadcast: emergencyBroadcastPhrase(info?.emergency),
       airline: info?.airline ?? null,
       // CLASS label follows the TR-3B conversion so every downstream card
       // (cockpit, Contacts, analyst) agrees with the triangle on screen.

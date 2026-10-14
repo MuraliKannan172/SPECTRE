@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+import { cyberSonarBaseAlpha } from '../../cyberSonar.js';
 import { CLASS_SCALE_2D } from '../../data/aircraftClass.js';
 import {
   turnRateFromFixHistory,
@@ -120,6 +121,11 @@ export function createMilitarySnapshotRenderer({
 
       if (flightState._billboards.has(icao24)) {
         const bb = flightState._billboards.get(icao24);
+        if (!isTracked) {
+          bb.color = rendering
+            ._fleetBillboardColor(icao24, meta)
+            .withAlpha(cyberSonarBaseAlpha(bb));
+        }
         // Position AND rotation are owned by the fleet pass (_fleetTick);
         // course changes land on the next rotation pass (forced below).
         // Ground flips (landing/takeoff) restyle this SAME billboard in

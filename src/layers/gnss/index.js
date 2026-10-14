@@ -2,8 +2,6 @@ import * as Cesium from 'cesium';
 import {
   GNSS_LEVEL_COLORS,
   GNSS_MIN_AIRCRAFT,
-  GNSS_NACP_THRESHOLD,
-  GNSS_NIC_THRESHOLD,
   GNSS_WINDOW_MS,
   accumulateGnssObservations,
   binGnssCells,
@@ -13,12 +11,23 @@ import {
 export * from './records.js';
 export { createAdsbGnssSource } from './source.js';
 
+/**
+ * GroundPrimitive allowPicking:false suppresses ids but still submits stencil
+ * commands in Cesium's pick pass, erasing picks of overlapping ground geometry.
+ * This fill participates only in rendering, so sibling polygons remain pickable.
+ */
+class GnssGroundFill extends Cesium.GroundPrimitive {
+  update(frameState) {
+    if (!frameState.passes.pick) super.update(frameState);
+  }
+}
+
 /** Low stays visible over land so coverage reads apart from no data. */
 const FILL_ALPHA = Object.freeze({ low: 0.3, medium: 0.42, high: 0.55 });
 const LEVEL_LABELS = Object.freeze({
-  low: 'Under 2% low accuracy',
-  medium: '2–10% low accuracy',
-  high: 'Over 10% low accuracy',
+  low: 'Low-accuracy score < 2%',
+  medium: 'Low-accuracy score 2–10%',
+  high: 'Low-accuracy score > 10%',
 });
 
 /** Degrees at the centre of the current view, or null before the camera settles. */
@@ -34,7 +43,8 @@ export function defaultGnssViewAnchor(viewer) {
       new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2),
       ellipsoid,
     );
-  const rectangle = viewer?.camera?.computeViewRectangle?.(ellipsoid);
+  const rectangle =
+    !centre && viewer?.camera?.computeViewRectangle?.(ellipsoid);
   const carto = centre
     ? (ellipsoid || Cesium.Ellipsoid.WGS84).cartesianToCartographic(centre)
     : rectangle
@@ -50,20 +60,20 @@ export function defaultGnssViewAnchor(viewer) {
 
 /**
  * Own one GNSS navigation-integrity display: rolling integrity observations
- * around the views the user visits, binned into cells coloured by the share
- * of aircraft reporting low navigation accuracy. The layer id keeps its
- * original `gnss-interference` spelling because share links depend on it.
+ * around the views the user visits, binned into cells coloured by the
+ * gpsjam low-accuracy score. Share links retain token 3.
  */
 export function createGnssIntegrityLayer({
   source,
   viewAnchor = defaultGnssViewAnchor,
   now = () => Date.now(),
+  monotonicNow = () => performance.now(),
   windowMs = GNSS_WINDOW_MS,
 } = {}) {
   if (typeof source?.getSnapshot !== 'function')
     throw new TypeError('GNSS integrity layer requires a snapshot source');
   let _viewer = null;
-  let _dataSource = null;
+  let _primitives = null;
   let _request = null;
   let _enabled = false;
   let _cells = [];
@@ -91,7 +101,7 @@ export function createGnssIntegrityLayer({
       : null;
 
   function scheduleCameraRefresh() {
-    if (!_enabled || !_dataSource) return;
+    if (!_enabled || !_primitives) return;
     if (now() < _retryAt) return;
     const key = queryKey(viewAnchor(_viewer));
     if (!key || key === _lastQueryKey) return;
@@ -101,12 +111,12 @@ export function createGnssIntegrityLayer({
     _cameraTimer = setTimeout(
       async () => {
         _cameraTimer = null;
-        if (!_enabled || _backgroundRefresh) return;
+        if (!_enabled || _backgroundRefresh || _request) return;
         const key = queryKey(viewAnchor(_viewer));
         if (!key || key === _lastQueryKey) return;
         await refreshInBackground();
       },
-      Math.max(600, 2500 - (now() - _lastRequestAt)),
+      Math.max(600, 2500 - (monotonicNow() - _lastRequestAt)),
     );
   }
 
@@ -157,26 +167,40 @@ export function createGnssIntegrityLayer({
     );
     if (signature === _signature) return;
     _signature = signature;
-    _dataSource.entities.removeAll();
-    for (const cell of _cells) {
-      const color = Cesium.Color.fromCssColorString(
-        GNSS_LEVEL_COLORS[cell.level],
-      );
-      _dataSource.entities.add(
-        new Cesium.Entity({
-          id: `gnss-interference:${cell.id}`,
-          rectangle: {
-            coordinates: Cesium.Rectangle.fromDegrees(
-              cell.west,
-              cell.south,
-              cell.east,
-              cell.north,
-            ),
-            material: new Cesium.ColorMaterialProperty(
-              color.withAlpha(FILL_ALPHA[cell.level]),
-            ),
-            classificationType: Cesium.ClassificationType.BOTH,
-          },
+    _primitives.removeAll();
+    if (_cells.length) {
+      _primitives.add(
+        new GnssGroundFill({
+          geometryInstances: _cells.map(
+            (cell) =>
+              new Cesium.GeometryInstance({
+                id: `${layer.id}:${cell.id}`,
+                geometry: new Cesium.RectangleGeometry({
+                  rectangle: Cesium.Rectangle.fromDegrees(
+                    cell.west,
+                    cell.south,
+                    cell.east,
+                    cell.north,
+                  ),
+                  vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+                }),
+                attributes: {
+                  color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+                    Cesium.Color.fromCssColorString(
+                      GNSS_LEVEL_COLORS[cell.level],
+                    ).withAlpha(FILL_ALPHA[cell.level]),
+                  ),
+                },
+              }),
+          ),
+          appearance: new Cesium.PerInstanceColorAppearance({
+            flat: true,
+            translucent: true,
+          }),
+          classificationType: Cesium.ClassificationType.BOTH,
+          allowPicking: false,
+          // Retain the compact rectangle descriptors for inspection, not Entity visualizers.
+          releaseGeometryInstances: false,
         }),
       );
     }
@@ -184,7 +208,7 @@ export function createGnssIntegrityLayer({
   }
 
   const layer = {
-    id: 'gnss-interference',
+    id: 'gnss-integrity',
     name: 'GNSS Integrity',
     icon: '📡',
     source: 'adsb.lol',
@@ -200,9 +224,10 @@ export function createGnssIntegrityLayer({
       if (_viewer)
         throw new Error('GNSS integrity layer is already initialized');
       _viewer = viewer;
-      _dataSource = new Cesium.CustomDataSource('gnss-interference');
-      _dataSource.show = false;
-      viewer.dataSources.add(_dataSource);
+      _primitives = new Cesium.PrimitiveCollection();
+      _primitives.id = layer.id;
+      _primitives.show = false;
+      viewer.scene.groundPrimitives.add(_primitives);
       _removeCameraEnd = viewer.camera?.moveEnd?.addEventListener(
         scheduleCameraRefresh,
       );
@@ -214,9 +239,9 @@ export function createGnssIntegrityLayer({
     enable() {
       _enabled = true;
       // Cells left from before a long disable must not reappear past the window.
-      if (_dataSource) {
+      if (_primitives) {
         expire();
-        _dataSource.show = true;
+        _primitives.show = true;
       }
     },
 
@@ -230,11 +255,11 @@ export function createGnssIntegrityLayer({
       _request?.abort();
       _request = null;
       _enabled = false;
-      if (_dataSource) _dataSource.show = false;
+      if (_primitives) _primitives.show = false;
     },
 
     async update(_viewerArg, { signal } = {}) {
-      if (!_enabled || !_dataSource || signal?.aborted) return false;
+      if (!_enabled || !_primitives || signal?.aborted) return false;
       if (now() < _retryAt) {
         expire();
         scheduleRetry();
@@ -257,7 +282,7 @@ export function createGnssIntegrityLayer({
       const onAbort = () => request.abort(signal.reason);
       signal?.addEventListener('abort', onAbort, { once: true });
       _lastQueryKey = queryKey(anchor);
-      _lastRequestAt = now();
+      _lastRequestAt = monotonicNow();
       _coverage = {
         kind: 'regional',
         latitude: Math.round(anchor.latitude),
@@ -283,7 +308,7 @@ export function createGnssIntegrityLayer({
         _cells = binGnssCells(_observations);
         render();
         _stale = snapshot.stale === true;
-        _lastUpdate = now();
+        _lastUpdate = at - snapshot.ageMs;
         _lastError = null;
         _retryAt = 0;
         _failureCount = 0;
@@ -325,15 +350,12 @@ export function createGnssIntegrityLayer({
       _removeCameraChanged?.();
       _removeCameraEnd = null;
       _removeCameraChanged = null;
-      _request?.abort();
-      _request = null;
-      _enabled = false;
       _observations.clear();
       _cells = [];
       _signature = null;
-      if (_dataSource) {
-        viewer.dataSources.remove(_dataSource, true);
-        _dataSource = null;
+      if (_primitives) {
+        viewer.scene.groundPrimitives.remove(_primitives);
+        _primitives = null;
       }
       _viewer = null;
       _lastUpdate = null;
@@ -350,7 +372,7 @@ export function createGnssIntegrityLayer({
       return {
         chips: [],
         info:
-          'Regional sample · 250 nm radius · pan to sample another area' +
+          'Regional sample · 250 nm radius · cells from visited views over 30 min' +
           (_lastError && _retryAt
             ? ` · ${_lastError} · Retrying automatically${
                 _retryAt <= 8640000000000000
@@ -359,14 +381,14 @@ export function createGnssIntegrityLayer({
               }`
             : ''),
         infoTitle:
-          'Updates automatically after pan or zoom and once a minute. The public feed covers a 250-nautical-mile circle around the view centre; zooming out does not make it a worldwide snapshot. Blank cells have insufficient observations.',
+          'Updates automatically after pan or zoom and once a minute. The public feed covers a 250-nautical-mile circle around the view centre; zooming out does not make it a worldwide snapshot. Blank cells are outside sampled coverage or have insufficient observations.',
         legend: ['high', 'medium', 'low'].map((level, index) => ({
           label: LEVEL_LABELS[level],
           color: GNSS_LEVEL_COLORS[level],
           count: _cells.filter((cell) => cell.level === level).length,
           ...(index === 0
             ? {
-                blurb: `Share of ADS-B aircraft reporting low navigation accuracy over the last ${provenance.window.minutes} minutes, around the views you visit. An aircraft counts when it reports NIC < ${GNSS_NIC_THRESHOLD} or NACp < ${GNSS_NACP_THRESHOLD} or GPS loss: a GEV threshold borrowed from US ADS-B Out minima, not a published interference test. Cells use gpsjam.org's formula and 2% / 10% bands. Cells with fewer than ${GNSS_MIN_AIRCRAFT} aircraft are not drawn, so blank areas mean no data, not clean GNSS. Medium and high cells are navigation-integrity anomalies. Suspected jamming or spoofing is one possible cause, not a detection: avionics faults also report low values.`,
+                blurb: `Low-accuracy score = 100 × max(0, bad − 1) / total: one aircraft is discounted, so this is not the raw share. Cells need ${GNSS_MIN_AIRCRAFT} aircraft over ${provenance.window.minutes} minutes. Navigation-integrity anomalies are not a detection of jamming or spoofing.`,
               }
             : {}),
         })),
@@ -376,6 +398,12 @@ export function createGnssIntegrityLayer({
     getStats() {
       return {
         count: _cells.length,
+        levels: Object.fromEntries(
+          ['low', 'medium', 'high'].map((level) => [
+            level,
+            _cells.filter((cell) => cell.level === level).length,
+          ]),
+        ),
         lastUpdate: _lastUpdate,
         error: _lastError,
         retryInSec: _retryAt

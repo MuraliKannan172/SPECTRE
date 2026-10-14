@@ -1,4 +1,3 @@
-// src/data/aircraftEmergency.js
 /**
  * Transponder emergency status for one aircraft, from the Mode A squawk and
  * the ADS-B emergency/priority field.
@@ -10,8 +9,8 @@
  * squawk only.
  *
  * The status is what the transponder broadcast in THIS poll, never a finding:
- * crews pass through 7x00 codes while dialling, and a real emergency clears
- * when the code does. Callers keep it per poll (not sticky).
+ * crews pass through 7x00 codes while dialling. Highlighting follows the latest
+ * broadcast, which does not confirm an incident or its resolution.
  */
 
 /** @constant {string} Tint for aircraft broadcasting an emergency (not a priority). */
@@ -39,7 +38,8 @@ export function normalizeSquawk(value) {
 }
 
 /**
- * Emergency status from one observation. An explicit ADS-B status wins; a
+ * Emergency status from one observation. Higher severity wins; an ADS-B
+ * emergency wins a tie. A
  * 7x00 squawk counts even when the ADS-B field says `none`.
  * @param {{squawk?: unknown, emergency?: unknown}} [observation]
  * @returns {{kind: string, label: string, severity: 'emergency'|'priority',
@@ -53,7 +53,11 @@ export function aircraftEmergency({ squawk, emergency } = {}) {
     .trim()
     .toLowerCase();
   const fromAdsb = Object.hasOwn(KINDS, reported);
-  const kind = fromAdsb ? reported : (SQUAWK_KINDS[code] ?? null);
+  const squawkKind = SQUAWK_KINDS[code] ?? null;
+  const kind =
+    fromAdsb && (KINDS[reported].severity === 'emergency' || !squawkKind)
+      ? reported
+      : squawkKind;
   if (!kind) return null;
   return {
     kind,

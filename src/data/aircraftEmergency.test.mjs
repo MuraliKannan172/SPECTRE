@@ -82,3 +82,14 @@ test('the broadcast phrase quotes a naming code, else attributes ADS-B', () => {
   assert.equal(emergencyBroadcastPhrase(null), null);
   assert.equal(emergencyBroadcastPhrase({ kind: 'reserved' }), null);
 });
+
+test('an emergency squawk outranks an ADS-B priority', () => {
+  assert.equal(
+    aircraftEmergency({ squawk: '7700', emergency: 'lifeguard' }).kind,
+    'general',
+  );
+  assert.equal(
+    aircraftEmergency({ squawk: '7500', emergency: 'minfuel' }).kind,
+    'unlawful',
+  );
+});

@@ -3271,18 +3271,18 @@ test('GNSS integrity and interference common names toggle only the GNSS layer th
   const calls = [];
   let enabled = false;
   const dataManager = {
-    layers: new Map([['gnss-interference', { module: {} }]]),
-    getAll: () => [{ id: 'gnss-interference', name: 'GNSS Integrity' }],
+    layers: new Map([['gnss-integrity', { module: {} }]]),
+    getAll: () => [{ id: 'gnss-integrity', name: 'GNSS Integrity' }],
     isEnabled: () => enabled,
     setEnabled: async (id, value) => { calls.push([id, value]); enabled = value; return true; },
   };
   const runner = createGevActionRunner({ viewer, styleManager: {}, dataManager });
-  for (const alias of ['gnss-interference', 'gnss integrity', 'navigation integrity', 'low navigation accuracy', 'gnss interference', 'gps interference', 'gps jamming', 'gnss']) {
+  for (const alias of ['gnss-integrity', 'gnss integrity', 'navigation integrity', 'low navigation accuracy', 'gnss interference', 'gps interference', 'gps jamming', 'gnss']) {
     for (const value of [true, false]) {
       const result = await runner('set_layer_visibility', { layerId: alias, enabled: value });
       assert.equal(result.ok, true);
-      assert.equal(result.layerId, 'gnss-interference');
-      assert.deepEqual(calls.at(-1), ['gnss-interference', value]);
+      assert.equal(result.layerId, 'gnss-integrity');
+      assert.deepEqual(calls.at(-1), ['gnss-integrity', value]);
     }
   }
 });

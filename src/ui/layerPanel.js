@@ -54,7 +54,7 @@ const PANEL_GROUPS = [
       'earthquakes',
       'local-firms',
       'fire-perimeters',
-      'gnss-interference',
+      'gnss-integrity',
     ],
   },
   {

@@ -1,3 +1,4 @@
+import { normalizeSquawk } from '../../data/aircraftEmergency.js';
 import {
   admitRecords,
   cleanText,
@@ -30,9 +31,9 @@ export function normalizeOpenSkyAircraft(row) {
     typeCode: null,
     registration: null,
     operator: null,
-    squawk: cleanText(row[14]) || null,
+    squawk: normalizeSquawk(row[14]),
     // State vectors carry no ADS-B emergency field; the squawk stands alone.
-    emergency: null,
+    emergency: undefined,
   };
 }
 
@@ -71,7 +72,7 @@ export function normalizeReadsbAircraft(row, snapshotTimeMs) {
     typeCode: cleanText(row.t),
     registration: cleanText(row.r),
     operator: cleanText(row.ownOp),
-    squawk: cleanText(row.squawk) || null,
+    squawk: normalizeSquawk(row.squawk),
     emergency: cleanText(row.emergency).toLowerCase() || null,
   };
 }

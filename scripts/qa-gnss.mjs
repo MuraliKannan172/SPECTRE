@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * qa-gnss.mjs — headless proof for the GNSS Integrity layer
- * (id `gnss-interference`): low navigation accuracy reported by ADS-B.
+ * (id `gnss-integrity`): low navigation accuracy reported by ADS-B.
  *
  * Drives the REAL app in headless Chromium against a dev server (keyless).
  * The live section reads adsb.lol through `/api/gnss-integrity` (60 s server
@@ -9,10 +9,10 @@
  * stub that route in the page so they are deterministic.
  *
  *   (i)   LIVE — over Poland and the southern Baltic the layer settles with no error,
- *         one entity per cell and legend band counts that sum to the cell
+ *         one geometry per cell and legend band counts that sum to the cell
  *         count; cells are required only when the returned rows, binned
  *         with the layer's own rules, reach the per-cell minimum (live
- *         traffic varies by hour).
+ *         traffic varies by hour). Requires a non-stale response no older than 60 s.
  *   (ii)  BANDS (synthetic) — a 10-aircraft cell with 5 degraded is high,
  *         a 30-aircraft cell with 2 degraded is medium, a 3-aircraft cell
  *         with 1 degraded is low (first bad discounted), a clean cell at sea
@@ -20,9 +20,11 @@
  *         getStats. Every band is drawn and low is shown over land and sea.
  *         The row reads as low navigation accuracy, and stats carry the
  *         machine-readable provenance (GEV classifier, gpsjam bands, window).
+ *         PICK verifies actual perimeter and empty-ground clicks under GNSS.
+ *         CAMERA/GLOBE verify automatic sampling and the screen-centre anchor.
  *   (iii) FAILURE — the route stubbed to 502: stats.error is set and the
  *         cells already on the globe are kept.
- *   (iv)  DISABLE — the layer's data source is hidden.
+ *   (iv)  DISABLE — owned ground primitives are hidden.
  *   (v)   KEYBOARD — the row's toggle button, focused, turns the layer on
  *         with Enter and off with Space, keeps focus and names its state.
  *   (vi)  VIEWPORT — at a 390x844 phone viewport the open row and its legend
@@ -39,6 +41,7 @@
  * Run:  node scripts/qa-gnss.mjs --url http://localhost:4173
  *       (also against a built preview: npm run build && npm run preview,
  *       then pass the preview URL)
+ * Optional: --timeout-ms 180000 for a slow boot.
  * Exits non-zero on any FAIL. Does not commit anything.
  */
 
@@ -62,7 +65,8 @@ const getOpt = (name, dflt) => {
 };
 const APP_URL = getOpt('--url', 'http://localhost:4173');
 const HEADFUL = argv.includes('--headful');
-const LAYER_ID = 'gnss-interference';
+const TIMEOUT_MS = Number(getOpt('--timeout-ms', '60000'));
+const LAYER_ID = 'gnss-integrity';
 
 const results = [];
 function record(name, ok, detail) {
@@ -76,11 +80,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function boot(page, { lon, lat, height }) {
   await page.goto(`${APP_URL}/?welcome=0`, {
     waitUntil: 'domcontentloaded',
-    timeout: 60000,
+    timeout: TIMEOUT_MS,
   });
   await page.waitForFunction(
     () => window.__godsEyeView?.viewer && window.__godsEyeView?.dataManager,
-    { timeout: 60000 },
+    { timeout: TIMEOUT_MS },
   );
   await sleep(5000);
   await page.keyboard.press('Escape');
@@ -118,26 +122,24 @@ async function enableAndSettle(page, { timeoutS = 30, refresh = false } = {}) {
       const layer = dm.layers.get(id).module;
       if (again) await dm.refreshLayer(id);
       else await dm.setEnabled(id, true);
-      let stats = null;
-      for (let i = 0; i < tS; i++) {
-        stats = layer.getStats();
-        if (stats.count > 0 || stats.error) break;
-        await new Promise((r) => setTimeout(r, 1000));
-      }
+      const stats = layer.getStats();
       const rowControls = layer.getRowControls().legend;
       const legend = rowControls.map(({ label, count }) => ({ label, count }));
       const blurb = rowControls[0]?.blurb ?? '';
       const rowName =
         document.querySelector(`[data-layer-id="${id}"] .data-name`)
           ?.textContent ?? '';
-      const ds = window.__godsEyeView.viewer.dataSources.getByName(id)[0];
+      const all = window.__godsEyeView.viewer.scene.groundPrimitives;
+      const ds = Array.from({ length: all.length }, (_, i) => all.get(i)).find(
+        (item) => item.id === id,
+      );
       return {
         stats,
         legend,
         blurb,
         rowName,
         name: layer.name,
-        entities: ds?.entities.values.length ?? -1,
+        entities: ds?.get(0)?.geometryInstances.length ?? 0,
         shown: ds?.show ?? null,
       };
     },
@@ -164,7 +166,7 @@ async function shoot(page, name) {
   await page
     .waitForFunction(
       () => window.__godsEyeView.viewer.scene.globe.tilesLoaded,
-      { timeout: 60000 },
+      { timeout: TIMEOUT_MS },
     )
     .catch(() => {});
   await showLayerRow(page);
@@ -174,15 +176,12 @@ async function shoot(page, name) {
 /** Bounding-sphere state of every GNSS cell: DONE = 0, PENDING = 1, FAILED = 2. */
 function cellStates(id) {
   const { viewer } = window.__godsEyeView;
-  const ds = viewer.dataSources.getByName(id)[0];
-  const sphere = {};
-  return ds.entities.values.map((entity) => {
-    try {
-      return viewer.dataSourceDisplay.getBoundingSphere(entity, false, sphere);
-    } catch {
-      return 1; // not yet seen by the geometry visualizer
-    }
-  });
+  const all = viewer.scene.groundPrimitives;
+  const ds = Array.from({ length: all.length }, (_, i) => all.get(i)).find(
+    (item) => item.id === id,
+  );
+  if (!ds?.length) return [];
+  return [ds.get(0).ready ? 0 : 1];
 }
 
 /** Wait until every GNSS cell's ground rectangle has finished building. */
@@ -371,7 +370,7 @@ async function main() {
       if (res.url().includes('/api/gnss-integrity') && res.ok())
         liveBodies.push(res.json());
     });
-    await boot(live, { lon: 19.5, lat: 52.5, height: 1_100_000 });
+    await boot(live, { lon: 19.6, lat: 52.6, height: 1_100_000 });
     const l = await enableAndSettle(live);
     const legendTotal = l.legend.reduce((sum, { count }) => sum + count, 0);
     // Bin what adsb.lol actually returned with the layer's own rules: live
@@ -388,7 +387,9 @@ async function main() {
             Array.isArray(body.rows) &&
             Number.isFinite(body.ageMs) &&
             body.ageMs >= 0 &&
-            body.classifier === 'gev-nic-nacp-v1',
+            body.ageMs <= 60000 &&
+            body.stale !== true &&
+            body.classifier === 'gev-nic-nacp-v2',
         ),
       `successful responses=${liveSnapshots.length}`,
     );
@@ -405,7 +406,7 @@ async function main() {
     }
     const expectedCells = binGnssCells(expectedStore).length;
     record(
-      'LIVE: no error, one entity per cell',
+      'LIVE: no error, one geometry per cell',
       !l.stats.error && l.entities === l.stats.count,
       `cells=${l.stats.count} entities=${l.entities} error=${JSON.stringify(l.stats.error)}`,
     );
@@ -456,17 +457,19 @@ async function main() {
     );
     record(
       'BANDS: 5/10 is high, 2/30 is medium, 1/3 and 0/4 are low',
-      band('Over') === 1 && band('2') === 1 && band('Under') === 2,
+      band('Low-accuracy score >') === 1 &&
+        band('Low-accuracy score 2') === 1 &&
+        band('Low-accuracy score <') === 2,
       JSON.stringify(f.legend),
     );
     const prov = f.stats.provenance;
     record(
       'PROVENANCE: GEV classifier, gpsjam bands and visited-view window are machine-readable',
-      prov?.classifier?.id === 'gev-nic-nacp-v1' &&
+      prov?.classifier?.id === 'gev-nic-nacp-v2' &&
         prov.classifier.definedBy === 'GEV' &&
         prov.classifier.validated === false &&
         prov.aggregation?.source === 'https://gpsjam.org/faq' &&
-        JSON.stringify(prov.aggregation.bands) === '[0.02,0.1]' &&
+        JSON.stringify(prov.aggregation.bands) === '[2,10]' &&
         prov.window?.minutes === 30 &&
         prov.window.scope === 'visited-view' &&
         prov.interpretation?.validated === false,
@@ -477,12 +480,9 @@ async function main() {
       f.name === 'GNSS Integrity' &&
         f.rowName.includes('GNSS Integrity') &&
         !/interference/i.test(f.rowName) &&
-        f.legend.every(({ label }) => label.endsWith('low accuracy')) &&
-        f.blurb.startsWith(
-          'Share of ADS-B aircraft reporting low navigation accuracy',
-        ) &&
-        /GEV threshold/.test(f.blurb) &&
-        /Suspected jamming or spoofing is one possible cause/.test(f.blurb),
+        f.legend.every(({ label }) => label.startsWith('Low-accuracy score')) &&
+        /one aircraft is discounted/.test(f.blurb) &&
+        /not a detection/.test(f.blurb),
       `name=${JSON.stringify(f.name)}`,
     );
     record(
@@ -498,6 +498,128 @@ async function main() {
     );
     await shoot(page, 'synthetic-bands');
 
+    // GNSS fills must not own map input, including over a real perimeter.
+    await page.evaluate(async () => {
+      const original = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.includes('/api/fire-perimeters/inciweb'))
+          return Promise.resolve(Response.json({ rows: [] }));
+        if (url.includes('/api/fire-perimeters'))
+          return Promise.resolve(
+            Response.json({
+              rows: [
+                {
+                  stableId: 'gnss-pick-qa',
+                  name: 'GNSS PICK QA FIRE',
+                  containedPct: 0,
+                  acres: 100,
+                  polygons: [
+                    [
+                      [
+                        [18.247, 54.247],
+                        [18.253, 54.247],
+                        [18.253, 54.253],
+                        [18.247, 54.253],
+                        [18.247, 54.247],
+                      ],
+                    ],
+                  ],
+                },
+              ],
+            }),
+          );
+        return original(input, init);
+      };
+      const { viewer, dataManager } = window.__godsEyeView;
+      viewer.camera.cancelFlight();
+      viewer.camera.setView({
+        destination: viewer.scene.globe.ellipsoid.cartographicToCartesian({
+          longitude: (18.25 * Math.PI) / 180,
+          latitude: (54.25 * Math.PI) / 180,
+          height: 2500,
+        }),
+        orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
+      });
+      await dataManager.setEnabled('fire-perimeters', true);
+      viewer.scene.requestRender();
+    });
+    await page.waitForFunction(
+      () => {
+        const v = window.__godsEyeView.viewer,
+          p = v.scene.pick({
+            x: v.scene.canvas.clientWidth / 2,
+            y: v.scene.canvas.clientHeight / 2,
+          });
+        return String(p?.id?.id ?? p?.id ?? '').startsWith(
+          'fire-perimeter:gnss-pick-qa:',
+        );
+      },
+      { timeout: TIMEOUT_MS, polling: 250 },
+    );
+    const pickProbe = await page.evaluate(() => {
+      const v = window.__godsEyeView.viewer,
+        c = v.scene.canvas;
+      const centre = { x: c.clientWidth / 2, y: c.clientHeight / 2 };
+      const empty = { x: centre.x + 300, y: centre.y };
+      const picked = v.scene.pick(empty),
+        box = c.getBoundingClientRect();
+      return {
+        centre: { x: centre.x + box.left, y: centre.y + box.top },
+        empty: { x: empty.x + box.left, y: empty.y + box.top },
+        surface: !picked || picked.id === undefined,
+        height: v.camera.positionCartographic.height,
+      };
+    });
+    record('PICK: a perimeter remains selectable under GNSS', true);
+    record(
+      'PICK: street ground remains a surface pick under GNSS',
+      pickProbe.surface,
+    );
+    await page.mouse.click(pickProbe.centre.x, pickProbe.centre.y);
+    await page.waitForFunction(
+      () =>
+        (window.__gevWorldOverlay.getDiagnostics().paintedBySource[
+          'fire-perimeters'
+        ] ?? 0) > 0,
+      { timeout: 10000 },
+    );
+    record('PICK: actual perimeter click opens its incident card', true);
+    await page.screenshot({
+      path: path.join(SHOTS_DIR, 'gnss-perimeter-selected.png'),
+    });
+    await page.mouse.click(pickProbe.empty.x, pickProbe.empty.y);
+    await sleep(500);
+    record(
+      'PICK: empty ground clears the perimeter card',
+      await page.evaluate(
+        () =>
+          (window.__gevWorldOverlay.getDiagnostics().entriesBySource[
+            'fire-perimeters'
+          ] ?? 0) === 0,
+      ),
+    );
+    await page.mouse.click(pickProbe.empty.x, pickProbe.empty.y, {
+      clickCount: 2,
+    });
+    await sleep(1000);
+    record(
+      'PICK: empty double-click does not zoom to a GNSS cell',
+      await page.evaluate(
+        (height) =>
+          Math.abs(
+            window.__godsEyeView.viewer.camera.positionCartographic.height -
+              height,
+          ) < 200,
+        pickProbe.height,
+      ),
+    );
+    await page.evaluate(async () => {
+      await window.__godsEyeView.dataManager.setEnabled(
+        'fire-perimeters',
+        false,
+      );
+    });
     console.log('\nCAMERA — automatic regional refresh without toggling...');
     const beforeMove = await page.evaluate(
       () => window.__gnssQaRequests.length,
@@ -555,7 +677,7 @@ async function main() {
       const { viewer } = window.__godsEyeView;
       viewer.camera.setView({
         destination: viewer.scene.globe.ellipsoid.cartographicToCartesian({
-          longitude: (12.5 * Math.PI) / 180,
+          longitude: (12.4 * Math.PI) / 180,
           latitude: (41.9 * Math.PI) / 180,
           height: 16_000_000,
         }),
@@ -569,7 +691,7 @@ async function main() {
         const params = url && new URL(url, location.origin).searchParams;
         return (
           params &&
-          Math.abs(Number(params.get('lon')) - 12.5) < 1 &&
+          Math.abs(Number(params.get('lon')) - 12.4) < 1 &&
           Math.abs(Number(params.get('lat')) - 41.9) < 1
         );
       },
@@ -592,7 +714,7 @@ async function main() {
       'GLOBE: zoomed-out sampling stays centred on Rome and exposes its regional radius',
       world.enabled &&
         world.height > 15_000_000 &&
-        world.coverage?.longitude === 13 &&
+        world.coverage?.longitude === 12 &&
         world.coverage?.latitude === 42 &&
         world.coverage?.radiusNm === 250,
       JSON.stringify(world),
@@ -642,7 +764,10 @@ async function main() {
     console.log('\n(iv) DISABLE...');
     const shown = await page.evaluate(async (id) => {
       await window.__godsEyeView.dataManager.setEnabled(id, false);
-      return window.__godsEyeView.viewer.dataSources.getByName(id)[0]?.show;
+      const all = window.__godsEyeView.viewer.scene.groundPrimitives;
+      return Array.from({ length: all.length }, (_, i) => all.get(i)).find(
+        (item) => item.id === id,
+      )?.show;
     }, LAYER_ID);
     record('DISABLE: data source hidden', shown === false, `show=${shown}`);
     await shoot(page, 'disabled');

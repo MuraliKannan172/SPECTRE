@@ -9,6 +9,6 @@ export function createReferenceSources() {
     earthquakes: createUsgsEarthquakeSource(),
     'fire-perimeters': createWfigsPerimeterSource(),
     cables: createBundledCableSource(),
-    'gnss-interference': createAdsbGnssSource(),
+    'gnss-integrity': createAdsbGnssSource(),
   };
 }
