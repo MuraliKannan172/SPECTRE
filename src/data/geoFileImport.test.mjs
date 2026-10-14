@@ -8,6 +8,7 @@ import {
   MAX_IMPORT_ENTITIES,
   countGeoJsonGeometry,
   countKmlGeometry,
+  deduplicateKmlStyles,
   detachImportedTime,
   gpxToGeoJson,
   importFeatureName,
@@ -231,8 +232,41 @@ function xmlEl(localName, attrs = {}, kids = []) {
   const el = {
     nodeType: 1,
     localName,
+    namespaceURI: 'http://www.opengis.net/kml/2.2',
     childNodes: [],
     getAttribute: (n) => (n in attrs ? String(attrs[n]) : null),
+    get attributes() {
+      return Object.entries(attrs);
+    },
+    setAttribute: (n, value) => {
+      attrs[n] = value;
+    },
+    removeAttribute: (n) => {
+      delete attrs[n];
+    },
+    cloneNode() {
+      return xmlEl(
+        localName,
+        { ...attrs },
+        text ?? el.childNodes.map((child) => child.cloneNode(true)),
+      );
+    },
+    getElementsByTagName(name) {
+      return xmlDoc(this).getElementsByTagName(name).slice(1);
+    },
+    appendChild(child) {
+      child.parentNode?.removeChild(child);
+      child.parentNode = this;
+      this.childNodes.push(child);
+    },
+    replaceChild(next, previous) {
+      const index = this.childNodes.indexOf(previous);
+      assert.ok(index >= 0);
+      next.parentNode?.removeChild(next);
+      this.childNodes[index] = next;
+      next.parentNode = this;
+      previous.parentNode = null;
+    },
     removeChild(child) {
       this.childNodes.splice(this.childNodes.indexOf(child), 1);
       child.parentNode = null;
@@ -242,14 +276,22 @@ function xmlEl(localName, attrs = {}, kids = []) {
     k.parentNode = el;
     el.childNodes.push(k);
   }
-  const text = typeof kids === 'string' ? kids : null;
+  let text = typeof kids === 'string' ? kids : null;
+  Object.defineProperty(el, 'firstChild', {
+    get: () => el.childNodes[0] || null,
+  });
   Object.defineProperty(el, 'textContent', {
     get: () => text ?? el.childNodes.map((c) => c.textContent).join(''),
+    set: (value) => {
+      text = value;
+      el.childNodes = [];
+    },
   });
   return el;
 }
 const xmlDoc = (root) => ({
   documentElement: root,
+  createElementNS: (_ns, name) => xmlEl(name),
   getElementsByTagName(name) {
     assert.equal(name, '*');
     const out = [];
@@ -261,6 +303,118 @@ const xmlDoc = (root) => ({
     return out;
   },
 });
+const serializeStyle = (el) =>
+  JSON.stringify({
+    name: el.localName,
+    attributes: el.attributes,
+    text: el.childNodes.length ? null : el.textContent,
+    children: el.childNodes.map(serializeStyle),
+  });
+
+test('repeated inline styles are shared without replacing their inherited styleUrl', () => {
+  const style = () =>
+    xmlEl('Style', {}, [xmlEl('IconStyle', {}, [xmlEl('scale', {}, '0.6')])]);
+  const placemarks = Array.from({ length: 2100 }, () =>
+    xmlEl('Placemark', {}, [xmlEl('styleUrl', {}, '#base'), style()]),
+  );
+  const doc = xmlDoc(
+    xmlEl('kml', {}, [
+      xmlEl('Document', {}, [
+        xmlEl('Style', { id: 'gev-import-style-1' }, [xmlEl('LineStyle')]),
+        ...placemarks,
+      ]),
+    ]),
+  );
+  assert.equal(countKmlGeometry(doc).over, 'links');
+  assert.equal(deduplicateKmlStyles(doc, { serializeStyle }), 2100);
+  assert.equal(countKmlGeometry(doc).over, '');
+  const styles = doc
+    .getElementsByTagName('*')
+    .filter((el) => el.localName === 'Style');
+  assert.equal(styles.length, 2);
+  assert.equal(styles[1].getAttribute('id'), 'gev-import-style-2');
+  for (const placemark of placemarks) {
+    assert.equal(placemark.childNodes[0].textContent, '#base');
+    assert.equal(placemark.childNodes[1].localName, 'StyleMap');
+    assert.deepEqual(
+      placemark.childNodes[1].childNodes.map((pair) =>
+        pair.childNodes.map((el) => el.textContent),
+      ),
+      [
+        ['normal', '#gev-import-style-2'],
+        ['highlight', '#gev-import-style-2'],
+      ],
+    );
+  }
+});
+
+test('identical named styles redirect existing references and Pair styles remain valid', () => {
+  const style = (id) =>
+    xmlEl('Style', id ? { id } : {}, [
+      xmlEl('LineStyle', {}, [xmlEl('width', {}, '3')]),
+    ]);
+  const reference = xmlEl('styleUrl', {}, '#b');
+  const pair = xmlEl('Pair', {}, [xmlEl('key', {}, 'normal'), style()]);
+  const doc = xmlDoc(
+    xmlEl('kml', {}, [
+      style('a'),
+      style('b'),
+      xmlEl('StyleMap', { id: 'map' }, [pair]),
+      xmlEl('Placemark', {}, [reference]),
+    ]),
+  );
+  assert.equal(deduplicateKmlStyles(doc, { serializeStyle }), 3);
+  assert.equal(doc.documentElement.firstChild.localName, 'Document');
+  assert.equal(reference.textContent, '#gev-import-style-1');
+  assert.equal(pair.childNodes[1].localName, 'styleUrl');
+  assert.equal(pair.childNodes[1].textContent, '#gev-import-style-1');
+  assert.equal(
+    doc.getElementsByTagName('*').filter((el) => el.localName === 'Style')
+      .length,
+    1,
+  );
+});
+
+test('random colors and ambiguous style IDs retain independent evaluations and precedence', () => {
+  const random = () =>
+    xmlEl('Style', {}, [
+      xmlEl('IconStyle', {}, [xmlEl('colorMode', {}, 'random')]),
+    ]);
+  const named = (width) =>
+    xmlEl('Style', { id: 'collision' }, [
+      xmlEl('LineStyle', {}, [xmlEl('width', {}, width)]),
+    ]);
+  const original = [random(), random(), named('1'), named('1'), named('2')];
+  const doc = xmlDoc(xmlEl('kml', {}, original));
+  assert.equal(deduplicateKmlStyles(doc, { serializeStyle }), 0);
+  assert.deepEqual(doc.documentElement.childNodes, original);
+});
+
+test('distinct style definitions and named StyleMaps still have a pre-loader budget', () => {
+  const doc = xmlDoc(
+    xmlEl(
+      'kml',
+      {},
+      ['1', '2', '3'].map((width) =>
+        xmlEl('Style', {}, [
+          xmlEl('LineStyle', {}, [xmlEl('width', {}, width)]),
+        ]),
+      ),
+    ),
+  );
+  assert.throws(
+    () => deduplicateKmlStyles(doc, { serializeStyle, maxStyles: 2 }),
+    GeoImportError,
+  );
+  const maps = xmlDoc(
+    xmlEl('kml', {}, [
+      xmlEl('StyleMap', { id: 'a' }),
+      xmlEl('StyleMap', { id: 'b' }),
+    ]),
+  );
+  assert.equal(countKmlGeometry(maps, { maxLinks: 1 }).over, 'links');
+});
+
 test('KML extended metadata is removed before the document reaches the loader', () => {
   const point = xmlEl('Point', {}, [xmlEl('coordinates', {}, '1,2,0')]);
   const metadata = xmlEl('ExtendedData', {}, [
@@ -495,14 +649,32 @@ test('KML multipart geometries count every Cesium entity before loading', () => 
   assert.equal(countKmlGeometry(oversized).over, 'entities');
 });
 
-test('KML styles and icon links are counted against their own limit', () => {
+test('KML folders contribute to the pre-loader entity budget', () => {
+  const doc = xmlDoc(
+    xmlEl('kml', {}, [
+      xmlEl('Folder', {}, [xmlEl('Folder', {}, [xmlEl('Placemark')])]),
+    ]),
+  );
+  assert.equal(countKmlGeometry(doc).entities, 3);
+  assert.equal(countKmlGeometry(doc, { maxEntities: 2 }).over, 'entities');
+});
+
+test('KML style definitions and distinct icon links have their own limit', () => {
   const style = () =>
     xmlEl('Style', {}, [
       xmlEl('IconStyle', {}, [xmlEl('Icon', {}, [xmlEl('href', {}, 'a.png')])]),
     ]);
   const doc = xmlDoc(xmlEl('kml', {}, [style(), style(), style()]));
-  assert.equal(countKmlGeometry(doc).links, 6);
-  assert.equal(countKmlGeometry(doc, { maxLinks: 5 }).over, 'links');
+  assert.equal(countKmlGeometry(doc).links, 4);
+  assert.equal(countKmlGeometry(doc, { maxLinks: 3 }).over, 'links');
+  const distinct = xmlDoc(
+    xmlEl(
+      'kml',
+      {},
+      ['a.png', 'b.png', 'c.png'].map((href) => xmlEl('href', {}, href)),
+    ),
+  );
+  assert.equal(countKmlGeometry(distinct, { maxLinks: 2 }).over, 'links');
 });
 
 test('a KMZ image gets one blob URL however many hrefs name it', () => {

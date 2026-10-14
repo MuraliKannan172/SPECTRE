@@ -42,7 +42,7 @@ export const MAX_IMPORTED_FILES = 12;
 export const MAX_IMPORT_ENTITIES = 20_000;
 /** Most vertices (points of every line, ring and marker) in one file. */
 export const MAX_IMPORT_POSITIONS = 250_000;
-/** Most `<href>` and `<Style>` elements in one KML/KMZ document. */
+/** Most normalized style definitions and local image links in one KML/KMZ. */
 export const MAX_KML_LINKS = 2_000;
 /** Longest plain-text name kept from a file's features. */
 export const MAX_IMPORT_NAME_LENGTH = 120;
@@ -225,11 +225,11 @@ export function countGeoJsonGeometry(
 function overLimitError({ over, features, positions }) {
   if (over === 'entities')
     return new GeoImportError(
-      `That file draws more than ${MAX_IMPORT_ENTITIES.toLocaleString()} objects (the limit).`,
+      `That file creates more than ${MAX_IMPORT_ENTITIES.toLocaleString()} map objects (the limit).`,
     );
   if (over === 'links')
     return new GeoImportError(
-      `That file has more than ${MAX_KML_LINKS.toLocaleString()} styles and icon links (the limit).`,
+      `That file has more than ${MAX_KML_LINKS.toLocaleString()} style definitions and image links after cleanup (the limit).`,
     );
   if (over === 'features')
     return new GeoImportError(
@@ -549,10 +549,117 @@ const childText = (el, localName) =>
   (childrenNamed(el, localName)[0]?.textContent || '').trim();
 
 /**
+ * Share identical styles before the loader builds their graphics. Inline
+ * overrides stay inline StyleMaps, so an existing styleUrl still supplies
+ * properties the override leaves unset. Named references are redirected.
+ * Random-color styles remain unchanged; duplicate IDs
+ * keep the loader's original precedence instead of being rewritten.
+ * @param {Document} doc Sanitized KML.
+ * @param {{serializeStyle?: Function, maxStyles?: number}} [options]
+ * @returns {number} Number of original style blocks replaced.
+ */
+export function deduplicateKmlStyles(
+  doc,
+  { serializeStyle, maxStyles = MAX_KML_LINKS } = {},
+) {
+  const serializer = serializeStyle ? null : new XMLSerializer();
+  const serialize =
+    serializeStyle || ((el) => serializer.serializeToString(el));
+  const groups = new Map();
+  const usedIds = new Set();
+  const duplicateIds = new Set();
+  for (const el of doc.getElementsByTagName('*')) {
+    const id = el.getAttribute('id');
+    if (id !== null) {
+      if (usedIds.has(id)) duplicateIds.add(id);
+      usedIds.add(id);
+    }
+  }
+  for (const style of elementsNamed(doc, 'Style')) {
+    if (
+      elementsNamed(style, 'colorMode').some(
+        (el) => el.textContent.trim() === 'random',
+      )
+    )
+      continue;
+    const template = style.cloneNode(true);
+    template.removeAttribute('id');
+    const key = serialize(template);
+    let group = groups.get(key);
+    if (!group) {
+      group = { template, nodes: [] };
+      groups.set(key, group);
+      if (groups.size > maxStyles) throw overLimitError({ over: 'links' });
+    }
+    group.nodes.push(style);
+  }
+  const redirects = new Map();
+  let replaced = 0;
+  let serial = 0;
+  let container;
+  for (const { template, nodes } of groups.values()) {
+    if (
+      nodes.length < 2 ||
+      nodes.some((el) => duplicateIds.has(el.getAttribute('id')))
+    )
+      continue;
+    const ns = template.namespaceURI || 'http://www.opengis.net/kml/2.2';
+    if (!container) {
+      const root = doc.documentElement;
+      container =
+        root.localName === 'Document'
+          ? root
+          : childrenNamed(root, 'Document')[0];
+      if (!container) {
+        container = doc.createElementNS(ns, 'Document');
+        while (root.firstChild) container.appendChild(root.firstChild);
+        root.appendChild(container);
+      }
+    }
+    let id;
+    do {
+      id = `gev-import-style-${++serial}`;
+    } while (usedIds.has(id));
+    usedIds.add(id);
+    template.setAttribute('id', id);
+    container.appendChild(template);
+    for (const style of nodes) {
+      const originalId = style.getAttribute('id');
+      if (originalId !== null) redirects.set(originalId, id);
+      let reference;
+      if (style.parentNode.localName === 'Pair') {
+        reference = doc.createElementNS(ns, 'styleUrl');
+        reference.textContent = `#${id}`;
+      } else {
+        reference = doc.createElementNS(ns, 'StyleMap');
+        for (const state of ['normal', 'highlight']) {
+          const pair = doc.createElementNS(ns, 'Pair');
+          const key = doc.createElementNS(ns, 'key');
+          key.textContent = state;
+          const url = doc.createElementNS(ns, 'styleUrl');
+          url.textContent = `#${id}`;
+          pair.appendChild(key);
+          pair.appendChild(url);
+          reference.appendChild(pair);
+        }
+      }
+      style.parentNode.replaceChild(reference, style);
+      replaced += 1;
+    }
+  }
+  for (const url of elementsNamed(doc, 'styleUrl')) {
+    const value = url.textContent.trim();
+    const id = value.startsWith('#') && redirects.get(value.slice(1));
+    if (id) url.textContent = `#${id}`;
+  }
+  return replaced;
+}
+
+/**
  * Count placemarks and vertices in a parsed KML document before Cesium reads
- * it: every `<coordinates>` tuple and every `gx:coord`, plus the `<href>`
- * and `<Style>` elements (`links`), each of which can make Cesium load and
- * decode an image.
+ * it: every `<coordinates>` tuple and every `gx:coord`, plus normalized
+ * style definitions and distinct image `<href>` values (`links`).
+ * Inline StyleMaps are references, not additional shared style definitions.
  * @param {Document} doc
  * @returns {{features: number, entities: number, positions: number, links: number,
  *   over: ''|'features'|'entities'|'positions'|'links'}}
@@ -570,6 +677,7 @@ export function countKmlGeometry(
   let entities = 0;
   let positions = 0;
   let links = 0;
+  const imageLinks = new Set();
   const result = (over) => ({ features, entities, positions, links, over });
   const geometryNames = new Set([
     'Point',
@@ -583,10 +691,11 @@ export function countKmlGeometry(
   ]);
   for (const el of doc.getElementsByTagName('*')) {
     const name = el.localName;
-    // Cesium creates a parent for every placemark and a child entity for
-    // each geometry in a MultiGeometry, including nested containers.
+    // Cesium creates entities for folders, a parent for every placemark, and
+    // a child for each geometry in a MultiGeometry, including nested containers.
     if (
       name === 'Placemark' ||
+      name === 'Folder' ||
       name === 'GroundOverlay' ||
       (geometryNames.has(name) &&
         ['MultiGeometry', 'MultiTrack'].includes(el.parentNode?.localName))
@@ -594,9 +703,19 @@ export function countKmlGeometry(
       entities += 1;
       if (entities > maxEntities) return result('entities');
     }
-    if (name === 'href' || name === 'Style') {
+    if (
+      name === 'Style' ||
+      (name === 'StyleMap' && el.getAttribute('id') !== null)
+    ) {
       links += 1;
       if (links > maxLinks) return result('links');
+    } else if (name === 'href') {
+      const href = el.textContent.trim();
+      if (!imageLinks.has(href)) {
+        imageLinks.add(href);
+        links += 1;
+        if (links > maxLinks) return result('links');
+      }
     } else if (name === 'Placemark') {
       features += 1;
       if (features > maxFeatures) return result('features');
@@ -888,9 +1007,14 @@ export async function loadGeoFile(file, { viewer, color = '#39d0ff' }) {
         text = new TextDecoder().decode(bytes);
       }
       const doc = parseXml(text, format.toUpperCase());
-      const size = countKmlGeometry(doc);
+      // Bound geometry before transformations, then count the styles and
+      // image links that survive sanitizing and sharing repeated styles.
+      const size = countKmlGeometry(doc, { maxLinks: Infinity });
       if (size.over) throw overLimitError(size);
       removed = sanitizeKmlDocument(doc, resolveLocal).removed;
+      deduplicateKmlStyles(doc);
+      const normalizedSize = countKmlGeometry(doc);
+      if (normalizedSize.over) throw overLimitError(normalizedSize);
       dataSource = await Cesium.KmlDataSource.load(doc, {
         camera: viewer.scene.camera,
         canvas: viewer.scene.canvas,
@@ -908,7 +1032,7 @@ export async function loadGeoFile(file, { viewer, color = '#39d0ff' }) {
   if (entityCount > MAX_IMPORT_ENTITIES) {
     revoke();
     throw new GeoImportError(
-      `That file has ${entityCount.toLocaleString()} features; the limit is ${MAX_IMPORT_ENTITIES.toLocaleString()}.`,
+      `That file has ${entityCount.toLocaleString()} map objects; the limit is ${MAX_IMPORT_ENTITIES.toLocaleString()}.`,
     );
   }
   if (entityCount === 0) {

@@ -347,7 +347,7 @@ test('dropping files on the globe imports them; other drags are left alone', asy
 test('stripped KML content is mentioned once, for the batch that had it', () => {
   assert.equal(
     summarize([{ name: 'a.kml', ok: true, removed: 3 }]),
-    'Added 1 file. Network links and remote images in KML were left out.',
+    'Added 1 file. KML descriptions and external references were left out.',
   );
   assert.equal(
     summarize([{ name: 'b.geojson', ok: true, removed: 0 }]),

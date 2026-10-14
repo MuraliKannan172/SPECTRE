@@ -409,6 +409,6 @@ export function summarize(outcomes) {
     0,
   );
   if (added && stripped)
-    parts.push('Network links and remote images in KML were left out.');
+    parts.push('KML descriptions and external references were left out.');
   return parts.join(' ');
 }

@@ -172,7 +172,9 @@
   segments apart. Size limits are checked before anything is built. The import
   half of #890. Thanks to Chase Mills (@kapturner). Multipart geometry limits
   apply before loading, recorded KML tracks retain their original vertices,
-  and queued imports respect navigation made while waiting.
+  and queued imports respect navigation made while waiting. Repeated KML styles
+  are shared before the style limit is applied, allowing large files with many
+  copies of the same style to load without changing their graphics.
 
 ## [0.2.1] — 2026-10-02 — God's Eye View through Your Agent (with security fixes and other features)
 
