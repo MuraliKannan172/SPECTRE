@@ -338,7 +338,9 @@ test('a Retry-After is honoured up to five minutes', async () => {
         headers: { 'retry-after': header },
       })).fetchImpl,
     });
-    return source.getTile({ x: 0, y: 0, z: 0 }).catch((error) => error.retryAfterSec);
+    return source
+      .getTile({ x: 0, y: 0, z: 0 })
+      .catch((error) => error.retryAfterSec);
   };
   assert.equal(await wait('3600'), 300);
   assert.equal(await wait('99999999999'), 300);

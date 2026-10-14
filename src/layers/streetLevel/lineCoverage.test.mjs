@@ -217,17 +217,29 @@ test('overview points take the provider’s size, each its own', async (t) => {
 
 test('a point budget skips lines past it, and a shorter one later may still fit', async (t) => {
   const { state, coverage } = setup(t, {
-    tuning: { ...TUNING, maxTiles: 1, maxSequences: 10, maxPoints: 5, keepOrder: true },
+    tuning: {
+      ...TUNING,
+      maxTiles: 1,
+      maxSequences: 10,
+      maxPoints: 5,
+      keepOrder: true,
+    },
     decoded: (centre) => {
       const line = (id, n) => ({
         id,
         parts: [
-          Array.from({ length: n }, (_, i) => [centre.lon - 0.001 + i * 0.0001, centre.lat]),
+          Array.from({ length: n }, (_, i) => [
+            centre.lon - 0.001 + i * 0.0001,
+            centre.lat,
+          ]),
         ],
         capturedAt: 0,
         isPano: false,
       });
-      return { sequences: [line('three', 3), line('four', 4), line('two', 2)], overview: [] };
+      return {
+        sequences: [line('three', 3), line('four', 4), line('two', 2)],
+        overview: [],
+      };
     },
   });
   coverage.refresh();

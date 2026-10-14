@@ -70,7 +70,11 @@ test('a task already aborted when its turn comes is skipped', async () => {
   const gate = createLimiter(1);
   const first = held(log, 'a');
   const running = gate.run(first.task);
-  const signal = { aborted: false, reason: new Error('gone'), addEventListener() {} };
+  const signal = {
+    aborted: false,
+    reason: new Error('gone'),
+    addEventListener() {},
+  };
   const queued = gate.run(held(log, 'b').task, { signal });
   signal.aborted = true;
   first.finish();

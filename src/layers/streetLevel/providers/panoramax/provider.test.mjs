@@ -543,7 +543,12 @@ test('a broken neighbour z15 tile only thins the cones; an unreadable home tile 
   const box = tileBounds(home.tile.x, home.tile.y, 15);
   const at = { lon: box.west + 0.0003, lat: box.north - 0.0002 };
   const items = [0, 1, 2].map((i) =>
-    stacItem({ id: `c-${i}`, sequenceId: 'c', lon: at.lon + i * 0.00005, lat: at.lat }),
+    stacItem({
+      id: `c-${i}`,
+      sequenceId: 'c',
+      lon: at.lon + i * 0.00005,
+      lat: at.lat,
+    }),
   );
   const tiles = pictureTiles(items);
   const broken = new TextEncoder().encode('<html>oops</html>');
@@ -835,7 +840,10 @@ test('a search hit outside the radius (a bounding box’s corner) is not the nea
 });
 
 test('a line clicked from low down still searches its own sequence within 50 m', async () => {
-  const items = [...sequence('other', 1, { offset: 2 }), ...sequence('clicked', 1, { offset: 30 })];
+  const items = [
+    ...sequence('other', 1, { offset: 2 }),
+    ...sequence('clicked', 1, { offset: 30 }),
+  ];
   const { instance, source } = setup({ items });
   instance.init({
     camera: { positionCartographic: { height: 300 } },
@@ -885,7 +893,9 @@ test('a filter that hides every density dot says so', async (t) => {
     grid: [{ lon: ORIGIN.lon, lat: ORIGIN.lat, pano: 0, flat: 5 }],
   });
   env.instance.activate(env.viewer);
-  assert.ok(await until(() => env.instance.coverageStats().hint === FILTERED_HINT));
+  assert.ok(
+    await until(() => env.instance.coverageStats().hint === FILTERED_HINT),
+  );
 });
 
 test('dots are drawn at their own sizes, and the busiest is the biggest', async (t) => {

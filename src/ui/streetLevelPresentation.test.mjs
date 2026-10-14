@@ -555,6 +555,9 @@ test('the caption names an image’s own licence after its author, and leaves it
     caption({ creator: 'Fixture Mapper', license: 'CC BY-SA 4.0' }),
     'Image by Fixture Mapper · CC BY-SA 4.0',
   );
-  assert.equal(caption({ license: 'Licence Ouverte 2.0' }), 'Licence Ouverte 2.0');
+  assert.equal(
+    caption({ license: 'Licence Ouverte 2.0' }),
+    'Licence Ouverte 2.0',
+  );
   assert.equal(caption({ creator: 'Someone' }), 'Image by Someone');
 });

@@ -178,7 +178,9 @@ test('a sharp panorama still downloading when another photo opens is aborted', a
       url.endsWith('-sharp')
         ? new Promise((_, reject) => {
             signals.push(options.signal);
-            options.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+            options.signal?.addEventListener('abort', () =>
+              reject(new Error('aborted')),
+            );
           })
         : Promise.resolve({ src: url }),
     createRenderer: () => ({
@@ -278,9 +280,8 @@ test('docked, Esc anywhere in the viewer’s box (toolbar, caption) is offered t
 });
 
 test('a picture file or bitmap past any real photo’s size is refused', async (t) => {
-  const { loadImage, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE } = await import(
-    './photoViewer.js'
-  );
+  const { loadImage, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE } =
+    await import('./photoViewer.js');
   const saved = {
     fetch: globalThis.fetch,
     createImageBitmap: globalThis.createImageBitmap,

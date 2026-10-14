@@ -78,8 +78,7 @@ export function decodeCoverageTile(bytes, address) {
       const props = feature.properties || {};
       const parts = [];
       let length = 0;
-      const tolerance =
-        (SIMPLIFY_TOLERANCE_UNITS * sequences.extent) / 4096;
+      const tolerance = (SIMPLIFY_TOLERANCE_UNITS * sequences.extent) / 4096;
       for (const line of feature.loadGeometry()) {
         if (line.length < 2) continue;
         for (let k = 1; k < line.length; k++)

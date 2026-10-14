@@ -1276,7 +1276,10 @@ async function main() {
                   },
                 )
                 .catch(() => null);
-              assert.ok(aimed, 'the line is pickable over the other’s pictures');
+              assert.ok(
+                aimed,
+                'the line is pickable over the other’s pictures',
+              );
               at = await aimed.jsonValue();
             }
             const parked = await camera();

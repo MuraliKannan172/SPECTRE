@@ -191,8 +191,15 @@ test('a z15 tile’s pictures of one sequence become cones; other sequences’ a
 });
 
 test('lines are simplified within a few tile units, ends and corners kept', () => {
-  const zigzag = Array.from({ length: 1000 }, (_, i) => ({ x: i, y: i % 2 ? 1 : 0 }));
-  assert.deepEqual(simplifyLine(zigzag, 4), [zigzag[0], zigzag.at(-1)], 'a 1-unit wobble goes');
+  const zigzag = Array.from({ length: 1000 }, (_, i) => ({
+    x: i,
+    y: i % 2 ? 1 : 0,
+  }));
+  assert.deepEqual(
+    simplifyLine(zigzag, 4),
+    [zigzag[0], zigzag.at(-1)],
+    'a 1-unit wobble goes',
+  );
   const corner = [
     { x: 0, y: 0 },
     { x: 50, y: 1 },
@@ -221,6 +228,9 @@ test('a decoded GPS track keeps a fraction of its points', () => {
     encodePanoramaxTile(tile, { sequences: [{ id: 'gps', parts: [track] }] }),
     tile,
   ).sequences;
-  assert.ok(sequence.parts[0].length < 100, `${sequence.parts[0].length} points`);
+  assert.ok(
+    sequence.parts[0].length < 100,
+    `${sequence.parts[0].length} points`,
+  );
   assert.ok(sequence.parts[0].length > 5);
 });

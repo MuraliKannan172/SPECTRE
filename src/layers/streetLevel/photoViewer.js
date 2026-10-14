@@ -178,6 +178,8 @@ export function createPhotoViewer({
   let documentOf = null;
   /** A context loss's look direction, for the reopen of that photo. */
   let restoreView = null;
+  /** The panel's viewer box, where Esc is listened for (null: the root). */
+  let escapeTarget = null;
   /** Width of the panorama texture on screen (0: the preview). */
   let panoWidth = 0;
   /** The sharper panorama on its way, for which open (resizes come in bursts). */
@@ -450,6 +452,7 @@ export function createPhotoViewer({
   }
 
   function onKeyDown(event) {
+    if (!escapeTarget) onEscapeKey(event);
     if (
       event.defaultPrevented ||
       event.altKey ||
@@ -528,7 +531,10 @@ export function createPhotoViewer({
     root.append(picture, canvas, prevButton, nextButton);
     host.append(root);
     listen(root, 'keydown', onKeyDown);
-    listen(host.closest?.('.sl-viewer-wrap') ?? root, 'keydown', onEscapeKey);
+    // The viewer's box in the panel; without one, the root's own handler
+    // takes Esc (one listener per element and type).
+    escapeTarget = host.closest?.('.sl-viewer-wrap') ?? null;
+    if (escapeTarget) listen(escapeTarget, 'keydown', onEscapeKey);
     applyRenderMode();
   }
 
@@ -564,9 +570,7 @@ export function createPhotoViewer({
       if (size[0] <= panoWidth) return;
       if (panoComing?.seq === seq && size[0] <= panoComing.width) return;
       const sharp = sources.panoSharp(target, size, {
-        expanded: Boolean(
-          root?.closest?.('.sl-viewer-wrap-expanded'),
-        ),
+        expanded: Boolean(root?.closest?.('.sl-viewer-wrap-expanded')),
       });
       if (!sharp?.url) return;
       const coming = { seq, width: size[0], controller: new AbortController() };

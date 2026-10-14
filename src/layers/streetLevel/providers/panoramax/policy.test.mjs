@@ -227,7 +227,12 @@ test('hostile item data: a malformed link escape, null coordinates, a huge produ
 });
 
 test('the instance holding a picture is named (its via host), never as its author', () => {
-  const item = stacItem({ id: 'a', lon: 1, lat: 2, producer: 'someone@ign.example.fr' });
+  const item = stacItem({
+    id: 'a',
+    lon: 1,
+    lat: 2,
+    producer: 'someone@ign.example.fr',
+  });
   item.links.push({ rel: 'via', href: 'https://panoramax.ign.fr' });
   assert.equal(normalizeItem(item).creator, null);
   assert.equal(normalizeItem(item).via, 'panoramax.ign.fr');

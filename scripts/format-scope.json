@@ -937,7 +937,6 @@
   "src/testSupport/panoramaxFixtures.mjs",
   "src/layers/streetLevel/photoViewer.test.mjs",
   "src/layers/streetLevel/limiter.test.mjs",
-  "src/layers/streetLevel/panorama.test.mjs",
   "src/layers/streetLevel/lineCoverage.test.mjs",
   "src/testSupport/kartaViewFakes.mjs",
   "src/testSupport/googleStreetViewFakes.mjs",

@@ -179,10 +179,19 @@ test('a 360° picture shows its SD equirectangular image, then HD shrunk to 4,09
 test('HD panoramas too big to decode, or no bigger than SD, are never fetched; nor while docked', () => {
   const size = [4096, 2048];
   const expanded = { expanded: true };
-  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.pano, size, { expanded: false }), null);
+  assert.equal(
+    PANORAMAX_SOURCES.panoSharp(PHOTOS.pano, size, { expanded: false }),
+    null,
+  );
   assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.pano, size), null);
-  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.bigPano, size, expanded), null);
-  assert.equal(PANORAMAX_SOURCES.panoSharp(PHOTOS.smallPano, size, expanded), null);
+  assert.equal(
+    PANORAMAX_SOURCES.panoSharp(PHOTOS.bigPano, size, expanded),
+    null,
+  );
+  assert.equal(
+    PANORAMAX_SOURCES.panoSharp(PHOTOS.smallPano, size, expanded),
+    null,
+  );
   assert.deepEqual(
     PANORAMAX_SOURCES.panoSharp({ ...PHOTOS.pano, width: 3000 }, size, expanded)
       .resize,
