@@ -5,6 +5,9 @@
   Repeated Context-open calls and rail-driven expansion both close the mini,
   with a regression for auto-collapse restoration (raysung-2026, #804).
 
+- Snow flakes sway within a fixed range instead of drifting sideways faster the
+  longer the app runs; the Wind setting still scales the sway.
+
 - The right rail ignores panels that other CSS hides, such as during an event
   view, so they no longer force one-panel-at-a-time layout or collapse visible
   panels. Panels the rail collapses itself are still restored.
@@ -25,6 +28,12 @@
   off-host. Offline cameras are dropped. Once enabled, the 250 cameras nearest
   the five borough cores load and `CCTV_NYC_MAX_SOURCES` changes the cap. The catalog-wide ceiling is
   unchanged; extra cameras share it round-robin with the other packs.
+
+- Weather records keep missing conditions unknown and refuse summaries without a measured temperature.
+
+- Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
+
+- Director timeline seeks cross the dateline along the short longitude arc.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
