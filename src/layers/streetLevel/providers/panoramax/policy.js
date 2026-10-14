@@ -1,0 +1,220 @@
+import { COLORS as SHARED_COLORS, PROVIDER_COLORS } from '../../policy.js';
+
+export { NEAREST_RADIUS_M } from '../../policy.js';
+
+/** Identity and tuning for the Panoramax street-level provider (keyless). */
+export const PANORAMAX_PROVIDER_ID = 'panoramax';
+export const PANORAMAX_NAME = 'Panoramax';
+export const PANORAMAX_LABEL = 'PANORAMAX';
+
+/**
+ * The Panoramax meta-catalogue: one keyless, CORS-enabled STAC API over
+ * every federated instance (OpenStreetMap France, IGN, MapComplete…). Its
+ * pictures are served by the instance that holds them.
+ */
+export const PANORAMAX_API = 'https://api.panoramax.xyz/api';
+/** The meta-catalogue's web viewer, where the caption link goes. */
+export const PANORAMAX_VIEWER = 'https://api.panoramax.xyz/';
+
+/** Stable id prefixes for picked primitives; every one starts with `pnx:`. */
+export const PICK_PREFIX = Object.freeze({
+  root: 'pnx:',
+  sequence: 'pnx:seq:',
+  image: 'pnx:img:',
+});
+
+export const COLORS = Object.freeze({
+  coverage: PROVIDER_COLORS.panoramax,
+  selected: SHARED_COLORS.selected,
+});
+
+/**
+ * Sequence lines come from z7–15 tiles; z11–14 are drawn (a dense z11 tile
+ * over Paris is ~1.4 MB and 3,800 sequences, z12 ~800 kB). Higher up, the
+ * z0–5 `grid` layer's density cells (0.1°, ~10 km) draw as points: below
+ * 30 km they would be a few dots over a whole city.
+ */
+export const COVERAGE_Z14_BELOW_M = 1_800;
+export const COVERAGE_Z13_BELOW_M = 5_000;
+export const COVERAGE_Z12_BELOW_M = 12_000;
+export const COVERAGE_LINES_BELOW_M = 30_000;
+export const COVERAGE_TUNING = Object.freeze({
+  maxTiles: 9,
+  overviewMaxTiles: 6,
+  // Each tile draws at most 1,600 lines, its longest first: a dense z11
+  // tile over Paris holds 3,800, and a lower cap left the city centre
+  // looking emptier than its suburbs. (KartaView draws as many.)
+  maxSequences: 14_400,
+  lineWidthPx: 2.5,
+  overviewPointPx: 4,
+  moveDebounceMs: 320,
+  viewRangeMinM: 2_500,
+  viewRangePerHeight: 10,
+  viewNearM: 1_000,
+});
+/**
+ * Grid cells per overview tile, at most: a z0 tile holds ~70,000 cells
+ * (1.9 MB), drawn as this many binned points.
+ */
+export const OVERVIEW_BINS_PER_AXIS = 96;
+
+export const RATE_LIMITED_MESSAGE =
+  'Panoramax is busy — coverage resumes on its own';
+export const NO_COVERAGE_HINT = 'no Panoramax pictures in view';
+/** From high up the dots are where pictures are, not sequences to click. */
+export const OVERVIEW_HINT = 'zoom in to click a Panoramax sequence';
+
+/** Cones come from z15 tiles' `pictures` layer (~110 bytes a picture). */
+export const PICTURE_TILE_ZOOM = 15;
+/** Within this of a z15 tile's edge, the neighbouring tile's pictures join. */
+export const PICTURE_TILE_EDGE_M = 150;
+
+export const TILE_TIMEOUT_MS = 20_000;
+export const API_TIMEOUT_MS = 12_000;
+/** Real tiles are under 6 MB (z6 over France); refuse anything absurd. */
+export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+/** Requests at once to the API (tiles have their own budget). */
+export const API_CONCURRENCY = 4;
+export const TILE_CONCURRENCY = 6;
+
+/** Pictures asked for around a point; the API returns them nearest first. */
+export const NEAREST_LIMIT = 10;
+/** Any picture within the radius, whichever way it looks (2–180°). */
+export const NEAREST_FOV_TOLERANCE_DEG = 180;
+
+/** A full-resolution panorama is only fetched up to this width (memory). */
+export const PANO_HD_MAX_WIDTH = 8_192;
+/** An HD panorama can be several megabytes. */
+export const HD_TIMEOUT_MS = 30_000;
+/** Panoramax's SD derivative is 2,048 px wide, its thumbnail 500 px. */
+export const SD_WIDTH = 2_048;
+
+/** On-globe credit: licences are per picture, named in the caption. */
+export const PANORAMAX_CREDIT_HTML =
+  'Street Level: imagery © <a href="https://panoramax.fr" target="_blank" rel="noopener">Panoramax</a> contributors, licence per picture';
+
+export const LINE_CLICK_HINT = 'click a line for the photo there';
+
+/** Licence ids Panoramax uses, as the caption names them. */
+const LICENSE_LABELS = Object.freeze({
+  'CC-BY-SA-4.0': 'CC BY-SA 4.0',
+  'CC-BY-4.0': 'CC BY 4.0',
+  'CC0-1.0': 'CC0',
+  'etalab-2.0': 'Licence Ouverte 2.0',
+});
+
+/** The caption's licence name for a STAC licence id, or null. */
+export function licenseLabel(license) {
+  if (typeof license !== 'string' || !license.trim()) return null;
+  const id = license.trim();
+  if (id === 'proprietary' || id === 'other') return null;
+  return LICENSE_LABELS[id] || id.slice(0, 40);
+}
+
+/** Deep link to a picture in the Panoramax web viewer. */
+export function panoramaxPictureUrl(pictureId) {
+  const id = String(pictureId ?? '').trim();
+  if (!id) return PANORAMAX_VIEWER;
+  return `${PANORAMAX_VIEWER}#${new URLSearchParams({ pic: id, focus: 'pic' })}`;
+}
+
+/** Epoch ms for a capture time ('2023-12-12T07:54:47+00:00', '2023-12-12 07:56:37+00'), or null. */
+export function panoramaxTimeMs(value) {
+  if (typeof value !== 'string' || !value) return null;
+  // Tile timestamps are Postgres text: a space and an hour-only offset.
+  const iso = /\d[T ]\d/.test(value)
+    ? value
+        .replace(' ', 'T')
+        .replace(/([+-]\d{2})$/, '$1:00')
+        .replace(/\.(\d{3})\d+/, '.$1')
+    : value;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) && ms > Date.UTC(1990, 0, 1) ? ms : null;
+}
+
+/** An https address, or null (asset links come from federated instances). */
+function httpsUrl(value) {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Last path segment of an item's `rel` link: the linked picture's id. */
+function linkedId(item, rel) {
+  const href = item?.links?.find?.((link) => link?.rel === rel)?.href;
+  if (typeof href !== 'string') return null;
+  const id = href.split(/[?#]/)[0].split('/').filter(Boolean).pop();
+  return id ? decodeURIComponent(id) : null;
+}
+
+/**
+ * Who took the picture. Producers are account names, and some accounts
+ * are named by an email address: those are not repeated in the caption.
+ */
+function creatorOf(item) {
+  const props = item.properties || {};
+  const names = [
+    props['geovisio:producer'],
+    ...(Array.isArray(item.providers)
+      ? item.providers
+          .filter((p) => p?.roles?.includes?.('producer'))
+          .map((p) => p.name)
+      : []),
+  ];
+  const name = names.find((value) => typeof value === 'string' && value.trim());
+  if (!name || /\S+@\S+\.\S+/.test(name)) return null;
+  return name.trim().slice(0, 80);
+}
+
+/** A 360° picture: a full-sphere field of view or an equirectangular projection. */
+export function isEquirectangular(item) {
+  const props = item?.properties || {};
+  const orientation = props['pers:interior_orientation'];
+  if (Number(orientation?.field_of_view) >= 360) return true;
+  return props['pers:projection'] === 'equirectangular';
+}
+
+/**
+ * A STAC item (from search or a collection) in the shape the provider and
+ * viewer use, or null without an id or a position.
+ * @returns {{id: string, sequenceId: string|null, lon: number, lat: number, heading: number|null, isPano: boolean, capturedAt: number|null, creator: string|null, license: string|null, width: number|null, prevId: string|null, nextId: string|null, urls: {thumb: string|null, sd: string|null, hd: string|null}}|null}
+ */
+export function normalizeItem(item) {
+  if (!item || item.id == null) return null;
+  const [lon, lat] = Array.isArray(item.geometry?.coordinates)
+    ? item.geometry.coordinates.map(Number)
+    : [NaN, NaN];
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  const props = item.properties || {};
+  const assets = item.assets || {};
+  const azimuth =
+    props['view:azimuth'] === '' || props['view:azimuth'] == null
+      ? NaN
+      : Number(props['view:azimuth']);
+  const width = Number(
+    props['pers:interior_orientation']?.sensor_array_dimensions?.[0],
+  );
+  return {
+    id: String(item.id),
+    sequenceId: item.collection != null ? String(item.collection) : null,
+    lon,
+    lat,
+    heading: Number.isFinite(azimuth) ? ((azimuth % 360) + 360) % 360 : null,
+    isPano: isEquirectangular(item),
+    capturedAt: panoramaxTimeMs(props.datetime),
+    creator: creatorOf(item),
+    license: licenseLabel(props.license),
+    width: Number.isFinite(width) && width > 0 ? width : null,
+    prevId: linkedId(item, 'prev'),
+    nextId: linkedId(item, 'next'),
+    urls: {
+      thumb: httpsUrl(assets.thumb?.href),
+      sd: httpsUrl(assets.sd?.href),
+      hd: httpsUrl(assets.hd?.href),
+    },
+  };
+}

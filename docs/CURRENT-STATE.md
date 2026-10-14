@@ -3084,7 +3084,7 @@ provider draws in one colour (`PROVIDER_COLORS` in
 `src/layers/streetLevel/policy.js`); 360° cones are rings and the selected
 sequence is GEV cyan. Share options: `m` (Mapillary), `r` (the other providers' switches by id,
 e.g. `google-1` for Street View), `p` (`a`/`p`/`f` panoramas), `s` (since, days). Mapillary, Google
-Street View and KartaView are registered. Without
+Street View, KartaView and Panoramax are registered. Without
 `MAPILLARY_CLIENT_TOKEN` the panel reads KEY REQUIRED and the controls are
 disabled. With it, coverage draws as z0–5 overview points from orbit and z11–14
 sequence lines below 60 km; the proxy strips the unused `image` layer from z14
@@ -3244,14 +3244,49 @@ photo that was opening is drawn on the new canvas instead. FIT / FILL hide
 for panoramas (`supportsRenderModes`). The
 caption has no place name (KartaView's is where the drive began) and links to
 the full-size photo through the image proxy, since kartaview.org's photo
-pages fail for signed-out visitors.
+pages fail for signed-out visitors. The viewer itself is `photoViewer.js`,
+shared with Panoramax: each provider hands it a `PhotoSources` table (first
+and sharper flat and panorama URLs, and the caption fields).
+
+Panoramax (`providers/panoramax/`) is keyless and browser-side: the
+meta-catalogue `api.panoramax.xyz` (CORS open) federates every instance, and
+each picture is served by the instance holding it (OpenStreetMap France,
+IGN, MapComplete…; IGN's redirect to its OVH object storage). Its chip
+(orange, `#ff6f00`, Panoramax's own) starts off. Coverage comes from its
+vector tiles (`/api/map/{z}/{x}/{y}.mvt`, an hour's HTTP cache): sequence
+lines from z14 below 1.8 km above ground, z13 to 5 km, z12 to 12 km and z11
+to 30 km (a dense z11 tile over Paris is ~1.4 MB and 3,800 sequences; each
+tile draws its 1,600 longest), and above 30 km the `grid` layer's 0.1°
+density cells, binned to at most 96×96 points a tile (a z0 tile holds
+~70,000 cells) and not counted as sequences: the panel says to zoom in. Both
+filters apply: lines carry their day and camera type, and a cell stays while
+it holds pictures of the kind asked for (cells are undated). A click on a
+line asks the core (`actions.openNearest`) for that sequence's picture
+nearest the click (`/api/search?place_position…&collections=<id>`, any
+direction: `place_fov_tolerance=180`), without framing, then any sequence's
+if it has none within 50 m; the filters go to the API (`filter=
+field_of_view=360`, `datetime=<since>/..`). Once the picture is on screen
+its sequence is highlighted and drawn as cones from the z15 tiles around it
+(their `pictures` layer, ~110 bytes a picture, against ~7.5 kB for a STAC
+item), plus a neighbour within 150 m of an edge; the cones re-centre when a
+picture opens outside them. ‹ › follow the picture's own `prev`/`next`
+links, so stepping costs one small search per picture. The viewer shows the
+2,048 px SD derivative (equirectangular for a 360° picture) and swaps in the
+HD original only when the viewer is wider than SD (flat) or needs a 4,096 px
+panorama (expanded), once, shrunk while it decodes; originals wider than
+8,192 px are never fetched. The caption names the author (not an account
+named by an email address) and the picture's licence (CC BY-SA 4.0, Licence
+Ouverte 2.0…; StreetPose `license`), and links to the picture in the
+Panoramax viewer. The MCP globe panel allows the meta-catalogue and the
+three biggest instances; a picture on another instance shows only in the
+app.
 
 Street Level has two browser gates. `npm run qa:street-level -- --url <server>`
 runs against real Mapillary and needs `MAPILLARY_CLIENT_TOKEN`. `npm run
 qa:street-level:fixtures -- --url <server>` answers every Mapillary request
 from fixtures (`providers/mapillary/coverageFixture.mjs`,
-`scripts/fixtures/street-level/`), so it needs no network and covers the whole
-photo flow. CI runs the fixture gate and `qa:panel-resize`
+`scripts/fixtures/street-level/`), and KartaView's and Panoramax's too, so it
+needs no network and covers the whole photo flow. CI runs the fixture gate and `qa:panel-resize`
 against a production build served by `vite preview` with a dummy token.
 
 Directions is a keyless front end to the routing the voice agent already
