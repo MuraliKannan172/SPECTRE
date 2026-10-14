@@ -225,3 +225,18 @@ test('hostile item data: a malformed link escape, null coordinates, a huge produ
     'an @ without a domain is a name',
   );
 });
+
+test('a picture whose producer is hidden is credited to the instance holding it', () => {
+  const item = stacItem({
+    id: 'a',
+    lon: 1,
+    lat: 2,
+    producer: 'someone@ign.example.fr',
+  });
+  item.links.push({ rel: 'via', href: 'https://panoramax.ign.fr' });
+  assert.equal(normalizeItem(item).creator, 'panoramax.ign.fr');
+  item.links.at(-1).href = 'http://insecure.example';
+  assert.equal(normalizeItem(item).creator, null);
+  item.links.at(-1).href = 'not a url';
+  assert.equal(normalizeItem(item).creator, null);
+});

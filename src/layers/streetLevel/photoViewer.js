@@ -117,6 +117,7 @@ export function panoSizeFor(canvasPixels, fovDeg) {
  * @param {(photo: object, delta: -1|1) => Promise<string|null>} options.step   The photo `delta` along the sequence, or null at its end.
  * @param {(imageId: string) => void} options.onStep   Open the photo ‹ › chose (through the core, so loading and errors show).
  * @param {(photo: object) => void} [options.onShown]   A photo is on screen.
+ * @param {() => boolean} [options.onEscape]   Esc in the docked viewer: true when it was used (e.g. a selection cleared).
  * @param {object} [options.render]   Render governor.
  * @param {(url: string, options?: object) => Promise<HTMLImageElement|ImageBitmap>} [options.load]
  * @param {(canvas: HTMLCanvasElement) => object} [options.createRenderer]
@@ -130,6 +131,7 @@ export function createPhotoViewer({
   step,
   onStep,
   onShown = () => {},
+  onEscape = () => false,
   render,
   load = loadImage,
   createRenderer = createPanoramaRenderer,
@@ -417,6 +419,18 @@ export function createPhotoViewer({
       event.metaKey
     )
       return;
+    // Docked, Esc is the viewer's before the panel's (which would collapse);
+    // expanded, the dialog's own Esc shrinks it.
+    if (
+      event.key === 'Escape' &&
+      !event.shiftKey &&
+      !root?.closest?.('.sl-viewer-wrap-expanded') &&
+      onEscape()
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const pano = showing === 'pano' && renderer;
     const turn = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
     // Shift+← → look around a panorama; ← → step along the sequence.

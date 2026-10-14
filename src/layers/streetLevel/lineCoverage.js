@@ -95,6 +95,7 @@ export function meshBoxInRange(box, centre) {
  * @param {LineCoverageTuning} options.tuning
  * @param {{keyRejected?: string, rateLimited: string, tooHigh?: string}} options.messages
  * @param {(sequence: object, filter: object) => boolean} [options.passes]  Whether the imagery filter keeps a line or point.
+ * @param {(point: object) => number} [options.overviewPointSize]  An overview point's size in pixels (default `tuning.overviewPointPx`).
  */
 export function createLineCoverage({
   state,
@@ -106,6 +107,7 @@ export function createLineCoverage({
   tuning,
   messages,
   passes = passesImageryFilter,
+  overviewPointSize = null,
 }) {
   const { render } = state.services;
   const perTileSequenceCap = Math.floor(tuning.maxSequences / tuning.maxTiles);
@@ -427,7 +429,7 @@ export function createLineCoverage({
         collection.add({
           position: Cesium.Cartesian3.fromDegrees(point.lon, point.lat),
           color: tint,
-          pixelSize: tuning.overviewPointPx,
+          pixelSize: overviewPointSize?.(point) ?? tuning.overviewPointPx,
           // Google 3D terrain and clouds must not hide the near side's dots;
           // the horizon cull hides the far side's, which this lets through.
           disableDepthTestDistance: Number.POSITIVE_INFINITY,

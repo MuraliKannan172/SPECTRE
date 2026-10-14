@@ -3254,9 +3254,10 @@ each picture is served by the instance holding it (OpenStreetMap France,
 IGN, MapComplete…; IGN's redirect to its OVH object storage). Its chip
 (orange, `#ff6f00`, Panoramax's own) starts off. Coverage comes from its
 vector tiles (`/api/map/{z}/{x}/{y}.mvt`, an hour's HTTP cache): sequence
-lines from z14 below 1.8 km above ground, z13 to 5 km, z12 to 12 km and z11
-to 30 km (a dense z11 tile over Paris is ~1.4 MB and 3,800 sequences; each
-tile draws its 1,600 longest), and above 30 km the `grid` layer's 0.1°
+lines from z14 below 1.8 km above ground, z13 to 5 km, z12 to 12 km, z11
+to 30 km and z10 to 60 km, as Mapillary's (a dense z10 tile over Paris is
+~2.1 MB and 8,600 sequences; each tile draws its 1,600 longest), and above
+60 km the `grid` layer's 0.1°
 density cells, binned to at most 96×96 points a tile (a z0 tile holds
 ~70,000 cells) and not counted as sequences: the panel says to zoom in. Both
 filters apply: lines carry their day and camera type, and a cell stays while

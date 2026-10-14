@@ -173,14 +173,16 @@ test('the newest search goes first when the API gate is full', async () => {
   });
   const all = ['1', '2', '3', '4', '5', '6'].map((id) => source.getItem(id));
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(order, ['1', '2', '3', '4'], 'four at once');
+  assert.deepEqual(order, ['1', '2'], 'two at once');
   waiting.shift()();
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(order.at(-1), '6', 'the latest waiting one next');
-  while (waiting.length) waiting.shift()();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  while (waiting.length) waiting.shift()();
-  await Promise.all(all);
+  let done = false;
+  Promise.allSettled(all).then(() => (done = true));
+  while (!done) {
+    waiting.splice(0).forEach((go) => go());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 });
 
 test('an unreadable search answer, or one with no features, is handled', async () => {
@@ -226,4 +228,68 @@ test('a network failure reads as no answer, not as a stack trace', async () => {
     assert.match(error.message, /did not answer/);
     return true;
   });
+});
+
+test('a search that timed out is asked once more; a second timeout is reported', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let calls = 0;
+  const hang = (signal) =>
+    new Promise((_, reject) =>
+      signal.addEventListener('abort', () => reject(signal.reason)),
+    );
+  const source = createPanoramaxSource({
+    fetchImpl: async (url, { signal }) => {
+      calls++;
+      if (calls === 1) return hang(signal);
+      return new Response(JSON.stringify({ features: [{ id: 'a' }] }));
+    },
+  });
+  const asked = source.getItem('a');
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+  t.mock.timers.tick(60_000);
+  assert.deepEqual(await asked, { id: 'a' });
+  assert.equal(calls, 2);
+  const stuck = createPanoramaxSource({
+    fetchImpl: async (url, { signal }) => hang(signal),
+  });
+  const never = stuck.getItem('b');
+  for (let round = 0; round < 2; round++) {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    t.mock.timers.tick(60_000);
+  }
+  await assert.rejects(never, /did not answer in time/);
+});
+
+test('the HTTP/1.1 API never gets more than five requests at once: three tiles, two searches', async () => {
+  const { API_CONCURRENCY, TILE_CONCURRENCY } = await import('./policy.js');
+  assert.ok(API_CONCURRENCY + TILE_CONCURRENCY <= 5);
+  let open = 0;
+  let most = 0;
+  const waiting = [];
+  const source = createPanoramaxSource({
+    fetchImpl: async (url) => {
+      open++;
+      most = Math.max(most, open);
+      await new Promise((resolve) => waiting.push(resolve));
+      open--;
+      return url.includes('/map/')
+        ? new Response(null, { status: 204 })
+        : new Response(JSON.stringify({ features: [] }));
+    },
+  });
+  const all = [
+    ...Array.from({ length: 8 }, (_, i) =>
+      source.getTile({ x: i, y: 0, z: 14 }),
+    ),
+    ...Array.from({ length: 4 }, (_, i) => source.getItem(String(i))),
+  ];
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(most, 5);
+  let done = false;
+  Promise.allSettled(all).then(() => (done = true));
+  while (!done) {
+    waiting.splice(0).forEach((go) => go());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.equal(most, 5, 'never more');
 });

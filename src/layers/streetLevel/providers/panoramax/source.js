@@ -115,13 +115,24 @@ export function createPanoramaxSource({
     }
   }
 
-  /** A STAC search, through the API gate (newest request first). */
+  /**
+   * A STAC search, through the API gate (newest request first). One that
+   * timed out is asked once more: a search is quick once the connection
+   * is free.
+   */
   async function search(params, { signal } = {}) {
     const url = `${root}/search?${new URLSearchParams(params)}`;
-    const bytes = await apiLimiter.run(
-      () => get(url, { signal, timeoutMs: API_TIMEOUT_MS }),
-      { signal },
-    );
+    const once = () =>
+      apiLimiter.run(() => get(url, { signal, timeoutMs: API_TIMEOUT_MS }), {
+        signal,
+      });
+    let bytes;
+    try {
+      bytes = await once();
+    } catch (error) {
+      if (signal?.aborted || error?.message !== NO_ANSWER) throw error;
+      bytes = await once();
+    }
     let payload;
     try {
       payload = JSON.parse(new TextDecoder().decode(bytes));

@@ -406,6 +406,13 @@ export function createKartaViewProvider({
         step,
         onStep: openStepped,
         onShown: recentreCones,
+        // Esc in the viewer clears the selected drive, as the panel says.
+        onEscape: () => {
+          if (!state.sequence.selectedId) return false;
+          cones.clearSelection();
+          drawnPage = null;
+          return true;
+        },
         render: context.services?.render,
         ...viewerOptions,
       });

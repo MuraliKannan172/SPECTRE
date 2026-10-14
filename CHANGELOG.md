@@ -97,7 +97,7 @@
 
 - Street Level: Panoramax is the fourth provider, keyless. Light its chip
   (orange; off by default, one provider at a time): from orbit dots show
-  where the federated commons has pictures, and below about 30 km its
+  where the federated commons has pictures, and below about 60 km its
   sequences draw as lines from `api.panoramax.xyz` vector tiles. A click on a
   line opens that sequence's picture nearest the click without moving the
   camera, flat or 360°, with cones along the sequence around it and ‹ › /

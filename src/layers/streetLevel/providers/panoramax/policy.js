@@ -29,15 +29,17 @@ export const COLORS = Object.freeze({
 });
 
 /**
- * Sequence lines come from z7–15 tiles; z11–14 are drawn (a dense z11 tile
- * over Paris is ~1.4 MB and 3,800 sequences, z12 ~800 kB). Higher up, the
- * z0–5 `grid` layer's density cells (0.1°, ~10 km) draw as points: below
- * 30 km they would be a few dots over a whole city.
+ * Sequence lines come from z7–15 tiles; z10–14 are drawn below 60 km, as
+ * Mapillary's are (a dense tile over Paris: z10 ~2.1 MB and 8,600
+ * sequences, z11 ~1.4 MB, z12 ~800 kB). Higher up, the z0–5 `grid` layer's
+ * density cells (0.1°, ~10 km) draw as points: lower down they would be a
+ * handful of dots over a whole city, which reads as no coverage.
  */
 export const COVERAGE_Z14_BELOW_M = 1_800;
 export const COVERAGE_Z13_BELOW_M = 5_000;
 export const COVERAGE_Z12_BELOW_M = 12_000;
-export const COVERAGE_LINES_BELOW_M = 30_000;
+export const COVERAGE_Z11_BELOW_M = 30_000;
+export const COVERAGE_LINES_BELOW_M = 60_000;
 export const COVERAGE_TUNING = Object.freeze({
   maxTiles: 9,
   overviewMaxTiles: 6,
@@ -62,12 +64,14 @@ export const OVERVIEW_BINS_PER_AXIS = 96;
 
 export const RATE_LIMITED_MESSAGE =
   'Panoramax is busy — coverage resumes on its own';
-export const NO_COVERAGE_HINT = 'no Panoramax pictures in view';
+export const NO_COVERAGE_HINT = 'no Panoramax photos in view';
+/** Lines in view, all hidden by the imagery filter. */
+export const FILTERED_HINT = 'no Panoramax photos here match the filters';
 export const UNREADABLE_TILE_MESSAGE =
   'Panoramax sent a map tile that could not be read';
 export const GONE_MESSAGE = 'This Panoramax picture is no longer available';
 /** From high up the dots are where pictures are, not sequences to click. */
-export const OVERVIEW_HINT = 'zoom in to click a Panoramax sequence';
+export const OVERVIEW_HINT = 'zoom in to see Panoramax sequences';
 
 /** Cones come from z15 tiles' `pictures` layer (~110 bytes a picture). */
 export const PICTURE_TILE_ZOOM = 15;
@@ -78,9 +82,13 @@ export const TILE_TIMEOUT_MS = 20_000;
 export const API_TIMEOUT_MS = 12_000;
 /** Real tiles are under 6 MB (z6 over France); refuse anything absurd. */
 export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
-/** Requests at once to the API (tiles have their own budget). */
-export const API_CONCURRENCY = 4;
-export const TILE_CONCURRENCY = 6;
+/**
+ * The meta-catalogue speaks HTTP/1.1 only, so the browser opens six
+ * connections to it: tiles take three, searches two, so a click's lookup
+ * never queues behind megabyte tiles (it timed out doing so).
+ */
+export const API_CONCURRENCY = 2;
+export const TILE_CONCURRENCY = 3;
 
 /** Pictures asked for around a point; the API returns them nearest first. */
 export const NEAREST_LIMIT = 10;
@@ -110,7 +118,7 @@ export const SD_WIDTH = 2_048;
 export const PANORAMAX_CREDIT_HTML =
   'Street Level: imagery © <a href="https://panoramax.fr" target="_blank" rel="noopener">Panoramax</a> contributors, licence per picture';
 
-export const LINE_CLICK_HINT = 'click a line for the photo there';
+export const LINE_CLICK_HINT = 'click a line for its nearest photo';
 
 /** Licence ids Panoramax uses, as the caption names them. */
 const LICENSE_LABELS = Object.freeze({
@@ -194,8 +202,20 @@ function creatorOf(item) {
       : []),
   ];
   const name = names.find((value) => typeof value === 'string' && value.trim());
-  if (!name || looksLikeEmail(name)) return null;
-  return name.trim().slice(0, 80);
+  if (name && !looksLikeEmail(name)) return name.trim().slice(0, 80);
+  // Licences ask for the source to be named: the instance that holds it.
+  return instanceOf(item);
+}
+
+/** The federated instance holding a picture (its `via` link's host), or null. */
+function instanceOf(item) {
+  const href = item?.links?.find?.((link) => link?.rel === 'via')?.href;
+  try {
+    const url = new URL(String(href));
+    return url.protocol === 'https:' ? url.hostname.slice(0, 80) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** A 360° picture: a full-sphere field of view or an equirectangular projection. */

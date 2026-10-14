@@ -15,6 +15,7 @@ import {
   COLORS,
   COVERAGE_LINES_BELOW_M,
   COVERAGE_TUNING,
+  COVERAGE_Z11_BELOW_M,
   COVERAGE_Z12_BELOW_M,
   COVERAGE_Z13_BELOW_M,
   COVERAGE_Z14_BELOW_M,
@@ -24,6 +25,7 @@ import {
   LINE_CLICK_RADIUS_PER_HEIGHT,
   NEAREST_LIMIT,
   NEAREST_RADIUS_M,
+  FILTERED_HINT,
   NO_COVERAGE_HINT,
   OVERVIEW_HINT,
   PANORAMAX_CREDIT_HTML,
@@ -55,13 +57,22 @@ async function readable(decode) {
   }
 }
 
+/**
+ * A density dot's size: busier places draw bigger (2.5 px for one picture,
+ * 8 px from a few hundred thousand), so a city does not read like farmland.
+ */
+export function overviewPointSize(point) {
+  const weight = Math.max(1, Number(point?.weight) || 1);
+  return Math.min(8, 2.5 + Math.log10(weight));
+}
+
 /** Pictures kept in memory by id (lookups and ‹ › fill it). */
 const PHOTO_CACHE_SIZE = 2000;
 /** Sequences whose cone centre is remembered. */
 const ANCHOR_CACHE_SIZE = 50;
 
 /**
- * Sequence lines at z11–14 below 30 km; above, the density grid at z5 and
+ * Sequence lines at z10–14 below 60 km; above, the density grid at z5 and
  * coarser.
  */
 export function panoramaxZoomFor(heightM) {
@@ -74,7 +85,9 @@ export function panoramaxZoomFor(heightM) {
           ? 13
           : heightM <= COVERAGE_Z12_BELOW_M
             ? 12
-            : 11;
+            : heightM <= COVERAGE_Z11_BELOW_M
+              ? 11
+              : 10;
     return { zoom, kind: 'sequence' };
   }
   return {
@@ -290,6 +303,7 @@ export function createPanoramaxProvider({
         tuning: COVERAGE_TUNING,
         messages: { rateLimited: RATE_LIMITED_MESSAGE },
         passes: passesCoverage,
+        overviewPointSize,
       });
 
       const cones = createSequenceCones({
@@ -352,6 +366,13 @@ export function createPanoramaxProvider({
         onStep: (photoId) =>
           context.actions.openImage(photoId, { frame: false }),
         onShown: recentreCones,
+        // Esc in the viewer clears the selected sequence, as the panel says.
+        onEscape: () => {
+          if (!state.sequence.selectedId) return false;
+          cones.clearSelection();
+          drawn = null;
+          return true;
+        },
         render: context.services?.render,
         ...viewerOptions,
       });
@@ -417,17 +438,22 @@ export function createPanoramaxProvider({
         },
 
         coverageStats() {
-          const lines = state.coverage.kind === 'sequence';
+          const { kind } = state.coverage;
+          const lines = kind === 'sequence';
+          const drawn = coverage.sequenceCount();
           // Density dots are not sequences: they are not counted as such.
-          const count = lines ? coverage.sequenceCount() : 0;
+          const count = lines ? drawn : 0;
           const loading = state.coverage.pending.size > 0;
-          const empty =
-            lines && !loading && count === 0 && !state.coverage.lastError;
-          const fallback = empty
-            ? NO_COVERAGE_HINT
-            : state.coverage.kind === 'overview'
-              ? OVERVIEW_HINT
-              : '';
+          const settled = !loading && !state.coverage.lastError;
+          // Lines in view that the filter hid all of: say so, not "none here".
+          const filteredOut =
+            lines &&
+            [...state.coverage.tiles.values()].some((tile) => tile.total > 0);
+          let fallback = '';
+          if (kind === 'overview')
+            fallback = drawn > 0 || !settled ? OVERVIEW_HINT : NO_COVERAGE_HINT;
+          else if (lines && settled && count === 0)
+            fallback = filteredOut ? FILTERED_HINT : NO_COVERAGE_HINT;
           return {
             count,
             zoom: state.coverage.zoom,

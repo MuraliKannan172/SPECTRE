@@ -132,3 +132,35 @@ test('a sharper flat version that failed is tried again on the next resize', asy
   env.release('f-sharp');
   assert.ok(await until(() => picture.src === 'f-sharp'));
 });
+
+test('Esc: the docked viewer offers it to the provider first; expanded, it is the dialog’s', async () => {
+  let asked = 0;
+  const viewer = createPhotoViewer({
+    providerId: 'test',
+    name: 'Test',
+    sources: SOURCES,
+    getPhoto: async (id) => PHOTOS[id],
+    step: async () => null,
+    onStep() {},
+    onEscape: () => ++asked > 0,
+    load: async (url) => ({ src: url }),
+  });
+  const host = fakeHost();
+  await viewer.mount(host);
+  const root = host.children[0];
+  const press = () => {
+    const event = { key: 'Escape', prevented: false, stopped: false };
+    event.preventDefault = () => (event.prevented = true);
+    event.stopPropagation = () => (event.stopped = true);
+    root.fire('keydown', event);
+    return event;
+  };
+  const docked = press();
+  assert.equal(asked, 1);
+  assert.equal(docked.prevented && docked.stopped, true);
+  root.closest = (selector) =>
+    selector.includes('sl-viewer-wrap-expanded') ? {} : null;
+  const expanded = press();
+  assert.equal(asked, 1, 'not asked while expanded');
+  assert.equal(expanded.prevented, false);
+});

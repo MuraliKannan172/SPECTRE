@@ -1200,7 +1200,7 @@ async function main() {
             );
             assert.match(
               await page.$eval('#sl-coverage-meta', (node) => node.textContent),
-              /sequences in view · click a line for the photo there/,
+              /sequences in view · click a line for its nearest photo/,
             );
             await page.waitForFunction(
               () =>

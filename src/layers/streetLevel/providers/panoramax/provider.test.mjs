@@ -2,11 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createPanoramaxProvider,
+  overviewPointSize,
   panoramaxZoomFor,
   passesCoverage,
   pictureTilesAround,
 } from './index.js';
-import { NO_COVERAGE_HINT, OVERVIEW_HINT, PICK_PREFIX } from './policy.js';
+import {
+  FILTERED_HINT,
+  NO_COVERAGE_HINT,
+  OVERVIEW_HINT,
+  PICK_PREFIX,
+} from './policy.js';
 import { validateProviders } from '../../registry.js';
 import { tileBounds } from '../../tileMath.js';
 import { fakeHost, until } from '../../../../testSupport/kartaViewFakes.mjs';
@@ -141,19 +147,21 @@ test('Panoramax registers keyless and off by default, with both filters and its 
   assert.match(definition.credit.html, /Panoramax<\/a> contributors/);
   assert.equal(
     definition.coverageLabel.action,
-    'click a line for the photo there',
+    'click a line for its nearest photo',
   );
   assert.doesNotThrow(() => validateProviders([definition]));
 });
 
-test('lines at z11–14 below 30 km; density points from z5 down to z0 above', () => {
+test('lines at z10–14 below 60 km, as Mapillary’s; density points from z5 down to z0 above', () => {
   assert.deepEqual(panoramaxZoomFor(500), { zoom: 14, kind: 'sequence' });
   assert.deepEqual(panoramaxZoomFor(1_800), { zoom: 14, kind: 'sequence' });
   assert.deepEqual(panoramaxZoomFor(4_000), { zoom: 13, kind: 'sequence' });
   assert.deepEqual(panoramaxZoomFor(12_000), { zoom: 12, kind: 'sequence' });
   assert.deepEqual(panoramaxZoomFor(25_000), { zoom: 11, kind: 'sequence' });
   assert.deepEqual(panoramaxZoomFor(30_000), { zoom: 11, kind: 'sequence' });
-  assert.deepEqual(panoramaxZoomFor(30_001), { zoom: 5, kind: 'overview' });
+  assert.deepEqual(panoramaxZoomFor(30_001), { zoom: 10, kind: 'sequence' });
+  assert.deepEqual(panoramaxZoomFor(60_000), { zoom: 10, kind: 'sequence' });
+  assert.deepEqual(panoramaxZoomFor(60_001), { zoom: 5, kind: 'overview' });
   assert.deepEqual(panoramaxZoomFor(100_000), { zoom: 5, kind: 'overview' });
   assert.deepEqual(panoramaxZoomFor(2_000_000), { zoom: 3, kind: 'overview' });
   assert.deepEqual(panoramaxZoomFor(20_000_000), { zoom: 0, kind: 'overview' });
@@ -689,4 +697,74 @@ test('switching off clears the cones and forgets a pending line click', async (t
   // The click's preference is gone: a later lookup asks any sequence.
   await env.instance.nearestImage(east(0));
   assert.equal(env.source.calls.nearest.at(-1).collections, null);
+});
+
+test('lines in view that the filter hides all of say so, not that there is nothing here', async (t) => {
+  const env = coverageSetup(t, {
+    filter: { pano: 'pano', sinceMs: null },
+    sequences: [line('flat-only')],
+  });
+  env.instance.activate(env.viewer);
+  assert.ok(
+    await until(
+      () =>
+        !env.instance.coverageStats().loading &&
+        env.instance.coverageStats().zoom !== null,
+    ),
+  );
+  assert.ok(
+    await until(() => env.instance.coverageStats().hint === FILTERED_HINT),
+  );
+  assert.equal(env.instance.coverageStats().count, 0);
+});
+
+test('from high up over empty sea the panel says there is nothing, not to zoom in', async (t) => {
+  const env = coverageSetup(t, { height: 200_000, grid: [] });
+  env.instance.activate(env.viewer);
+  assert.ok(
+    await until(() => env.instance.coverageStats().kind === 'overview'),
+  );
+  assert.ok(
+    await until(() => env.instance.coverageStats().hint === NO_COVERAGE_HINT),
+  );
+});
+
+test('density dots grow with the pictures they stand for', () => {
+  assert.equal(overviewPointSize({ weight: 1 }), 2.5);
+  assert.equal(overviewPointSize({ weight: 100 }), 4.5);
+  assert.equal(overviewPointSize({ weight: 1e9 }), 8);
+  assert.equal(overviewPointSize({}), 2.5);
+  assert.ok(
+    overviewPointSize({ weight: 50_000 }) >
+      overviewPointSize({ weight: 50 }) + 2,
+  );
+});
+
+test('Esc in the docked viewer clears the selected sequence before the panel can collapse', async (t) => {
+  const items = sequence('s', 3);
+  const env = await mounted({ items, tiles: pictureTiles(items) });
+  await withCones(t, env);
+  await env.instance.viewer.open('s-0');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => env.instance.sequenceStats().images === 3));
+  const root = env.next.parentNode;
+  const event = {
+    key: 'Escape',
+    stopped: false,
+    stopPropagation() {
+      this.stopped = true;
+    },
+  };
+  root.fire('keydown', event);
+  assert.equal(env.instance.sequenceStats().selectedId, null);
+  // Nothing selected: Esc goes on to the panel.
+  const again = { key: 'Escape', defaultPrevented: false };
+  const result = { prevented: false };
+  root.fire('keydown', {
+    ...again,
+    preventDefault() {
+      result.prevented = true;
+    },
+  });
+  assert.equal(result.prevented, false);
 });
