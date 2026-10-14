@@ -338,3 +338,98 @@ test('a selected sequence the budget left out is drawn, highlighted', async (t) 
   coverage.recolorSequence('short', true);
   assert.deepEqual([...tile.sequences.keys()].sort(), ['long', 'short']);
 });
+
+/** Count the line primitives a coverage adds to the scene. */
+function countAdds(viewer) {
+  const counts = { added: 0 };
+  for (const collection of [
+    viewer.scene.groundPrimitives,
+    viewer.scene.primitives,
+  ]) {
+    const add = collection.add.bind(collection);
+    collection.add = (primitive) => {
+      counts.added++;
+      return add(primitive);
+    };
+  }
+  return counts;
+}
+
+test('a tile redrawn for a new share keeps its old lines until the new ones are ready', async (t) => {
+  const tuning = {
+    ...TUNING,
+    maxTiles: 9,
+    maxSequences: 900,
+    maxPoints: 90,
+    keepOrder: true,
+  };
+  const { state, coverage, viewer } = setup(t, {
+    zoomFor: () => ({ zoom: 18, kind: 'sequence' }),
+    tuning,
+    decoded: (centre, tile) => {
+      const dense = tile.x % 2 === 0 && tile.y % 2 === 0;
+      return {
+        sequences: dense
+          ? Array.from({ length: 30 }, (_, i) =>
+              pointsLine(`d${tile.x}/${tile.y}/${i}`, 5, tile, centre),
+            )
+          : [pointsLine(`s${tile.x}/${tile.y}`, 2, tile, centre)],
+        overview: [],
+      };
+    },
+  });
+  coverage.refresh();
+  assert.ok(
+    await until(
+      () => state.coverage.tiles.size > 1 && !state.coverage.pending.size,
+    ),
+  );
+  const redrawn = [...state.coverage.tiles.values()].filter(
+    (entry) => entry.swap,
+  );
+  assert.ok(redrawn.length > 0, 'a dense tile took a bigger share');
+  for (const entry of redrawn)
+    for (const { primitive } of entry.swap.old)
+      assert.ok(
+        viewer.scene.groundPrimitives.items.has(primitive) ||
+          viewer.scene.primitives.items.has(primitive),
+        'the old lines are still on the globe while the new ones build',
+      );
+});
+
+test('a selected line outside the cap does not make its tile redraw on every settle, nor does one the filter hides', async (t) => {
+  let pano = 'all';
+  const { state, coverage, viewer } = setup(t, {
+    tuning: {
+      ...TUNING,
+      maxTiles: 1,
+      maxSequences: 10,
+      maxPoints: 5,
+      keepOrder: true,
+    },
+    decoded: (centre, tile) => ({
+      sequences: [
+        pointsLine('long', 5, tile, centre),
+        { ...pointsLine('short', 3, tile, centre), isPano: true },
+      ],
+      overview: [],
+    }),
+  });
+  state.context.getFilter = () => ({ pano, sinceMs: null });
+  coverage.refresh();
+  assert.ok(await until(() => state.coverage.tiles.size === 1));
+  state.sequence.selectedId = 'short';
+  coverage.recolorSequence('short', true);
+  const counts = countAdds(viewer);
+  for (let i = 0; i < 3; i++) {
+    coverage.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(counts.added, 0, 'settles redraw nothing');
+  // A selection the filter hides is not drawn, so it is not redrawn for.
+  pano = 'flat';
+  coverage.rebuild();
+  const after = countAdds(viewer);
+  for (let i = 0; i < 3; i++) coverage.recolorSequence('short', true);
+  assert.equal(after.added, 0);
+});

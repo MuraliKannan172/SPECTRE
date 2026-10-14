@@ -12,6 +12,8 @@ import { densifyLine, MESH_DENSIFY_DEG } from './groundCast.js';
 import { MESH_SAMPLE_RADIUS_M } from './meshSampler.js';
 import { tileBounds, tilesForBbox } from './tileMath.js';
 
+/** A tile's shared point cap must move by this much to redraw it. */
+const SHARE_HYSTERESIS = 0.1;
 /** Draped lines stay at most this long while a tile's cast lines build. */
 export const SWAP_MAX_WAIT_MS = 4000;
 /** Tiles touched by new mesh samples are redrawn at most this often. */
@@ -164,9 +166,9 @@ export function createLineCoverage({
       const size = pointsOf(sequence);
       demand += size;
       // The selected sequence is always drawn: its highlight is the answer
-      // to a click, whatever the caps leave out.
+      // to a click, whatever the caps leave out. It is outside the cap, so
+      // it is not counted against it.
       if (sequence.id === selectedId) {
-        points += size;
         drawn.push(sequence);
         continue;
       }
@@ -204,32 +206,45 @@ export function createLineCoverage({
       left -= cap;
       const before = entry.pointCap ?? perTilePointCap;
       entry.pointCap = cap;
-      // Only a change that alters what is drawn: more room for a tile that
-      // had lines left out, or less than it draws now.
-      if (
-        (cap > before && entry.pointsDrawn < entry.pointDemand) ||
-        cap < entry.pointsDrawn
-      )
-        changed.push(entry);
+      // Only a change that alters what is drawn, by enough to be worth a
+      // rebuild: more room for a tile that had lines left out, or well
+      // under what it draws now (a small overshoot stays until the next
+      // natural redraw).
+      const grows =
+        cap > before * (1 + SHARE_HYSTERESIS) &&
+        entry.pointsDrawn < entry.pointDemand;
+      const shrinks = cap < entry.pointsDrawn * (1 - SHARE_HYSTERESIS);
+      if (grows || shrinks) changed.push(entry);
     });
     return changed;
   }
 
-  /** Once loading settles: redraw the tiles the shared budget changes. */
+  /**
+   * Once loading settles: redraw the tiles the shared budget changes,
+   * keeping their old lines until the new ones are ready (no blink).
+   */
   function shareBudget() {
     const changed = shareCaps();
-    for (const entry of changed) redrawEntry(entry);
+    for (const entry of changed) redrawEntry(entry, { swap: true });
     if (changed.length) {
       requestRender();
       notify();
     }
   }
 
-  /** Draw one tile again from its decoded lines (caps or selection changed). */
-  function redrawEntry(entry) {
+  /**
+   * Draw one tile again from its decoded lines (filter, caps or selection
+   * changed). With `swap`, its old lines stay until the new ones are ready.
+   */
+  function redrawEntry(entry, { swap = false } = {}) {
     cancelCast(entry);
     entry.castRequested = false;
     entry.meshParts = null;
+    if (swap && entry.kind === 'sequence' && entry.primitives?.length) {
+      finishSwap(entry);
+      redrawTile(entry);
+      return;
+    }
     detachPrimitive(entry);
     attachPrimitive(entry);
   }
@@ -825,7 +840,10 @@ export function createLineCoverage({
         state.coverage.pending.delete(key);
       }
     for (const tile of tiles) loadTile(tile, kind);
-    if (!state.coverage.pending.size) purgeStale();
+    if (!state.coverage.pending.size) {
+      purgeStale();
+      shareBudget();
+    }
     // The camera moved: cells that were out of the sampler's range may not be,
     // and lines left draped by a failed, partial or dropped cast get another try.
     if (terrainMode())
@@ -943,9 +961,11 @@ export function createLineCoverage({
         if (
           entry.kind === 'sequence' &&
           !entry.sequences.has(id) &&
-          entry.sequenceList.some((sequence) => sequence.id === id)
+          entry.sequenceList.some(
+            (sequence) => sequence.id === id && passes(sequence, filter()),
+          )
         )
-          redrawEntry(entry);
+          redrawEntry(entry, { swap: true });
     for (const entry of drawnEntries()) {
       const sequence = entry.sequences.get(id);
       if (!sequence) continue;
