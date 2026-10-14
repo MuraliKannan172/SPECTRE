@@ -119,11 +119,11 @@ Version 8.2 fixes the launcher installation issue;
 
 **Pinokio opens but the globe is very choppy?** Before treating that as a GPU
 compatibility or minimum-hardware problem, copy the local server URL shown by
-Pinokio and open the same URL in your normal hardware-accelerated browser. A
-Pinokio 8.2.0 Linux report reproduced severe stutter in Pinokio's embedded view
-while the same running server was smooth in an external browser ([#365](https://github.com/bilawalsidhu/gods-eye-view/issues/365)).
-That isolates the browser/compositor path from the app server and your machine;
-it does not establish a minimum GPU requirement.
+Pinokio and open the same URL in your normal hardware-accelerated browser. One
+Pinokio 8.2.0 user reported severe stutter in Pinokio's embedded view that went
+away when the same running server was opened in an external browser ([#365](https://github.com/bilawalsidhu/gods-eye-view/issues/365)).
+That points to the embedded browser rather than the app server or your
+hardware; it does not establish a minimum GPU requirement.
 
 ### Path 2 — Terminal / coding agent
 
