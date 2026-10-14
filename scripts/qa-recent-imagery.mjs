@@ -383,6 +383,9 @@ try {
   const initialStack = await page.evaluate(() => window.__riQa.activeStack());
   const photoreal = initialStack === 'photoreal';
   console.log(`initial map stack: ${initialStack}`);
+  console.log(
+    `stability: ${SLOW_RENDER ? 'slow-render' : 'default'} (zoom ${ZOOM_TIMEOUT_MS} ms, last ${HEIGHT_TAIL_SAMPLES} samples)`,
+  );
   const onPhotorealOnly = (name, passed, detail) =>
     photoreal
       ? check(name, passed, detail)
