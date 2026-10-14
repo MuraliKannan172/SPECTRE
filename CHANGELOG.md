@@ -32,7 +32,6 @@
 - Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
 
 - Director timeline seeks cross the dateline along the short longitude arc.
-- Recent Imagery refuses missing bounding-box edges instead of interpreting them as zero coordinates.
 
 - Recent Imagery’s exported `setBox` and `searchHls` reject missing, blank or
   boolean programmatic box edges instead of interpreting them as zero coordinates.

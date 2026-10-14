@@ -75,20 +75,23 @@ const pad2 = (value) => String(value).padStart(2, '0');
  * east are not swapped: west > east crosses the dateline and `validateBox`
  * rejects it. Null when any edge is nonfinite.
  */
+/** A box edge as a number, or null when it is missing, blank or not numeric. */
+function edgeNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function normalizeBox(box) {
   if (!box || typeof box !== 'object') return null;
-  const edges = [box.west, box.south, box.east, box.north];
-  if (
-    edges.some(
-      (value) =>
-        value == null ||
-        typeof value === 'boolean' ||
-        (typeof value === 'string' && !value.trim()),
-    )
-  )
-    return null;
-  const [west, south, east, north] = edges.map(Number);
-  if (![west, south, east, north].every(Number.isFinite)) return null;
+  const [west, south, east, north] = [
+    box.west,
+    box.south,
+    box.east,
+    box.north,
+  ].map(edgeNumber);
+  if ([west, south, east, north].some((edge) => edge == null)) return null;
   return {
     west,
     south: Math.min(south, north),
@@ -216,11 +219,16 @@ export function boxFromPin(lon, lat, sideKm = PIN_BOX_SIDE_KM) {
 
 function mapBox(box, fn) {
   if (!box || typeof box !== 'object') return null;
+  // Converting first would turn a blank edge into 0 before normalizeBox sees it.
+  const edge = (value) => {
+    const number = edgeNumber(value);
+    return number == null ? null : fn(number);
+  };
   return normalizeBox({
-    west: fn(box.west),
-    south: fn(box.south),
-    east: fn(box.east),
-    north: fn(box.north),
+    west: edge(box.west),
+    south: edge(box.south),
+    east: edge(box.east),
+    north: edge(box.north),
   });
 }
 
