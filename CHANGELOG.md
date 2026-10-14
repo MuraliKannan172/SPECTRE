@@ -1,5 +1,9 @@
 # Changelog
 
+- The right rail ignores panels that other CSS hides, such as during an event
+  view, so they no longer force one-panel-at-a-time layout or collapse visible
+  panels. Panels the rail collapses itself are still restored.
+
 - Bing Aerial and Bing Labels request HTTPS tiles on HTTP localhost through
   their ion-backed providers, retaining ion and per-tile attribution without
   widening the Content Security Policy.
