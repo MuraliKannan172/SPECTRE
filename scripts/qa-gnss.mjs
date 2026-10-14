@@ -115,9 +115,9 @@ async function boot(page, { lon, lat, height }) {
 }
 
 /** Enable (or refresh) the layer and poll until it settles. */
-async function enableAndSettle(page, { timeoutS = 30, refresh = false } = {}) {
+async function enableAndSettle(page, { refresh = false } = {}) {
   return page.evaluate(
-    async (id, tS, again) => {
+    async (id, again) => {
       const dm = window.__godsEyeView.dataManager;
       const layer = dm.layers.get(id).module;
       if (again) await dm.refreshLayer(id);
@@ -144,7 +144,6 @@ async function enableAndSettle(page, { timeoutS = 30, refresh = false } = {}) {
       };
     },
     LAYER_ID,
-    timeoutS,
     refresh,
   );
 }
@@ -160,6 +159,18 @@ async function showLayerRow(page) {
       ?.scrollIntoView({ block: 'center' });
   }, LAYER_ID);
   await sleep(800);
+}
+
+/** Actual card pixels on the shared canvas, available in dev and production. */
+function paintedOverlayPixels() {
+  const canvas = document.getElementById('world-overlay-canvas');
+  if (!canvas) return -1;
+  const pixels = canvas
+    .getContext('2d')
+    .getImageData(0, 0, canvas.width, canvas.height).data;
+  let count = 0;
+  for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) count++;
+  return count;
 }
 
 async function shoot(page, name) {
@@ -576,28 +587,31 @@ async function main() {
       'PICK: street ground remains a surface pick under GNSS',
       pickProbe.surface,
     );
+    const beforeCardPixels = await page.evaluate(paintedOverlayPixels);
     await page.mouse.click(pickProbe.centre.x, pickProbe.centre.y);
     await page.waitForFunction(
-      () =>
-        (window.__gevWorldOverlay.getDiagnostics().paintedBySource[
-          'fire-perimeters'
-        ] ?? 0) > 0,
-      { timeout: 10000 },
+      `(${paintedOverlayPixels})() > ${beforeCardPixels + 100}`,
+      { timeout: 10000, polling: 250 },
     );
-    record('PICK: actual perimeter click opens its incident card', true);
+    const selectedCardPixels = await page.evaluate(paintedOverlayPixels);
+    record(
+      'PICK: actual perimeter click paints its incident card',
+      selectedCardPixels > beforeCardPixels + 100,
+      `${beforeCardPixels} → ${selectedCardPixels} pixels`,
+    );
     await page.screenshot({
       path: path.join(SHOTS_DIR, 'gnss-perimeter-selected.png'),
     });
     await page.mouse.click(pickProbe.empty.x, pickProbe.empty.y);
-    await sleep(500);
+    await page.waitForFunction(
+      `(${paintedOverlayPixels})() <= ${beforeCardPixels}`,
+      { timeout: 10000, polling: 250 },
+    );
+    const clearedCardPixels = await page.evaluate(paintedOverlayPixels);
     record(
       'PICK: empty ground clears the perimeter card',
-      await page.evaluate(
-        () =>
-          (window.__gevWorldOverlay.getDiagnostics().entriesBySource[
-            'fire-perimeters'
-          ] ?? 0) === 0,
-      ),
+      clearedCardPixels <= beforeCardPixels,
+      `${selectedCardPixels} → ${clearedCardPixels} pixels`,
     );
     await page.mouse.click(pickProbe.empty.x, pickProbe.empty.y, {
       clickCount: 2,
@@ -752,7 +766,7 @@ async function main() {
     await page.evaluate(() => {
       window.__gnssQaMode = 'error';
     });
-    const e = await enableAndSettle(page, { refresh: true, timeoutS: 1 });
+    const e = await enableAndSettle(page, { refresh: true });
     record(
       'FAILURE: error surfaced, cells kept',
       Boolean(e.stats.error) && e.stats.count === 4 && e.entities === 4,
@@ -931,7 +945,7 @@ async function main() {
     aged.on('pageerror', (e) => errors.push(e.message));
     await stubRoute(aged, { ageMs: 31 * 60_000 });
     await boot(aged, { lon: 18.6, lat: 54.6, height: 450_000 });
-    const old = await enableAndSettle(aged, { timeoutS: 5 });
+    const old = await enableAndSettle(aged, {});
     record(
       'AGE: a snapshot observed 31 min ago adds no cells and is not an error',
       old.stats.count === 0 && old.entities === 0 && !old.stats.error,
