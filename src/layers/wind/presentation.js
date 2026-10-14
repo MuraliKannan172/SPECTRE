@@ -1,5 +1,5 @@
 import { formatWindSpeed, WIND_UNITS } from './inspection.js';
-import { t } from '../../i18n/index.js';
+import { formatNumber, formatUtcDayMonth, t } from '../../i18n/index.js';
 import { formatQuantity, unitLabel } from '../../ui/unitLabels.js';
 
 /** Reformat a captured sample; changing units never samples the map again. */
@@ -62,12 +62,46 @@ function windText(reading) {
     : `${speed}${t(' from {direction}', { direction: t(reading.from) })}`;
 }
 
+/** "29.93°N · 97.74°W" from the English reading, in the active language. */
+function displayCoordinates(coordinates) {
+  const match = /^(\d+(?:\.\d+)?)°([NS]) · (\d+(?:\.\d+)?)°([EW])$/.exec(
+    coordinates,
+  );
+  if (!match) return coordinates.replace(' · ', ' ');
+  const part = (value, hemisphere) => {
+    const decimals = value.split('.')[1]?.length || 0;
+    const amount = formatNumber(Number(value), {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+      useGrouping: false,
+    });
+    switch (hemisphere) {
+      case 'N':
+        return t('{value}°N', { value: amount });
+      case 'S':
+        return t('{value}°S', { value: amount });
+      case 'E':
+        return t('{value}°E', { value: amount });
+      default:
+        return t('{value}°W', { value: amount });
+    }
+  };
+  return `${part(match[1], match[2])} ${part(match[3], match[4])}`;
+}
+
+/** "2026-10-14 14:00 UTC" from the reading, as "10-14 14:00 UTC" / "14.10 …". */
+function displayValidTime(validTime) {
+  const match = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) UTC$/.exec(validTime || '');
+  if (!match) return validTime?.replace(/^\d{4}-/, '');
+  return `${formatUtcDayMonth(match[1])} ${match[2]} UTC`;
+}
+
 /** Portable result block consumed by the WEATHER card. */
 export function windReadingResult(reading) {
   const coordinates =
     reading.coordinates === 'No surface reading'
       ? t('No surface reading')
-      : reading.coordinates.replace(' · ', ' ');
+      : displayCoordinates(reading.coordinates);
   return {
     id: 'reading',
     label: t('WIND AT {coordinates}', { coordinates }),
@@ -80,7 +114,7 @@ export function windReadingResult(reading) {
         id: 'meta',
         text: t('{model} · valid {time}', {
           model: reading.model,
-          time: reading.validTime?.replace(/^\d{4}-/, ''),
+          time: displayValidTime(reading.validTime),
         }),
       },
       ...(reading.scalarValue

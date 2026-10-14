@@ -435,7 +435,7 @@ test('Bhote Koshi overview pins translate their descriptive titles and keep plac
   );
   assert.equal(
     titles.get('bhote-koshi-place-immediate-collapse-viewpoint'),
-    '01 · ОБЗОР ОБРУШЕНИЯ',
+    '01 · ВИД НА ОБРУШЕНИЕ',
   );
   assert.equal(
     titles.get('bhote-koshi-place-gyirong-border-gate'),

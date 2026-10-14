@@ -1145,7 +1145,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/layers/installations/classLabel.js"
     ],
     "external": ["cesium", "@mapbox/vector-tile", "pbf"]
   },
@@ -2348,7 +2349,8 @@
       "src/i18n/locales/ru.json",
       "src/ui/unitLabels.js",
       "src/layers/recentImagery/display.js",
-      "src/ui/keyGuidance.js"
+      "src/ui/keyGuidance.js",
+      "src/layers/installations/classLabel.js"
     ],
     "external": [
       "hls.js",
@@ -2881,7 +2883,8 @@
       "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json",
       "src/ui/unitLabels.js",
-      "src/layers/recentImagery/display.js"
+      "src/layers/recentImagery/display.js",
+      "src/layers/installations/classLabel.js"
     ],
     "external": [
       "hls.js",

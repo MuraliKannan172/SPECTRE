@@ -1,6 +1,6 @@
 import {
   accentForVesselType,
-  normalizeVesselType,
+  displayVesselType,
 } from '../../data/vesselLabels.js';
 import { formatNumber, t } from '../../i18n/index.js';
 
@@ -130,7 +130,7 @@ export function createCards({
   /** Uppercased, card-width-bounded AIS type (empty string when unknown). */
 
   function vesselTypeShort(record) {
-    return normalizeVesselType(record.type).toUpperCase().slice(0, 14);
+    return displayVesselType(record.type).toUpperCase().slice(0, 14);
   }
 
   /**
