@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Large KML acceptance: style equivalence, 25 MB import and optional real file.
  * QA_BASE_URL defaults to http://localhost:4173. Optional --file /path/file.kml.
+ * For a USGS fixture with blocked icons, add --expect-local-pins to check paint.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -303,6 +304,90 @@ try {
       'real dated KML leaves the shared clock unchanged',
       JSON.stringify(clockBefore) === JSON.stringify(clockAfter),
     );
+    if (suppliedItem && process.argv.includes('--expect-local-pins')) {
+      const markers = await page.evaluate(() => {
+        const { viewer } = window.__godsEyeView,
+          C = window.__CESIUM__;
+        const source = viewer.dataSources.get(viewer.dataSources.length - 1);
+        const points = source.entities.values.filter(
+          (e) => e.position && e.billboard,
+        );
+        const images = points.filter((e) =>
+          e.billboard.image?.getValue(viewer.clock.currentTime),
+        );
+        if (images.length) {
+          const at = C.Cartographic.fromCartesian(
+            images[0].position.getValue(viewer.clock.currentTime),
+          );
+          viewer.camera.cancelFlight();
+          viewer.camera.setView({
+            destination: C.Cartesian3.fromRadians(
+              at.longitude,
+              at.latitude,
+              100000,
+            ),
+            orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
+          });
+        }
+        return { points: points.length, images: images.length };
+      });
+      check(
+        'supplied point markers have drawable images',
+        markers.points > 0 && markers.images === markers.points,
+        JSON.stringify(markers),
+      );
+      if (markers.points) {
+        const yellowPixels = async () => {
+          const shot = await page.screenshot({
+            clip: { x: 620, y: 350, width: 200, height: 200 },
+            type: 'png',
+            encoding: 'base64',
+          });
+          return page.evaluate(async (base64) => {
+            const bitmap = await createImageBitmap(
+              await (await fetch(`data:image/png;base64,${base64}`)).blob(),
+            );
+            const canvas = new OffscreenCanvas(bitmap.width, bitmap.height),
+              context = canvas.getContext('2d');
+            context.drawImage(bitmap, 0, 0);
+            const data = context.getImageData(
+              0,
+              0,
+              bitmap.width,
+              bitmap.height,
+            ).data;
+            let count = 0;
+            for (let i = 0; i < data.length; i += 4)
+              if (data[i] > 150 && data[i + 1] > 150 && data[i + 2] < 100)
+                count++;
+            return count;
+          }, shot);
+        };
+        const setVisible = (visible) =>
+          page.evaluate(
+            ({ id, visible }) => window.__gevGeoImport.setVisible(id, visible),
+            { id: suppliedItem.id, visible },
+          );
+        await setVisible(false);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const hidden = await yellowPixels();
+        await setVisible(true);
+        let shown = hidden;
+        const deadline = performance.now() + 10000;
+        while (performance.now() < deadline && shown <= hidden + 10) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          shown = await yellowPixels();
+        }
+        check(
+          'real USGS markers paint when shown and disappear when hidden',
+          shown > hidden + 10,
+          JSON.stringify({ hidden, shown }),
+        );
+        await page.screenshot({
+          path: path.join(directory, 'real-kml-visible.png'),
+        });
+      }
+    }
     if (suppliedItem)
       await page.evaluate(
         (id) => window.__gevGeoImport.remove(id),

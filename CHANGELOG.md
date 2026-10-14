@@ -174,7 +174,9 @@
   apply before loading, recorded KML tracks retain their original vertices,
   and queued imports respect navigation made while waiting. Repeated KML styles
   are shared before the style limit is applied, allowing large files with many
-  copies of the same style to load without changing their graphics.
+  copies of the same style to load without changing their graphics. Blocked
+  remote icons now fall back to local pins instead of leaving point markers
+  invisible, including USGS earthquake exports.
 
 ## [0.2.1] — 2026-10-02 — God's Eye View through Your Agent (with security fixes and other features)
 

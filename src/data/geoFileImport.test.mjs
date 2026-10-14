@@ -426,6 +426,43 @@ test('KML extended metadata is removed before the document reaches the loader', 
   assert.deepEqual(placemark.childNodes, [point]);
   assert.equal(metadata.parentNode, null);
 });
+test('blocked icon sources fall back to local pins without changing intentional empty icons', () => {
+  const blocked = xmlEl('Icon', {}, [
+    xmlEl('href', {}, 'https://example.invalid/icon.png'),
+  ]);
+  const blank = xmlEl('Icon');
+  const embedded = xmlEl('Icon', {}, [
+    xmlEl('href', {}, 'data:image/png;base64,AAAA'),
+  ]);
+  const packed = xmlEl('Icon', {}, [xmlEl('href', {}, 'packed.png')]);
+  const iconStyle = xmlEl('IconStyle', {}, [
+    xmlEl('scale', {}, '0.3'),
+    blocked,
+  ]);
+  const doc = xmlDoc(
+    xmlEl('kml', {}, [
+      xmlEl('Style', {}, [iconStyle]),
+      ...[blank, embedded, packed].map((icon) =>
+        xmlEl('Style', {}, [xmlEl('IconStyle', {}, [icon])]),
+      ),
+    ]),
+  );
+  assert.equal(
+    sanitizeKmlDocument(doc, (href) =>
+      href === 'packed.png' ? 'blob:local-image' : null,
+    ).removed,
+    1,
+  );
+  assert.equal(blocked.parentNode, null);
+  assert.equal(iconStyle.childNodes[0].textContent, '0.3');
+  assert.equal(blank.parentNode.localName, 'IconStyle');
+  assert.equal(
+    embedded.childNodes[0].textContent,
+    'data:image/png;base64,AAAA',
+  );
+  assert.equal(packed.childNodes[0].textContent, 'blob:local-image');
+});
+
 const trkpt = (lat, lon, time) =>
   xmlEl('trkpt', { lat, lon }, time ? [xmlEl('time', {}, time)] : []);
 

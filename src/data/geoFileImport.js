@@ -493,7 +493,17 @@ export function sanitizeKmlDocument(doc, resolveLocal = () => null) {
     const local = resolveLocal(value);
     if (local) href.textContent = local;
     else if (/^data:image\/(png|jpeg|gif|webp|bmp);/i.test(value)) continue;
-    else drop(href);
+    else {
+      const icon = href.parentNode;
+      // An empty Icon explicitly hides the billboard in Cesium. Remove the
+      // blocked icon definition so the loader supplies its local default pin.
+      // Authored empty Icons (with no blocked href) still mean no marker.
+      drop(
+        icon?.localName === 'Icon' && icon.parentNode?.localName === 'IconStyle'
+          ? icon
+          : href,
+      );
+    }
   }
   for (const overlay of elementsNamed(doc, 'GroundOverlay')) {
     if (!elementsNamed(overlay, 'href').length) drop(overlay);

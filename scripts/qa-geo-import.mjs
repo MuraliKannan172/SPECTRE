@@ -362,6 +362,9 @@ try {
       withKml: entities.filter((e) => e.kml !== undefined).length,
       hidden: entities.filter((e) => !e.isAvailable(now)).length,
       datedPinNow: Boolean(named('QA KML pin')?.isAvailable(now)),
+      fallbackPins: ['QA KML pin', 'QA palette pin'].filter((name) =>
+        named(name)?.billboard?.image?.getValue(now),
+      ).length,
       movingIsLine: Boolean(
         named('QA moving')?.polyline && !named('QA moving')?.position,
       ),
@@ -392,6 +395,11 @@ try {
       inside.movingIsLine &&
       inside.movingVertices === 2,
     JSON.stringify(inside),
+  );
+  check(
+    'blocked KML icon sources use drawable local fallback pins',
+    inside.fallbackPins === 2,
+    JSON.stringify({ fallbackPins: inside.fallbackPins }),
   );
   check(
     'KML MultiTrack keeps its segments and original vertex count',
