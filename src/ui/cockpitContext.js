@@ -1,12 +1,25 @@
 /** Contact readouts and nearby-signal presentation for the Cockpit controller. */
 import * as Cesium from 'cesium';
-import { t, tn } from '../i18n/index.js';
+import { formatNumber, t, tn } from '../i18n/index.js';
+import { unitLabel } from './unitLabels.js';
 import {
   bearingBetweenCoordinates,
   formatCockpitContextScope,
   relativeBearing,
   resolveCockpitContextReadout,
 } from '../cockpitMath.js';
+import { formatCockpitDistance } from './cockpitPresentation.js';
+
+/** The Context scope line in the active language (see cockpitMath.js). */
+const LOCALIZED_CONTEXT_SCOPE = Object.freeze({
+  window: ({ label, radiusKm }) =>
+    t('{label} · {radius} AIR/SEA WINDOW', {
+      label,
+      radius: `${radiusKm === null ? '—' : formatNumber(radiusKm)}\u00a0${unitLabel('km').toUpperCase()}`,
+    }),
+  installations: ({ scope, coverage }) =>
+    t('{scope} · INSTALLATIONS {coverage}', { scope, coverage }),
+});
 
 export function updateContext(info, heading) {
   if (!this.context) return;
@@ -37,6 +50,7 @@ export function updateContext(info, heading) {
       snapshot.subject.label || trackedId,
       snapshot.radiusM,
       installationCoverage,
+      LOCALIZED_CONTEXT_SCOPE,
     );
   }
   // Navigation stays wired in every state — the operator must always be able
@@ -53,11 +67,6 @@ export function updateContext(info, heading) {
     const enteringLost = this.context.dataset.state !== 'lost';
     this.context.dataset.state = 'lost';
     if (this.contextUncertainty) {
-      // The English literal write is pinned verbatim by cockpitMarkup.test.mjs
-      // ('CONTACT LOST' must appear in this method body); the t() re-write
-      // below is a same-value override that localizes it under other locales.
-      this.contextUncertainty.textContent =
-        'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR';
       this.contextUncertainty.textContent = t(
         'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR',
       );
@@ -109,13 +118,13 @@ export function updateContext(info, heading) {
   if (this.contextDistance) {
     const distanceM = closest?.distanceM;
     this.contextDistance.textContent = Number.isFinite(distanceM)
-      ? `${distanceM < 10000 ? (distanceM / 1000).toFixed(1) : Math.round(distanceM / 1000)} KM`
+      ? formatCockpitDistance(distanceM)
       : '—';
     this.contextDistance.setAttribute(
       'aria-label',
       Number.isFinite(distanceM)
         ? this.contextDistance.textContent
-        : 'Unavailable',
+        : t('Unavailable'),
     );
   }
 
@@ -147,12 +156,6 @@ export function updateContext(info, heading) {
     this.contextDirection.classList.toggle('unknown', relative === null);
   }
   if (this.contextBearing) {
-    // The 'BRG —' literal is pinned verbatim by cockpitMarkup.test.mjs; the
-    // t() re-write below is a same-value override that localizes it.
-    if (relative === null) this.contextBearing.textContent = 'BRG —';
-    else if (Math.abs(relative) < 8) this.contextBearing.textContent = 'AHEAD';
-    else
-      this.contextBearing.textContent = `${relative < 0 ? 'L' : 'R'} ${String(Math.round(Math.abs(relative))).padStart(3, '0')}°`;
     if (relative === null) this.contextBearing.textContent = t('BRG —');
     else if (Math.abs(relative) < 8)
       this.contextBearing.textContent = t('AHEAD');

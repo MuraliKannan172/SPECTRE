@@ -198,7 +198,10 @@ export function initDrawTool({ viewer, annotations }) {
     // a limit rather than the harmless tail of a double-click.
     if (reason === 'full')
       setHint(
-        `That shape already has ${MAX_VERTICES} points — finish it or press Backspace.`,
+        t(
+          'That shape already has {count} points — finish it or press Backspace.',
+          { count: MAX_VERTICES },
+        ),
       );
     else if (reason === 'invalid')
       setHint(t('That point is off the globe — click on the world.'));
@@ -241,7 +244,11 @@ export function initDrawTool({ viewer, annotations }) {
       return result;
     } catch (error) {
       if (destroyed || attempt !== generation) return null;
-      setHint(`Could not place the shape: ${error?.message || error}`);
+      setHint(
+        t('Could not place the shape: {error}', {
+          error: error?.message || error,
+        }),
+      );
       return null;
     }
   };
@@ -325,7 +332,11 @@ export function initDrawTool({ viewer, annotations }) {
         // Somebody else is using the pointer — possibly an older instance of
         // this same tool that has not finished tearing down. Say so instead of
         // half-starting.
-        setHint(`${pointerOwner()} is using the pointer — close it first.`);
+        setHint(
+          t('{owner} is using the pointer — close it first.', {
+            owner: pointerOwner(),
+          }),
+        );
         return active;
       }
     }

@@ -39,7 +39,7 @@ const msg = (text) => text;
 export const KEY_SETUP_KEYS = Object.freeze([
   Object.freeze({
     id: 'google-maps',
-    title: 'GOOGLE MAPS',
+    title: 'GOOGLE MAPS', // i18n-ignore: provider product name
     unlocks: msg('The photorealistic 3D planet, place search + Street View'),
     getUrl: 'https://developers.google.com/maps/documentation/tile/get-api-key',
     envVars: Object.freeze(['GOOGLE_MAPS_API_KEY']),
@@ -48,7 +48,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'google-maps-server',
-    title: 'GOOGLE MAPS — SERVER',
+    title: 'GOOGLE MAPS — SERVER', // i18n-ignore: provider product name; row is hidden
     unlocks: msg(
       'Places context + Street View fallback; optional separate key',
     ),
@@ -60,7 +60,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'openai',
-    title: 'OPENAI',
+    title: 'OPENAI', // i18n-ignore: provider product name
     unlocks: msg('Voice control — API key or ChatGPT OAuth'),
     getUrl: 'https://platform.openai.com/api-keys',
     envVars: Object.freeze(['OPENAI_API_KEY']),
@@ -68,7 +68,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'aisstream',
-    title: 'AISSTREAM',
+    title: 'AISSTREAM', // i18n-ignore: provider product name
     unlocks: msg('Live ships, worldwide'),
     getUrl: 'https://aisstream.io',
     envVars: Object.freeze(['AISSTREAM_API_KEY']),
@@ -76,7 +76,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'firms',
-    title: 'NASA FIRMS',
+    title: 'NASA FIRMS', // i18n-ignore: provider product name
     unlocks: msg('Live active-fire detections'),
     getUrl: 'https://firms.modaps.eosdis.nasa.gov/api/map_key/',
     envVars: Object.freeze(['FIRMS_MAP_KEY']),
@@ -84,7 +84,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'tomtom',
-    title: 'TOMTOM',
+    title: 'TOMTOM', // i18n-ignore: provider product name
     unlocks: msg('Real live traffic (keyless runs a simulation)'),
     getUrl: 'https://my.tomtom.com/keys',
     envVars: Object.freeze(['TOMTOM_API_KEY']),
@@ -92,7 +92,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'cesium-ion',
-    title: 'CESIUM ION',
+    title: 'CESIUM ION', // i18n-ignore: provider product name
     unlocks: msg('Bing imagery map stacks + world terrain'),
     getUrl: 'https://ion.cesium.com/tokens',
     envVars: Object.freeze(['CESIUM_ION_TOKEN']),
@@ -101,7 +101,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'opensky',
-    title: 'OPENSKY',
+    title: 'OPENSKY', // i18n-ignore: provider product name
     unlocks: msg('More flight-polling credits (anonymous works without)'),
     getUrl: 'https://opensky-network.org',
     envVars: Object.freeze(['OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET']),
@@ -109,7 +109,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'mapillary',
-    title: 'MAPILLARY',
+    title: 'MAPILLARY', // i18n-ignore: provider product name
     unlocks: msg(
       'Street-level imagery and coverage in the Street Level layer. Free: register an app in the Mapillary developer dashboard and paste its Client Token',
     ),
@@ -120,7 +120,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   }),
   Object.freeze({
     id: 'launch-library',
-    title: 'LAUNCH LIBRARY',
+    title: 'LAUNCH LIBRARY', // i18n-ignore: provider product name
     unlocks: msg('Higher space-missions request allowance'),
     getUrl: 'https://thespacedevs.com',
     envVars: Object.freeze(['LL2_API_TOKEN']),
@@ -392,28 +392,6 @@ export function keySetupWithAlternatives(requirement, alternatives = []) {
   if (!options.length) return requirement;
   const offer = `or ${options.join(', or ')}`;
   return requirement ? `${requirement}, ${offer}` : offer.replace(/^or l/, 'L');
-}
-
-/**
- * Alternative sources plus the registry name of the key each would use, as
- * machine values for presentation layers that localize the guidance sentence
- * themselves (this module also runs in node-side key-setup builds, which stay
- * English).
- * @param {Array<{label: string, requiresKeyId?: string|null}>} [alternatives]
- * @returns {Array<{label: string, name: string|null}>}
- */
-export function keySetupAlternativeKeyNames(alternatives = []) {
-  return alternatives.map(({ label, requiresKeyId }) => {
-    const entry = KEY_SETUP_KEYS.find(
-      (candidate) => candidate.id === requiresKeyId,
-    );
-    const name = entry
-      ? entry.title
-          .toLowerCase()
-          .replace(/\b\w/g, (letter) => letter.toUpperCase())
-      : null;
-    return { label, name };
-  });
 }
 
 /**

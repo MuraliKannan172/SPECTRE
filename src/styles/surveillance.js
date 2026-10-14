@@ -246,7 +246,7 @@ export const nightVisionShader = {
         nvgColor += phosphor * lbl * 0.3 * intensity;
       }
 
-      // Gain indicator below label: "AUTO" marker
+      // Gain indicator below label: "AUTO" marker (i18n-ignore: shader comment, not UI)
       vec2 gainArea = (uv - vec2(0.03, 0.88)) / vec2(0.05, 0.025);
       if (gainArea.x >= 0.0 && gainArea.x <= 1.0 && gainArea.y >= 0.0 && gainArea.y <= 1.0) {
         float gLbl = step(0.1, gainArea.x) * step(gainArea.x, 0.9) *

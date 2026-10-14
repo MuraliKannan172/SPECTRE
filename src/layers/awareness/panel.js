@@ -1,9 +1,9 @@
 import {
   formatAwarenessLabel,
-  formatAwarenessDistance,
   AWARENESS_RADIUS_M,
 } from '../../data/militaryAwarenessEngine.js';
-import { t } from '../../i18n/index.js';
+import { formatNumber, t, translateKnown } from '../../i18n/index.js';
+import { formatQuantity } from '../../ui/unitLabels.js';
 import { AWARENESS_PAGE_SIZE, AWARENESS_PAGE_ROTATE_MS } from './policy.js';
 
 /** Format a cohort total without presenting a retained cap as exact. */
@@ -13,6 +13,33 @@ export function formatAwarenessCount(summary = {}) {
   return summary.complete === false || summary.truncated === true
     ? `At least ${count}`
     : count;
+}
+
+/** The count as the panel shows it, in the UI language. */
+function presentAwarenessCount(summary = {}) {
+  if (!Number.isFinite(summary.count)) return '?';
+  const count = formatNumber(summary.count);
+  return summary.complete === false || summary.truncated === true
+    ? t('At least {count}', { count })
+    : count;
+}
+
+/** A distance as the panel shows it: 850 m, 4.6 km, 120 km, in the UI language. */
+function presentAwarenessDistance(meters) {
+  if (!Number.isFinite(meters) || meters < 0) return '—';
+  if (meters < 1000) return formatQuantity(Math.round(meters), 'm');
+  const digits = meters < 10000 ? 1 : 0;
+  return formatQuantity(meters / 1000, 'km', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+/** The cohort's reason, kept English in data, shown in the UI language. */
+function presentAwarenessReason(summary = {}) {
+  return summary.reasonTemplate
+    ? t(summary.reasonTemplate, summary.reasonValues)
+    : translateKnown(summary.reason || '');
 }
 
 export function createPanel({ state: layerState, services, parts, source }) {
@@ -71,7 +98,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
 
   function rowHtml(cohort) {
     const summary = cohort.summary;
-    const count = formatAwarenessCount(summary);
+    const count = presentAwarenessCount(summary);
     const page = layerState.cohortPages.get(cohort.id) || 0;
     const nearest = summary.nearest
       .slice(page, page + AWARENESS_PAGE_SIZE)
@@ -79,10 +106,10 @@ export function createPanel({ state: layerState, services, parts, source }) {
         const label = formatAwarenessLabel(item);
         const targetId = item.icao24 || item.mmsi || item.id;
         if (!targetId) {
-          return `<li><span class="military-awareness-target unavailable" aria-label="${t('Unavailable')}">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></span></li>`;
+          return `<li><span class="military-awareness-target unavailable" aria-label="${t('Unavailable')}">${escapeHtml(label)} <span>${presentAwarenessDistance(item.distanceM)}</span></span></li>`;
         }
         const accessibleLabel = label === '—' ? t('Unavailable') : label;
-        return `<li><button type="button" class="military-awareness-target" data-awareness-layer="${escapeHtml(cohort.id)}" data-awareness-id="${escapeHtml(targetId)}" aria-label="${escapeHtml(t('Focus {label}', { label: accessibleLabel }))}">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></button>${namedAreasHtml(item.memberNames)}</li>`;
+        return `<li><button type="button" class="military-awareness-target" data-awareness-layer="${escapeHtml(cohort.id)}" data-awareness-id="${escapeHtml(targetId)}" aria-label="${escapeHtml(t('Focus {label}', { label: accessibleLabel }))}">${escapeHtml(label)} <span>${presentAwarenessDistance(item.distanceM)}</span></button>${namedAreasHtml(item.memberNames)}</li>`;
       })
       .join('');
     const pageCount = Math.max(
@@ -96,7 +123,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
     const coverage = cohort.coverage ? ` · ${escapeHtml(cohort.coverage)}` : '';
     return `<section class="military-awareness-row ${summary.relationship.toLowerCase()}">
     <div><strong>${escapeHtml(cohort.label)}</strong><b aria-live="polite">${count}${pageLabel}</b></div>
-    <small>${escapeHtml(cohort.source)}${coverage} · ${escapeHtml(summary.reason)}</small>
+    <small>${escapeHtml(cohort.source)}${coverage} · ${escapeHtml(presentAwarenessReason(summary))}</small>
     ${nearest ? `<ul>${nearest}</ul>` : ''}
   </section>`;
   }
@@ -176,7 +203,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
 
   function namedAreasHtml(names) {
     return names?.length
-      ? `<details class="military-awareness-names"><summary>Named areas (${names.length})</summary><div>${names.map((name) => escapeHtml(name)).join('<br>')}</div></details>`
+      ? `<details class="military-awareness-names"><summary>${escapeHtml(t('Named areas ({n})', { n: formatNumber(names.length) }))}</summary><div>${names.map((name) => escapeHtml(name)).join('<br>')}</div></details>`
       : '';
   }
 
@@ -184,7 +211,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
     if (!layerState.enabled || !layerState.results) return hidePanel();
     const panel = ensurePanel();
     const { subject, cohorts } = layerState.results;
-    const markup = `<div class="military-awareness-subject">${escapeHtml(subject.label)} · ${formatAwarenessDistance(AWARENESS_RADIUS_M)} FLIGHT / VESSEL WINDOW</div>
+    const markup = `<div class="military-awareness-subject">${escapeHtml(subject.label)} · ${escapeHtml(t('{distance} FLIGHT / VESSEL WINDOW', { distance: presentAwarenessDistance(AWARENESS_RADIUS_M) }))}</div>
     ${namedAreasHtml(subject.memberNames)}
     ${navigationControlsHtml()}
     ${cohorts.map(rowHtml).join('')}

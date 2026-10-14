@@ -10,6 +10,7 @@ import {
 } from '../loadingFeedback.js';
 import { setSplitFlapText, disposeSplitFlap } from '../splitFlap.js';
 import { t, msg } from '../i18n/index.js';
+import { localizeLayerName } from './layerPanel.js';
 
 // loadingFeedback.js composes the shared status copy inside the portable
 // node/browser graph (the server-side HUD summary reads the same modules), so
@@ -25,6 +26,9 @@ const STATUS_LABEL_KEYS = Object.freeze({
   'MAPPED SITES LOADED': msg('MAPPED SITES LOADED'),
   'RETRYING MAPPED SITES': msg('RETRYING MAPPED SITES'),
   'FETCHING MAPPED SITES': msg('FETCHING MAPPED SITES'),
+  'RETRYING ALPR CAMERAS': msg('RETRYING ALPR CAMERAS'),
+  'FETCHING ALPR CAMERAS': msg('FETCHING ALPR CAMERAS'),
+  'OVERPASS TEMPORARILY UNAVAILABLE': msg('OVERPASS TEMPORARILY UNAVAILABLE'),
   'TURNING OFF LIVE DATA': msg('TURNING OFF LIVE DATA'),
   'REFRESHING LIVE DATA': msg('REFRESHING LIVE DATA'),
   'syncing road network': msg('syncing road network'),
@@ -43,7 +47,21 @@ function localizeStatusDetail(detail) {
   const match = detail.match(RETRY_DETAIL_RE);
   if (match) return t('retrying in {seconds}s', { seconds: match[1] });
   if (detail.trim() === 'retry pending') return t('retry pending');
-  return detail;
+  return localizeLayerRoster(detail);
+}
+
+// The loading detail is the active layers' English names joined by " · ",
+// with " +N" when more are loading. Translate each known layer name; anything
+// else (a provider such as "OpenStreetMap · Overpass") passes through.
+function localizeLayerRoster(detail) {
+  const [, names, suffix = ''] = detail.match(/^(.*?)( \+\d+)?$/s) || [];
+  if (!names) return detail;
+  return (
+    names
+      .split(' · ')
+      .map((name) => localizeLayerName(name))
+      .join(' · ') + suffix
+  );
 }
 
 function localizeLoadingPresentation(presentation) {
@@ -121,15 +139,14 @@ export class ShellFeedback {
     // the flap keeps textContent equal to the settled label throughout, so
     // this stays a no-op on the repeat ticks exactly as it did before.
     if (presentation.label)
-      if (presentation.label)
-        setSplitFlapText(
-          this._trafficSyncLabel,
-          localizeStatusLabel(presentation.label),
-          {
-            // Completion is a timing signal, not another animated loading stage.
-            immediate: !presentation.busy,
-          },
-        );
+      setSplitFlapText(
+        this._trafficSyncLabel,
+        localizeStatusLabel(presentation.label),
+        {
+          // Completion is a timing signal, not another animated loading stage.
+          immediate: !presentation.busy,
+        },
+      );
     // Written on every change INCLUDING the empty settled value — the reducer
     // clears the progress number once the sync lands, and a truthiness guard
     // here would strand the last "..." beside the settled label.

@@ -1,5 +1,6 @@
 /** Connect the portable Director runner to the existing scene presentation. */
 import { t } from '../i18n/index.js';
+import { displaySceneTitle, displayShotTitle } from './recipes.js';
 
 export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
   let timing;
@@ -19,8 +20,8 @@ export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
         t('Running {index}/{total}: {scene} / {shot}', {
           index: index + 1,
           total,
-          scene: scene.title,
-          shot: shot.title,
+          scene: displaySceneTitle(scene),
+          shot: displayShotTitle(shot.title),
         }),
       );
       director._logEvent('shot_start', {

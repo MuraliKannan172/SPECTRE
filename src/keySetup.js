@@ -128,12 +128,17 @@ function updateCloudVoiceAuthControl(auth, busy = false) {
   const state = auth.querySelector('.key-setup-cloud-auth-state');
   const toggle = auth.querySelector('[data-cloud-voice-auth-toggle]');
   state.textContent =
-    mode === 'oauth' ? 'VOICE AUTH · CHATGPT OAUTH' : 'VOICE AUTH · API KEY';
-  toggle.textContent = mode === 'oauth' ? 'USE API KEY' : 'USE CHATGPT OAUTH';
+    mode === 'oauth'
+      ? t('VOICE AUTH · CHATGPT OAUTH')
+      : t('VOICE AUTH · API KEY');
+  toggle.textContent =
+    mode === 'oauth' ? t('USE API KEY') : t('USE CHATGPT OAUTH');
   toggle.title =
     mode === 'oauth'
-      ? 'Use OPENAI_API_KEY for the next cloud voice session'
-      : 'Use the signed-in local ChatGPT/Codex OAuth session for the next cloud voice session';
+      ? t('Use OPENAI_API_KEY for the next cloud voice session')
+      : t(
+          'Use the signed-in local ChatGPT/Codex OAuth session for the next cloud voice session',
+        );
   // Keep the control focusable while the delegated handler blocks repeats.
   toggle.setAttribute('aria-disabled', String(busy));
 }
@@ -153,21 +158,22 @@ function buildRow(documentRef, key) {
   led.className = 'key-setup-led';
   led.setAttribute('aria-hidden', 'true');
   const title = documentRef.createElement('strong');
-  title.textContent = key.title;
+  title.textContent = key.title; // i18n-ignore: provider product name
   const tier = documentRef.createElement('span');
   tier.className = 'key-setup-tier';
   tier.textContent = TIER_DOTS[key.tier] || '';
   tier.title =
     key.tier === 'metered'
-      ? 'Metered — a billing-enabled account'
-      : 'Free key — register, paste, done';
+      ? t('Metered — a billing-enabled account')
+      : t('Free key — register, paste, done');
   head.append(led, title, tier);
   if (key.clientExposed) {
     const exposed = documentRef.createElement('span');
     exposed.className = 'key-setup-exposed';
-    exposed.textContent = 'browser-side';
-    exposed.title =
-      'This key runs in the browser by design — restrict it at the provider (see SECURITY.md)';
+    exposed.textContent = t('browser-side');
+    exposed.title = t(
+      'This key runs in the browser by design — restrict it at the provider (see SECURITY.md)',
+    );
     head.append(exposed);
   }
   if (external) {
@@ -175,9 +181,10 @@ function buildRow(documentRef, key) {
     // facts this panel reports, never values it rewrites or deletes.
     const badge = documentRef.createElement('span');
     badge.className = 'key-setup-external';
-    badge.textContent = 'configured externally';
-    badge.title =
-      'Supplied by your environment, Keychain, or launcher — change it where it was set';
+    badge.textContent = t('configured externally');
+    badge.title = t(
+      'Supplied by your environment, Keychain, or launcher — change it where it was set',
+    );
     head.append(badge);
   }
   const get = documentRef.createElement('a');
@@ -185,7 +192,7 @@ function buildRow(documentRef, key) {
   get.href = key.getUrl;
   get.target = '_blank';
   get.rel = 'noopener noreferrer';
-  get.textContent = key.set ? 'MANAGE ↗' : 'GET KEY ↗';
+  get.textContent = key.set ? t('MANAGE ↗') : t('GET KEY ↗');
   head.append(get);
 
   const unlocks = documentRef.createElement('p');
@@ -206,8 +213,8 @@ function buildRow(documentRef, key) {
       input.dataset.envVar = envVar;
       input.setAttribute('aria-label', envVar);
       input.placeholder = key.set
-        ? `${envVar} saved — paste to replace`
-        : `paste ${envVar}`;
+        ? t('{envVar} saved — paste to replace', { envVar })
+        : t('paste {envVar}', { envVar });
       fields.append(input);
     }
     if (key.managed === 'file') {
@@ -328,7 +335,9 @@ export async function initKeySetup({
     if (disposed) return;
     status = nextStatus;
     chipLabel.textContent = keySetupChipLabel(status);
-    chip.title = `Project keys: ${keySetupChipLabel(status)}`;
+    chip.title = t('Project keys: {status}', {
+      status: keySetupChipLabel(status),
+    });
     chip.setAttribute('aria-label', chip.title);
     // Fully powered is the owner's clean screen: the chip retires. The dialog
     // stays reachable this session (and via ?setup=1) to swap or verify keys.

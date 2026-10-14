@@ -569,9 +569,11 @@ export class StyleManager extends ShellFacade {
     });
     this._initUI();
     this._initMapStackControl();
+    // Headers first: panel chrome builds its toggle labels from them.
+    this._applyRuntimeStaticHeaderText();
     this._initPanelChrome();
     this._initLocaleSelector();
-    this._applyRuntimeStaticHeaderText();
+    this._sizeDisplayLabelColumn();
     this._initLeftPanelAdaptiveLayout();
     this._initRightPanelAdaptiveLayout();
     this._initRadioPanel();
@@ -732,6 +734,30 @@ export class StyleManager extends ShellFacade {
         persistLocaleAndReload(button.dataset.locale);
       });
       container.appendChild(button);
+    }
+  }
+
+  /**
+   * Gives every Display-panel row label one shared column, sized in
+   * characters to the longest label of the active language, so the slider
+   * tracks of separate rows start at the same x. The labels are monospace and
+   * often hidden (collapsed rows have no layout), so this counts characters
+   * instead of measuring; the CSS turns the count into a width.
+   * @returns {void}
+   */
+  _sizeDisplayLabelColumn() {
+    const labels = document.querySelectorAll(
+      '#pp-toggles .pp-slider-row > .pp-slider-mini-label',
+    );
+    let longest = 0;
+    for (const label of labels) {
+      longest = Math.max(longest, label.textContent.trim().length);
+    }
+    if (longest > 0) {
+      document.documentElement.style.setProperty(
+        '--pp-label-chars',
+        String(longest),
+      );
     }
   }
 

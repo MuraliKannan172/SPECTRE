@@ -55,17 +55,18 @@ export {
 
 import { createRealtimeBackend } from './realtimeBackend.js';
 
-import { t, msg } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
+import { voiceStatusLabel } from './control.js';
 
 // Status enum VALUES are machine identifiers (dataset.status, CSS hooks);
 // only the LABEL rendered from them localizes, resolved at write time via t().
-const STATUS_LABEL_KEYS = Object.freeze({
-  idle: msg('OFF'),
-  connecting: msg('CONNECTING'),
-  listening: msg('LISTENING'),
-  executing: msg('EXECUTING'),
-  error: msg('ERROR'),
-});
+const STATUS_STATES = new Set([
+  'idle',
+  'connecting',
+  'listening',
+  'executing',
+  'error',
+]);
 
 /** Compose voice state owners and coordinate ordered session startup/teardown. */
 export class GevRealtimeController extends RealtimeFacade {
@@ -436,9 +437,8 @@ export class GevRealtimeController extends RealtimeFacade {
     this.ui.root.dataset.status = status;
     if (status === 'error') this.ui.root.classList.remove('error-dismissed');
     this.updateVoiceButtonLabel();
-    this.ui.status.textContent = t(
-      STATUS_LABEL_KEYS[status] || STATUS_LABEL_KEYS.idle,
-    );
+    const shownStatus = STATUS_STATES.has(status) ? status : 'idle';
+    this.ui.status.textContent = voiceStatusLabel(shownStatus);
     const resolvedDetail =
       status === 'listening' && this.pushToTalkMode
         ? this.pushToTalkKeyHeld

@@ -49,7 +49,7 @@ export class RealtimeCost {
     const pendingTier = resolveVoiceModel(this.voiceTier).tier;
     const isMini = pendingTier === 'mini';
     if (this.ui?.tierButton) {
-      this.ui.tierButton.textContent = isMini ? 'MINI' : 'STD';
+      this.ui.tierButton.textContent = isMini ? t('MINI') : t('STD');
       this.ui.tierButton.setAttribute(
         'aria-pressed',
         isMini ? 'true' : 'false',
@@ -65,7 +65,7 @@ export class RealtimeCost {
               'Voice model: {pendingId} — click to switch to {target}; applies next session',
               {
                 pendingId,
-                target: isMini ? 'standard' : 'mini',
+                target: isMini ? t('standard') : t('mini'),
               },
             );
     }
@@ -74,13 +74,22 @@ export class RealtimeCost {
       if (liveAuth === 'oauth') {
         const { responses, input, output, captions } = this.oauthUsage;
         this.ui.costValue.hidden = false;
-        this.ui.costValue.textContent = 'COST UNKNOWN';
+        this.ui.costValue.textContent = t('COST UNKNOWN');
         this.ui.costValue.dataset.level = 'unknown';
         this.ui.costValue.title =
-          `ChatGPT OAuth session: ${responses} response(s), ${input} input and ${output} output tokens, ${captions} caption transcription(s) reported. ` +
-          'USD cost and the API spend cap are unavailable for this auth mode.' +
+          t(
+            'ChatGPT OAuth session: {responses} response(s), {input} input and {output} output tokens, {captions} caption transcription(s) reported.',
+            { responses, input, output, captions },
+          ) +
+          ' ' +
+          t(
+            'USD cost and the API spend cap are unavailable for this auth mode.',
+          ) +
           (state.incomplete
-            ? ' Usage is incomplete because a response was still in flight when the session ended.'
+            ? ' ' +
+              t(
+                'Usage is incomplete because a response was still in flight when the session ended.',
+              )
             : '');
         return;
       }

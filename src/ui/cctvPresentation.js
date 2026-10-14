@@ -1,4 +1,5 @@
 import { t, tn } from '../i18n/index.js';
+import { cctvSourceLabelText, cctvSourceMessageText } from './cctvFrames.js';
 
 import { createCctvVideoSurface } from './cctvVideo.js';
 export function _calBadgeLabel(badge) {
@@ -148,12 +149,13 @@ export function _renderCctvState(state) {
 
   if (this._cctvMeta) {
     if (activeCamera) {
-      const provider =
+      const provider = cctvSourceLabelText(
         activeCamera.sourceLabel ||
-        activeCamera.provider ||
-        'Configured Source';
+          activeCamera.provider ||
+          'Configured Source',
+      );
       const statusMsg = activeCamera.sourceMessage
-        ? ` · ${activeCamera.sourceMessage}`
+        ? ` · ${cctvSourceMessageText(activeCamera.sourceMessage)}`
         : '';
       // A partner-supplied feed inside a pack names its owner here.
       const credit = activeCamera.credit ? ` · ${activeCamera.credit}` : '';

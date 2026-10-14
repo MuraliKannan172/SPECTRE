@@ -39,7 +39,7 @@ The `many` form is the `other` text with «de» after the number: «{count} de c
 | retry / retrying                              | reintento / reintentando                                          |
 | key (API key) / POWER UP / POWERED UP         | clave / ENCENDER / ENCENDIDO                                      |
 | Provider Settings                             | Ajustes de proveedores                                            |
-| ON / OFF (state chips)                        | ACTIVADO / DESACTIVADO                                            |
+| ON / OFF (state chips)                        | ACTIVO / INACTIVO (short enough for the layer pill)               |
 | enable / disable                              | activar / desactivar                                              |
 | globe / map / map source / map stack          | globo / mapa / fuente del mapa / conjunto de mapas                |
 | aircraft, plane / flight / military flights   | aeronave / vuelo / vuelos militares                               |
@@ -61,10 +61,15 @@ The `many` form is the `other` text with «de» after the number: «{count} de c
 | Scope (circular viewport mask) / keyhole      | mirilla / ojo de cerradura                                        |
 | feather / fade                                | difuminado / desvanecimiento                                      |
 | detection overlay                             | superposición de detección                                        |
+| pin (Draw tool)                               | marcador                                                          |
+| Bloom / Glow (visual effect)                  | resplandor                                                        |
+| Cyber (HUD layout, effect)                    | Ciber                                                             |
 | heading, course / altitude / ground speed     | rumbo / altitud / velocidad respecto al suelo (short: VEL. SUELO) |
 | HDG / BRG / CRS / FOV / DEST / SPD / RANGE    | HDG / BRG / CRS / FOV / DEST / SPD / RANGE (unchanged)            |
 | PREV / NEXT                                   | ANT. / SIG.                                                       |
 | Previous / Next (button text)                 | Anterior / Siguiente                                              |
 | L / R (relative bearing)                      | I / D                                                             |
+| SIG / NEWS / LOCAL (briefing tabs)            | SIG / NOTICIAS / LOCAL                                            |
+| PITCH / HGT (CCTV calibration chips)          | INCL. / ALT.                                                      |
 | NOT AN ALL-CLEAR                              | NO IMPLICA TODO DESPEJADO                                         |
 | click / click to …                            | haz clic / clic para …                                            |

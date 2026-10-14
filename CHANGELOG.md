@@ -21,7 +21,9 @@
   switch in the Visual Presets dock, then the browser language; English stays
   the default and the fallback. `npm run i18n`, also run by `npm test`, fails on
   missing, unused or broken translations. Built on the i18n foundation by
-  @meirm (#601), with the Russian catalog started from #312.
+  @meirm (#601), with the Russian catalog started from #312. It also fails on UI text that is
+  not marked at all, so the whole interface, including surfaces added after
+  the original extraction, is translated (1,679 messages).
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.

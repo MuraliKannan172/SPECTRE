@@ -1,5 +1,6 @@
 /** Reconcile actionable signal rows without disturbing native keyboard focus. */
 import { t, tn } from '../i18n/index.js';
+import { formatCockpitDistance } from './cockpitPresentation.js';
 
 export function renderCockpitSignals() {
   if (!this.signalList) return;
@@ -157,7 +158,7 @@ export function updateCockpitSignals(snapshot, unknownCount) {
               ? t('MILITARY FLIGHT')
               : t('COMMERCIAL FLIGHT'),
           distance: Number.isFinite(item.distanceM)
-            ? `${item.distanceM < 10000 ? (item.distanceM / 1000).toFixed(1) : Math.round(item.distanceM / 1000)} KM`
+            ? formatCockpitDistance(item.distanceM)
             : t('DISTANCE UNKNOWN'),
         }),
         target: { layerId: cohort.id, id: String(id) },

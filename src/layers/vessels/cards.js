@@ -1,8 +1,8 @@
 import {
   accentForVesselType,
-  normalizeVesselType,
+  displayVesselType,
 } from '../../data/vesselLabels.js';
-import { t } from '../../i18n/index.js';
+import { formatNumber, t } from '../../i18n/index.js';
 
 export function createCards({
   vesselState,
@@ -130,7 +130,7 @@ export function createCards({
   /** Uppercased, card-width-bounded AIS type (empty string when unknown). */
 
   function vesselTypeShort(record) {
-    return normalizeVesselType(record.type).toUpperCase().slice(0, 14);
+    return displayVesselType(record.type).toUpperCase().slice(0, 14);
   }
 
   /**
@@ -160,11 +160,22 @@ export function createCards({
   }
 
   function formatSpeed(speed) {
-    return speed === null ? '--KT' : `${speed.toFixed(1)}KT`;
+    return t('{speed}KT', {
+      speed:
+        speed === null
+          ? '--'
+          : formatNumber(speed, {
+              minimumFractionDigits: 1,
+              maximumFractionDigits: 1,
+              useGrouping: false,
+            }),
+    });
   }
 
   function formatHeading(heading) {
-    return Number.isFinite(heading) ? `${Math.round(heading)}DEG` : '--DEG';
+    return t('{heading}DEG', {
+      heading: Number.isFinite(heading) ? Math.round(heading) : '--',
+    });
   }
 
   function formatPositionTime(record) {

@@ -215,6 +215,12 @@ export function renderRadioState(state) {
     : state.audioState === 'paused'
       ? t('Resume')
       : t('Play');
+  // The transport button is narrow: it gets its own short uppercase labels.
+  const playbackButtonLabel = activePlayback
+    ? t('PAUSE')
+    : state.audioState === 'paused'
+      ? t('RESUME')
+      : t('PLAY');
   const playTargetWord = selected ? t('selected') : t('nearest');
   const playAria = t('{action} {target} radio station', {
     action: playbackAction,
@@ -223,7 +229,7 @@ export function renderRadioState(state) {
   if (this._radioPlayBtn) {
     this._radioPlayBtn.disabled = !interactive || !hasStations;
     this._radioPlayBtn.classList.toggle('active', activePlayback);
-    this._radioPlayBtn.textContent = playbackAction.toUpperCase();
+    this._radioPlayBtn.textContent = playbackButtonLabel;
     this._radioPlayBtn.setAttribute('aria-label', playAria);
   }
   if (this._contextRadioMiniPlayBtn) {

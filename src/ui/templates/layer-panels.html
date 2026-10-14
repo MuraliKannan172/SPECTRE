@@ -44,7 +44,7 @@
       </div>
       <div class="cctv-controls">
         <button id="cctv-projection-btn" class="scene-btn" data-i18n>PROJECTION ON</button>
-        <span id="cctv-quality-chip">CAL · --</span>
+        <span id="cctv-quality-chip" data-i18n-runtime>CAL · --</span>
       </div>
       <div class="cctv-calibration-block">
         <div class="cctv-calibration-header">
@@ -52,11 +52,11 @@
           <button id="cctv-adjust-btn" class="scene-btn" title="Drag the camera in the world: rings rotate, arrows move, handles set range/FOV" data-i18n-title data-i18n>ADJUST</button>
         </div>
         <div id="cctv-cal-readout" class="cctv-cal-readout" aria-label="Camera pose — click a value to type" data-i18n-aria-label>
-          <button class="cctv-cal-value" data-cal-field="heading" title="Heading (compass °) — click to type" data-i18n-title>HDG --</button>
-          <button class="cctv-cal-value" data-cal-field="pitch" title="Pitch (° up/down) — click to type" data-i18n-title>PITCH --</button>
-          <button class="cctv-cal-value" data-cal-field="fov" title="Horizontal FOV (°) — click to type" data-i18n-title>FOV --</button>
-          <button class="cctv-cal-value" data-cal-field="range" title="Range / monitor-plane distance (m) — click to type" data-i18n-title>RANGE --</button>
-          <button class="cctv-cal-value" data-cal-field="height" title="Mount height above ground (m) — click to type" data-i18n-title>HGT --</button>
+          <button class="cctv-cal-value" data-cal-field="heading" title="Heading (compass °) — click to type" data-i18n-title data-i18n-runtime>HDG --</button>
+          <button class="cctv-cal-value" data-cal-field="pitch" title="Pitch (° up/down) — click to type" data-i18n-title data-i18n-runtime>PITCH --</button>
+          <button class="cctv-cal-value" data-cal-field="fov" title="Horizontal FOV (°) — click to type" data-i18n-title data-i18n-runtime>FOV --</button>
+          <button class="cctv-cal-value" data-cal-field="range" title="Range / monitor-plane distance (m) — click to type" data-i18n-title data-i18n-runtime>RANGE --</button>
+          <button class="cctv-cal-value" data-cal-field="height" title="Mount height above ground (m) — click to type" data-i18n-title data-i18n-runtime>HGT --</button>
           <button class="cctv-cal-value" data-cal-field="north" title="North offset from catalog position (m) — click to type" data-i18n-title>ΔN --</button>
           <button class="cctv-cal-value" data-cal-field="east" title="East offset from catalog position (m) — click to type" data-i18n-title>ΔE --</button>
         </div>
@@ -78,8 +78,8 @@
       <div class="panel-header">
         <span class="panel-title" data-i18n>STREET LEVEL</span>
         <span class="panel-divider"></span>
-        <button id="sl-status" class="sl-status" type="button" aria-pressed="false" title="Turn Street Level on or off">OFF</button>
-        <button class="panel-collapse-btn" data-collapse-target="street-level-panel" title="Expand panel">◀</button>
+        <button id="sl-status" class="sl-status" type="button" aria-pressed="false" title="Turn Street Level on or off" data-i18n-title data-i18n>OFF</button>
+        <button class="panel-collapse-btn" data-collapse-target="street-level-panel" title="Expand panel" data-i18n-title>◀</button>
       </div>
       <div id="sl-body" class="sl-body">
         <div class="sl-main">
@@ -129,7 +129,7 @@
               <div id="sl-since-row" class="sl-since">
                 <label class="cctv-summary-label" for="sl-since" data-i18n>SINCE</label>
                 <input id="sl-since" class="sl-range" type="range" min="0" max="8" step="1" value="0" aria-valuetext="ANY DATE" aria-describedby="sl-since-label sl-since-note" />
-                <output id="sl-since-label" class="sl-since-label" for="sl-since">ANY DATE</output>
+                <output id="sl-since-label" class="sl-since-label" for="sl-since" data-i18n>ANY DATE</output>
                 <small id="sl-since-note" class="sl-since-note" hidden></small>
               </div>
             </fieldset>
@@ -137,7 +137,7 @@
             <!-- The hint says how to open imagery; the button does it without a pointer. -->
             <div class="sl-meta-row">
               <div id="sl-coverage-meta" class="sl-meta"></div>
-              <button id="sl-nearest-btn" class="scene-btn sl-nearest-btn" type="button" hidden data-i18n>OPEN STREET VIEW</button>
+              <button id="sl-nearest-btn" class="scene-btn sl-nearest-btn" type="button" hidden data-i18n-runtime>OPEN STREET VIEW</button>
             </div>
           </div>
         </div>

@@ -69,6 +69,7 @@ export function _handleContextLayerChange(change) {
               );
               return true;
             },
+            'Space Missions cancellation could not restore the previous layer state', // i18n-ignore: English message; the toast shows localizedMessage
             {
               localizedMessage: t(
                 'Space Missions cancellation could not restore the previous layer state',

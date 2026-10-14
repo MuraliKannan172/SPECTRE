@@ -130,6 +130,12 @@ test('tn() picks English and Russian plural forms', () => {
   assert.match(label(21), / 21 КЛЮЧ(?![А-ЯЁ])/);
 });
 
+test('t() context separates identical English with different meanings', () => {
+  assert.equal(t('CLEAR', { context: 'action' }), 'CLEAR');
+  setLocale('ru');
+  assert.notEqual(t('CLEAR', { context: 'action' }), t('CLEAR'));
+});
+
 test('msg() returns its text unchanged', () => {
   assert.equal(msg('Live Flights'), 'Live Flights');
 });
@@ -180,6 +186,31 @@ test('applyDocumentTranslations translates opted-in text and attributes in place
   assert.equal(label.textContent, t('POWERED UP'));
   assert.equal(pin.attrs.get('title'), t('POWERED UP'));
   assert.equal(unknown.textContent, 'No such message');
+});
+
+test('persistLocaleAndReload keeps the choice in ?lang when storage is blocked', () => {
+  const calls = [];
+  const location = {
+    href: 'https://gev.local/?x=1#scene=a',
+    assign: (url) => calls.push(['assign', url]),
+    reload: () => calls.push(['reload']),
+  };
+  const history = {
+    replaceState: (_s, _t, url) => calls.push(['replace', url]),
+  };
+  const storage = {
+    setItem() {
+      throw new Error('blocked');
+    },
+  };
+  assert.equal(
+    persistLocaleAndReload('ru', { location, history, storage }),
+    true,
+  );
+  assert.deepEqual(calls, [
+    ['replace', 'https://gev.local/?x=1&lang=ru#scene=a'],
+    ['reload'],
+  ]);
 });
 
 test('persistLocaleAndReload stores the choice, keeps the hash, strips ?lang', () => {

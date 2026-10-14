@@ -1,5 +1,5 @@
-import { keyRequirementText, withKeyAlternatives } from './keyGuidance.js';
-import { formatNumber, msg, t, tn } from '../i18n/index.js';
+import { formatNumber, msg, t, tn, translateKnown } from '../i18n/index.js';
+import { keyGuidanceText, keyRequirementText } from './keyGuidance.js';
 
 // Street Level UI state to panel strings and flags. Pure, so it is testable.
 
@@ -70,7 +70,7 @@ function keyGuidance(state) {
     .filter((p) => p.on && p.keyRequired && p.requiresKeyId)
     .map((p) => keyRequirementText(p.requiresKeyId))
     .filter(Boolean);
-  return withKeyAlternatives(
+  return keyGuidanceText(
     [...new Set(needs)].join('; '),
     state.keyAlternatives || [],
   );
@@ -107,13 +107,14 @@ function presentProviders(state) {
       ? t('{name} imagery on', { name: provider.name })
       : t('{name} imagery off', { name: provider.name });
     if (provider.keyRejected && provider.error)
-      title = `${provider.name}: ${provider.error}`;
+      title = `${provider.name}: ${translateKnown(provider.error)}`;
     else if (keyRequired && provider.requiresKeyId)
       title = `${provider.name}: ${keyRequirementText(provider.requiresKeyId)}`;
-    else if (provider.error) title = `${provider.name}: ${provider.error}`;
+    else if (provider.error)
+      title = `${provider.name}: ${translateKnown(provider.error)}`;
     return {
       id: provider.id,
-      label: provider.label,
+      label: translateKnown(provider.label),
       color: provider.color || null,
       title,
       active: on,
@@ -140,7 +141,8 @@ function presentViewer(state) {
     right.push(formatDate(street.capturedAt, street.capturedAtPrecision));
   const left = [];
   if (street.title) left.push(street.title);
-  if (street.creator) left.push(t('Image by {creator}', { creator: street.creator }));
+  if (street.creator)
+    left.push(t('Image by {creator}', { creator: street.creator }));
   return {
     open: street.open === true,
     loading: street.loading === true && !street.imageId,
@@ -149,7 +151,9 @@ function presentViewer(state) {
     captionLeft: left.join(' · '),
     captionRight: right.join(' · '),
     link: street.externalUrl || null,
-    linkLabel: street.providerLabel ? `${street.providerLabel} ↗` : '',
+    linkLabel: street.providerLabel
+      ? `${translateKnown(street.providerLabel)} ↗`
+      : '',
     follow: {
       pressed: street.follow === true,
       disabled: street.open !== true || street.followAvailable !== true,
@@ -179,13 +183,16 @@ function presentNearest(state) {
       disabled: true,
       providerIds: [],
     };
-  const names = targets.map((provider) => provider.name).join(t(' or '));
+  const names = targets
+    .map((provider) => translateKnown(provider.name))
+    .join(t(' or '));
+  const labels = targets
+    .map((provider) => translateKnown(provider.label))
+    .join(' / ');
   const ready = state.groundClickReady === true;
   return {
     visible: true,
-    label: t('OPEN {labels}', {
-      labels: targets.map((provider) => provider.label).join(' / '),
-    }),
+    label: t('OPEN {labels}', { labels }),
     title: ready
       ? t('Open {names} at the centre of the view', { names })
       : t('Zoom in to a street to open {names} here', { names }),
@@ -194,9 +201,13 @@ function presentNearest(state) {
   };
 }
 
+/** Provider hints are English data joined by " · "; translate each part. */
+function translateHint(hint) {
+  return hint ? hint.split(' · ').map(translateKnown).join(' · ') : '';
+}
+
 function presentMeta(state) {
-  if (state.providers.length === 0)
-    return state.coverage.hint ? t(state.coverage.hint) : '';
+  if (state.providers.length === 0) return translateHint(state.coverage.hint);
   if (!state.enabled) return t('Switch a provider on to draw its coverage.');
   // Key-gated with another source ready: say how to use it.
   if (state.keyRequired && state.keyAlternatives?.length)
@@ -210,26 +221,25 @@ function presentMeta(state) {
           '{n} images in this sequence · Esc clears',
           { n: formatNumber(state.sequence.images) },
         );
-  const hint = state.coverage.hint ? t(state.coverage.hint) : '';
+  const hint = translateHint(state.coverage.hint);
   if (state.coverage.count > 0) {
     // A provider whose lines are not sequences carries its wording as data
     // (coverageLabel); its count line needs its own tn pair so every language
     // gets real plural forms. New wording: add a pair here and to the catalogs.
     const count = state.coverage.count;
-    const n = () => formatNumber(count);
     const countLine =
       state.coverage.label?.noun === 'streets'
         ? tn(
             count,
             '{n} street in view · click a line for its nearest photo',
             '{n} streets in view · click a line for its nearest photo',
-            { n: n() },
+            { n: formatNumber(count) },
           )
         : tn(
             count,
             '{n} sequence in view · click a line for its photos',
             '{n} sequences in view · click a line for its photos',
-            { n: n() },
+            { n: formatNumber(count) },
           );
     return [countLine, hint].filter(Boolean).join(' · ');
   }
@@ -252,7 +262,8 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
     providers: presentProviders(state),
     error: keyMissing
       ? null
-      : state.street.error || state.coverage.error || null,
+      : translateKnown(state.street.error || state.coverage.error || '') ||
+        null,
     filter: { pano: filter.pano, sinceDays: Number(filter.sinceDays) || 0 },
     filterControls: {
       pano: state.filterControls?.pano !== false,

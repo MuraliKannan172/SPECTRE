@@ -119,7 +119,11 @@ export function composeUIState({
         provider.groundClick !== true && provider.highlightsSequence !== false,
     )
   )
-    legend.push({ key: 'selected', label: t('Selected'), color: COLORS.selected });
+    legend.push({
+      key: 'selected',
+      label: t('Selected'),
+      color: COLORS.selected,
+    });
   return {
     enabled,
     groundClickReady: groundClickReady === true,

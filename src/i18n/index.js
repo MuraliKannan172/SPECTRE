@@ -3,6 +3,7 @@
 //   t('Save keys')                                   → 'Сохранить ключи'
 //   t('Cleared {name}', { name })                    → named interpolation
 //   tn(count, '{count} camera', '{count} cameras')   → plural by Intl.PluralRules
+//   t('CLEAR', { context: 'action' })                → same English, own entry
 //   msg('Live Flights')                              → marks a string kept in data
 //                                                      for a later t(); returns it as is
 //
@@ -76,11 +77,13 @@ function lookup(text) {
 /**
  * Translate English source text into the active locale.
  * @param {string} text English text, e.g. 'Hold Space to talk'
- * @param {object} [values] Named interpolation values
+ * @param {object} [values] Named interpolation values. `context` tells
+ *   apart identical English with different meanings: t('CLEAR', { context:
+ *   'action' }) is the catalog entry "action|CLEAR"; English is unchanged.
  * @returns {string}
  */
 export function t(text, values) {
-  const entry = lookup(text);
+  const entry = lookup(values?.context ? `${values.context}|${text}` : text);
   return interpolate(typeof entry === 'string' ? entry : text, values);
 }
 
@@ -104,6 +107,18 @@ export function tn(count, one, other, values) {
     pattern = pluralRules(DEFAULT_LOCALE).select(count) === 'one' ? one : other;
   }
   return interpolate(pattern, { ...values, count });
+}
+
+/**
+ * Translate text that may be ours or may come from a provider: a catalog
+ * entry is used when there is one, anything else shows as given, without a
+ * missing-translation warning.
+ */
+export function translateKnown(text) {
+  const catalog = CATALOGS[currentLocale];
+  if (!catalog || typeof text !== 'string') return text;
+  const entry = catalog[text];
+  return typeof entry === 'string' ? entry : text;
 }
 
 /** Mark English text that is stored in data and translated later by t(). */
@@ -147,6 +162,32 @@ export function formatNumber(value, options) {
 /** Locale-aware date/time formatting (Intl.DateTimeFormat). */
 export function formatDate(value, options) {
   return cachedFormatter('date', Intl.DateTimeFormat, options).format(value);
+}
+
+const UTC_DAY_MONTH = Object.freeze({
+  day: '2-digit',
+  month: '2-digit',
+  timeZone: 'UTC',
+});
+
+/**
+ * The UTC day and month of a time, for "MM-DD HH:MM UTC" readouts: "10-13" in
+ * English (as before), "13.10" in Russian, "13/10" in Spanish, never read as a
+ * range. Takes an ISO string (its date part is used as written) or a time.
+ * @param {string|number|Date} value
+ * @returns {string} '' when the value is not a time.
+ */
+export function formatUtcDayMonth(value) {
+  const written =
+    typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
+  const time = written
+    ? Date.UTC(Number(written[1]), Number(written[2]) - 1, Number(written[3]))
+    : new Date(value).getTime();
+  if (!Number.isFinite(time)) return '';
+  if (currentLocale === 'en') return new Date(time).toISOString().slice(5, 10);
+  return cachedFormatter('date', Intl.DateTimeFormat, UTC_DAY_MONTH).format(
+    time,
+  );
 }
 
 /**
@@ -209,7 +250,7 @@ export function applyDocumentTranslations(doc) {
 /**
  * Persist a locale choice, then reload preserving window.location.hash exactly
  * and stripping ?lang from the search string, so the override is one-shot.
- * Storage is best-effort: where it is blocked the choice will not survive.
+ * Where storage is blocked, ?lang carries the choice instead.
  * @returns {boolean} true when a reload was triggered.
  */
 export function persistLocaleAndReload(
@@ -221,12 +262,14 @@ export function persistLocaleAndReload(
   } = {},
 ) {
   const normalized = normalizeLocale(locale) || DEFAULT_LOCALE;
-  writeStoredLocale(normalized, storage);
+  const stored = writeStoredLocale(normalized, storage);
   if (!location || typeof location.assign !== 'function') return false;
   let target = location.href;
   try {
+    // Without storage the choice only survives in the URL, so keep it there.
     const url = new URL(location.href);
-    url.searchParams.delete('lang');
+    if (stored) url.searchParams.delete('lang');
+    else url.searchParams.set('lang', normalized);
     target = url.href;
   } catch {
     // Keep the current href.
