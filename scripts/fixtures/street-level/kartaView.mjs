@@ -66,7 +66,8 @@ function record(photo) {
     lng: String(photo.lon),
     matchLat: String(photo.lat),
     matchLng: String(photo.lon),
-    heading: '0',
+    // A dashcam phone's compass, disturbed by the car: the drive runs north.
+    heading: '200',
     fieldOfView: photo.isPano ? '360' : '0',
     projection: photo.isPano ? 'SPHERE' : 'PLANE',
     shotDate: SHOT,
@@ -117,6 +118,7 @@ export function describeKartaViewCall(method, url) {
     .replace(/\/tiles\/\d+\/\d+\/\d+\.json$/, '/tiles/{x}/{y}/{z}.json')
     .replace(/\/photo\/\d+$/, '/photo/{id}')
     .replace(/\/sequence\/\d+\/photos$/, '/sequence/{id}/photos')
+    .replace(/\/sequence\/\d+$/, '/sequence/{id}')
     .replace(/^\/files\/photo\/.*$/, '/files/photo/{path}')
     .replace(
       /^\/pr:sharp\/rs:fit:\d+:\d+\/.*$/,
@@ -202,6 +204,18 @@ export function answerKartaViewRequest({ method, url }) {
       ? { ...ok({ data: record(photo) }), known: true }
       : { ...raw(200, { status: { apiCode: 601 }, result: {} }), known: true };
   }
+  const sequence = path.match(/^\/2\.0\/sequence\/(\d+)$/);
+  if (sequence)
+    return {
+      ...ok({
+        data: {
+          id: sequence[1],
+          countActivePhotos:
+            sequence[1] === KV_SEQUENCE_ID ? String(photos.length) : '0',
+        },
+      }),
+      known: true,
+    };
   const page = path.match(/^\/2\.0\/sequence\/(\d+)\/photos$/);
   if (page) {
     const q = address.searchParams;

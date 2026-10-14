@@ -11,6 +11,7 @@ import {
   PANO_FULL_SIZE,
   PANO_MID_SIZE,
   PANO_PREVIEW_SIZE,
+  cameraBearing,
   kartaViewPhotoUrl,
   resizedImageUrl,
 } from './policy.js';
@@ -88,6 +89,7 @@ export function panoSizeFor(canvasPixels, fovDeg) {
  * @param {(photo: object, delta: -1|1) => Promise<string|null>} options.step   The photo `delta` along the sequence, or null at its end.
  * @param {(imageId: string) => void} options.onStep   Open the photo ‹ › chose (through the core, so loading and errors show).
  * @param {(photo: object) => void} [options.onShown]   A photo is on screen.
+ * @param {(imageId: string) => void} [options.onReopen]   Draw the same photo again after a GPU reset (default: `onStep`).
  * @param {object} [options.render]   Render governor.
  * @param {(url: string, options?: object) => Promise<HTMLImageElement>} [options.load]
  * @param {(canvas: HTMLCanvasElement) => object} [options.createRenderer]
@@ -98,6 +100,7 @@ export function createKartaViewViewer({
   step,
   onStep,
   onShown = () => {},
+  onReopen = onStep,
   render,
   load = loadImage,
   createRenderer = createPanoramaRenderer,
@@ -125,6 +128,8 @@ export function createKartaViewViewer({
   let restoreView = null;
   /** Width of the panorama texture on screen (0: the preview). */
   let panoWidth = 0;
+  /** The flat photo on screen is the 2,560 px version. */
+  let flatSharp = false;
   /** The photo an open is fetching: ‹ › step on from it, not the old one. */
   let openingId = null;
   /** ‹ › chose this photo: keep the panorama's look direction for it. */
@@ -139,7 +144,7 @@ export function createKartaViewViewer({
   function emit() {
     if (!photo || !showing) return;
     const view = showing === 'pano' ? renderer.getView() : null;
-    const heading = photo.heading;
+    const heading = cameraBearing(photo);
     const pose = {
       providerId: KARTAVIEW_PROVIDER_ID,
       imageId: photo.id,
@@ -257,7 +262,7 @@ export function createKartaViewViewer({
       const again = photo.id;
       show(null);
       openingId = again;
-      onStep(again);
+      onReopen(again);
     }
   }
 
@@ -471,6 +476,10 @@ export function createKartaViewViewer({
     if (kind === 'flat' && target.isPano) return;
     const size = kind === 'pano' ? panoSizeNow() : FLAT_FULL_SIZE;
     if (kind === 'pano' && size[0] <= panoWidth) return;
+    // A docked viewer shows the 1,280 px version in full: the 2,560 px one
+    // (~0.6 MB a photo) waits until the viewer is bigger than that.
+    if (kind === 'flat' && (flatSharp || flatPixels() <= FLAT_VIEW_SIZE[0]))
+      return;
     const url =
       kind === 'pano'
         ? resizedImageUrl(target.urls.pano, size)
@@ -483,11 +492,22 @@ export function createKartaViewViewer({
         if (!renderer || size[0] <= panoWidth) return;
         renderer.setImage(image);
         panoWidth = size[0];
-      } else picture.src = image.src;
+      } else {
+        picture.src = image.src;
+        flatSharp = true;
+      }
       requestRender();
     } catch {
       /* the first version stays */
     }
+  }
+
+  /** Device pixels across the flat photo's frame. */
+  function flatPixels() {
+    const ratio = globalThis.devicePixelRatio || 1;
+    return (
+      Math.max(picture?.clientWidth || 0, picture?.clientHeight || 0) * ratio
+    );
   }
 
   /** The sharp panorama this viewer needs now: 2,048 docked, 4,096 expanded. */
@@ -543,6 +563,7 @@ export function createKartaViewViewer({
     if (!image) throw failure || new Error(LOAD_FAILED);
     if (seq !== openSeq) return false;
     picture.src = image.src;
+    flatSharp = false;
     photo = target;
     show('flat');
     return true;
@@ -610,9 +631,11 @@ export function createKartaViewViewer({
 
     resize() {
       renderer?.resize();
-      // Expanded: a docked viewer's 2,048 px panorama is now too soft.
+      // Expanded: a docked viewer's first version is now too soft.
       if (showing === 'pano' && photo && panoSizeNow()[0] > panoWidth)
         upgrade(photo, openSeq, 'pano');
+      if (showing === 'flat' && photo && !flatSharp)
+        upgrade(photo, openSeq, 'flat');
     },
 
     /** FIT / FILL frame a flat photo; a panorama has no frame to fit. */
@@ -621,6 +644,11 @@ export function createKartaViewViewer({
     setRenderMode(mode) {
       renderMode = mode === 'fill' ? 'fill' : 'letterbox';
       applyRenderMode();
+    },
+
+    /** The photo's direction became known (its drive loaded): pose again. */
+    refreshPose() {
+      emit();
     },
 
     onPose(listener) {

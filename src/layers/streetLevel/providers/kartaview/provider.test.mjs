@@ -714,7 +714,7 @@ test('coverage hints: zoom in from too high, “no photos” only once an empty 
   assert.equal(env.instance.coverageStats().hint, NO_COVERAGE_HINT);
 });
 
-test('a coverage tile loaded a moment ago is not asked for again', async (t) => {
+test('coverage tiles are kept while KartaView is on and dropped once it is switched off', async (t) => {
   const env = coverageSetup(t, {
     lines: [
       [
@@ -725,11 +725,14 @@ test('a coverage tile loaded a moment ago is not asked for again', async (t) => 
   });
   env.instance.activate(env.viewer);
   assert.ok(await until(() => env.instance.coverageStats().count === 1));
-  // Off and on again (or a pan away and back): drawn from the kept tile.
+  env.instance.refreshCoverage();
+  assert.ok(await until(() => env.instance.coverageStats().count === 1));
+  assert.equal(env.tiles.length, 1, 'kept while on');
+  // Switched off: the decoded lines are not kept, so on again asks again.
   env.instance.deactivate();
   env.instance.activate(env.viewer);
   assert.ok(await until(() => env.instance.coverageStats().count === 1));
-  assert.equal(env.tiles.length, 1);
+  assert.equal(env.tiles.length, 2);
 });
 
 test('a photo no page lists steps to the photos either side of its index', async () => {
@@ -745,4 +748,114 @@ test('a photo no page lists steps to the photos either side of its index', async
   await env.instance.viewer.open('s-5');
   await press(env.prev, env.poses);
   assert.equal(env.poses.at(-1), 's-4');
+});
+
+test('the panel counts the drive’s photos, not the thinned page of them the cones show', async (t) => {
+  const env = await mounted({
+    sequences: { s: Array.from({ length: 40 }, (_, i) => i) },
+  });
+  const asked = [];
+  env.source.getSequenceCount = async (id) => {
+    asked.push(id);
+    return 2385;
+  };
+  await withCones(t, env);
+  await env.instance.viewer.open('s-3');
+  await env.instance.selectSequence('s');
+  assert.ok(
+    await until(() => env.instance.sequenceStats().images === 2385),
+    `images: ${env.instance.sequenceStats().images}`,
+  );
+  // Asked once per drive.
+  env.instance.clearSequence();
+  await env.instance.viewer.open('s-30');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => env.instance.sequenceStats().images === 2385));
+  assert.deepEqual(asked, ['s']);
+});
+
+test('after a GPU reset the photo is drawn again by the viewer, not through the core; a failure is reported', async () => {
+  const source = fakeSource();
+  const record = {
+    ...photoRecord('pano', { seq: 'p', index: 0 }),
+    projection: 'SPHERE',
+    fieldOfView: '360',
+    filepathProc: '2022/10/6/wrapped_proc/pano.jpg',
+  };
+  source.getPhoto = async () => record;
+  const view = { yaw: 0, pitch: 0, fov: 80 };
+  let failLoads = false;
+  const definition = createKartaViewProvider({
+    source,
+    viewerOptions: {
+      load: async (url) => {
+        if (failLoads)
+          throw new Error('The KartaView photo could not be loaded');
+        return { src: url };
+      },
+      createRenderer: () => ({
+        setImage() {},
+        setView: (next) => Object.assign(view, next),
+        getView: () => ({ ...view }),
+        resize() {},
+        clear() {},
+        destroy() {},
+      }),
+    },
+  });
+  const { context, actions } = fakeContext();
+  const errors = [];
+  context.actions.reportError = (message) => errors.push(message);
+  const instance = definition.create(context);
+  actions.instance = instance;
+  const host = fakeHost();
+  await instance.viewer.mount(host);
+  const poses = [];
+  instance.viewer.onPose((pose) => poses.push(pose.imageId));
+  await instance.viewer.open('pano');
+  const canvas = () => host.children[0].children[1];
+  const kind = () => host.children[0].dataset.kind;
+  canvas().fire('webglcontextlost');
+  assert.equal(kind(), '', 'cleared while it is drawn again');
+  assert.ok(await until(() => kind() === 'pano'), 'drawn again');
+  assert.ok(poses.length >= 2);
+  assert.deepEqual(actions.opened, [], 'the core (and its lookup) left alone');
+  failLoads = true;
+  canvas().fire('webglcontextlost');
+  assert.ok(await until(() => errors.length === 1));
+  assert.match(errors[0], /could not be loaded/);
+});
+
+test('the marker is KartaView’s own cone, and it points along the drive, not at a wrong compass', async () => {
+  const env = setup({
+    sequences: { s: Array.from({ length: 10 }, (_, i) => i) },
+  });
+  assert.deepEqual(env.definition.marker, {
+    kind: 'view-cone',
+    color: '#635bff',
+  });
+  // Photos run east (photoRecord puts index i at 5·i m east); the compass says 200°.
+  const getPhoto = env.source.getPhoto;
+  env.source.getPhoto = async (id) => ({
+    ...(await getPhoto(id)),
+    heading: '200',
+  });
+  const getPage = env.source.getSequencePhotos;
+  env.source.getSequencePhotos = async (...args) => {
+    const page = await getPage(...args);
+    return {
+      ...page,
+      photos: page.photos.map((record) => ({ ...record, heading: '200' })),
+    };
+  };
+  const host = fakeHost();
+  await env.instance.viewer.mount(host);
+  const bearings = [];
+  env.instance.viewer.onPose((pose) => bearings.push(pose.bearing));
+  await env.instance.viewer.open('s-4');
+  assert.equal(bearings[0], 200, 'the compass until the drive is known');
+  assert.ok(
+    await until(() => Math.abs(bearings.at(-1) - 90) < 1),
+    `then along the drive: ${bearings}`,
+  );
 });

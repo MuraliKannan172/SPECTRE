@@ -1,3 +1,8 @@
+/** More than any real tile holds (a dense z13 tile has ~4,700 segments). */
+export const MAX_TILE_SEGMENTS = 20_000;
+/** A chained line stops growing here and the next one starts. */
+export const MAX_LINE_POINTS = 5_000;
+
 /**
  * Decode a KartaView coverage tile (`{lines: [{track: [{lat, lng}]}]}`) into
  * line records for the shared coverage. The tile's lines are OSM way
@@ -14,6 +19,7 @@ export function decodeCoverageTile(payload, { x, y, z }) {
     throw new Error('KartaView sent an unreadable coverage tile');
   const segments = [];
   for (const line of payload.lines) {
+    if (segments.length >= MAX_TILE_SEGMENTS) break;
     const points = [];
     for (const point of Array.isArray(line?.track) ? line.track : []) {
       const lon = Number(point?.lng);
@@ -34,16 +40,28 @@ export function decodeCoverageTile(payload, { x, y, z }) {
     else startingAt.set(at, [index]);
   });
   const used = new Uint8Array(segments.length);
+  // Per start point, how far its list has been used: each segment is looked
+  // at once, so a tile of segments sharing one point stays linear.
+  const cursor = new Map();
+  const nextFrom = (point) => {
+    const at = key(point);
+    const list = startingAt.get(at);
+    if (!list) return undefined;
+    let i = cursor.get(at) ?? 0;
+    while (i < list.length && used[list[i]]) i++;
+    cursor.set(at, i);
+    return list[i];
+  };
   const sequences = [];
   segments.forEach((segment, index) => {
     if (used[index]) return;
     used[index] = 1;
     const chain = [...segment];
     for (;;) {
-      const next = startingAt
-        .get(key(chain[chain.length - 1]))
-        ?.find((candidate) => !used[candidate]);
+      const next = nextFrom(chain[chain.length - 1]);
       if (next === undefined) break;
+      // Full: the segment starts the next line instead.
+      if (chain.length + segments[next].length - 1 > MAX_LINE_POINTS) break;
       used[next] = 1;
       chain.push(...segments[next].slice(1));
     }

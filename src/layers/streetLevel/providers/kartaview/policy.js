@@ -145,6 +145,56 @@ export function kartaViewTimeMs(value) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/** Initial great-circle bearing from `a` to `b`, degrees clockwise from north. */
+export function bearingBetween(a, b) {
+  const rad = Math.PI / 180;
+  const dLon = (b.lon - a.lon) * rad;
+  const y = Math.sin(dLon) * Math.cos(b.lat * rad);
+  const x =
+    Math.cos(a.lat * rad) * Math.sin(b.lat * rad) -
+    Math.sin(a.lat * rad) * Math.cos(b.lat * rad) * Math.cos(dLon);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+/** Photos closer than this say nothing about the direction of travel. */
+const COURSE_MIN_STEP_M = 2;
+/** How many photos along to look for one far enough away. */
+const COURSE_SEARCH = 5;
+
+/**
+ * Give each photo of a drive (in index order) its `course`: the direction
+ * of travel from it to the next photo a few metres on (from the previous one
+ * at the end). KartaView is dashcam imagery, so this is where the camera
+ * looks; its `heading` is the device compass, which reads 0 without one and
+ * can sit 110° off inside a car.
+ * @param {Array<{lon: number, lat: number, course?: number|null}>} photos
+ * @param {(a: object, b: object) => number} metres
+ */
+export function assignCourses(photos, metres) {
+  photos.forEach((photo, i) => {
+    let course = null;
+    for (let j = i + 1; j <= i + COURSE_SEARCH && j < photos.length; j++)
+      if (metres(photo, photos[j]) >= COURSE_MIN_STEP_M) {
+        course = bearingBetween(photo, photos[j]);
+        break;
+      }
+    for (
+      let k = i - 1;
+      course === null && k >= i - COURSE_SEARCH && k >= 0;
+      k--
+    )
+      if (metres(photos[k], photo) >= COURSE_MIN_STEP_M)
+        course = bearingBetween(photos[k], photo);
+    photo.course = course;
+  });
+  return photos;
+}
+
+/** Where the camera looked: the direction of travel, else the compass, else unknown. */
+export function cameraBearing(photo) {
+  return photo?.course ?? photo?.heading ?? null;
+}
+
 /** A coordinate pair as numbers; the road-matched one when KartaView has it. */
 function positionOf(record) {
   const matchLat = Number(record.matchLat);
@@ -214,10 +264,11 @@ export function normalizePhoto(record) {
   // 0,0 is a missing fix, not a photo in the Gulf of Guinea.
   if (lat === 0 && lon === 0) return null;
   if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  // An exact 0 is a device without a compass (whole drives read 0), not north.
   const heading =
     record.heading === '' || record.heading == null
       ? NaN
-      : Number(record.heading);
+      : Number(record.heading) || NaN;
   const isPano =
     record.projection === 'SPHERE' || Number(record.fieldOfView) >= 360;
   const full =

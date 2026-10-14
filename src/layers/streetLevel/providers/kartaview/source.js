@@ -16,17 +16,27 @@ import {
   TILE_TIMEOUT_MS,
 } from './policy.js';
 
-/** An HTTP or API failure; `retryAfterSec` is set while KartaView rate-limits. */
+/**
+ * An HTTP or API failure; `retryAfterSec` is set while KartaView rate-limits,
+ * `timedOut` when it did not answer in time (the one failure worth asking
+ * again at once).
+ */
 export class KartaViewSourceError extends Error {
-  constructor(message, { status = 0, retryAfterSec = null } = {}) {
+  constructor(
+    message,
+    { status = 0, retryAfterSec = null, timedOut = false } = {},
+  ) {
     super(message);
     this.name = 'KartaViewSourceError';
     this.status = status;
     this.retryAfterSec = retryAfterSec;
+    this.timedOut = timedOut;
   }
 }
 
 const NO_ANSWER = 'KartaView did not answer in time — try again';
+const UNREACHABLE = 'KartaView could not be reached — check the network';
+const UNREADABLE = 'KartaView sent an answer that could not be read';
 /** Statuses that mean a photo file is gone, not that storage hiccupped. */
 const GONE_STATUSES = Object.freeze([403, 404, 409, 410]);
 
@@ -129,7 +139,10 @@ export function createKartaViewSource({
     if (signal?.aborted) throw signal.reason;
     signal?.addEventListener('abort', onAbort, { once: true });
     const timer = setTimeout(
-      () => controller.abort(new KartaViewSourceError(NO_ANSWER)),
+      () =>
+        controller.abort(
+          new KartaViewSourceError(NO_ANSWER, { timedOut: true }),
+        ),
       timeoutMs,
     );
     try {
@@ -152,7 +165,16 @@ export function createKartaViewSource({
       if (length > MAX_RESPONSE_BYTES) throw tooMuch();
       // KartaView answers chunked, without a length: count while reading.
       const reader = response.body?.getReader?.();
-      if (!reader) return await response.json();
+      if (!reader) {
+        try {
+          return await response.json();
+        } catch (error) {
+          if (controller.signal.aborted) throw error;
+          throw new KartaViewSourceError(UNREADABLE, {
+            status: response.status,
+          });
+        }
+      }
       const chunks = [];
       let bytes = 0;
       for (;;) {
@@ -171,12 +193,19 @@ export function createKartaViewSource({
         body.set(chunk, offset);
         offset += chunk.byteLength;
       }
-      return JSON.parse(new TextDecoder().decode(body));
+      try {
+        return JSON.parse(new TextDecoder().decode(body));
+      } catch {
+        throw new KartaViewSourceError(UNREADABLE, {
+          status: response.status,
+        });
+      }
     } catch (error) {
       if (signal?.aborted) throw signal.reason;
       if (controller.signal.aborted) throw controller.signal.reason;
       if (error instanceof KartaViewSourceError) throw error;
-      throw new KartaViewSourceError(NO_ANSWER);
+      // fetch rejects on no network, a blocked request or a refused CORS check.
+      throw new KartaViewSourceError(UNREACHABLE);
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
@@ -221,7 +250,7 @@ export function createKartaViewSource({
         return payload?.result ?? {};
       } catch (error) {
         if (signal?.aborted) throw error;
-        const timedOut = error?.message === NO_ANSWER && error.status === 0;
+        const timedOut = error?.timedOut === true;
         if (timedOut && timeouts++ < 1) continue;
         if (error?.status !== 429 || attempt >= PHOTO_API_RETRIES) {
           if (error?.status === 429)
@@ -259,7 +288,7 @@ export function createKartaViewSource({
       } catch (error) {
         // A cold dense tile can outlast the timeout; KartaView has it ready
         // by the second ask.
-        if (signal?.aborted || error?.message !== NO_ANSWER) throw error;
+        if (signal?.aborted || error?.timedOut !== true) throw error;
         return once();
       }
     },
@@ -320,6 +349,17 @@ export function createKartaViewSource({
       if (!result.data || typeof result.data !== 'object')
         throw new KartaViewSourceError('KartaView has no such photo');
       return result.data;
+    },
+
+    /** How many photos a sequence has, or null if KartaView does not say. */
+    async getSequenceCount(sequenceId, { signal } = {}) {
+      const result = await photoApi(
+        `/2.0/sequence/${encodeURIComponent(sequenceId)}`,
+        null,
+        { signal },
+      );
+      const count = Number(result.data?.countActivePhotos);
+      return Number.isFinite(count) && count > 0 ? count : null;
     },
 
     /** A page of a sequence's photos in capture order (1-based `page`). */

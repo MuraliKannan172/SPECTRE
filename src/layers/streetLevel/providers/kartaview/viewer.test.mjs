@@ -168,6 +168,7 @@ test('a flat photo shows its 1280 px version, then the sharp one, with a pose fa
   });
   await viewer.mount(host);
   const { picture, canvas, prev, next } = parts(host);
+  picture.clientWidth = 1600; // expanded: the sharp version is wanted
   assert.equal(prev.disabled, true, 'nothing to step through yet');
   await viewer.open('flat1');
   assert.equal(picture.hidden, false);
@@ -621,6 +622,8 @@ test('quick presses while the next photo is still loading each step on from the 
 test('a slow sharp version of an older photo never replaces the newer photo', async () => {
   const { viewer, host, shown, poses, release } = heldSetup();
   await viewer.mount(host);
+  // An expanded viewer, so the sharp version is wanted.
+  parts(host).picture.clientWidth = 1600;
   const first = viewer.open('a');
   await release('a@1280');
   await first;
@@ -903,4 +906,20 @@ test('a CORS image is decoded off the main thread into an ImageBitmap where the 
     loadImage('https://cdn.kartaview.org/gone', { crossOrigin: true }),
     /could not be loaded/,
   );
+});
+
+test('a docked viewer keeps the 1,280 px photo; expanding it brings the 2,560 px one', async () => {
+  const { viewer, host, loads } = setup();
+  await viewer.mount(host);
+  await viewer.open('flat1');
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(loads.length, 1, 'no 2,560 px download for a 400 px frame');
+  parts(host).picture.clientWidth = 1600;
+  viewer.resize();
+  assert.ok(await until(() => loads.length === 2));
+  assert.match(loads[1].url, /rs:fit:2560:2560/);
+  assert.equal(parts(host).picture.src, loads[1].url);
+  viewer.resize();
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(loads.length, 2, 'once only');
 });

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeCoverageTile } from './decode.js';
+import {
+  MAX_LINE_POINTS,
+  MAX_TILE_SEGMENTS,
+  decodeCoverageTile,
+} from './decode.js';
 
 const at = (lng, lat) => ({ lat: String(lat), lng: String(lng) });
 const TILE = { x: 4412, y: 6061, z: 14 };
@@ -84,4 +88,41 @@ test('a tile that is not a line list fails, so it is asked for again rather than
       () => decodeCoverageTile(payload, TILE),
       /unreadable coverage tile/,
     );
+});
+
+test('a tile whose segments all share one point decodes in linear time', () => {
+  // [P, Q_i, P]: every chain step looks at the same start point's list.
+  // 60k: the old quadratic chaining took over a second; capped and linear
+  // decoding takes tens of milliseconds.
+  const lines = Array.from({ length: 60_000 }, (_, i) => ({
+    track: [at(0, 0), at(1 + i * 1e-6, 1), at(0, 0)],
+  }));
+  const started = performance.now();
+  const { sequences } = decodeCoverageTile({ lines }, TILE);
+  const ms = performance.now() - started;
+  assert.ok(
+    ms < 1_000,
+    `${Math.round(ms)} ms (quadratic chaining took ~200 ms per 20k and grows fourfold per doubling)`,
+  );
+  const points = sequences.reduce((sum, s) => sum + s.parts[0].length, 0);
+  assert.ok(sequences.every((s) => s.parts[0].length <= MAX_LINE_POINTS));
+  assert.equal(
+    points,
+    MAX_TILE_SEGMENTS * 2 + sequences.length,
+    'every segment drawn once',
+  );
+});
+
+test('a tile is capped in segments and in points per line', () => {
+  const lines = Array.from({ length: MAX_TILE_SEGMENTS + 500 }, (_, i) => ({
+    track: [at(i, 0), at(i + 1, 0)],
+  }));
+  const { sequences } = decodeCoverageTile({ lines }, TILE);
+  const points = sequences.reduce((sum, s) => sum + s.parts[0].length, 0);
+  // One long chain, cut into lines of at most MAX_LINE_POINTS.
+  assert.ok(sequences.every((s) => s.parts[0].length <= MAX_LINE_POINTS));
+  assert.ok(points <= MAX_TILE_SEGMENTS + sequences.length);
+  assert.ok(
+    sequences.length >= Math.floor(MAX_TILE_SEGMENTS / MAX_LINE_POINTS),
+  );
 });

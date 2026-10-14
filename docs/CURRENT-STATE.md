@@ -3195,14 +3195,16 @@ ground and z13 up to 6 km (lower zooms take seconds per tile; z10 does not
 answer), so higher up the hint says to zoom in, and an empty view says there
 are no KartaView photos in it. A tile's lines are OSM way segments with
 photos and carry no sequence, date or projection, so `decode.js` chains
-segments that meet end to start (about four times fewer lines), they are
+segments that meet end to start (about four times fewer lines; linear time,
+at most 20,000 segments a tile and 5,000 points a line), they are
 drawn as `kv:line:<z/x/y/n>`, up to 1,600 per tile, and never highlighted
 (`highlightsSequence: false`, so the legend has no "Selected"), and the
 provider declares `filters: []` and `coverageLabel` ("N streets in view ·
 click a line for its nearest photo"). Tiles come uncompressed and
-uncacheable, so the last 24 decoded tiles are kept for 10 minutes
-(`createTileCache`); one that does not answer in 20 s is asked once more,
-and one that is not a line list is not cached. A click on a line reaches
+uncacheable, so the last 24 decoded tiles are kept for 10 minutes while
+KartaView is lit (`createTileCache`, dropped when it is switched off); one
+that does not answer in 20 s is asked once more, and one that is not a line
+list is not cached. A click on a line reaches
 `handlePick(id, {groundPoint})`, and the provider asks the core
 (`actions.openNearest`) for its nearest showable photo within 50 m, without
 framing: many photos are archived (their file answers 409, while a HEAD says
@@ -3211,7 +3213,15 @@ off at the headers, and where all are gone the panel says KartaView's photos
 there are archived. Only a definite answer (403/404/409/410, or 200) is
 remembered; a storage timeout or 5xx is asked again. The open photo's
 sequence draws as cones from the 250-photo page holding it
-(`/2.0/sequence/{id}/photos`). Pages follow photo ids, which only roughly
+(`/2.0/sequence/{id}/photos`); the panel counts the drive's own photos
+(`countActivePhotos`, asked once per sequence). The camera direction (the
+marker, cones, FOLLOW, and a panorama's centre) is the direction of travel
+to the next photo a few metres on (`assignCourses`): KartaView is dashcam
+imagery, while its `heading` is the device compass, which reads 0 for whole
+drives without one and can sit a steady 110° off inside a car. Until the
+drive's page arrives the compass stands in (0 counts as unknown), and the
+pose is sent again once the course is known. The open photo's marker is a
+purple view cone (`marker: {kind: 'view-cone'}`), as Street View's is blue. Pages follow photo ids, which only roughly
 follow the index, so the page is found by search (both ways, halving past the
 end when many photos were deleted), a neighbour page joins within 12 photos
 of an edge, and the cones re-centre whenever a photo of the selected sequence
@@ -3222,7 +3232,9 @@ browser's six connections to it tiles take three, lookups two and pages one
 (newest first), and a lookup never waits behind tiles; the photo API answers
 429 to more than about three requests at once, so a 429 is retried with
 backoff (at most 10 s), and a lookup gets 8 s, then 15 s once more (KartaView
-sometimes sits on a lookup for 11 s and answers the same one in 3 s). Answers
+sometimes sits on a lookup for 11 s and answers the same one in 3 s); a
+request that could not be made at all (no network, CORS) says so and is not
+repeated. Answers
 are read with a running byte count and cut off past 16 MB (KartaView sends
 them chunked, without a length). Photo URLs are built from
 `storage` and `filepath*`: the API's `fileurl*` always name storage1, where

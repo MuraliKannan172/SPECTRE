@@ -103,7 +103,12 @@
   look, wheel to zoom), with cones along its drive and ‹ › / ← → to step
   through it. The caption links to the full-size photo (KartaView's photo
   pages fail for signed-out visitors), and the globe credits "© KartaView
-  contributors, CC BY-SA 4.0". Share links carry it as `0.m.0_0.r.kartaview-1`. Archived photos (KartaView answers 409) are skipped by the click and by ‹ ›; a keyboard and pinch look around a 360° photo.
+  contributors, CC BY-SA 4.0". Share links carry it in the provider
+  switches (`0.m.0_0.r.google-0*kartaview-1`). Archived photos (KartaView
+  answers 409) are skipped by the click and by ‹ ›. Shift+← →, ↑ ↓, + − and
+  pinch look around a 360° photo. The open photo's marker is a purple view
+  cone pointing along the drive (KartaView's own compass headings are often
+  0 or far off).
   Mapillary's line coverage and sequence cones are now shared by both
   (`lineCoverage.js`, `sequenceCones.js`).
 

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  assignCourses,
+  bearingBetween,
+  cameraBearing,
   kartaViewPhotoUrl,
   kartaViewTimeMs,
   normalizePhoto,
@@ -140,7 +143,9 @@ test('records without an id or a position are dropped; a missing heading is null
     null,
   );
   assert.equal(normalizePhoto(record({ heading: '' })).heading, null);
-  assert.equal(normalizePhoto(record({ heading: '0' })).heading, 0);
+  // A device without a compass reads 0 for a whole drive: unknown, not north.
+  assert.equal(normalizePhoto(record({ heading: '0' })).heading, null);
+  assert.equal(normalizePhoto(record({ heading: '0.5' })).heading, 0.5);
   assert.equal(normalizePhoto(record({ heading: 'n/a' })).heading, null);
 });
 
@@ -235,5 +240,43 @@ test('with no processed-photo path the size prefix gives the full photo', () => 
   assert.match(
     thumbOnly.urls.view,
     /^https:\/\/storage3\.openstreetcam\.org\/.*\/lth\//,
+  );
+});
+
+test('the camera looks along the drive: each photo’s course points to the next one a few metres on', () => {
+  // North along a meridian, 5 m apart, then a repeat of the last position.
+  const step = 5 / 110_540;
+  const photos = [0, 1, 2, 3].map((i) => ({ lon: 10, lat: 50 + i * step }));
+  photos.push({ lon: 10, lat: 50 + 3 * step }); // a stop: same place
+  const metres = (a, b) =>
+    Math.hypot(
+      (b.lon - a.lon) * 111_320 * Math.cos((a.lat * Math.PI) / 180),
+      (b.lat - a.lat) * 110_540,
+    );
+  assignCourses(photos, metres);
+  for (const photo of photos)
+    assert.ok(
+      Math.abs(photo.course) < 0.5 || Math.abs(photo.course - 360) < 0.5,
+      `${photo.course}`,
+    );
+  // Eastward: 90°.
+  const east = [0, 1].map((i) => ({ lon: 10 + (i * 5) / 71_600, lat: 50 }));
+  assignCourses(east, metres);
+  assert.ok(
+    Math.abs(east[0].course - 90) < 0.5 && Math.abs(east[1].course - 90) < 0.5,
+  );
+  // A lone photo has no course; the compass is the fallback, then unknown.
+  const [lone] = assignCourses([{ lon: 1, lat: 1 }], metres);
+  assert.equal(lone.course, null);
+  assert.equal(cameraBearing({ ...lone, heading: 42 }), 42);
+  assert.equal(cameraBearing({ ...lone, heading: null }), null);
+  assert.equal(
+    cameraBearing({ course: 90, heading: 200 }),
+    90,
+    'the drive beats the compass',
+  );
+  assert.ok(
+    Math.abs(bearingBetween({ lon: 0, lat: 0 }, { lon: 0, lat: -1 }) - 180) <
+      1e-9,
   );
 });

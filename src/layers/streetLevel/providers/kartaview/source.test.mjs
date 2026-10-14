@@ -151,12 +151,19 @@ test('an API refusal inside a 200 is a readable error with its code; 601 is just
 test('HTTP errors, network failures and non-JSON become readable errors', async () => {
   const http = createKartaViewSource({ fetchImpl: async () => status(500) });
   await assert.rejects(http.getTile({ x: 0, y: 0, z: 14 }), /HTTP 500/);
+  let asked = 0;
   const offline = createKartaViewSource({
     fetchImpl: async () => {
+      asked++;
       throw new TypeError('Failed to fetch');
     },
   });
-  await assert.rejects(offline.getPhoto('1'), /did not answer/);
+  // Not a timeout: no network is said as much, and not asked again at once.
+  await assert.rejects(
+    offline.getPhoto('1'),
+    /could not be reached — check the network/,
+  );
+  assert.equal(asked, 1);
   const garbled = createKartaViewSource({
     fetchImpl: async () => ({
       ok: true,
@@ -169,7 +176,19 @@ test('HTTP errors, network failures and non-JSON become readable errors', async 
   });
   await assert.rejects(
     garbled.getTile({ x: 0, y: 0, z: 14 }),
-    /did not answer/,
+    /could not be read/,
+  );
+  const torn = createKartaViewSource({
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      body: streamed('{"lines": [', 4),
+    }),
+  });
+  await assert.rejects(
+    torn.getTile({ x: 0, y: 0, z: 14 }),
+    /could not be read/,
   );
 });
 
@@ -265,18 +284,24 @@ test('tiles, lookups and sequence pages queue separately, so a lookup never wait
   assert.equal(peak.page, 1);
 });
 
-test('a lookup that times out is asked once more; a second timeout says to try again', async () => {
+test('a lookup that times out is asked once more, then reported as no answer in time', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   let calls = 0;
-  const source = createKartaViewSource({
-    fetchImpl: async () => {
-      calls++;
-      throw new TypeError('Failed to fetch');
-    },
-  });
-  await assert.rejects(
-    source.getPhoto('1'),
+  const outcome = await onMockClock(t, () =>
+    createKartaViewSource({
+      fetchImpl: (url, { signal }) => {
+        calls++;
+        return new Promise((resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason)),
+        );
+      },
+    }).getPhoto('1'),
+  );
+  assert.match(
+    String(outcome?.error?.message),
     /did not answer in time — try again/,
   );
+  assert.equal(outcome.error.timedOut, true);
   assert.equal(calls, 2);
 });
 
@@ -323,17 +348,35 @@ test('an image probe reads only the status: an archived photo (409) is not showa
   );
 });
 
-test('a cold tile that times out is asked once more', async () => {
+test('a cold tile that times out is asked once more; an unreachable one is not', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   let calls = 0;
-  const source = createKartaViewSource({
+  const outcome = await onMockClock(t, () =>
+    createKartaViewSource({
+      fetchImpl: (url, { signal }) => {
+        calls++;
+        if (calls === 1)
+          return new Promise((resolve, reject) =>
+            signal.addEventListener('abort', () => reject(signal.reason)),
+          );
+        return Promise.resolve(ok({ lines: [] }));
+      },
+    }).getTile({ x: 1, y: 2, z: 13 }),
+  );
+  assert.deepEqual(outcome.value, { lines: [] });
+  assert.equal(calls, 2);
+  let asked = 0;
+  const offline = createKartaViewSource({
     fetchImpl: async () => {
-      calls++;
-      if (calls === 1) throw new TypeError('Failed to fetch');
-      return ok({ lines: [] });
+      asked++;
+      throw new TypeError('Failed to fetch');
     },
   });
-  assert.deepEqual(await source.getTile({ x: 1, y: 2, z: 13 }), { lines: [] });
-  assert.equal(calls, 2);
+  await assert.rejects(
+    offline.getTile({ x: 1, y: 2, z: 13 }),
+    /could not be reached/,
+  );
+  assert.equal(asked, 1);
 });
 
 test('an absurdly large answer is refused before it is parsed', async () => {

@@ -24,6 +24,8 @@ import {
   SEQUENCE_PAGE_EDGE,
   SEQUENCE_PAGE_SIZE,
   TOO_HIGH_HINT,
+  assignCourses,
+  cameraBearing,
   normalizePhoto,
 } from './policy.js';
 
@@ -86,6 +88,8 @@ export function createTileCache({
       kept.set(key, { at: now(), tile: loaded });
       return loaded;
     },
+    /** Drop every tile (the provider was switched off). */
+    clear: () => kept.clear(),
   };
 }
 
@@ -112,6 +116,8 @@ export function createKartaViewProvider({
     requiresKeyId: null,
     pickPrefix: PICK_PREFIX.root,
     colors: COLORS,
+    // Its own marker, as Street View has: a purple cone that turns with the view.
+    marker: Object.freeze({ kind: 'view-cone', color: COLORS.coverage }),
     credit: Object.freeze({ html: KARTAVIEW_CREDIT_HTML }),
     defaultOn: false,
     // Coverage lines carry no date or projection: no filter could thin them.
@@ -162,9 +168,13 @@ export function createKartaViewProvider({
       /** The sequence page the cones were drawn from. */
       let drawnPage = null;
 
+      /** A record as a photo; the one already known keeps its identity (and course). */
       function remember(record) {
-        const photo = normalizePhoto(record);
-        if (photo) photos.set(photo.id, photo);
+        const fresh = normalizePhoto(record);
+        if (!fresh) return null;
+        const known = photos.get(fresh.id);
+        const photo = known ? Object.assign(known, fresh) : fresh;
+        photos.set(photo.id, photo);
         return photo;
       }
 
@@ -186,16 +196,20 @@ export function createKartaViewProvider({
               page,
               itemsPerPage: SEQUENCE_PAGE_SIZE,
             })
-            .then(({ photos: records, hasMore }) => ({
-              page,
-              hasMore,
-              photos: records
-                .map(remember)
-                .filter(Boolean)
-                .sort(
-                  (a, b) => (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0),
-                ),
-            }));
+            .then(({ photos: records, hasMore }) => {
+              const list = assignCourses(
+                records
+                  .map(remember)
+                  .filter(Boolean)
+                  .sort(
+                    (a, b) => (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0),
+                  ),
+                metresBetween,
+              );
+              // The open photo may have just learnt which way it looked.
+              viewer.refreshPose?.();
+              return { page, hasMore, photos: list };
+            });
           pages.set(key, entry);
           entry.catch(() => pages.delete(key));
         }
@@ -353,12 +367,13 @@ export function createKartaViewProvider({
           const window = await windowOf(anchor);
           signal?.throwIfAborted();
           drawnPage = { sequenceId, page: window.home };
+          countPhotos(sequenceId);
           return thinImages(
             window.photos.map((photo) => ({
               id: photo.id,
               lon: photo.lon,
               lat: photo.lat,
-              compassAngle: photo.heading ?? 0,
+              compassAngle: cameraBearing(photo) ?? 0,
               capturedAt: photo.capturedAt ?? 0,
               isPano: photo.isPano,
             })),
@@ -371,6 +386,23 @@ export function createKartaViewProvider({
         // The filters are hidden for KartaView: one left set must not hide cones.
         passes: () => true,
       });
+
+      /** Sequence id → its photo count from KartaView (asked once). */
+      const counts = new Map();
+      function countPhotos(sequenceId) {
+        if (counts.has(sequenceId) || !source.getSequenceCount) return;
+        counts.set(sequenceId, undefined);
+        source.getSequenceCount(sequenceId).then(
+          (count) => {
+            if (count === null) counts.delete(sequenceId);
+            else {
+              counts.set(sequenceId, count);
+              context.notify();
+            }
+          },
+          () => counts.delete(sequenceId),
+        );
+      }
 
       /** ‹ › open through the core (loading, errors, cones), camera still. */
       function openStepped(photoId) {
@@ -406,6 +438,17 @@ export function createKartaViewProvider({
         step,
         onStep: openStepped,
         onShown: recentreCones,
+        // After a GPU reset the same photo is drawn again by the viewer
+        // itself: going through the core would cancel a lookup the user
+        // started. A failure still shows.
+        onReopen: (photoId) =>
+          viewer
+            .open(photoId)
+            .catch((error) =>
+              context.actions.reportError(
+                error?.message || 'The KartaView photo could not be loaded',
+              ),
+            ),
         render: context.services?.render,
         ...viewerOptions,
       });
@@ -434,6 +477,8 @@ export function createKartaViewProvider({
           cones.clearSelection();
           cones.setVisible(false);
           drawnPage = null;
+          // Tens of MB of decoded lines are not kept for a source left off.
+          tiles.clear();
         },
 
         destroy(cesiumViewer) {
@@ -441,6 +486,7 @@ export function createKartaViewProvider({
           coverage.clear();
           coverage.resetErrors();
           cones.destroy(cesiumViewer);
+          tiles.clear();
         },
 
         refreshCoverage: () => coverage.refresh(),
@@ -495,9 +541,12 @@ export function createKartaViewProvider({
           cones.clearSelection();
           drawnPage = null;
         },
+        // The drive's own count, not the thinned page of it the cones show.
         sequenceStats: () => ({
           selectedId: state.sequence.selectedId,
-          images: state.sequence.images.length,
+          images:
+            counts.get(state.sequence.selectedId) ??
+            state.sequence.images.length,
           loading: state.sequence.loading,
         }),
 

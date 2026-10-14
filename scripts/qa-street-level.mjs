@@ -465,6 +465,45 @@ async function assertKeylessGate(page) {
 }
 
 /**
+ * With no Mapillary key the panel points at KartaView, which needs none:
+ * lit, it draws coverage and the layer is not key-gated.
+ */
+async function assertKeylessKartaView(page) {
+  assert.match(
+    await page.$eval('#sl-coverage-meta', (node) => node.textContent),
+    /light KARTAVIEW/,
+    'KEY REQUIRED points at KartaView',
+  );
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await page.evaluate((at) => {
+      const v = window.__godsEyeView.viewer;
+      v.camera.cancelFlight?.();
+      const C = v.camera.positionCartographic.constructor;
+      v.camera.setView({
+        destination: v.scene.globe.ellipsoid.cartographicToCartesian(
+          C.fromDegrees(at.lon, at.lat, at.height),
+        ),
+        orientation: { heading: 0, pitch: at.pitch, roll: 0 },
+      });
+    }, PARK);
+    await sleep(1000);
+  }
+  await clickPanelControl(
+    page,
+    '#sl-provider-chips [data-chip-id="kartaview"]',
+  );
+  await waitForCoverage(page);
+  const state = await page.evaluate(() => ({
+    status: document.getElementById('sl-status').textContent,
+    keyRequired: window.__godsEyeView.dataManager.layers
+      .get('street-level')
+      .module.getUIState().keyRequired,
+  }));
+  assert.equal(state.keyRequired, false);
+  assert.doesNotMatch(state.status, /KEY/);
+}
+
+/**
  * Runs in the page. Find a point where a real click picks `prefix` + `id` (any
  * id when null), searched around `points` ([lon, lat]), the aimed billboards,
  * or else a grid mid-screen. Only points where the canvas is topmost count.
@@ -941,6 +980,15 @@ async function main() {
                 { timeout: 30_000 },
               ),
               `cones for the whole drive: ${JSON.stringify((await ui()).sequence)}`,
+            );
+            // The drive runs north; the photos' compass says 200°.
+            assert.ok(
+              await uiUntil(
+                (u) =>
+                  Number.isFinite(u.street.bearing) &&
+                  Math.min(u.street.bearing, 360 - u.street.bearing) < 2,
+              ),
+              `the camera looks along the drive, not where the compass points: ${(await ui()).street.bearing}`,
             );
           }
           const before = street.imageId;
@@ -2444,7 +2492,7 @@ async function main() {
       );
       if (fixtures)
         await step(
-          'keyless install (a second page, no key on the server) gates the controls and reports KEY REQUIRED',
+          'keyless install (a second page, no key on the server) gates the controls and reports KEY REQUIRED, and KartaView draws there',
           async () => {
             const keyless = await browser.newPage();
             await keyless.setViewport(VIEWPORTS[0]);
@@ -2453,6 +2501,7 @@ async function main() {
             await boot(keyless, url);
             await expandStrip(keyless);
             await assertKeylessGate(keyless);
+            await assertKeylessKartaView(keyless);
             renderErrorsSeen.push(
               ...(await readRenderErrors(keyless)).map(
                 (text) => `[keyless] scene.renderError: ${text}`,
