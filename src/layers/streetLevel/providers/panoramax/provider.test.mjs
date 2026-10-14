@@ -160,6 +160,20 @@ test('lines at z11–14 below 30 km; density points from z5 down to z0 above', (
   assert.equal(panoramaxZoomFor(NaN), null);
 });
 
+test('a line with no camera type or no day passes the filters: a click finds out', () => {
+  const filter = { pano: 'pano', sinceMs: Date.UTC(2024, 0, 1) };
+  assert.equal(
+    passesCoverage({ isPano: null, capturedAt: Date.UTC(2025, 0, 1) }, filter),
+    true,
+  );
+  assert.equal(passesCoverage({ isPano: true, capturedAt: 0 }, filter), true);
+  assert.equal(passesCoverage({ isPano: false, capturedAt: 0 }, filter), false);
+  assert.equal(
+    passesCoverage({ isPano: null, capturedAt: Date.UTC(2020, 0, 1) }, filter),
+    false,
+  );
+});
+
 test('the imagery filter: lines by type and day, density cells by what they hold', () => {
   const old = Date.UTC(2020, 0, 1);
   const since = { pano: 'all', sinceMs: Date.UTC(2024, 0, 1) };
@@ -314,9 +328,25 @@ test('one lookup for a picture asked twice at once', async () => {
   assert.deepEqual(source.calls.items, ['s-0']);
 });
 
-test('a picture Panoramax does not know fails the open with a reason', async () => {
+test('a picture Panoramax does not know, or an id it refuses, fails the open with a reason', async () => {
   const env = await mounted({ items: [] });
-  await assert.rejects(env.instance.viewer.open('ghost'), /no position/);
+  await assert.rejects(
+    env.instance.viewer.open('ghost'),
+    /no longer available/,
+  );
+  env.source.getItem = async () => {
+    throw Object.assign(new Error('Panoramax answered HTTP 400'), {
+      status: 400,
+    });
+  };
+  await assert.rejects(
+    env.instance.viewer.open('not-a-uuid'),
+    /no longer available/,
+  );
+  env.source.getItem = async () => {
+    throw Object.assign(new Error('Panoramax is busy'), { status: 503 });
+  };
+  await assert.rejects(env.instance.viewer.open('busy'), /busy/);
 });
 
 /** Cones on a stand-in Cesium viewer; `count()` reads how many are drawn. */
@@ -340,7 +370,13 @@ async function withCones(t, env) {
     },
     camera: { positionWC: new Cesium.Cartesian3(0, 0, 1e8) },
   });
-  return { count: () => collection?.length ?? 0 };
+  return {
+    count: () => collection?.length ?? 0,
+    ids: () =>
+      Array.from({ length: collection?.length ?? 0 }, (_, i) =>
+        String(collection.get(i).id).replace(PICK_PREFIX.image, ''),
+      ),
+  };
 }
 
 /** z15 tiles holding every item of `items` as a picture. */
@@ -379,18 +415,148 @@ test('once a picture is on screen its sequence’s cones load from the z15 tile 
   assert.ok(env.source.calls.tiles.every((key) => key.startsWith('15/')));
 });
 
-test('a sequence selected with no picture or click to centre on draws no cones', async (t) => {
+test('a click on a line with no ground under it changes nothing: the open sequence keeps its cones', async (t) => {
+  const items = [...sequence('x', 6), ...sequence('y', 3, { offset: 3 })];
+  const env = await mounted({ items, tiles: pictureTiles(items) });
+  const cones = await withCones(t, env);
+  await env.instance.viewer.open('x-1');
+  await env.instance.selectSequence('x');
+  assert.ok(await until(() => cones.count() === 6));
+  const asked = env.source.calls.tiles.length;
+  assert.equal(
+    env.instance.handlePick(`${PICK_PREFIX.sequence}y`, {
+      groundPoint: () => null,
+    }),
+    true,
+    'the click is the provider’s, even with nothing to open',
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(env.instance.sequenceStats().selectedId, 'x');
+  assert.equal(cones.count(), 6);
+  assert.equal(env.source.calls.tiles.length, asked);
+  assert.deepEqual(env.actions.nearest, []);
+});
+
+test('a sequence selected with nothing to centre on draws no cones, and a picture opening in it then does not throw', async (t) => {
   const items = sequence('s', 3);
   const env = await mounted({ items, tiles: pictureTiles(items) });
   await withCones(t, env);
-  env.instance.handlePick(`${PICK_PREFIX.sequence}s`, {
-    groundPoint: () => null,
-  });
-  assert.ok(await until(() => !env.instance.sequenceStats().loading));
-  assert.equal(env.instance.sequenceStats().selectedId, 's', 'highlighted');
+  await env.instance.selectSequence('s');
   assert.equal(env.instance.sequenceStats().images, 0);
   assert.deepEqual(env.source.calls.tiles, []);
-  assert.deepEqual(env.actions.nearest, []);
+  // Its first picture opens: the cones load around it.
+  await env.instance.viewer.open('s-0');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => env.instance.sequenceStats().images === 3));
+});
+
+test('a line clicked from high up looks for its sequence further off; the radius grows with height, up to 400 m', async () => {
+  const items = [
+    ...sequence('near', 1),
+    ...sequence('line', 1, { offset: 220 }),
+  ];
+  const { instance, source } = setup({ items });
+  const height = (h) =>
+    instance.init({
+      camera: { positionCartographic: { height: h } },
+      scene: {
+        primitives: { add() {}, remove() {} },
+        preRender: { addEventListener: () => () => {} },
+      },
+    });
+  const click = () =>
+    instance.handlePick(`${PICK_PREFIX.sequence}line`, {
+      groundPoint: () => east(0),
+    });
+  height(25_000);
+  click();
+  assert.equal(
+    await instance.nearestImage(east(0)),
+    'line-0',
+    '220 m off, from 25 km',
+  );
+  assert.equal(source.calls.nearest.at(-1).radius, 250);
+  height(1_000);
+  click();
+  assert.equal(
+    await instance.nearestImage(east(0)),
+    'near-0',
+    'from 1 km only 50 m: any sequence’s nearer picture',
+  );
+  height(900_000);
+  click();
+  await instance.nearestImage(east(0));
+  assert.equal(
+    source.calls.nearest.filter((q) => q.collections === 'line').at(-1).radius,
+    400,
+    'capped',
+  );
+});
+
+test('a lookup at another point does not take a line click’s sequence', async () => {
+  const items = [
+    ...sequence('other', 1),
+    ...sequence('clicked', 1, { offset: 8 }),
+  ];
+  const { instance, source } = setup({ items });
+  instance.handlePick(`${PICK_PREFIX.sequence}clicked`, {
+    groundPoint: () => east(1),
+  });
+  // OPEN at the view centre, a few metres away, overtakes the click.
+  assert.equal(await instance.nearestImage(east(3)), 'other-0');
+  assert.deepEqual(
+    source.calls.nearest.map((q) => q.collections),
+    [null],
+  );
+});
+
+test('the cones come in capture order, and a broken neighbour tile only thins them', async (t) => {
+  const items = sequence('s', 5).map((item, i) => ({
+    ...item,
+    properties: {
+      ...item.properties,
+      // Captured in reverse of their position along the street.
+      datetime: `2025-06-01T10:00:0${9 - i}+00:00`,
+    },
+  }));
+  const tiles = pictureTiles(items);
+  const env = await mounted({ items, tiles });
+  const cones = await withCones(t, env);
+  await env.instance.viewer.open('s-0');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => cones.count() === 5));
+  assert.deepEqual(cones.ids(), ['s-4', 's-3', 's-2', 's-1', 's-0']);
+  // A neighbour answers with garbage: the home tile's cones still draw.
+  const home = new Set();
+  env.source.getTile = async (tile) => {
+    const key = `${tile.z}/${tile.x}/${tile.y}`;
+    if (!home.size) home.add(key);
+    if (!home.has(key)) return new TextEncoder().encode('<html>oops</html>');
+    return tiles(tile);
+  };
+  await env.instance.viewer.open('s-0');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => !env.instance.sequenceStats().loading));
+  // The home tile itself unreadable: a readable error, not a parser's.
+  env.source.getTile = async () =>
+    new TextEncoder().encode('<html>oops</html>');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => env.actions.errors.some(Boolean)));
+  assert.match(env.actions.errors.filter(Boolean).at(-1), /could not be read/);
+});
+
+test('› within the tiles the cones came from reloads nothing', async (t) => {
+  const items = sequence('s', 4);
+  const env = await mounted({ items, tiles: pictureTiles(items) });
+  await withCones(t, env);
+  await env.instance.viewer.open('s-0');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => env.instance.sequenceStats().images === 4));
+  const asked = env.source.calls.tiles.length;
+  env.next.fire('click');
+  assert.ok(await until(() => env.poses.at(-1) === 's-1'));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(env.source.calls.tiles.length, asked);
 });
 
 test('the cones re-centre when › walks into another z15 tile', async (t) => {

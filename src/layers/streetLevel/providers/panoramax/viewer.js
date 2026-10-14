@@ -1,4 +1,8 @@
-import { createPhotoViewer, loadImage } from '../../photoViewer.js';
+import {
+  PANO_FULL_SIZE,
+  createPhotoViewer,
+  loadImage,
+} from '../../photoViewer.js';
 import {
   HD_TIMEOUT_MS,
   PANORAMAX_NAME,
@@ -8,6 +12,13 @@ import {
   panoramaxPictureUrl,
 } from './policy.js';
 
+/** An HD original small enough to decode (its width is known and under the cap). */
+function hdDecodable(photo) {
+  return Boolean(
+    photo.urls.hd && photo.width && photo.width <= PANO_HD_MAX_WIDTH,
+  );
+}
+
 /**
  * Where Panoramax pictures come from: the instance holding each one serves
  * a 2,048 px SD derivative (equirectangular for a 360° picture) and the HD
@@ -16,11 +27,15 @@ import {
  * @type {import('../../photoViewer.js').PhotoSources}
  */
 export const PANORAMAX_SOURCES = Object.freeze({
-  hasPano: (photo) => Boolean(photo.isPano && (photo.urls.sd || photo.urls.hd)),
-  panoFirst: (photo) =>
-    photo.urls.sd
-      ? { url: photo.urls.sd, width: SD_WIDTH }
-      : { url: photo.urls.hd, width: photo.width || SD_WIDTH },
+  hasPano: (photo) =>
+    Boolean(photo.isPano && (photo.urls.sd || hdDecodable(photo))),
+  // Without an SD derivative the original goes straight to the texture size.
+  panoFirst: (photo) => {
+    if (photo.urls.sd) return { url: photo.urls.sd, width: SD_WIDTH };
+    if (!hdDecodable(photo)) return null;
+    const width = Math.min(photo.width, PANO_FULL_SIZE[0]);
+    return { url: photo.urls.hd, width, resize: [width, width / 2] };
+  },
   panoSharp: (photo, size) => {
     const width = photo.width || 0;
     if (!photo.urls.hd || !photo.urls.sd) return null;
@@ -34,8 +49,13 @@ export const PANORAMAX_SOURCES = Object.freeze({
       timeoutMs: HD_TIMEOUT_MS,
     };
   },
-  // A 360° picture shown flat (no WebGL) is its whole equirectangular image.
-  flatFirst: (photo) => [photo.urls.sd, photo.urls.hd, photo.urls.thumb],
+  // A 360° picture shown flat (no WebGL) is its whole equirectangular image;
+  // an original too big to decode is skipped for the thumbnail.
+  flatFirst: (photo) => [
+    photo.urls.sd,
+    !photo.isPano || hdDecodable(photo) ? photo.urls.hd : null,
+    photo.urls.thumb,
+  ],
   flatSharp: (photo, pixels) =>
     photo.urls.sd && photo.urls.hd && pixels > SD_WIDTH ? photo.urls.hd : null,
   describe: (photo) => ({

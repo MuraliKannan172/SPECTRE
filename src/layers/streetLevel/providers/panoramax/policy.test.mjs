@@ -193,3 +193,35 @@ test('the caption link opens the picture in the Panoramax viewer', () => {
   assert.equal(panoramaxPictureUrl(null), 'https://api.panoramax.xyz/');
   assert.ok(panoramaxPictureUrl('a&b=c').includes('pic=a%26b%3Dc'));
 });
+
+test('hostile item data: a malformed link escape, null coordinates, a huge producer name', () => {
+  const item = stacItem({ id: 'a', lon: 1, lat: 2, nextId: 'n' });
+  item.links.push({
+    rel: 'prev',
+    href: 'https://api.panoramax.xyz/api/collections/s/items/%E0%A4%A',
+  });
+  const photo = normalizeItem(item);
+  assert.equal(photo.prevId, null, 'no link, no throw');
+  assert.equal(photo.nextId, 'n');
+  for (const coordinates of [[null, null], ['', ''], ['2.35', '48.85'], [2.35]])
+    assert.equal(
+      normalizeItem({ id: 'x', geometry: { coordinates } }),
+      null,
+      JSON.stringify(coordinates),
+    );
+  // A million characters without spaces is checked in linear time.
+  const started = Date.now();
+  const huge = normalizeItem(
+    stacItem({ id: 'a', lon: 1, lat: 2, producer: 'a'.repeat(1_000_000) }),
+  );
+  assert.ok(Date.now() - started < 500, `${Date.now() - started} ms`);
+  assert.equal(huge.creator.length, 80);
+  const named = (producer) =>
+    normalizeItem(stacItem({ id: 'a', lon: 1, lat: 2, producer })).creator;
+  assert.equal(named(`${'x'.repeat(200_000)}@example.org`), null);
+  assert.equal(
+    named('Carto@Cité'),
+    'Carto@Cité',
+    'an @ without a domain is a name',
+  );
+});

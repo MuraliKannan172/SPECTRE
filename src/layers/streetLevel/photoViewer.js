@@ -90,8 +90,8 @@ export function panoSizeFor(canvasPixels, fovDeg) {
 /**
  * @typedef {object} PhotoSources   Where a provider's photo comes from.
  * @property {(photo: object) => boolean} hasPano   A 360° photo with an equirectangular image.
- * @property {(photo: object) => {url: string, width: number}|null} panoFirst
- *   The panorama shown first, and its texture width (0 when it is only a preview).
+ * @property {(photo: object) => {url: string, width: number, resize?: [number, number]|null}|null} panoFirst
+ *   The panorama shown first, its texture width (0 when it is only a preview), and a size to shrink it to.
  * @property {(photo: object, size: [number, number]) => {url: string, resize?: [number, number]|null, timeoutMs?: number}|null} panoSharp
  *   A sharper panorama for a canvas that needs `size`, or null.
  * @property {(photo: object) => Array<string>} flatFirst   Flat versions to try in turn.
@@ -158,8 +158,8 @@ export function createPhotoViewer({
   let restoreView = null;
   /** Width of the panorama texture on screen (0: the preview). */
   let panoWidth = 0;
-  /** Width of a sharper panorama on its way (resizes come in bursts). */
-  let panoComing = 0;
+  /** The sharper panorama on its way, for which open (resizes come in bursts). */
+  let panoComing = null;
   /** The sharper flat version on screen or on its way (one download each). */
   let flatSharpUrl = null;
   /** The photo an open is fetching: ‹ › step on from it, not the old one. */
@@ -520,10 +520,12 @@ export function createPhotoViewer({
     if (kind === 'flat' && target.isPano) return;
     if (kind === 'pano') {
       const size = panoSizeNow();
-      if (size[0] <= Math.max(panoWidth, panoComing)) return;
+      if (size[0] <= panoWidth) return;
+      if (panoComing?.seq === seq && size[0] <= panoComing.width) return;
       const sharp = sources.panoSharp(target, size);
       if (!sharp?.url) return;
-      panoComing = size[0];
+      const coming = { seq, width: size[0] };
+      panoComing = coming;
       try {
         const image = await loadAs(sharp.url, {
           crossOrigin: true,
@@ -544,7 +546,7 @@ export function createPhotoViewer({
       } catch {
         /* the first version stays */
       } finally {
-        if (panoComing === size[0]) panoComing = 0;
+        if (panoComing === coming) panoComing = null;
       }
       return;
     }
@@ -574,7 +576,10 @@ export function createPhotoViewer({
     // waiting on it twice.
     const first = sources.panoFirst(target);
     if (!first?.url) throw new Error(LOAD_FAILED);
-    const image = await loadAs(first.url, { crossOrigin: true });
+    const image = await loadAs(first.url, {
+      crossOrigin: true,
+      resize: first.resize ?? null,
+    });
     if (seq !== openSeq) {
       image.close?.();
       return false;
@@ -592,7 +597,7 @@ export function createPhotoViewer({
     show('pano');
     renderer.setImage(image);
     panoWidth = first.width || 0;
-    panoComing = 0;
+    panoComing = null;
     return true;
   }
 

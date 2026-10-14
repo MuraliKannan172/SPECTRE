@@ -755,12 +755,10 @@ test('Panoramax fixtures: two sequences on one street, searches honour sequence 
     panoramaxTile,
     resetPanoramaxFixture,
   } = await import('../../scripts/fixtures/street-level/panoramax.mjs');
-  const { decodeCoverageTile, decodePictures } = await import(
-    '../layers/streetLevel/providers/panoramax/decode.js'
-  );
-  const { normalizeItem } = await import(
-    '../layers/streetLevel/providers/panoramax/policy.js'
-  );
+  const { decodeCoverageTile, decodePictures } =
+    await import('../layers/streetLevel/providers/panoramax/decode.js');
+  const { normalizeItem } =
+    await import('../layers/streetLevel/providers/panoramax/policy.js');
   resetPanoramaxFixture();
   const pictures = panoramaxPictures();
   assert.deepEqual(

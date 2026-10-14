@@ -101,7 +101,7 @@ test('a picture by id is a STAC search; another id in the answer is not taken fo
   assert.equal(asked.searchParams.get('limit'), '1');
 });
 
-test('nearest pictures: any direction within the radius, filtered as the imagery filter asks', async () => {
+test('nearest pictures: a place search and a box search side by side, both filtered as the imagery filter asks', async () => {
   const { urls, fetchImpl } = fakeFetch(() => json({ features: [] }));
   const source = createPanoramaxSource({ fetchImpl });
   await source.nearestItems({ lat: 48.85, lon: 2.35 });
@@ -115,7 +115,13 @@ test('nearest pictures: any direction within the radius, filtered as the imagery
     limit: 500,
   });
   await source.nearestItems({ lat: 48.85, lon: 2.35, pano: 'flat' });
-  const [plain, filtered, flat] = urls.map((u) => new URL(u).searchParams);
+  const asked = urls.map((u) => new URL(u).searchParams);
+  assert.equal(asked.length, 6, 'two searches a lookup');
+  const place = asked.filter((q) => q.has('place_position'));
+  const box = asked.filter((q) => q.has('bbox'));
+  assert.equal(place.length, 3);
+  assert.equal(box.length, 3);
+  const [plain, filtered, flat] = place;
   assert.equal(plain.get('place_position'), '2.3500000,48.8500000');
   assert.equal(plain.get('place_distance'), '0-50');
   assert.equal(plain.get('place_fov_tolerance'), '180');
@@ -128,6 +134,53 @@ test('nearest pictures: any direction within the radius, filtered as the imagery
   assert.equal(filtered.get('place_distance'), '0-1000', 'capped');
   assert.equal(filtered.get('limit'), '100', 'capped');
   assert.equal(flat.get('filter'), 'field_of_view<360');
+  // The box spans the radius each way, and carries the same filters.
+  const [w, s, e, n] = box[0].get('bbox').split(',').map(Number);
+  assert.ok(Math.abs((n - s) * 111_320 - 100) < 1, `${n - s}°`);
+  assert.ok(
+    Math.abs((e - w) * 111_320 * Math.cos((48.85 * Math.PI) / 180) - 100) < 1,
+  );
+  assert.equal(box[1].get('collections'), 'seq');
+  assert.equal(box[1].get('filter'), 'field_of_view=360');
+  assert.equal(box[1].get('datetime'), '2025-01-01T00:00:00.000Z/..');
+  assert.equal(box[2].get('filter'), 'field_of_view<360');
+});
+
+test('a picture both searches find is listed once', async () => {
+  const source = createPanoramaxSource({
+    fetchImpl: fakeFetch((url) =>
+      url.includes('bbox')
+        ? json({ features: [{ id: 'b' }, { id: 'a' }, { id: null }] })
+        : json({ features: [{ id: 'a' }] }),
+    ).fetchImpl,
+  });
+  const items = await source.nearestItems({ lat: 1, lon: 2 });
+  assert.deepEqual(
+    items.map((i) => i.id),
+    ['a', 'b'],
+  );
+});
+
+test('the newest search goes first when the API gate is full', async () => {
+  const waiting = [];
+  const order = [];
+  const source = createPanoramaxSource({
+    fetchImpl: async (url) => {
+      order.push(new URL(url).searchParams.get('ids'));
+      await new Promise((resolve) => waiting.push(resolve));
+      return new Response(JSON.stringify({ features: [] }));
+    },
+  });
+  const all = ['1', '2', '3', '4', '5', '6'].map((id) => source.getItem(id));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(order, ['1', '2', '3', '4'], 'four at once');
+  waiting.shift()();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(order.at(-1), '6', 'the latest waiting one next');
+  while (waiting.length) waiting.shift()();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  while (waiting.length) waiting.shift()();
+  await Promise.all(all);
 });
 
 test('an unreadable search answer, or one with no features, is handled', async () => {

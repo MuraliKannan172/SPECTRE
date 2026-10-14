@@ -3,6 +3,7 @@ import {
   API_CONCURRENCY,
   API_TIMEOUT_MS,
   MAX_RESPONSE_BYTES,
+  NEAREST_BOX_LIMIT,
   NEAREST_FOV_TOLERANCE_DEG,
   NEAREST_LIMIT,
   NEAREST_RADIUS_M,
@@ -151,9 +152,13 @@ export function createPanoramaxSource({
     },
 
     /**
-     * Pictures within `radius` metres of a point, nearest first, whichever
-     * way they look; `collections` keeps one sequence's, `pano` and
-     * `sinceMs` filter as the imagery filter does.
+     * Pictures within `radius` metres of a point, unranked: the caller ranks
+     * them by distance. Two searches side by side, since neither finds them
+     * all: `place_position` (nearest first) leaves out pictures looking
+     * away from the point, whatever the tolerance; a bounding box has them
+     * but in no order, so in a dense spot its page may miss the nearest.
+     * `collections` keeps one sequence's, `pano` and `sinceMs` filter as
+     * the imagery filter does.
      */
     async nearestItems(
       {
@@ -167,18 +172,40 @@ export function createPanoramaxSource({
       },
       { signal } = {},
     ) {
-      const params = {
-        place_position: `${Number(lon).toFixed(7)},${Number(lat).toFixed(7)}`,
-        place_distance: `0-${Math.min(1000, Math.max(1, Math.round(radius)))}`,
-        place_fov_tolerance: String(NEAREST_FOV_TOLERANCE_DEG),
-        limit: String(Math.min(100, Math.max(1, limit))),
-      };
-      if (collections) params.collections = String(collections);
-      if (pano === 'pano') params.filter = 'field_of_view=360';
-      else if (pano === 'flat') params.filter = 'field_of_view<360';
+      const metres = Math.min(1000, Math.max(1, Math.round(radius)));
+      const shared = {};
+      if (collections) shared.collections = String(collections);
+      if (pano === 'pano') shared.filter = 'field_of_view=360';
+      else if (pano === 'flat') shared.filter = 'field_of_view<360';
       if (Number.isFinite(sinceMs) && sinceMs > 0)
-        params.datetime = `${new Date(sinceMs).toISOString()}/..`;
-      return search(params, { signal });
+        shared.datetime = `${new Date(sinceMs).toISOString()}/..`;
+      const dLat = metres / 111_320;
+      const dLon =
+        metres / (111_320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
+      const box = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map((v) =>
+        v.toFixed(7),
+      );
+      const [facing, around] = await Promise.all([
+        search(
+          {
+            place_position: `${Number(lon).toFixed(7)},${Number(lat).toFixed(7)}`,
+            place_distance: `0-${metres}`,
+            place_fov_tolerance: String(NEAREST_FOV_TOLERANCE_DEG),
+            limit: String(Math.min(100, Math.max(1, limit))),
+            ...shared,
+          },
+          { signal },
+        ),
+        search(
+          { bbox: box.join(','), limit: String(NEAREST_BOX_LIMIT), ...shared },
+          { signal },
+        ),
+      ]);
+      const byId = new Map();
+      for (const item of [...facing, ...around])
+        if (item?.id != null && !byId.has(String(item.id)))
+          byId.set(String(item.id), item);
+      return [...byId.values()];
     },
   };
 }

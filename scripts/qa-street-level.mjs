@@ -2809,7 +2809,7 @@ async function main() {
         );
       if (fixtures)
         await step(
-          'every Mapillary and KartaView request was answered from a fixture',
+          'every Mapillary, KartaView and Panoramax request was answered from a fixture',
           () => {
             console.log(
               `  (answered: ${[...fixture.calls].sort().join(' | ')})`,

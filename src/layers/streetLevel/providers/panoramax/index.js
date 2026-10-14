@@ -18,7 +18,10 @@ import {
   COVERAGE_Z12_BELOW_M,
   COVERAGE_Z13_BELOW_M,
   COVERAGE_Z14_BELOW_M,
+  GONE_MESSAGE,
   LINE_CLICK_HINT,
+  LINE_CLICK_RADIUS_MAX_M,
+  LINE_CLICK_RADIUS_PER_HEIGHT,
   NEAREST_LIMIT,
   NEAREST_RADIUS_M,
   NO_COVERAGE_HINT,
@@ -31,13 +34,31 @@ import {
   PICTURE_TILE_EDGE_M,
   PICTURE_TILE_ZOOM,
   RATE_LIMITED_MESSAGE,
+  UNREADABLE_TILE_MESSAGE,
   normalizeItem,
 } from './policy.js';
 
 export { PANORAMAX_PROVIDER_ID } from './policy.js';
 
+/**
+ * A tile's bytes decoded by `decode`; a body that is not a vector tile
+ * (an HTML error page, a cut-off answer) reads as such, not as a parser's
+ * "Unimplemented type: 4".
+ */
+async function readable(decode) {
+  try {
+    return await decode();
+  } catch (error) {
+    if (error?.name === 'AbortError' || error?.status !== undefined)
+      throw error;
+    throw new Error(UNREADABLE_TILE_MESSAGE);
+  }
+}
+
 /** Pictures kept in memory by id (lookups and ‹ › fill it). */
 const PHOTO_CACHE_SIZE = 2000;
+/** Sequences whose cone centre is remembered. */
+const ANCHOR_CACHE_SIZE = 50;
 
 /**
  * Sequence lines at z11–14 below 30 km; above, the density grid at z5 and
@@ -63,17 +84,23 @@ export function panoramaxZoomFor(heightM) {
 }
 
 /**
- * The imagery filter for lines (dated, typed) and grid cells (undated, with
- * 360° and flat counts): a cell stays while it holds pictures of the kind
- * asked for.
+ * The imagery filter for lines and grid cells. A cell (undated, with 360°
+ * and flat counts) stays while it holds pictures of the kind asked for. A
+ * line is dated by its sequence's first day, so a sequence still growing
+ * may hide under "since" while its newer pictures can be opened; a line
+ * with no camera type or no day is kept (a click finds out).
  */
 export function passesCoverage(record, filter) {
+  if (!filter) return true;
   if ('hasPano' in record) {
-    if (filter?.pano === 'pano') return record.hasPano;
-    if (filter?.pano === 'flat') return record.hasFlat;
+    if (filter.pano === 'pano') return record.hasPano;
+    if (filter.pano === 'flat') return record.hasFlat;
     return true;
   }
-  return passesImageryFilter(record, filter);
+  return passesImageryFilter(record, {
+    pano: typeof record.isPano === 'boolean' ? filter.pano : 'all',
+    sinceMs: record.capturedAt ? filter.sinceMs : null,
+  });
 }
 
 /** Least-recently-used map: reading an entry renews it. */
@@ -193,7 +220,7 @@ export function createPanoramaxProvider({
       };
       const photos = createLru(PHOTO_CACHE_SIZE);
       /** Where each sequence's cones centre: the picture last opened in it, or a click. */
-      const anchors = new Map();
+      const anchors = createLru(ANCHOR_CACHE_SIZE);
       /** The z15 tiles the cones were drawn from. */
       let drawn = null;
       /** A line click: its sequence's pictures win the next nearest lookup there. */
@@ -215,16 +242,33 @@ export function createPanoramaxProvider({
         if (!lookup) {
           lookup = source
             .getItem(id)
+            .catch((error) => {
+              // Ids are UUIDs: the API answers 400 to anything else.
+              if (error?.status === 400) return null;
+              throw error;
+            })
             .then((item) => {
               const photo = item && remember(item);
-              if (!photo)
-                throw new Error('Panoramax has no position for this picture');
+              if (!photo) throw new Error(GONE_MESSAGE);
               return photo;
             })
             .finally(() => inflight.delete(id));
           inflight.set(id, lookup);
         }
         return lookup;
+      }
+
+      /**
+       * How far from a line click its sequence's pictures are looked for:
+       * from high up the click may land tens of metres off the line.
+       */
+      function lineClickRadius() {
+        const height = state.viewer?.camera?.positionCartographic?.height;
+        if (!Number.isFinite(height)) return NEAREST_RADIUS_M;
+        return Math.min(
+          LINE_CLICK_RADIUS_MAX_M,
+          Math.max(NEAREST_RADIUS_M, height * LINE_CLICK_RADIUS_PER_HEIGHT),
+        );
       }
 
       /** The picture `delta` along its sequence, from its own links (null at an end). */
@@ -236,7 +280,9 @@ export function createPanoramaxProvider({
       const coverage = createLineCoverage({
         state,
         fetchTile: async (tile, { signal }) =>
-          decodeCoverageTile(await source.getTile(tile, { signal }), tile),
+          readable(async () =>
+            decodeCoverageTile(await source.getTile(tile, { signal }), tile),
+          ),
         zoomFor: panoramaxZoomFor,
         colors: COLORS,
         pickPrefix: PICK_PREFIX.sequence,
@@ -252,18 +298,26 @@ export function createPanoramaxProvider({
           const anchor = anchors.get(sequenceId);
           if (!anchor) return [];
           const tiles = pictureTilesAround(anchor);
-          const lists = await Promise.all(
-            tiles.map(async (tile) =>
-              decodePictures(
-                await source.getTile(tile, { signal }),
-                tile,
-                sequenceId,
+          // The home tile must load; a neighbour that fails only thins the cones.
+          const lists = await Promise.allSettled(
+            tiles.map((tile) =>
+              readable(async () =>
+                decodePictures(
+                  await source.getTile(tile, { signal }),
+                  tile,
+                  sequenceId,
+                ),
               ),
             ),
           );
           signal?.throwIfAborted();
+          if (lists[0].status === 'rejected') throw lists[0].reason;
           drawn = { sequenceId, tiles: new Set(tiles.map(tileKey)) };
-          const byId = new Map(lists.flat().map((image) => [image.id, image]));
+          const byId = new Map(
+            lists
+              .flatMap((list) => list.value ?? [])
+              .map((image) => [image.id, image]),
+          );
           return thinImages(
             [...byId.values()].sort((a, b) => a.capturedAt - b.capturedAt),
           );
@@ -302,14 +356,14 @@ export function createPanoramaxProvider({
         ...viewerOptions,
       });
 
-      /** Nearest of `items` within the search radius of a point, or null. */
-      function nearestOf(items, point) {
+      /** Nearest of `items` within `radius` metres of a point, or null. */
+      function nearestOf(items, point, radius = NEAREST_RADIUS_M) {
         let best = null;
         for (const item of items) {
           const photo = remember(item);
           if (!photo) continue;
           const metres = metresBetween(point, photo);
-          if (metres > NEAREST_RADIUS_M) continue;
+          if (metres > radius) continue;
           if (!best || metres < best.metres) best = { photo, metres };
         }
         return best?.photo ?? null;
@@ -398,13 +452,15 @@ export function createPanoramaxProvider({
           const sequenceId = sequenceIdFromPick(pickId, PICK_PREFIX.sequence);
           if (!sequenceId) return false;
           const point = groundPoint?.();
-          if (!point) {
-            // No ground under the click: show the line selected, nothing more.
-            cones.select(sequenceId);
-            return true;
-          }
+          // No ground under the click (the sky beyond a line): nothing to open.
+          if (!point) return true;
           anchors.set(sequenceId, { ...point, sequenceId });
-          preferred = { sequenceId, lon: point.lon, lat: point.lat };
+          preferred = {
+            sequenceId,
+            lon: point.lon,
+            lat: point.lat,
+            radius: lineClickRadius(),
+          };
           context.actions.openNearest(point);
           return true;
         },
@@ -429,17 +485,16 @@ export function createPanoramaxProvider({
         async nearestImage({ lat, lon }, { signal } = {}) {
           const point = { lat, lon };
           const filter = context.getFilter();
+          // Only the lookup the click itself asked for (the same point).
           const wanted =
-            preferred && metresBetween(preferred, point) < 1
-              ? preferred.sequenceId
-              : null;
+            preferred && metresBetween(preferred, point) < 1 ? preferred : null;
           preferred = null;
-          const ask = (collections) =>
+          const ask = (collections, radius = NEAREST_RADIUS_M) =>
             source.nearestItems(
               {
                 lat,
                 lon,
-                radius: NEAREST_RADIUS_M,
+                radius,
                 limit: NEAREST_LIMIT,
                 collections,
                 pano: filter.pano,
@@ -448,7 +503,11 @@ export function createPanoramaxProvider({
               { signal },
             );
           if (wanted) {
-            const hit = nearestOf(await ask(wanted), point);
+            const hit = nearestOf(
+              await ask(wanted.sequenceId, wanted.radius),
+              point,
+              wanted.radius,
+            );
             if (hit) return hit.id;
           }
           return nearestOf(await ask(null), point)?.id ?? null;

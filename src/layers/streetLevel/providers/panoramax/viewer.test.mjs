@@ -143,6 +143,7 @@ test('a 360° picture shows its SD equirectangular image, then HD shrunk to 4,09
   assert.deepEqual(loads[0], {
     url: PHOTOS.pano.urls.sd,
     crossOrigin: true,
+    resize: null,
     failure: 'The Panoramax photo could not be loaded',
   });
   assert.equal(poses.at(-1).isPano, true);
@@ -179,8 +180,16 @@ test('HD panoramas too big to decode, or no bigger than SD, are never fetched', 
   const hdOnly = { ...PHOTOS.pano, urls: { ...PHOTOS.pano.urls, sd: null } };
   assert.deepEqual(PANORAMAX_SOURCES.panoFirst(hdOnly), {
     url: hdOnly.urls.hd,
-    width: 5760,
+    width: 4096,
+    resize: [4096, 2048],
   });
+  // …unless it is too big to decode: then no panorama, and the thumbnail.
+  const hugeOnly = { ...hdOnly, width: 11_904 };
+  assert.equal(PANORAMAX_SOURCES.panoFirst(hugeOnly), null);
+  assert.equal(PANORAMAX_SOURCES.hasPano(hugeOnly), false);
+  assert.deepEqual(PANORAMAX_SOURCES.flatFirst(hugeOnly).filter(Boolean), [
+    hugeOnly.urls.thumb,
+  ]);
   assert.equal(PANORAMAX_SOURCES.panoSharp(hdOnly, size), null);
   assert.equal(PANORAMAX_SOURCES.flatSharp(PHOTOS.flat, 2048), null);
   assert.equal(

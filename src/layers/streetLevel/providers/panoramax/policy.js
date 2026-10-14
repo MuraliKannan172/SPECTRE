@@ -41,10 +41,12 @@ export const COVERAGE_LINES_BELOW_M = 30_000;
 export const COVERAGE_TUNING = Object.freeze({
   maxTiles: 9,
   overviewMaxTiles: 6,
-  // Each tile draws at most 1,600 lines, its longest first: a dense z11
+  // Each tile draws at most 1,600 lines, its longest first (as decoded,
+  // `keepOrder`): a dense z11
   // tile over Paris holds 3,800, and a lower cap left the city centre
   // looking emptier than its suburbs. (KartaView draws as many.)
   maxSequences: 14_400,
+  keepOrder: true,
   lineWidthPx: 2.5,
   overviewPointPx: 4,
   moveDebounceMs: 320,
@@ -61,6 +63,9 @@ export const OVERVIEW_BINS_PER_AXIS = 96;
 export const RATE_LIMITED_MESSAGE =
   'Panoramax is busy — coverage resumes on its own';
 export const NO_COVERAGE_HINT = 'no Panoramax pictures in view';
+export const UNREADABLE_TILE_MESSAGE =
+  'Panoramax sent a map tile that could not be read';
+export const GONE_MESSAGE = 'This Panoramax picture is no longer available';
 /** From high up the dots are where pictures are, not sequences to click. */
 export const OVERVIEW_HINT = 'zoom in to click a Panoramax sequence';
 
@@ -79,8 +84,20 @@ export const TILE_CONCURRENCY = 6;
 
 /** Pictures asked for around a point; the API returns them nearest first. */
 export const NEAREST_LIMIT = 10;
-/** Any picture within the radius, whichever way it looks (2–180°). */
+/**
+ * The widest the API allows: the point may be beside a picture, but a
+ * picture looking away from it is still left out (the bounding-box search
+ * beside it has those).
+ */
 export const NEAREST_FOV_TOLERANCE_DEG = 180;
+/** Pictures in the bounding box around a click, at most. */
+export const NEAREST_BOX_LIMIT = 100;
+/**
+ * A line clicked from high up may be tens of metres off the click: its
+ * sequence is searched within the camera height / 100 (50–400 m).
+ */
+export const LINE_CLICK_RADIUS_PER_HEIGHT = 0.01;
+export const LINE_CLICK_RADIUS_MAX_M = 400;
 
 /** A full-resolution panorama is only fetched up to this width (memory). */
 export const PANO_HD_MAX_WIDTH = 8_192;
@@ -147,7 +164,19 @@ function linkedId(item, rel) {
   const href = item?.links?.find?.((link) => link?.rel === rel)?.href;
   if (typeof href !== 'string') return null;
   const id = href.split(/[?#]/)[0].split('/').filter(Boolean).pop();
-  return id ? decodeURIComponent(id) : null;
+  if (!id) return null;
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    // A malformed escape is no link, not a failed lookup.
+    return null;
+  }
+}
+
+/** An email address anywhere in a name (linear: names come from any instance). */
+function looksLikeEmail(name) {
+  const at = name.indexOf('@');
+  return at > 0 && name.indexOf('.', at + 2) !== -1;
 }
 
 /**
@@ -165,7 +194,7 @@ function creatorOf(item) {
       : []),
   ];
   const name = names.find((value) => typeof value === 'string' && value.trim());
-  if (!name || /\S+@\S+\.\S+/.test(name)) return null;
+  if (!name || looksLikeEmail(name)) return null;
   return name.trim().slice(0, 80);
 }
 
@@ -184,8 +213,11 @@ export function isEquirectangular(item) {
  */
 export function normalizeItem(item) {
   if (!item || item.id == null) return null;
+  // Only numbers: Number(null) and Number('') would put a picture at 0,0.
   const [lon, lat] = Array.isArray(item.geometry?.coordinates)
-    ? item.geometry.coordinates.map(Number)
+    ? item.geometry.coordinates.map((value) =>
+        typeof value === 'number' ? value : NaN,
+      )
     : [NaN, NaN];
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;

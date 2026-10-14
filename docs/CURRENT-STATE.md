@@ -3262,10 +3262,16 @@ density cells, binned to at most 96×96 points a tile (a z0 tile holds
 filters apply: lines carry their day and camera type, and a cell stays while
 it holds pictures of the kind asked for (cells are undated). A click on a
 line asks the core (`actions.openNearest`) for that sequence's picture
-nearest the click (`/api/search?place_position…&collections=<id>`, any
-direction: `place_fov_tolerance=180`), without framing, then any sequence's
-if it has none within 50 m; the filters go to the API (`filter=
-field_of_view=360`, `datetime=<since>/..`). Once the picture is on screen
+nearest the click, within the camera height / 100 (50–400 m: from high up
+a click lands well off a line), without framing, then any sequence's within
+50 m. Each lookup is two searches side by side, ranked by distance in the
+browser: `place_position` (nearest first, but even at
+`place_fov_tolerance=180` it leaves out pictures looking away from the
+point) and a bounding box (those too, but in no order); the filters go to
+both (`filter=field_of_view=360`, `datetime=<since>/..`). A line is dated
+by its sequence's first day, so a sequence still growing can hide under
+SINCE; a line with no camera type or day stays drawn. Lines keep the
+decoded longest-first order under the per-tile cap (`keepOrder`). Once the picture is on screen
 its sequence is highlighted and drawn as cones from the z15 tiles around it
 (their `pictures` layer, ~110 bytes a picture, against ~7.5 kB for a STAC
 item), plus a neighbour within 150 m of an edge; the cones re-centre when a

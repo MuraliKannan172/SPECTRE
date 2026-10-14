@@ -72,6 +72,7 @@ export function meshBoxInRange(box, centre) {
  * @property {number} viewRangeMinM       Street-zoom coverage reaches at least this far…
  * @property {number} viewRangePerHeight  …or camera height times this.
  * @property {number} viewNearM           Ground always covered around a tilted camera.
+ * @property {boolean} [keepOrder]        Cap a tile's lines in the order decoded (default: newest first).
  */
 
 /**
@@ -559,10 +560,13 @@ export function createLineCoverage({
         north: bounds.north + pad,
       };
       if (kind === 'sequence') {
-        // Newest first; the per-tile cap applies to what passes the filter.
-        entry.sequenceList = decoded.sequences.sort(
-          (a, b) => (b.capturedAt || 0) - (a.capturedAt || 0),
-        );
+        // Newest first, unless the provider ordered them itself; the
+        // per-tile cap applies to what passes the filter.
+        entry.sequenceList = tuning.keepOrder
+          ? decoded.sequences
+          : decoded.sequences.sort(
+              (a, b) => (b.capturedAt || 0) - (a.capturedAt || 0),
+            );
         entry.sequences = new Map();
         entry.total = decoded.sequences.length;
       } else {

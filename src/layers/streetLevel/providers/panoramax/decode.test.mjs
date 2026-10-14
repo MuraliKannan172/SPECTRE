@@ -47,6 +47,24 @@ test('sequence lines keep their parts apart, with their day and camera type', ()
   assert.equal(pano.parts.length, 2, 'the gap is not bridged');
   assert.ok(near(pano.parts[1][1][0], lon + 0.001));
   assert.equal(flat.isPano, false);
+  const untyped = decodeCoverageTile(
+    encodePanoramaxTile(tile, {
+      sequences: [
+        {
+          id: 'u',
+          type: '',
+          parts: [
+            [
+              [lon, lat],
+              [lon + 0.001, lat],
+            ],
+          ],
+        },
+      ],
+    }),
+    tile,
+  ).sequences[0];
+  assert.equal(untyped.isPano, null, 'no camera type: neither');
 });
 
 test('density cells bin to a bounded number of points that keep the counts and kinds', () => {

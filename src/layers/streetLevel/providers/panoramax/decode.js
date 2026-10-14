@@ -54,7 +54,13 @@ export function decodeCoverageTile(bytes, address) {
         id: String(props.id),
         parts,
         capturedAt: dayMs(props.date),
-        isPano: props.type === 'equirectangular',
+        // A sequence with no camera type is neither (the filters keep it).
+        isPano:
+          props.type === 'equirectangular'
+            ? true
+            : props.type === 'flat'
+              ? false
+              : null,
       };
       lengths.set(sequence, length);
       result.sequences.push(sequence);
