@@ -6,6 +6,8 @@ import {
   createLimiter,
 } from './source.js';
 import {
+  MASK_ATTEMPTS,
+  MASK_SLOW_MESSAGE,
   NEAREST_LIMIT,
   NEAREST_SEARCH_ZOOM,
   PHOTO_API_CONCURRENCY,
@@ -151,12 +153,19 @@ test('an API refusal inside a 200 is a readable error with its code; 601 is just
 test('HTTP errors, network failures and non-JSON become readable errors', async () => {
   const http = createKartaViewSource({ fetchImpl: async () => status(500) });
   await assert.rejects(http.getTile({ x: 0, y: 0, z: 14 }), /HTTP 500/);
+  let asked = 0;
   const offline = createKartaViewSource({
     fetchImpl: async () => {
+      asked++;
       throw new TypeError('Failed to fetch');
     },
   });
-  await assert.rejects(offline.getPhoto('1'), /did not answer/);
+  // Not a timeout: no network is said as much, and not asked again at once.
+  await assert.rejects(
+    offline.getPhoto('1'),
+    /could not be reached — check the network/,
+  );
+  assert.equal(asked, 1);
   const garbled = createKartaViewSource({
     fetchImpl: async () => ({
       ok: true,
@@ -169,7 +178,19 @@ test('HTTP errors, network failures and non-JSON become readable errors', async 
   });
   await assert.rejects(
     garbled.getTile({ x: 0, y: 0, z: 14 }),
-    /did not answer/,
+    /could not be read/,
+  );
+  const torn = createKartaViewSource({
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      body: streamed('{"lines": [', 4),
+    }),
+  });
+  await assert.rejects(
+    torn.getTile({ x: 0, y: 0, z: 14 }),
+    /could not be read/,
   );
 });
 
@@ -265,18 +286,24 @@ test('tiles, lookups and sequence pages queue separately, so a lookup never wait
   assert.equal(peak.page, 1);
 });
 
-test('a lookup that times out is asked once more; a second timeout says to try again', async () => {
+test('a lookup that times out is asked once more, then reported as no answer in time', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   let calls = 0;
-  const source = createKartaViewSource({
-    fetchImpl: async () => {
-      calls++;
-      throw new TypeError('Failed to fetch');
-    },
-  });
-  await assert.rejects(
-    source.getPhoto('1'),
+  const outcome = await onMockClock(t, () =>
+    createKartaViewSource({
+      fetchImpl: (url, { signal }) => {
+        calls++;
+        return new Promise((resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason)),
+        );
+      },
+    }).getPhoto('1'),
+  );
+  assert.match(
+    String(outcome?.error?.message),
     /did not answer in time — try again/,
   );
+  assert.equal(outcome.error.timedOut, true);
   assert.equal(calls, 2);
 });
 
@@ -323,17 +350,35 @@ test('an image probe reads only the status: an archived photo (409) is not showa
   );
 });
 
-test('a cold tile that times out is asked once more', async () => {
+test('a cold tile that times out is asked once more; an unreachable one is not', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   let calls = 0;
-  const source = createKartaViewSource({
+  const outcome = await onMockClock(t, () =>
+    createKartaViewSource({
+      fetchImpl: (url, { signal }) => {
+        calls++;
+        if (calls === 1)
+          return new Promise((resolve, reject) =>
+            signal.addEventListener('abort', () => reject(signal.reason)),
+          );
+        return Promise.resolve(ok({ lines: [] }));
+      },
+    }).getTile({ x: 1, y: 2, z: 13 }),
+  );
+  assert.deepEqual(outcome.value, { lines: [] });
+  assert.equal(calls, 2);
+  let asked = 0;
+  const offline = createKartaViewSource({
     fetchImpl: async () => {
-      calls++;
-      if (calls === 1) throw new TypeError('Failed to fetch');
-      return ok({ lines: [] });
+      asked++;
+      throw new TypeError('Failed to fetch');
     },
   });
-  assert.deepEqual(await source.getTile({ x: 1, y: 2, z: 13 }), { lines: [] });
-  assert.equal(calls, 2);
+  await assert.rejects(
+    offline.getTile({ x: 1, y: 2, z: 13 }),
+    /could not be reached/,
+  );
+  assert.equal(asked, 1);
 });
 
 test('an absurdly large answer is refused before it is parsed', async () => {
@@ -551,4 +596,133 @@ test('a sequence page gets the full 30 s on its first try, then 30 s once more',
   assert.deepEqual(asked, [0, PAGE_TIMEOUT_MS]);
   assert.match(String(outcome?.error?.message), /did not answer in time/);
   assert.equal(outcome.at, 2 * PAGE_TIMEOUT_MS);
+});
+
+test('an answer turned away unread (an error, a 429, a length past the cap) lets its connection go', async () => {
+  /** A response whose body is never read: records its cancel and the abort. */
+  const unread = (answer) => {
+    const seen = { cancelled: false, signal: null };
+    const fetchImpl = async (url, { signal }) => {
+      seen.signal = signal;
+      return {
+        ...answer,
+        body: {
+          locked: false,
+          getReader: () => {
+            throw new Error('not read');
+          },
+          cancel: async () => {
+            seen.cancelled = true;
+          },
+        },
+      };
+    };
+    return { seen, fetchImpl };
+  };
+  const cases = [
+    [{ ok: false, status: 503, headers: new Map() }, /HTTP 503/],
+    [
+      {
+        ok: true,
+        status: 200,
+        headers: new Map([['content-length', String(64 * 1024 * 1024)]]),
+      },
+      /too much data/,
+    ],
+  ];
+  for (const [answer, message] of cases) {
+    const { seen, fetchImpl } = unread(answer);
+    const source = createKartaViewSource({ fetchImpl });
+    await assert.rejects(source.getTile({ x: 1, y: 2, z: 13 }), message);
+    assert.equal(seen.signal.aborted, true, `${message}: request aborted`);
+    assert.equal(seen.cancelled, true, `${message}: body cancelled`);
+  }
+  // A 429 is let go before its retry is asked.
+  const { seen, fetchImpl } = unread({
+    ok: false,
+    status: 429,
+    headers: new Map([['retry-after', '0']]),
+  });
+  const signals = [];
+  const source = createKartaViewSource({
+    fetchImpl: async (url, init) => {
+      signals.push(init.signal);
+      if (signals.length === 1) return fetchImpl(url, init);
+      return ok(photoPayload([]));
+    },
+  });
+  await source.getPhoto('1');
+  assert.equal(signals[0].aborted, true);
+  assert.equal(seen.cancelled, true);
+  assert.equal(signals[1].aborted, false, 'a read answer is left alone');
+});
+
+test('a filtered tile comes as PNG bytes; KartaView still drawing it (504) is asked again, then given up', async () => {
+  const png = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+  const bytesOf = () => ({
+    ok: true,
+    status: 200,
+    headers: new Map(),
+    body: {
+      getReader: () => {
+        let given = false;
+        return {
+          read: async () =>
+            given
+              ? { done: true }
+              : ((given = true), { done: false, value: png }),
+          cancel: async () => {},
+        };
+      },
+    },
+  });
+  const urls = [];
+  let answers = [status(504), status(503), bytesOf()];
+  const source = createKartaViewSource({
+    maskRetryMs: 0,
+    fetchImpl: async (url) => {
+      urls.push(url);
+      return answers.shift();
+    },
+  });
+  const tile = { x: 13054, y: 8474, z: 14 };
+  assert.deepEqual(await source.getTileMask(tile, 'fieldOfView=360'), png);
+  assert.deepEqual(urls, [
+    'https://api.kartaview.org/2.0/sequence/tiles/13054/8474/14.png?fieldOfView=360',
+    'https://api.kartaview.org/2.0/sequence/tiles/13054/8474/14.png?fieldOfView=360',
+    'https://api.kartaview.org/2.0/sequence/tiles/13054/8474/14.png?fieldOfView=360',
+  ]);
+  // Still drawing after every try: given up, saying so.
+  urls.length = 0;
+  answers = Array.from({ length: 10 }, () => status(504));
+  await assert.rejects(source.getTileMask(tile, 'fieldOfView=360'), {
+    message: MASK_SLOW_MESSAGE,
+    timedOut: true,
+  });
+  assert.equal(urls.length, MASK_ATTEMPTS);
+  // A refusal is not asked again.
+  urls.length = 0;
+  answers = [status(400)];
+  await assert.rejects(source.getTileMask(tile, 'fieldOfView=360'), /HTTP 400/);
+  assert.equal(urls.length, 1);
+});
+
+test('a filtered nearest search asks KartaView for the projection and upload date', async () => {
+  const urls = [];
+  const source = createKartaViewSource({
+    fetchImpl: async (url) => {
+      urls.push(new URL(url));
+      return ok(photoPayload([]));
+    },
+  });
+  await source.nearestPhotos({
+    lat: 42.3314,
+    lon: -83.0458,
+    filter: { pano: 'pano', sinceMs: Date.UTC(2026, 0, 2, 12) },
+  });
+  await source.nearestPhotos({ lat: 42.3314, lon: -83.0458 });
+  assert.equal(urls[0].searchParams.get('projection'), 'SPHERE');
+  assert.equal(urls[0].searchParams.get('startDate'), '2026-01-02');
+  assert.equal(urls[1].searchParams.has('projection'), false);
+  assert.equal(urls[1].searchParams.has('startDate'), false);
 });

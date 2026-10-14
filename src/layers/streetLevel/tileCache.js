@@ -24,7 +24,7 @@ export function createLru(limit) {
 }
 
 /**
- * Loaded (decoded) coverage tiles by `z/x/y`, at most `size`, each for
+ * Loaded (decoded) coverage tiles by `keyOf` (default `z/x/y`), at most `size`, each for
  * `ttlMs`: a pan back, or a zoom across bands and back, neither fetches nor
  * decodes them again. A load that fails is not kept.
  */
@@ -33,11 +33,12 @@ export function createTileCache({
   size = TILE_CACHE_SIZE,
   ttlMs = TILE_CACHE_TTL_MS,
   now = Date.now,
+  keyOf = (tile) => `${tile.z}/${tile.x}/${tile.y}`,
 }) {
   const kept = createLru(size);
   return {
     async get(tile, options) {
-      const key = `${tile.z}/${tile.x}/${tile.y}`;
+      const key = keyOf(tile);
       const entry = kept.get(key);
       if (entry && now() - entry.at < ttlMs) return entry.tile;
       const loaded = await load(tile, options);

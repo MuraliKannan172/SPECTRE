@@ -438,6 +438,7 @@ export function createStreetLevelLayer({
         color: entry.def.colors.coverage,
         coverageLabel: entry.def.coverageLabel || null,
         highlightsSequence: entry.def.highlightsSequence !== false,
+        sinceBasis: entry.def.sinceBasis === 'upload' ? 'upload' : 'capture',
         groundClick: entry.def.groundClick === true,
         filters: [...filtersOf(entry.def)],
       };

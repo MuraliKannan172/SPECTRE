@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  assignCourses,
+  bearingBetween,
+  cameraBearing,
   kartaViewPhotoUrl,
   kartaViewTimeMs,
   normalizePhoto,
+  passesKartaViewFilter,
+  photoFilterParams,
   resizedImageUrl,
+  tileFilterQuery,
 } from './policy.js';
 
 /** A photo record as /2.0/photo returns it (trimmed to what is read). */
@@ -140,7 +146,9 @@ test('records without an id or a position are dropped; a missing heading is null
     null,
   );
   assert.equal(normalizePhoto(record({ heading: '' })).heading, null);
-  assert.equal(normalizePhoto(record({ heading: '0' })).heading, 0);
+  // A device without a compass reads 0 for a whole drive: unknown, not north.
+  assert.equal(normalizePhoto(record({ heading: '0' })).heading, null);
+  assert.equal(normalizePhoto(record({ heading: '0.5' })).heading, 0.5);
   assert.equal(normalizePhoto(record({ heading: 'n/a' })).heading, null);
 });
 
@@ -235,5 +243,106 @@ test('with no processed-photo path the size prefix gives the full photo', () => 
   assert.match(
     thumbOnly.urls.view,
     /^https:\/\/storage3\.openstreetcam\.org\/.*\/lth\//,
+  );
+});
+
+test('the camera looks along the drive: each photo’s course points to the next one a few metres on', () => {
+  // North along a meridian, 5 m apart, then a repeat of the last position.
+  const step = 5 / 110_540;
+  const photos = [0, 1, 2, 3].map((i) => ({ lon: 10, lat: 50 + i * step }));
+  photos.push({ lon: 10, lat: 50 + 3 * step }); // a stop: same place
+  const metres = (a, b) =>
+    Math.hypot(
+      (b.lon - a.lon) * 111_320 * Math.cos((a.lat * Math.PI) / 180),
+      (b.lat - a.lat) * 110_540,
+    );
+  assignCourses(photos, metres);
+  for (const photo of photos)
+    assert.ok(
+      Math.abs(photo.course) < 0.5 || Math.abs(photo.course - 360) < 0.5,
+      `${photo.course}`,
+    );
+  // Eastward: 90°.
+  const east = [0, 1].map((i) => ({ lon: 10 + (i * 5) / 71_600, lat: 50 }));
+  assignCourses(east, metres);
+  assert.ok(
+    Math.abs(east[0].course - 90) < 0.5 && Math.abs(east[1].course - 90) < 0.5,
+  );
+  // A lone photo has no course; the compass is the fallback, then unknown.
+  const [lone] = assignCourses([{ lon: 1, lat: 1 }], metres);
+  assert.equal(lone.course, null);
+  assert.equal(cameraBearing({ ...lone, heading: 42 }), 42);
+  assert.equal(cameraBearing({ ...lone, heading: null }), null);
+  assert.equal(
+    cameraBearing({ course: 90, heading: 200 }),
+    90,
+    'the drive beats the compass',
+  );
+  assert.ok(
+    Math.abs(bearingBetween({ lon: 0, lat: 0 }, { lon: 0, lat: -1 }) - 180) <
+      1e-9,
+  );
+});
+
+test('the imagery filter becomes KartaView’s tile query and photo-search params', () => {
+  // 2026-03-05 23:30 UTC: the cut-off day is the UTC one.
+  const sinceMs = Date.UTC(2026, 2, 5, 23, 30);
+  assert.equal(tileFilterQuery(null), '');
+  assert.equal(tileFilterQuery({ pano: 'all', sinceMs: null }), '');
+  assert.equal(
+    tileFilterQuery({ pano: 'pano', sinceMs: null }),
+    'fieldOfView=360',
+  );
+  assert.equal(
+    tileFilterQuery({ pano: 'flat', sinceMs }),
+    'fieldOfView=plane&startDate=2026-03-05',
+  );
+  assert.equal(tileFilterQuery({ pano: 'all', sinceMs: 0 }), '');
+  // The search ignores fieldOfView; its projection filters instead.
+  assert.deepEqual(photoFilterParams({ pano: 'all', sinceMs: null }), {});
+  assert.deepEqual(photoFilterParams({ pano: 'pano', sinceMs }), {
+    projection: 'SPHERE',
+    startDate: '2026-03-05',
+  });
+  assert.deepEqual(photoFilterParams({ pano: 'flat', sinceMs: null }), {
+    projection: 'PLANE',
+  });
+});
+
+test('KartaView’s SINCE is the upload date, from the start of the cut-off’s UTC day', () => {
+  const photo = normalizePhoto(
+    record({
+      shotDate: '2016-08-23 20:17:47.000',
+      dateAdded: '2026-03-05 00:10:00',
+    }),
+  );
+  assert.equal(photo.uploadedAt, Date.UTC(2026, 2, 5, 0, 10));
+  const since = (iso) => ({ pano: 'all', sinceMs: Date.parse(iso) });
+  // Taken in 2016, uploaded on the cut-off day: it passes, as KartaView's
+  // startDate=2026-03-05 keeps it.
+  assert.equal(
+    passesKartaViewFilter(photo, since('2026-03-05T23:00:00Z')),
+    true,
+  );
+  assert.equal(
+    passesKartaViewFilter(photo, since('2026-03-06T00:00:00Z')),
+    false,
+  );
+  assert.equal(
+    passesKartaViewFilter(photo, { pano: 'pano', sinceMs: null }),
+    false,
+  );
+  assert.equal(
+    passesKartaViewFilter(photo, { pano: 'flat', sinceMs: null }),
+    true,
+  );
+  assert.equal(passesKartaViewFilter(photo, null), true);
+  assert.equal(
+    passesKartaViewFilter(
+      { ...photo, uploadedAt: null },
+      since('2020-01-01T00:00:00Z'),
+    ),
+    false,
+    'no upload date passes no SINCE',
   );
 });

@@ -914,6 +914,24 @@ owners. Tuner calculations have a pure entry, with existing layer exports
 preserved. Destruction removes listeners and state subscriptions before ending
 tuning; a delayed Enable result cannot reveal or refocus removed controls.
 
+## NYC DOT TMC CCTV source pack
+
+The CCTV catalog can add New York City traffic cameras from the NYC DOT
+Traffic Management Center. NYC DOT requires developers to sign a data-sharing
+agreement for the camera feed, so this is the one opt-in pack: it loads only
+when `CCTV_NYC_ENABLED=1`, and with the flag unset the server makes no NYC
+request. NYC DOT's requested disclaimer is in the Data attribution popover.
+When enabled, the server reads the keyless
+camera list at `https://webcams.nyctmc.org/api/cameras` and keeps cameras the
+feed marks online. Frame URLs are built from each camera UUID under
+`https://webcams.nyctmc.org/api/cameras/<uuid>/image`; they are never taken
+from the payload. There is no heading in the feed, so gizmos use the shared
+id-hash fallback at low confidence.
+
+Once enabled, the 250 cameras nearest the five borough cores load.
+`CCTV_NYC_MAX_SOURCES` sets the pack cap (8–400). The catalog-wide ceiling stays at 4,000 and is shared
+round-robin, so adding this pack does not silently drop another region.
+
 ## DriveBC CCTV source pack
 
 The CCTV catalog adds DriveBC highway cameras for British Columbia alongside the
@@ -1091,6 +1109,19 @@ as a stalled upstream. Error responses are cancelled. Buffered snapshots have a
 normal fallback chain. The existing declared media size ceiling remains 64 MiB.
 
 ## GBFS upstream bounds
+
+Station information is normalized in `src/sources/gbfsStations.js` for both the
+globe layer and `get_bike_share`. Names accept legacy strings or GBFS v3 Localized
+String arrays regardless of the reported feed version. Nonempty English text
+(including regional `en-*` tags, case-insensitive) takes precedence, then the first
+usable translation. An unusable `name` falls back to `short_name` with the same
+rules; if neither supplies text, the station remains available with an empty name
+(the globe uses its station-ID label and the tool returns `null`). Malformed
+translation entries do not interrupt loading of the other stations. This covers
+station names, not complete GBFS v3 support.
+`scripts/qa-gbfs-names.mjs` checks synthetic localized names through the real layer,
+station selection, keyboard dismissal, mobile cards and bike-share tool against
+either a dev or preview server (`--url` selects the target).
 
 The station reader addresses the proxy as `/api/gbfs/<encoded feed URL>`; the
 feed address is read from the path, and a query-string form is refused with a 400. GBFS refuses upstream redirects and enforces its 5 MiB response cap while
@@ -3058,7 +3089,7 @@ its criteria cannot be silently ignored.
 | Satellites             | CelesTrak                                                                                                                                                                                       | `src/data/satellites.js`                              | `/api/celestrak`                                         | 120s                                                                              |
 | Space Missions (30d)   | Launch Library 2 + CelesTrak                                                                                                                                                                    | `src/data/rocketLaunches.js`                          | `/api/launches` + `/api/celestrak/active`                | 5 min                                                                             |
 | Traffic | Selectable TomTom / OpenStreetMap / Hybrid roads; optional TomTom flow (BYOK) | `src/data/traffic.js` | browser-direct OpenFreeMap tiles; `/api/tomtom` for flow | viewport-driven; capped tile cache |
-| CCTV                   | Austin + Caltrans (CA) + TfL London + Ontario 511 + Fintraffic (FI) + DriveBC (BC) + TxDOT (TX) + Estonia (Tallinn, Tarktee) + Live Traffic NSW + Open Calgary Open Data + Statens vegvesen (NO, stills + live HLS) + Street View fallback | `src/data/cctv.js`                                    | `/api/cctv`                                              | 10s (active)                                                                      |
+| CCTV                   | Austin + Caltrans (CA) + TfL London + Ontario 511 + Fintraffic (FI) + DriveBC (BC) + TxDOT (TX) + Estonia (Tallinn, Tarktee) + Live Traffic NSW + Open Calgary Open Data + Statens vegvesen (NO, stills + live HLS) + NYC DOT TMC (opt-in) + Street View fallback | `src/data/cctv.js`                                    | `/api/cctv`                                              | 10s (active)                                                                      |
 | Radio                  | Radio Browser (public-domain station directory)                                                                                                                                                 | `src/data/radio.js`                                   | `/api/radio/stations`, `/api/radio/click/:uuid`          | 45 min directory refresh                                                          |
 | Transit 🚌             | Operator GTFS-Realtime VehiclePositions (7 keyless regions, `src/data/transitFeeds.js`)                                                                                                         | `src/layers/transit/` via `src/app/layers/transit.js` | `/api/transit`                                           | 15s (poll + delayed playback)                                                     |
 | Bikeshare 🚲           | GBFS (Lyft + BCycle)                                                                                                                                                                            | `src/data/bikeshare.js`                               | `/api/gbfs`                                              | 60s                                                                               |
@@ -3195,14 +3226,36 @@ ground and z13 up to 6 km (lower zooms take seconds per tile; z10 does not
 answer), so higher up the hint says to zoom in, and an empty view says there
 are no KartaView photos in it. A tile's lines are OSM way segments with
 photos and carry no sequence, date or projection, so `decode.js` chains
-segments that meet end to start (about four times fewer lines), they are
+segments that meet end to start (about four times fewer lines; linear time,
+at most 20,000 segments a tile and 5,000 points a line), they are
 drawn as `kv:line:<z/x/y/n>`, up to 1,600 per tile, and never highlighted
 (`highlightsSequence: false`, so the legend has no "Selected"), and the
-provider declares `filters: []` and `coverageLabel` ("N streets in view ·
-click a line for its nearest photo"). Tiles come uncompressed and
-uncacheable, so the last 24 decoded tiles are kept for 10 minutes
-(`createTileCache`); one that does not answer in 20 s is asked once more,
-and one that is not a line list is not cached. A click on a line reaches
+provider declares `filters: ['pano', 'since']` and `coverageLabel` ("N
+streets in view · click a line for its nearest photo"). KartaView filters
+coverage only in its PNG tiles (`/sequence/tiles/{x}/{y}/{z}.png?fieldOfView=360|plane&startDate=YYYY-MM-DD`;
+its JSON, GeoJSON and jsoncanvas tiles come back empty once a filter is
+asked for), so a filtered tile is drawn from the cached JSON segments that
+lie on the filtered PNG's drawn pixels (`maskedSegments`: at least half the
+points sampled every 2 px have a drawn pixel within one; on Jakarta's 360°
+filter, 332 of 1,041 segments lie on it, 676 miss it, 33 fall between).
+A filter change reloads the lines (`lineCoverage.reload`: the drawn ones show
+until the new ones are in), keeps the JSON segments, and caches masks per
+filter and tile. A dense filtered PNG can take KartaView over a minute the
+first time (it answers 504 at 60 s and keeps drawing), so a timeout or 5xx is
+asked again 4 s later, four tries in all; then the panel says it did not
+filter the area in time. KartaView's `startDate` is the upload date (its
+server filters by nothing else), so SINCE goes by upload date throughout,
+the cut-off taken as its UTC day (`passesKartaViewFilter`): the nearest
+lookup asks the photo API for the projection (`SPHERE`/`PLANE`; it ignores
+`fieldOfView`) and upload date and checks each answer the same way (when
+photos are near but none passes, the panel says so), and the cones pass on
+each photo's projection and upload date. The provider declares
+`sinceBasis: 'upload'`, so while it is lit the panel shows "KartaView: by
+upload date" under the SINCE slider (`sinceNote` in the UI state). Tiles come uncompressed and
+uncacheable, so the last 24 decoded tiles are kept for 10 minutes while
+KartaView is lit (`createTileCache`, dropped when it is switched off); one
+that does not answer in 20 s is asked once more, and one that is not a line
+list is not cached. A click on a line reaches
 `handlePick(id, {groundPoint})`, and the provider asks the core
 (`actions.openNearest`) for its nearest showable photo within 50 m, without
 framing: many photos are archived (their file answers 409, while a HEAD says
@@ -3211,7 +3264,15 @@ off at the headers, and where all are gone the panel says KartaView's photos
 there are archived. Only a definite answer (403/404/409/410, or 200) is
 remembered; a storage timeout or 5xx is asked again. The open photo's
 sequence draws as cones from the 250-photo page holding it
-(`/2.0/sequence/{id}/photos`). Pages follow photo ids, which only roughly
+(`/2.0/sequence/{id}/photos`); the panel counts the drive's own photos
+(`countActivePhotos`, asked once per sequence). The camera direction (the
+marker, cones, FOLLOW, and a panorama's centre) is the direction of travel
+to the next photo a few metres on (`assignCourses`): KartaView is dashcam
+imagery, while its `heading` is the device compass, which reads 0 for whole
+drives without one and can sit a steady 110° off inside a car. Until the
+drive's page arrives the compass stands in (0 counts as unknown), and the
+pose is sent again once the course is known. The open photo's marker is a
+purple view cone (`marker: {kind: 'view-cone'}`), as Street View's is blue. Pages follow photo ids, which only roughly
 follow the index, so the page is found by search (both ways, halving past the
 end when many photos were deleted), a neighbour page joins within 12 photos
 of an edge, and the cones re-centre whenever a photo of the selected sequence
@@ -3222,7 +3283,9 @@ browser's six connections to it tiles take three, lookups two and pages one
 (newest first), and a lookup never waits behind tiles; the photo API answers
 429 to more than about three requests at once, so a 429 is retried with
 backoff (at most 10 s), and a lookup gets 8 s, then 15 s once more (KartaView
-sometimes sits on a lookup for 11 s and answers the same one in 3 s). Answers
+sometimes sits on a lookup for 11 s and answers the same one in 3 s); a
+request that could not be made at all (no network, CORS) says so and is not
+repeated. Answers
 are read with a running byte count and cut off past 16 MB (KartaView sends
 them chunked, without a length). Photo URLs are built from
 `storage` and `filepath*`: the API's `fileurl*` always name storage1, where

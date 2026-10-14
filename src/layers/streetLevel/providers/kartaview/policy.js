@@ -108,6 +108,90 @@ export const FLAT_FULL_SIZE = Object.freeze([2560, 2560]);
 export const KARTAVIEW_CREDIT_HTML =
   'Street Level: imagery © <a href="https://kartaview.org" target="_blank" rel="noopener">KartaView</a> contributors, CC BY-SA 4.0';
 
+/**
+ * The imagery filter (360° or flat, SINCE). KartaView filters coverage on
+ * its server only in its PNG tiles: its JSON tiles come back empty once a
+ * filter is asked for. So a filtered PNG tile is a mask, and a JSON line is
+ * kept where it lies on the mask's drawn pixels.
+ *
+ * KartaView's date filter is the upload date, and SINCE goes by it
+ * throughout (lines, the photo a click opens, the cones), as KartaView's own
+ * map does; the panel says so under the slider.
+ */
+export const MASK_TIMEOUT_MS = 20_000;
+/**
+ * A filtered PNG tile is drawn on demand and a dense one can outlast
+ * KartaView's own 60 s (504); it keeps drawing, and has the tile a few
+ * seconds later. A timeout or a 5xx is asked again this many times in all.
+ */
+export const MASK_ATTEMPTS = 4;
+export const MASK_RETRY_WAIT_MS = 4_000;
+/** Real masks are tens of kilobytes. */
+export const MASK_MAX_BYTES = 2 * 1024 * 1024;
+/** A segment is kept when this share of the points along it lies on the mask. */
+export const MASK_KEEP_SHARE = 0.5;
+/** Points along a segment are tested this many mask pixels apart. */
+export const MASK_SAMPLE_PX = 2;
+export const MASK_SLOW_MESSAGE =
+  'KartaView did not filter this area in time — move the map to ask again';
+export const FILTERED_OUT_MESSAGE =
+  'None of KartaView’s photos here pass the imagery filter';
+/** Under the SINCE slider while KartaView is lit. */
+export const SINCE_NOTE = 'KartaView: by upload date';
+
+/** The UTC calendar day of `ms`, as KartaView's startDate reads it. */
+function utcDay(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+const filtersSince = (filter) =>
+  Number.isFinite(filter?.sinceMs) && filter.sinceMs > 0;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Whether a photo passes the resolved imagery filter by its projection and
+ * upload date, the cut-off taken as its UTC day, as KartaView's startDate.
+ * @param {{isPano: boolean, uploadedAt: number|null}} photo
+ * @param {{pano: string, sinceMs: number|null}|null} filter
+ */
+export function passesKartaViewFilter(photo, filter) {
+  if (!filter) return true;
+  if (filter.pano === 'pano' && !photo.isPano) return false;
+  if (filter.pano === 'flat' && photo.isPano) return false;
+  if (!filtersSince(filter)) return true;
+  const day = Math.floor(filter.sinceMs / DAY_MS) * DAY_MS;
+  return (photo.uploadedAt ?? 0) >= day;
+}
+
+/**
+ * The query of a filtered PNG coverage tile, or '' when nothing is
+ * filtered. The day, not the instant, so it is stable for a day (and keys
+ * the mask cache).
+ * @param {{pano: string, sinceMs: number|null}|null} filter  resolved
+ */
+export function tileFilterQuery(filter) {
+  const params = new URLSearchParams();
+  if (filter?.pano === 'pano') params.set('fieldOfView', '360');
+  else if (filter?.pano === 'flat') params.set('fieldOfView', 'plane');
+  if (filtersSince(filter)) params.set('startDate', utcDay(filter.sinceMs));
+  return params.toString();
+}
+
+/**
+ * The photo search's own filter: projection and upload date (its
+ * `fieldOfView` is ignored).
+ * @param {{pano: string, sinceMs: number|null}|null} filter  resolved
+ * @returns {Record<string, string>}
+ */
+export function photoFilterParams(filter) {
+  const params = {};
+  if (filter?.pano === 'pano') params.projection = 'SPHERE';
+  else if (filter?.pano === 'flat') params.projection = 'PLANE';
+  if (filtersSince(filter)) params.startDate = utcDay(filter.sinceMs);
+  return params;
+}
+
 /** The cone and coverage noun: a line is a street with photos, not a sequence. */
 export const COVERAGE_NOUN = 'streets';
 export const LINE_CLICK_HINT = 'click a line for its nearest photo';
@@ -140,6 +224,56 @@ export function kartaViewTimeMs(value) {
   if (Number(y) < 1990) return null;
   const ms = Date.UTC(+y, +mo - 1, +d, +h, +mi, +s);
   return Number.isFinite(ms) ? ms : null;
+}
+
+/** Initial great-circle bearing from `a` to `b`, degrees clockwise from north. */
+export function bearingBetween(a, b) {
+  const rad = Math.PI / 180;
+  const dLon = (b.lon - a.lon) * rad;
+  const y = Math.sin(dLon) * Math.cos(b.lat * rad);
+  const x =
+    Math.cos(a.lat * rad) * Math.sin(b.lat * rad) -
+    Math.sin(a.lat * rad) * Math.cos(b.lat * rad) * Math.cos(dLon);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+/** Photos closer than this say nothing about the direction of travel. */
+const COURSE_MIN_STEP_M = 2;
+/** How many photos along to look for one far enough away. */
+const COURSE_SEARCH = 5;
+
+/**
+ * Give each photo of a drive (in index order) its `course`: the direction
+ * of travel from it to the next photo a few metres on (from the previous one
+ * at the end). KartaView is dashcam imagery, so this is where the camera
+ * looks; its `heading` is the device compass, which reads 0 without one and
+ * can sit 110° off inside a car.
+ * @param {Array<{lon: number, lat: number, course?: number|null}>} photos
+ * @param {(a: object, b: object) => number} metres
+ */
+export function assignCourses(photos, metres) {
+  photos.forEach((photo, i) => {
+    let course = null;
+    for (let j = i + 1; j <= i + COURSE_SEARCH && j < photos.length; j++)
+      if (metres(photo, photos[j]) >= COURSE_MIN_STEP_M) {
+        course = bearingBetween(photo, photos[j]);
+        break;
+      }
+    for (
+      let k = i - 1;
+      course === null && k >= i - COURSE_SEARCH && k >= 0;
+      k--
+    )
+      if (metres(photos[k], photo) >= COURSE_MIN_STEP_M)
+        course = bearingBetween(photos[k], photo);
+    photo.course = course;
+  });
+  return photos;
+}
+
+/** Where the camera looked: the direction of travel, else the compass, else unknown. */
+export function cameraBearing(photo) {
+  return photo?.course ?? photo?.heading ?? null;
 }
 
 /** A coordinate pair as numbers; the road-matched one when KartaView has it. */
@@ -211,10 +345,11 @@ export function normalizePhoto(record) {
   // 0,0 is a missing fix, not a photo in the Gulf of Guinea.
   if (lat === 0 && lon === 0) return null;
   if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  // An exact 0 is a device without a compass (whole drives read 0), not north.
   const heading =
     record.heading === '' || record.heading == null
       ? NaN
-      : Number(record.heading);
+      : Number(record.heading) || NaN;
   const isPano =
     record.projection === 'SPHERE' || Number(record.fieldOfView) >= 360;
   const full =
@@ -230,6 +365,8 @@ export function normalizePhoto(record) {
     isPano,
     capturedAt:
       kartaViewTimeMs(record.shotDate) ?? kartaViewTimeMs(record.dateAdded),
+    // KartaView's SINCE goes by this (its server filters by upload date).
+    uploadedAt: kartaViewTimeMs(record.dateAdded),
     urls: {
       // A 1280 px rendition; for a 360° photo it is the front view only.
       view:

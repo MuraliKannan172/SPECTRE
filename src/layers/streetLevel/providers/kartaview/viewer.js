@@ -9,6 +9,7 @@ import {
   KARTAVIEW_NAME,
   KARTAVIEW_PROVIDER_ID,
   PANO_PREVIEW_SIZE,
+  cameraBearing,
   kartaViewPhotoUrl,
   resizedImageUrl,
 } from './policy.js';
@@ -47,7 +48,14 @@ const KARTAVIEW_SOURCES = Object.freeze({
     photo.isPano ? null : resizedImageUrl(photo.urls.full, FLAT_VIEW_SIZE),
     photo.urls.view,
   ],
-  flatSharp: (photo) => resizedImageUrl(photo.urls.full, FLAT_FULL_SIZE),
+  // A docked viewer shows the 1,280 px version in full: the 2,560 px one
+  // (~0.6 MB a photo) waits until the viewer is bigger than that.
+  flatSharp: (photo, pixels) =>
+    pixels > FLAT_VIEW_SIZE[0]
+      ? resizedImageUrl(photo.urls.full, FLAT_FULL_SIZE)
+      : null,
+  // The camera's direction, which the drive's track may refine.
+  bearingOf: (photo) => cameraBearing(photo),
   describe: (photo) => ({
     // KartaView's only place name is the sequence's, where the drive began.
     title: null,

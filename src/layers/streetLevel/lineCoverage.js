@@ -889,6 +889,15 @@ export function createLineCoverage({
   }
 
   /**
+   * Load every tile again (a source that filters on its server had its
+   * filter changed); the lines drawn now show until the new ones are in.
+   */
+  function reload() {
+    retire();
+    refresh();
+  }
+
+  /**
    * Redraw tiles draped or cast for the new surface mode, then re-pick the
    * zoom, since the ground height under the camera may have changed.
    */
@@ -1018,6 +1027,7 @@ export function createLineCoverage({
     clear,
     resetErrors,
     rebuild,
+    reload,
     setSurface,
     recolorSequence,
     sequenceCount,

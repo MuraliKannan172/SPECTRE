@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { inflateSync } from 'node:zlib';
 import { createApplicationStreetLevel } from '../app/layers/streetLevel.js';
 import {
   fixtureTile,
@@ -24,10 +25,15 @@ import {
   answerKartaViewRequest,
   describeKartaViewCall,
   KV_LINE,
+  KV_OLD_STREET,
   KV_SEQUENCE_ID,
   kartaViewPhotos,
   resetKartaViewFixture,
 } from '../../scripts/fixtures/street-level/kartaView.mjs';
+import {
+  maskedSegments,
+  tileSegments,
+} from '../layers/streetLevel/providers/kartaview/decode.js';
 import { lonToTileX, latToTileY } from '../layers/streetLevel/tileMath.js';
 import {
   normalizePhoto,
@@ -851,4 +857,80 @@ test('Panoramax fixtures: two sequences on one street, searches honour sequence 
     ),
     'GET api.panoramax.xyz/api/map/{z}/{x}/{y}.mvt',
   );
+});
+
+/** The alpha of a fixture PNG (8-bit RGBA, unfiltered rows, as it writes them). */
+function fixturePngAlpha(bytes) {
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  const idat = [];
+  for (let at = 8; at < bytes.length;) {
+    const length = bytes.readUInt32BE(at);
+    const type = bytes.toString('ascii', at + 4, at + 8);
+    if (type === 'IDAT') idat.push(bytes.subarray(at + 8, at + 8 + length));
+    at += 12 + length;
+  }
+  const rows = inflateSync(Buffer.concat(idat));
+  const alpha = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      alpha[y * width + x] = rows[y * (width * 4 + 1) + 1 + x * 4 + 3];
+  return { width, height, alpha };
+}
+
+test('KartaView fixtures filter like KartaView: PNG tiles by view and upload date, the photo search by projection', () => {
+  const body = (answer) => JSON.parse(answer.body);
+  const z = 14;
+  const x = lonToTileX(KV_LINE.lon, z);
+  const y = latToTileY((KV_LINE.south + KV_LINE.north) / 2, z);
+  assert.equal(x, lonToTileX(KV_OLD_STREET.lon, z), 'both streets in a tile');
+  const base = `https://api.kartaview.org/2.0/sequence/tiles/${x}/${y}/${z}`;
+  const segments = tileSegments(
+    body(answerKartaViewRequest({ method: 'GET', url: `${base}.json` })),
+  );
+  const lons = (kept) => [...new Set(kept.map((segment) => segment[0][0]))];
+  const keptFor = (query) => {
+    const answer = answerKartaViewRequest({
+      method: 'GET',
+      url: `${base}.png?${query}`,
+    });
+    assert.equal(answer.contentType, 'image/png');
+    assert.equal(answer.known, true);
+    return lons(
+      maskedSegments(segments, fixturePngAlpha(answer.body), { x, y, z }),
+    );
+  };
+  assert.deepEqual(
+    lons(segments).sort(),
+    [KV_LINE.lon, KV_OLD_STREET.lon].sort(),
+  );
+  assert.deepEqual(keptFor('fieldOfView=360'), [KV_LINE.lon]);
+  assert.deepEqual(keptFor('fieldOfView=plane').sort(), lons(segments).sort());
+  const lastYear = new Date(Date.now() - 365 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  assert.deepEqual(keptFor(`startDate=${lastYear}`), [KV_LINE.lon]);
+  assert.deepEqual(keptFor('startDate=2099-01-01'), []);
+  assert.equal(
+    describeKartaViewCall('GET', new URL(`${base}.png?fieldOfView=360`)),
+    'GET api.kartaview.org/2.0/sequence/tiles/{x}/{y}/{z}.png?fieldOfView',
+  );
+  // The photo search: 360° only, and nothing uploaded after the drive.
+  resetKartaViewFixture();
+  const search = (extra) => {
+    answerKartaViewRequest({
+      method: 'GET',
+      url: 'https://api.kartaview.org/2.0/photo/?lat=0&lng=0',
+    });
+    return body(
+      answerKartaViewRequest({
+        method: 'GET',
+        url: `https://api.kartaview.org/2.0/photo/?lat=${KV_LINE.south + 0.002}&lng=${KV_LINE.lon}&zoomLevel=18&itemsPerPage=10${extra}`,
+      }),
+    ).result.data;
+  };
+  const panos = search('&projection=SPHERE');
+  assert.ok(panos.length > 0);
+  assert.ok(panos.every((record) => record.projection === 'SPHERE'));
+  assert.deepEqual(search('&startDate=2099-01-01'), []);
 });

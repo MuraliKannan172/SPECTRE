@@ -302,6 +302,17 @@ button.sl-status:focus-visible {
   outline-offset: 3px;
 }
 
+.sl-since-note {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: var(--sl-text-small);
+  color: var(--text-secondary);
+}
+
+.sl-since-note[hidden] {
+  display: none;
+}
+
 .sl-since-label {
   grid-column: 2;
   font-family: var(--font-mono);

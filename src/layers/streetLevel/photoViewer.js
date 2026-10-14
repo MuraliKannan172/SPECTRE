@@ -146,6 +146,7 @@ export function panoSizeFor(canvasPixels, fovDeg) {
  * @property {(photo: object, pixels: number) => string|null} flatSharp
  *   A sharper flat version for a picture this many device pixels wide, or null.
  * @property {(photo: object) => {title?: string|null, creator?: string|null, license?: string|null, externalUrl: string, capturedAtPrecision?: 'day'|'month'}} describe
+ * @property {(photo: object) => number|null} [bearingOf]   Where the camera looked (default `photo.heading`).
  */
 
 /**
@@ -165,6 +166,7 @@ export function panoSizeFor(canvasPixels, fovDeg) {
  * @param {(photo: object, delta: -1|1) => Promise<string|null>} options.step   The photo `delta` along the sequence, or null at its end.
  * @param {(imageId: string) => void} options.onStep   Open the photo ‹ › chose (through the core, so loading and errors show).
  * @param {(photo: object) => void} [options.onShown]   A photo is on screen.
+ * @param {(imageId: string) => void} [options.onReopen]   Draw the same photo again after a GPU reset (default: `onStep`).
  * @param {() => boolean} [options.onEscape]   Esc in the docked viewer: true when it was used (e.g. a selection cleared).
  * @param {object} [options.render]   Render governor.
  * @param {(url: string, options?: object) => Promise<HTMLImageElement|ImageBitmap>} [options.load]
@@ -179,6 +181,7 @@ export function createPhotoViewer({
   step,
   onStep,
   onShown = () => {},
+  onReopen = onStep,
   onEscape = () => false,
   render,
   load = loadImage,
@@ -212,6 +215,8 @@ export function createPhotoViewer({
   let panoWidth = 0;
   /** The sharper panorama on its way, for which open (resizes come in bursts). */
   let panoComing = null;
+  /** A resize came while it loaded: look again once it lands. */
+  let lookAgain = false;
   /** The sharper flat version on screen or on its way (one download each). */
   let flatSharpUrl = null;
   /** The photo an open is fetching: ‹ › step on from it, not the old one. */
@@ -230,8 +235,13 @@ export function createPhotoViewer({
 
   function emit() {
     if (!photo || !showing) return;
+    // A lost GPU context, still being recovered: the open that redraws the
+    // panorama poses once it is on screen.
+    if (showing === 'pano' && !renderer) return;
     const view = showing === 'pano' ? renderer.getView() : null;
-    const heading = photo.heading;
+    const heading = sources.bearingOf
+      ? sources.bearingOf(photo)
+      : photo.heading;
     const described = sources.describe(photo);
     const pose = {
       providerId,
@@ -350,7 +360,7 @@ export function createPhotoViewer({
       const again = photo.id;
       show(null);
       openingId = again;
-      onStep(again);
+      onReopen(again);
     }
   }
 
@@ -582,11 +592,15 @@ export function createPhotoViewer({
     photo = null;
   }
 
-  /** Device pixels across the viewer (its picture or canvas). */
+  /** Device pixels across the flat photo's frame (its longer side). */
   function viewerPixels() {
-    const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
+    const ratio = globalThis.devicePixelRatio || 1;
     const element = showing === 'pano' ? canvas : picture;
-    return (element?.clientWidth || root?.clientWidth || 0) * ratio;
+    const side = Math.max(
+      element?.clientWidth || 0,
+      element?.clientHeight || 0,
+    );
+    return (side || root?.clientWidth || 0) * ratio;
   }
 
   /** A sharper version once the first is on screen, if nothing replaced it. */
@@ -596,13 +610,19 @@ export function createPhotoViewer({
     if (kind === 'pano') {
       const size = panoSizeNow();
       if (size[0] <= panoWidth) return;
-      if (panoComing?.seq === seq && size[0] <= panoComing.width) return;
+      // Resizes come in bursts while the panel animates: one load at a time
+      // for this photo, and one more look once it lands.
+      if (panoComing?.seq === seq) {
+        lookAgain = true;
+        return;
+      }
       const sharp = sources.panoSharp(target, size, {
         expanded: Boolean(root?.closest?.('.sl-viewer-wrap-expanded')),
       });
       if (!sharp?.url) return;
       const coming = { seq, width: size[0], controller: new AbortController() };
       panoComing = coming;
+      lookAgain = false;
       try {
         const image = await loadAs(sharp.url, {
           crossOrigin: true,
@@ -624,7 +644,13 @@ export function createPhotoViewer({
       } catch {
         /* the first version stays */
       } finally {
-        if (panoComing === coming) panoComing = null;
+        if (panoComing === coming) {
+          panoComing = null;
+          if (lookAgain && seq === openSeq && photo === target) {
+            lookAgain = false;
+            upgrade(target, seq, 'pano');
+          }
+        }
       }
       return;
     }
@@ -646,6 +672,7 @@ export function createPhotoViewer({
   function dropSharpPanorama() {
     panoComing?.controller?.abort();
     panoComing = null;
+    lookAgain = false;
   }
 
   /** The sharp panorama this viewer needs now: 2,048 docked, 4,096 expanded. */
@@ -789,6 +816,11 @@ export function createPhotoViewer({
     setRenderMode(mode) {
       renderMode = mode === 'fill' ? 'fill' : 'letterbox';
       applyRenderMode();
+    },
+
+    /** The photo's direction became known (its drive loaded): pose again. */
+    refreshPose() {
+      emit();
     },
 
     onPose(listener) {
