@@ -87,27 +87,22 @@ export function normalizeRegionalArticles(payload, limit = MAX_ARTICLES) {
   return articles;
 }
 
+/** A reported number, or null when the observation is missing or not numeric. */
+function observedNumber(value) {
+  if (
+    value == null ||
+    typeof value === 'boolean' ||
+    (typeof value === 'string' && !value.trim())
+  )
+    return null;
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
 /** Normalize Open-Meteo current conditions into a small source-stamped record. */
 export function normalizeRegionalWeather(payload) {
   const current = payload?.current;
-  if (
-    !current ||
-    current.temperature_2m == null ||
-    typeof current.temperature_2m === 'boolean' ||
-    (typeof current.temperature_2m === 'string' &&
-      !current.temperature_2m.trim()) ||
-    !Number.isFinite(Number(current.temperature_2m))
-  )
-    return null;
-  const numberOrNull = (value) => {
-    if (
-      value == null ||
-      typeof value === 'boolean' ||
-      (typeof value === 'string' && !value.trim())
-    )
-      return null;
-    return Number.isFinite(Number(value)) ? Number(value) : null;
-  };
+  if (!current || observedNumber(current.temperature_2m) == null) return null;
+  const numberOrNull = observedNumber;
   // Open-Meteo reports zone-naive timestamps ("2026-08-17T00:15") that are UTC,
   // but JS parses zoneless date-times as LOCAL — pin them to UTC explicitly.
   const observedRaw =
@@ -132,14 +127,8 @@ export function normalizeRegionalWeather(payload) {
 
 /** Translate the WMO weather code used by Open-Meteo into concise cockpit copy. */
 export function weatherCodeLabel(code) {
-  if (
-    code == null ||
-    typeof code === 'boolean' ||
-    (typeof code === 'string' && !code.trim())
-  )
-    return 'CONDITIONS UNKNOWN';
-  const value = Number(code);
-  if (!Number.isFinite(value)) return 'CONDITIONS UNKNOWN';
+  const value = observedNumber(code);
+  if (value == null) return 'CONDITIONS UNKNOWN';
   if (value === 0) return 'CLEAR';
   if ([1, 2].includes(value)) return 'PARTLY CLOUDY';
   if (value === 3) return 'OVERCAST';
