@@ -146,7 +146,10 @@ export function tilesForBbox(bbox, z, { limit = Infinity, focus = null } = {}) {
         const dx = Math.abs(tile.x - centre.x);
         return Math.min(dx, n - dx) ** 2 + (tile.y - centre.y) ** 2;
       };
-  // Each tile's distance is computed once; ties keep their row order.
+  // The date-line halves share a column when the gap between east and west is
+  // narrower than a tile; count that column once so a capped overview does not
+  // spend its slots on repeats. Each tile's distance is computed once; ties keep
+  // their row order.
   const unique = [
     ...new Map(
       tiles.map((tile) => [`${tile.x}/${tile.y}/${tile.z}`, tile]),

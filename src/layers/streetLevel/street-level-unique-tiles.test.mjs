@@ -20,3 +20,12 @@ test('reachable polar dateline coverage ranks 24 distinct tiles before overview 
   );
   assert.equal(overview.truncated, true);
 });
+
+test('a limit that fits every distinct tile is not spent on repeats', () => {
+  // Before de-duplication this box yielded 27 entries for 24 tiles, so a
+  // 24-slot overview held repeats and still reported itself truncated.
+  const result = tilesForBbox([-10, 60, -20, 85], 3, { limit: 24 });
+  const keys = result.tiles.map((tile) => `${tile.x}/${tile.y}/${tile.z}`);
+  assert.equal(new Set(keys).size, 24);
+  assert.equal(result.truncated, false);
+});
