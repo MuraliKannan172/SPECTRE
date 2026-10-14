@@ -111,6 +111,71 @@ export const FLAT_FULL_SIZE = Object.freeze([2560, 2560]);
 export const KARTAVIEW_CREDIT_HTML =
   'Street Level: imagery © <a href="https://kartaview.org" target="_blank" rel="noopener">KartaView</a> contributors, CC BY-SA 4.0';
 
+/**
+ * The imagery filter (360° or flat, SINCE). KartaView filters coverage on
+ * its server only in its PNG tiles: its JSON tiles come back empty once a
+ * filter is asked for. So a filtered PNG tile is a mask, and a JSON line is
+ * kept where it lies on the mask's drawn pixels.
+ *
+ * KartaView's date filter is the upload date, never before the capture
+ * date: the lines are the streets with photos uploaded since the cut-off,
+ * and a photo opened from them is held to its capture date.
+ */
+export const MASK_TIMEOUT_MS = 20_000;
+/**
+ * A filtered PNG tile is drawn on demand and a dense one can outlast
+ * KartaView's own 60 s (504); it keeps drawing, and has the tile a few
+ * seconds later. A timeout or a 5xx is asked again this many times in all.
+ */
+export const MASK_ATTEMPTS = 4;
+export const MASK_RETRY_WAIT_MS = 4_000;
+/** Real masks are tens of kilobytes. */
+export const MASK_MAX_BYTES = 2 * 1024 * 1024;
+/** A segment is kept when this share of the points along it lies on the mask. */
+export const MASK_KEEP_SHARE = 0.5;
+/** Points along a segment are tested this many mask pixels apart. */
+export const MASK_SAMPLE_PX = 2;
+export const MASK_SLOW_MESSAGE =
+  'KartaView did not filter this area in time — move the map to ask again';
+export const FILTERED_OUT_MESSAGE =
+  'None of KartaView’s photos here pass the imagery filter';
+
+/** The UTC calendar day of `ms`, as KartaView's startDate reads it. */
+function utcDay(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+const filtersSince = (filter) =>
+  Number.isFinite(filter?.sinceMs) && filter.sinceMs > 0;
+
+/**
+ * The query of a filtered PNG coverage tile, or '' when nothing is
+ * filtered. The day, not the instant, so it is stable for a day (and keys
+ * the mask cache).
+ * @param {{pano: string, sinceMs: number|null}|null} filter  resolved
+ */
+export function tileFilterQuery(filter) {
+  const params = new URLSearchParams();
+  if (filter?.pano === 'pano') params.set('fieldOfView', '360');
+  else if (filter?.pano === 'flat') params.set('fieldOfView', 'plane');
+  if (filtersSince(filter)) params.set('startDate', utcDay(filter.sinceMs));
+  return params.toString();
+}
+
+/**
+ * The photo search's own filter: projection and upload date (its
+ * `fieldOfView` is ignored). The capture date is checked on the answers.
+ * @param {{pano: string, sinceMs: number|null}|null} filter  resolved
+ * @returns {Record<string, string>}
+ */
+export function photoFilterParams(filter) {
+  const params = {};
+  if (filter?.pano === 'pano') params.projection = 'SPHERE';
+  else if (filter?.pano === 'flat') params.projection = 'PLANE';
+  if (filtersSince(filter)) params.startDate = utcDay(filter.sinceMs);
+  return params;
+}
+
 /** The cone and coverage noun: a line is a street with photos, not a sequence. */
 export const COVERAGE_NOUN = 'streets';
 export const LINE_CLICK_HINT = 'click a line for its nearest photo';

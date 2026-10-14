@@ -1,7 +1,13 @@
+import { passesImageryFilter } from '../../filter.js';
 import { createLineCoverage } from '../../lineCoverage.js';
 import { createSequenceCones, thinImages } from '../../sequenceCones.js';
 import { metresBetween } from '../../view.js';
-import { decodeCoverageTile } from './decode.js';
+import {
+  chainSegments,
+  maskedSegments,
+  readMaskImage,
+  tileSegments,
+} from './decode.js';
 import { createKartaViewSource } from './source.js';
 import { createKartaViewViewer } from './viewer.js';
 import {
@@ -11,6 +17,7 @@ import {
   COVERAGE_NOUN,
   COVERAGE_STREET_ZOOM_BELOW_M,
   COVERAGE_TUNING,
+  FILTERED_OUT_MESSAGE,
   KARTAVIEW_CREDIT_HTML,
   KARTAVIEW_LABEL,
   KARTAVIEW_NAME,
@@ -27,13 +34,14 @@ import {
   assignCourses,
   cameraBearing,
   normalizePhoto,
+  tileFilterQuery,
 } from './policy.js';
 
 /** Photos kept in memory by id (sequence pages fill it). */
 const PHOTO_CACHE_SIZE = 4000;
 /** Sequence pages kept in memory. */
 const PAGE_CACHE_SIZE = 12;
-/** Decoded coverage tiles kept, and for how long. */
+/** Decoded coverage tiles kept, and for how long (masks too). */
 const TILE_CACHE_SIZE = 24;
 const TILE_CACHE_TTL_MS = 10 * 60_000;
 
@@ -77,11 +85,12 @@ export function createTileCache({
   size = TILE_CACHE_SIZE,
   ttlMs = TILE_CACHE_TTL_MS,
   now = Date.now,
+  keyOf = (tile) => `${tile.z}/${tile.x}/${tile.y}`,
 }) {
   const kept = createLru(size);
   return {
     async get(tile, options) {
-      const key = `${tile.z}/${tile.x}/${tile.y}`;
+      const key = keyOf(tile);
       const entry = kept.get(key);
       if (entry && now() - entry.at < ttlMs) return entry.tile;
       const loaded = await load(tile, options);
@@ -102,12 +111,13 @@ function pageOf(index) {
  * KartaView Street Level provider: keyless coverage lines from KartaView's
  * tile API, the photos nearest a clicked line, cones along the photo's
  * sequence, and a flat or 360° viewer with ‹ › along the sequence.
- * @param {{source?: ReturnType<typeof createKartaViewSource>, viewerOptions?: object}} [options]
+ * @param {{source?: ReturnType<typeof createKartaViewSource>, viewerOptions?: object, readMask?: typeof readMaskImage}} [options]
  * @returns {import('../../registry.js').StreetLevelProvider}
  */
 export function createKartaViewProvider({
   source = createKartaViewSource(),
   viewerOptions = {},
+  readMask = readMaskImage,
 } = {}) {
   return Object.freeze({
     id: KARTAVIEW_PROVIDER_ID,
@@ -120,8 +130,9 @@ export function createKartaViewProvider({
     marker: Object.freeze({ kind: 'view-cone', color: COLORS.coverage }),
     credit: Object.freeze({ html: KARTAVIEW_CREDIT_HTML }),
     defaultOn: false,
-    // Coverage lines carry no date or projection: no filter could thin them.
-    filters: [],
+    // 360° / flat and SINCE, as Mapillary: KartaView filters the lines on
+    // its server (see tileFilterQuery), the photos by their own record.
+    filters: Object.freeze(['pano', 'since']),
     // Its lines are streets, not sequences: a selected drive shows as cones.
     highlightsSequence: false,
     coverageLabel: Object.freeze({
@@ -315,12 +326,30 @@ export function createKartaViewProvider({
         return probe;
       }
 
-      // Decoded coverage tiles, kept a while: panning back asks nothing.
+      // A tile's way segments, kept a while: panning back, or a filter
+      // change, asks KartaView nothing more for them.
       const tiles = createTileCache({
         load: async (tile, { signal }) =>
-          decodeCoverageTile(await source.getTile(tile, { signal }), tile),
+          tileSegments(await source.getTile(tile, { signal })),
       });
-      const fetchTile = (tile, options) => tiles.get(tile, options);
+      // A filtered tile's mask, by filter and tile.
+      const masks = createTileCache({
+        load: async ({ query, ...tile }, { signal }) =>
+          readMask(await source.getTileMask(tile, query, { signal })),
+        keyOf: ({ query, z, x, y }) => `${query}|${z}/${x}/${y}`,
+      });
+      /** The tile's lines under the filter now: all, or the masked ones. */
+      async function fetchTile(tile, options) {
+        const query = tileFilterQuery(context.getFilter());
+        if (!query) return chainSegments(await tiles.get(tile, options), tile);
+        const [segments, mask] = await Promise.all([
+          tiles.get(tile, options),
+          masks.get({ ...tile, query }, options),
+        ]);
+        return chainSegments(maskedSegments(segments, mask, tile), tile);
+      }
+      /** The query the drawn lines were loaded under. */
+      let drawnQuery = tileFilterQuery(context.getFilter());
 
       /**
        * The next showable photo `delta` along the sequence, or null at its
@@ -361,6 +390,7 @@ export function createKartaViewProvider({
         renderKey: 'kartaview-coverage',
         tuning: COVERAGE_TUNING,
         messages: { rateLimited: RATE_LIMITED_MESSAGE, tooHigh: TOO_HIGH_HINT },
+        // Filtered on the way in (fetchTile): a line has no date to test.
         passes: () => true,
       });
 
@@ -395,8 +425,7 @@ export function createKartaViewProvider({
         pickPrefix: PICK_PREFIX.image,
         spriteId: 'street-level:kartaview-cones',
         renderKey: 'kartaview-sequence',
-        // The filters are hidden for KartaView: one left set must not hide cones.
-        passes: () => true,
+        // The imagery filter applies to cones as to Mapillary's (capture date).
       });
 
       /** Sequence id → its photo count from KartaView (asked once). */
@@ -491,6 +520,7 @@ export function createKartaViewProvider({
           drawnPage = null;
           // Tens of MB of decoded lines are not kept for a source left off.
           tiles.clear();
+          masks.clear();
         },
 
         destroy(cesiumViewer) {
@@ -499,12 +529,23 @@ export function createKartaViewProvider({
           coverage.resetErrors();
           cones.destroy(cesiumViewer);
           tiles.clear();
+          masks.clear();
         },
 
         refreshCoverage: () => coverage.refresh(),
 
-        /** No filter applies (see `filters`). */
-        setFilter() {},
+        /**
+         * The filter changed: the lines come from KartaView again under it
+         * (the old ones show meanwhile), the cones are drawn again.
+         */
+        setFilter() {
+          const query = tileFilterQuery(context.getFilter());
+          if (query !== drawnQuery) {
+            drawnQuery = query;
+            coverage.reload();
+          }
+          cones.rerender();
+        },
 
         setSurface() {
           coverage.setSurface();
@@ -568,13 +609,21 @@ export function createKartaViewProvider({
          * file at all, so the nearest few are tried in turn.
          */
         async nearestImage({ lat, lon }, { signal } = {}) {
-          const records = await source.nearestPhotos({ lat, lon }, { signal });
+          const filter = context.getFilter();
+          const records = await source.nearestPhotos(
+            { lat, lon, filter },
+            { signal },
+          );
           const near = [];
+          let filteredOut = 0;
           for (const record of records) {
             const photo = remember(record);
             if (!photo?.urls.view) continue;
             const metres = metresBetween({ lat, lon }, photo);
-            if (metres <= NEAREST_RADIUS_M) near.push({ photo, metres });
+            if (metres > NEAREST_RADIUS_M) continue;
+            // KartaView filtered by upload date: hold it to the capture date.
+            if (!passesImageryFilter(photo, filter)) filteredOut++;
+            else near.push({ photo, metres });
           }
           near.sort((a, b) => a.metres - b.metres);
           // Probed side by side (photo storage is not the API host): the
@@ -586,6 +635,7 @@ export function createKartaViewProvider({
           const hit = candidates.find((_, i) => answers[i]);
           if (hit) return hit.photo.id;
           if (near.length) throw new Error(ARCHIVED_MESSAGE);
+          if (filteredOut) throw new Error(FILTERED_OUT_MESSAGE);
           return null;
         },
 

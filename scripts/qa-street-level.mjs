@@ -888,14 +888,14 @@ async function main() {
         await sleep(1000);
       }
       await step(
-        'KartaView: its chip draws keyless coverage, credits KartaView and hides the filters',
+        'KartaView: its chip draws keyless coverage, credits KartaView and offers Mapillary’s filters',
         async () => {
           await clickPanelControl(page, kvChip);
           assert.ok(await lit('kartaview'), 'KartaView alone is lit');
           await waitForCoverage(page);
           const u = await ui();
           assert.equal(u.keyRequired, false);
-          assert.deepEqual(u.filterControls, { pano: false, since: false });
+          assert.deepEqual(u.filterControls, { pano: true, since: true });
           assert.equal(
             await page.$eval(kvChip, (chip) =>
               chip.style.getPropertyValue('--chip-color'),
@@ -922,6 +922,72 @@ async function main() {
             ),
             `the share link lights KartaView: ${await page.evaluate(() => location.hash)}`,
           );
+        },
+      );
+      await step(
+        'KartaView: 360° and SINCE thin its lines through KartaView’s filtered tiles, and ALL / ANY DATE bring them back',
+        async () => {
+          const before = (await ui()).coverage.count;
+          const setStop = (index) =>
+            page.$eval(
+              '#sl-since',
+              (input, value) => {
+                input.value = String(value);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+              },
+              index,
+            );
+          // Filtered tiles are drawn by KartaView on demand: give them time.
+          const settled = async (test, arg, what) =>
+            assert.ok(
+              await uiUntil(test, arg, { timeout: 60_000 }),
+              `${what}: ${JSON.stringify((await ui()).coverage)}`,
+            );
+          await clickPanelControl(page, '[data-sl-pano="pano"]');
+          await settled(
+            (u) => u.filter.pano === 'pano' && !u.coverage.loading,
+            null,
+            '360° drawn',
+          );
+          const panos = (await ui()).coverage.count;
+          assert.ok(panos <= before, `${panos} ≤ ${before}`);
+          // Fixtures: the old street has only flat photos, the drive 360° too.
+          if (fixtures)
+            assert.ok(panos > 0 && panos < before, `0 < ${panos} < ${before}`);
+          await clickPanelControl(page, '[data-sl-pano="all"]');
+          await settled(
+            (u, n) =>
+              u.filter.pano === 'all' &&
+              !u.coverage.loading &&
+              u.coverage.count === n,
+            before,
+            'every line again',
+          );
+          await setStop(5);
+          await settled(
+            (u) => u.filter.sinceDays === 365 && !u.coverage.loading,
+            null,
+            'LAST YEAR drawn',
+          );
+          const lastYear = (await ui()).coverage.count;
+          assert.ok(lastYear <= before, `${lastYear} ≤ ${before}`);
+          // Fixtures: the drive is a month old, the old street from 2019.
+          if (fixtures)
+            assert.ok(
+              lastYear > 0 && lastYear < before,
+              `0 < ${lastYear} < ${before}`,
+            );
+          await setStop(0);
+          await settled(
+            (u, n) =>
+              u.filter.sinceDays === 0 &&
+              !u.coverage.loading &&
+              u.coverage.count === n,
+            before,
+            'ANY DATE: every line again',
+          );
+          assert.equal((await ui()).coverage.error, null);
         },
       );
       await step(

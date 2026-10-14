@@ -3212,8 +3212,26 @@ segments that meet end to start (about four times fewer lines; linear time,
 at most 20,000 segments a tile and 5,000 points a line), they are
 drawn as `kv:line:<z/x/y/n>`, up to 1,600 per tile, and never highlighted
 (`highlightsSequence: false`, so the legend has no "Selected"), and the
-provider declares `filters: []` and `coverageLabel` ("N streets in view ·
-click a line for its nearest photo"). Tiles come uncompressed and
+provider declares `filters: ['pano', 'since']` and `coverageLabel` ("N
+streets in view · click a line for its nearest photo"). KartaView filters
+coverage only in its PNG tiles (`/sequence/tiles/{x}/{y}/{z}.png?fieldOfView=360|plane&startDate=YYYY-MM-DD`;
+its JSON, GeoJSON and jsoncanvas tiles come back empty once a filter is
+asked for), so a filtered tile is drawn from the cached JSON segments that
+lie on the filtered PNG's drawn pixels (`maskedSegments`: at least half the
+points sampled every 2 px have a drawn pixel within one; on Jakarta's 360°
+filter, 332 of 1,041 segments lie on it, 676 miss it, 33 fall between).
+A filter change reloads the lines (`lineCoverage.reload`: the drawn ones show
+until the new ones are in), keeps the JSON segments, and caches masks per
+filter and tile. A dense filtered PNG can take KartaView over a minute the
+first time (it answers 504 at 60 s and keeps drawing), so a timeout or 5xx is
+asked again 4 s later, four tries in all; then the panel says it did not
+filter the area in time. KartaView's `startDate` is the upload date, never
+before the capture date, so the lines are a superset of what passes; the
+nearest lookup asks the photo API for the projection (`SPHERE`/`PLANE`; it
+ignores `fieldOfView`) and upload date, then holds each photo to its capture
+date (when photos are near but none passes, the panel says so), and the
+cones pass the filter on each photo's projection and capture date, as
+Mapillary's do. Tiles come uncompressed and
 uncacheable, so the last 24 decoded tiles are kept for 10 minutes while
 KartaView is lit (`createTileCache`, dropped when it is switched off); one
 that does not answer in 20 s is asked once more, and one that is not a line

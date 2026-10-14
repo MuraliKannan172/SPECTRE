@@ -114,7 +114,11 @@
   answers 409) are skipped by the click and by ‹ ›. Shift+← →, ↑ ↓, + − and
   pinch look around a 360° photo. The open photo's marker is a purple view
   cone pointing along the drive (KartaView's own compass headings are often
-  0 or far off).
+  0 or far off). The IMAGERY (ALL / 360° / FLAT) and SINCE filters apply to
+  KartaView as to Mapillary: its lines are filtered by KartaView's own
+  server (its filtered PNG tiles, as a mask over the JSON lines; SINCE goes
+  by upload date there), and the photo a click opens, and the cones, by
+  each photo's projection and capture date.
   Mapillary's line coverage and sequence cones are now shared by both
   (`lineCoverage.js`, `sequenceCones.js`).
 

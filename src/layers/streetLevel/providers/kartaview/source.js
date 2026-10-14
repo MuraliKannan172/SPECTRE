@@ -2,6 +2,11 @@ import {
   IMAGE_PROBE_TIMEOUT_MS,
   MAX_RESPONSE_BYTES,
   KARTAVIEW_API_HOST,
+  MASK_ATTEMPTS,
+  MASK_MAX_BYTES,
+  MASK_RETRY_WAIT_MS,
+  MASK_SLOW_MESSAGE,
+  MASK_TIMEOUT_MS,
   NEAREST_LIMIT,
   NEAREST_SEARCH_ZOOM,
   PAGE_CONCURRENCY,
@@ -14,6 +19,7 @@ import {
   PHOTO_API_TIMEOUT_MS,
   TILE_CONCURRENCY,
   TILE_TIMEOUT_MS,
+  photoFilterParams,
 } from './policy.js';
 
 /**
@@ -121,19 +127,32 @@ export function createLimiter(limit, { lifo = false } = {}) {
  * waits behind slow tiles or pages. The photo API answers 429 to more than
  * about three requests at once; a 429 (and a lookup that timed out) is
  * retried.
- * @param {{fetchImpl?: typeof fetch, apiHost?: string, retryBaseMs?: number}} [options]
+ * @param {{fetchImpl?: typeof fetch, apiHost?: string, retryBaseMs?: number, maskRetryMs?: number}} [options]
  */
 export function createKartaViewSource({
   fetchImpl = (...args) => globalThis.fetch(...args),
   apiHost = KARTAVIEW_API_HOST,
   retryBaseMs = PHOTO_API_RETRY_BASE_MS,
+  maskRetryMs = MASK_RETRY_WAIT_MS,
 } = {}) {
   const limiter = createLimiter(PHOTO_API_CONCURRENCY);
   const tileLimiter = createLimiter(TILE_CONCURRENCY);
   const pageLimiter = createLimiter(PAGE_CONCURRENCY, { lifo: true });
 
   /** GET JSON within `timeoutMs`; the caller's abort wins over the timeout. */
-  async function getJson(url, { signal, timeoutMs }) {
+  function getJson(url, { signal, timeoutMs }) {
+    return fetchBody(url, { signal, timeoutMs, as: 'json' });
+  }
+
+  /**
+   * GET a body within `timeoutMs`, at most `maxBytes` of it, as parsed JSON
+   * or (`as: 'bytes'`) a Uint8Array; the caller's abort wins over the
+   * timeout.
+   */
+  async function fetchBody(
+    url,
+    { signal, timeoutMs, as = 'json', maxBytes = MAX_RESPONSE_BYTES },
+  ) {
     const controller = new AbortController();
     const onAbort = () => controller.abort(signal.reason);
     if (signal?.aborted) throw signal.reason;
@@ -164,12 +183,14 @@ export function createKartaViewSource({
         new KartaViewSourceError('KartaView sent too much data', {
           status: response.status,
         });
-      if (length > MAX_RESPONSE_BYTES) throw tooMuch();
+      if (length > maxBytes) throw tooMuch();
       // KartaView answers chunked, without a length: count while reading.
       const reader = response.body?.getReader?.();
       if (!reader) {
         read = true;
         try {
+          if (as === 'bytes')
+            return new Uint8Array(await response.arrayBuffer());
           return await response.json();
         } catch (error) {
           if (controller.signal.aborted) throw error;
@@ -185,7 +206,7 @@ export function createKartaViewSource({
         const { done, value } = await reader.read();
         if (done) break;
         bytes += value.byteLength;
-        if (bytes > MAX_RESPONSE_BYTES) {
+        if (bytes > maxBytes) {
           reader.cancel().catch(() => {});
           throw tooMuch();
         }
@@ -197,6 +218,7 @@ export function createKartaViewSource({
         body.set(chunk, offset);
         offset += chunk.byteLength;
       }
+      if (as === 'bytes') return body;
       try {
         return JSON.parse(new TextDecoder().decode(body));
       } catch {
@@ -305,6 +327,41 @@ export function createKartaViewSource({
     },
 
     /**
+     * A filtered coverage tile as PNG bytes, `query` from tileFilterQuery
+     * (KartaView filters only its PNG tiles). It draws a filtered tile on
+     * demand; a dense one can outlast its own 60 s (504) and still be drawn,
+     * so a timeout or a 5xx is asked again a few seconds later.
+     */
+    async getTileMask({ x, y, z }, query, { signal } = {}) {
+      const url = `${apiHost}/2.0/sequence/tiles/${x}/${y}/${z}.png?${query}`;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          // Outside the gate between tries: a wait holds no connection.
+          return await tileLimiter.run(
+            () =>
+              fetchBody(url, {
+                signal,
+                timeoutMs: MASK_TIMEOUT_MS,
+                as: 'bytes',
+                maxBytes: MASK_MAX_BYTES,
+              }),
+            { signal },
+          );
+        } catch (error) {
+          if (signal?.aborted) throw error;
+          const drawing =
+            error?.timedOut === true || [502, 503, 504].includes(error?.status);
+          if (!drawing) throw error;
+          if (attempt >= MASK_ATTEMPTS)
+            throw new KartaViewSourceError(MASK_SLOW_MESSAGE, {
+              timedOut: true,
+            });
+          await wait(maskRetryMs, signal);
+        }
+      }
+    },
+
+    /**
      * Whether a photo file is there: true, false when it is gone (archived
      * photos answer 409, and a HEAD says 200 regardless), or null when the
      * storage did not say (timeout, network, 5xx). It GETs and stops at the
@@ -335,8 +392,11 @@ export function createKartaViewSource({
       }
     },
 
-    /** Photo records around a point, nearest first. */
-    async nearestPhotos({ lat, lon }, { signal } = {}) {
+    /**
+     * Photo records around a point, nearest first; with a resolved imagery
+     * `filter`, only those of its projection uploaded since its cut-off.
+     */
+    async nearestPhotos({ lat, lon, filter = null }, { signal } = {}) {
       const result = await photoApi(
         '/2.0/photo/',
         {
@@ -344,6 +404,7 @@ export function createKartaViewSource({
           lng: lon.toFixed(7),
           zoomLevel: String(NEAREST_SEARCH_ZOOM),
           itemsPerPage: String(NEAREST_LIMIT),
+          ...photoFilterParams(filter),
         },
         { signal },
       );

@@ -6,6 +6,8 @@ import {
   createLimiter,
 } from './source.js';
 import {
+  MASK_ATTEMPTS,
+  MASK_SLOW_MESSAGE,
   NEAREST_LIMIT,
   NEAREST_SEARCH_ZOOM,
   PHOTO_API_CONCURRENCY,
@@ -653,4 +655,74 @@ test('an answer turned away unread (an error, a 429, a length past the cap) lets
   assert.equal(signals[0].aborted, true);
   assert.equal(seen.cancelled, true);
   assert.equal(signals[1].aborted, false, 'a read answer is left alone');
+});
+
+test('a filtered tile comes as PNG bytes; KartaView still drawing it (504) is asked again, then given up', async () => {
+  const png = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+  const bytesOf = () => ({
+    ok: true,
+    status: 200,
+    headers: new Map(),
+    body: {
+      getReader: () => {
+        let given = false;
+        return {
+          read: async () =>
+            given
+              ? { done: true }
+              : ((given = true), { done: false, value: png }),
+          cancel: async () => {},
+        };
+      },
+    },
+  });
+  const urls = [];
+  let answers = [status(504), status(503), bytesOf()];
+  const source = createKartaViewSource({
+    maskRetryMs: 0,
+    fetchImpl: async (url) => {
+      urls.push(url);
+      return answers.shift();
+    },
+  });
+  const tile = { x: 13054, y: 8474, z: 14 };
+  assert.deepEqual(await source.getTileMask(tile, 'fieldOfView=360'), png);
+  assert.deepEqual(urls, [
+    'https://api.kartaview.org/2.0/sequence/tiles/13054/8474/14.png?fieldOfView=360',
+    'https://api.kartaview.org/2.0/sequence/tiles/13054/8474/14.png?fieldOfView=360',
+    'https://api.kartaview.org/2.0/sequence/tiles/13054/8474/14.png?fieldOfView=360',
+  ]);
+  // Still drawing after every try: given up, saying so.
+  urls.length = 0;
+  answers = Array.from({ length: 10 }, () => status(504));
+  await assert.rejects(source.getTileMask(tile, 'fieldOfView=360'), {
+    message: MASK_SLOW_MESSAGE,
+    timedOut: true,
+  });
+  assert.equal(urls.length, MASK_ATTEMPTS);
+  // A refusal is not asked again.
+  urls.length = 0;
+  answers = [status(400)];
+  await assert.rejects(source.getTileMask(tile, 'fieldOfView=360'), /HTTP 400/);
+  assert.equal(urls.length, 1);
+});
+
+test('a filtered nearest search asks KartaView for the projection and upload date', async () => {
+  const urls = [];
+  const source = createKartaViewSource({
+    fetchImpl: async (url) => {
+      urls.push(new URL(url));
+      return ok(photoPayload([]));
+    },
+  });
+  await source.nearestPhotos({
+    lat: 42.3314,
+    lon: -83.0458,
+    filter: { pano: 'pano', sinceMs: Date.UTC(2026, 0, 2, 12) },
+  });
+  await source.nearestPhotos({ lat: 42.3314, lon: -83.0458 });
+  assert.equal(urls[0].searchParams.get('projection'), 'SPHERE');
+  assert.equal(urls[0].searchParams.get('startDate'), '2026-01-02');
+  assert.equal(urls[1].searchParams.has('projection'), false);
+  assert.equal(urls[1].searchParams.has('startDate'), false);
 });

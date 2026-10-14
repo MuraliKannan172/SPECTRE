@@ -3,7 +3,10 @@ import test from 'node:test';
 import {
   MAX_LINE_POINTS,
   MAX_TILE_SEGMENTS,
+  chainSegments,
   decodeCoverageTile,
+  maskedSegments,
+  tileSegments,
 } from './decode.js';
 
 const at = (lng, lat) => ({ lat: String(lat), lng: String(lng) });
@@ -125,4 +128,60 @@ test('a tile is capped in segments and in points per line', () => {
   assert.ok(
     sequences.length >= Math.floor(MAX_TILE_SEGMENTS / MAX_LINE_POINTS),
   );
+});
+
+/** [lon, lat] at pixel (px, py) of a 512 px mask of `tile` (Web Mercator). */
+function lonLatAt(px, py, { x, y, z } = TILE, size = 512) {
+  const n = 2 ** z;
+  const lon = ((x + px / size) / n) * 360 - 180;
+  const my = Math.PI * (1 - (2 * (y + py / size)) / n);
+  const lat = (Math.atan(Math.sinh(my)) * 180) / Math.PI;
+  return [lon, lat];
+}
+
+/** A 512 px mask drawn on the given rows. */
+function rowsMask(rows) {
+  const alpha = new Uint8Array(512 * 512);
+  for (const [from, to] of rows) alpha.fill(255, from * 512, (to + 1) * 512);
+  return { width: 512, height: 512, alpha };
+}
+
+test('a mask keeps the segments it draws over, chained as before', () => {
+  const along = (row, from = 40, to = 470) => [
+    lonLatAt(from, row),
+    lonLatAt(to, row),
+  ];
+  const segments = [
+    along(100), // drawn at row 100
+    along(101.6), // a pixel off: still drawn within one pixel
+    along(300), // not drawn
+    // Two thirds along the drawn row, then off it: kept (at least half).
+    [lonLatAt(40, 100), lonLatAt(400, 100), lonLatAt(400, 280)],
+    // A third along it, then off: dropped.
+    [lonLatAt(300, 100), lonLatAt(400, 100), lonLatAt(400, 300)],
+    // Off the tile entirely: not this tile's to keep.
+    [lonLatAt(-200, 100), lonLatAt(-20, 100)],
+  ];
+  const kept = maskedSegments(segments, rowsMask([[99, 100]]), TILE);
+  assert.deepEqual(kept, [segments[0], segments[1], segments[3]]);
+  assert.deepEqual(maskedSegments(segments, rowsMask([]), TILE), []);
+  // A full mask keeps every segment that is on the tile.
+  assert.equal(maskedSegments(segments, rowsMask([[0, 511]]), TILE).length, 5);
+});
+
+test('decoding is segments then chaining: the same lines either way', () => {
+  const payload = {
+    lines: [
+      { track: [at(1, 1), at(2, 1)] },
+      { track: [at(2, 1), at(3, 1)] },
+      { track: [at(5, 5), at(6, 6)] },
+    ],
+  };
+  const segments = tileSegments(payload);
+  assert.equal(segments.length, 3);
+  assert.deepEqual(
+    chainSegments(segments, TILE),
+    decodeCoverageTile(payload, TILE),
+  );
+  assert.throws(() => tileSegments({}), /unreadable coverage tile/);
 });

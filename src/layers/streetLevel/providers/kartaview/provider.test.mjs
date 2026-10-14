@@ -6,6 +6,7 @@ import {
   kartaViewZoomFor,
 } from './index.js';
 import {
+  FILTERED_OUT_MESSAGE,
   NO_COVERAGE_HINT,
   SEQUENCE_PAGE_SIZE,
   TOO_HIGH_HINT,
@@ -36,13 +37,23 @@ function photoRecord(id, { metres = 0, seq = '14010', index = 0 } = {}) {
   };
 }
 
+/** KartaView's shotDate for `ms` ago. */
+const shotAgo = (ms) =>
+  new Date(Date.now() - ms).toISOString().replace('T', ' ').slice(0, 23);
+
 /**
  * A source over `sequences` (id → indexes present, in page order: KartaView
  * pages follow photo ids, which only roughly follow the index), recording
  * calls. Photos whose id is in `archived` answer 409.
  */
 function fakeSource({ nearest = [], sequences = {}, archived = [] } = {}) {
-  const calls = { nearest: 0, photo: [], pages: [], probes: [] };
+  const calls = {
+    nearest: 0,
+    nearestFilters: [],
+    photo: [],
+    pages: [],
+    probes: [],
+  };
   return {
     calls,
     probeImage: async (url) => {
@@ -50,8 +61,9 @@ function fakeSource({ nearest = [], sequences = {}, archived = [] } = {}) {
       return !archived.some((id) => url.includes(`/${id}.jpg`));
     },
     getTile: async () => ({ lines: [] }),
-    nearestPhotos: async () => {
+    nearestPhotos: async ({ filter }) => {
       calls.nearest++;
+      calls.nearestFilters.push(filter);
       return nearest;
     },
     getPhoto: async (id) => {
@@ -80,12 +92,13 @@ function fakeSource({ nearest = [], sequences = {}, archived = [] } = {}) {
 }
 
 function fakeContext({ filter = { pano: 'all', sinceMs: null } } = {}) {
-  const actions = { opened: [], nearest: [], instance: null };
+  // `actions.filter` is the resolved filter now; a test may change it.
+  const actions = { opened: [], nearest: [], instance: null, filter };
   return {
     actions,
     context: {
       services: {},
-      getFilter: () => filter,
+      getFilter: () => actions.filter,
       isActive: () => true,
       groundCaster: null,
       meshSampler: null,
@@ -105,11 +118,12 @@ function fakeContext({ filter = { pano: 'all', sinceMs: null } } = {}) {
   };
 }
 
-function setup(sourceOptions, contextOptions) {
+function setup(sourceOptions, contextOptions, { readMask } = {}) {
   const source = fakeSource(sourceOptions);
   const loads = [];
   const definition = createKartaViewProvider({
     source,
+    readMask,
     viewerOptions: {
       load: async (url) => {
         loads.push(url);
@@ -128,12 +142,12 @@ function setup(sourceOptions, contextOptions) {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-test('KartaView registers keyless, off by default, with no filters and its own wording', () => {
+test('KartaView registers keyless, off by default, with Mapillary’s filters and its own wording', () => {
   const { definition } = setup();
   assert.equal(definition.id, 'kartaview');
   assert.equal(definition.requiresKeyId, null);
   assert.equal(definition.defaultOn, false);
-  assert.deepEqual(definition.filters, []);
+  assert.deepEqual(definition.filters, ['pano', 'since']);
   assert.equal(
     definition.highlightsSequence,
     false,
@@ -193,6 +207,38 @@ test('the nearest photo is the closest within 50 m, and opening it asks nothing 
     await none.instance.nearestImage({ lat: 42.3314, lon: -83.0458 }),
     null,
   );
+});
+
+test('the nearest photo passes the imagery filter by its capture date; none passing says so', async () => {
+  const since = Date.now() - 86_400_000;
+  const filter = { pano: 'pano', sinceMs: since };
+  // KartaView filters the search by upload date: an old capture uploaded
+  // today still comes back, and is held to its capture date here.
+  const pano = (id, metres, shot) => ({
+    ...photoRecord(id, { metres }),
+    projection: 'SPHERE',
+    fieldOfView: '360',
+    shotDate: shot,
+  });
+  const { instance, source } = setup(
+    {
+      nearest: [
+        pano('old', 5, '2016-08-23 20:17:47.000'),
+        pano('new', 20, shotAgo(3_600_000)),
+      ],
+    },
+    { filter },
+  );
+  const at = { lat: 42.3314, lon: -83.0458 };
+  assert.equal(await instance.nearestImage(at), 'new');
+  assert.deepEqual(source.calls.nearestFilters, [filter]);
+  const old = setup(
+    { nearest: [pano('old', 5, '2016-08-23 20:17:47.000')] },
+    { filter },
+  );
+  await assert.rejects(old.instance.nearestImage(at), {
+    message: FILTERED_OUT_MESSAGE,
+  });
 });
 
 test('a cone opens its photo; a line opens the photo nearest the click', () => {
@@ -617,34 +663,72 @@ test('the cones re-centre when ‹ › walk off the page they were drawn from', 
   );
 });
 
-test('a leftover imagery filter hides no cones: flat, undated photos still draw', async (t) => {
+test('the imagery filter thins the cones by each photo’s capture date and projection', async (t) => {
   const env = await mounted(
     { sequences: { s: [0, 1, 2, 3] } },
     { filter: { pano: 'pano', sinceMs: Date.now() - 86_400_000 } },
   );
-  // Undated records: no capture time to pass a "since" filter with.
-  const undated = (record) => ({ ...record, shotDate: '', dateAdded: '' });
+  // 0 and 1: 360° photos taken an hour ago; 2 and 3: flat ones from 2016.
+  const shaped = (record) =>
+    Number(record.sequenceIndex) < 2
+      ? {
+          ...record,
+          projection: 'SPHERE',
+          fieldOfView: '360',
+          shotDate: shotAgo(3_600_000),
+        }
+      : record;
   const getPhoto = env.source.getPhoto;
-  env.source.getPhoto = async (id) => undated(await getPhoto(id));
+  env.source.getPhoto = async (id) => shaped(await getPhoto(id));
   const getPage = env.source.getSequencePhotos;
   env.source.getSequencePhotos = async (...args) => {
     const page = await getPage(...args);
-    return { ...page, photos: page.photos.map(undated) };
+    return { ...page, photos: page.photos.map(shaped) };
   };
   const cones = await withCones(t, env);
   await env.instance.viewer.open('s-1');
   await env.instance.selectSequence('s');
   assert.ok(await until(() => !env.instance.sequenceStats().loading));
-  assert.equal(env.instance.sequenceStats().images, 4);
-  assert.equal(cones.count(), 4, 'every cone drawn');
+  assert.equal(env.instance.sequenceStats().images, 4, 'the drive is whole');
+  assert.equal(cones.count(), 2, 'the recent 360° photos');
+  assert.deepEqual(cones(), [0, 1]);
+  env.actions.filter = { pano: 'flat', sinceMs: null };
+  env.instance.setFilter();
+  assert.deepEqual(cones(), [2, 3], 'the flat ones');
+  env.actions.filter = { pano: 'all', sinceMs: null };
+  env.instance.setFilter();
+  assert.equal(cones.count(), 4, 'every cone, unfiltered');
 });
 
 /**
  * The provider drawing coverage on a stand-in viewer above one z14 tile.
  * `lines` are the tile's tracks as [lon, lat] pairs; `getTile` may be held.
  */
-function coverageSetup(t, { lines = [], filter, height = 900 } = {}) {
-  const env = setup({}, { filter });
+function coverageSetup(
+  t,
+  { lines = [], filter, height = 900, drawnRows = () => [] } = {},
+) {
+  // A filtered tile's mask: 512 px square, drawn on the rows
+  // `drawnRows(query)` lists as [from, to].
+  const env = setup(
+    {},
+    { filter },
+    {
+      readMask: async ({ query }) => {
+        const alpha = new Uint8Array(512 * 512);
+        for (const [from, to] of drawnRows(query))
+          alpha.fill(255, from * 512, (to + 1) * 512);
+        return { width: 512, height: 512, alpha };
+      },
+    },
+  );
+  const masks = [];
+  let maskHold = null;
+  env.source.getTileMask = async (tile, query) => {
+    masks.push(query);
+    await maskHold;
+    return { query };
+  };
   const centre = tileCentre(-83.0458, 42.3314);
   const viewer = coverageViewer(
     { lon: centre.lon, lat: centre.lat, height },
@@ -671,6 +755,15 @@ function coverageSetup(t, { lines = [], filter, height = 900 } = {}) {
     viewer,
     centre,
     tiles,
+    masks,
+    holdMasks() {
+      let release;
+      maskHold = new Promise((resolve) => (release = resolve));
+      return () => {
+        maskHold = null;
+        release();
+      };
+    },
     holdTiles() {
       let release;
       hold = new Promise((resolve) => (release = resolve));
@@ -682,20 +775,59 @@ function coverageSetup(t, { lines = [], filter, height = 900 } = {}) {
   };
 }
 
-test('a leftover imagery filter hides no KartaView line', async (t) => {
-  const { instance, viewer, centre } = coverageSetup(t, {
-    filter: { pano: 'pano', sinceMs: Date.now() - 86_400_000 },
-    lines: [
-      [
-        [-83.0458 - 0.001, 42.3314],
-        [-83.0458 + 0.001, 42.3314],
-      ],
-    ],
+test('a filter thins the lines to those its PNG mask draws; without one they all show', async (t) => {
+  const { lon, lat } = tileCentre(-83.0458, 42.3314);
+  // Across the tile's middle row (mask row ~256), and a quarter up (~130).
+  const across = (at) => [
+    [lon - 0.001, at],
+    [lon + 0.001, at],
+  ];
+  const env = coverageSetup(t, {
+    filter: { pano: 'pano', sinceMs: null },
+    lines: [across(lat), across(lat + 0.004)],
+    // 360° photos lie on the middle line only.
+    drawnRows: (query) => (query === 'fieldOfView=360' ? [[254, 258]] : []),
   });
-  assert.ok(centre);
-  instance.activate(viewer);
-  assert.ok(await until(() => instance.coverageStats().count === 1));
-  assert.equal(instance.coverageStats().hint, '');
+  env.instance.activate(env.viewer);
+  assert.ok(await until(() => env.instance.coverageStats().count === 1));
+  assert.deepEqual(env.masks, ['fieldOfView=360']);
+  // Unfiltered: every line, and the tile's lines are not asked for again.
+  env.actions.filter = { pano: 'all', sinceMs: null };
+  env.instance.setFilter();
+  assert.ok(await until(() => env.instance.coverageStats().count === 2));
+  assert.equal(env.tiles.length, 1, 'the segments are kept');
+  // SINCE a day: uploaded since yesterday (UTC) — none here. The lines
+  // drawn now stay on the globe while KartaView draws the filtered tile.
+  const since = Date.now() - 86_400_000;
+  const release = env.holdMasks();
+  env.actions.filter = { pano: 'all', sinceMs: since };
+  env.instance.setFilter();
+  assert.ok(await until(() => env.instance.coverageStats().loading));
+  assert.ok(
+    env.viewer.scene.groundPrimitives.items.size > 0,
+    'the unfiltered lines show meanwhile',
+  );
+  release();
+  assert.ok(
+    await until(
+      () =>
+        !env.instance.coverageStats().loading &&
+        env.instance.coverageStats().count === 0,
+    ),
+  );
+  assert.equal(
+    env.masks.at(-1),
+    `startDate=${new Date(since).toISOString().slice(0, 10)}`,
+  );
+  assert.equal(env.instance.coverageStats().hint, NO_COVERAGE_HINT);
+  assert.ok(
+    await until(() => env.viewer.scene.groundPrimitives.items.size === 0),
+    'and go once it is in',
+  );
+  // The same filter again asks KartaView for nothing.
+  env.instance.setFilter();
+  for (let i = 0; i < 5; i++) await settle();
+  assert.equal(env.masks.length, 2);
 });
 
 test('coverage hints: zoom in from too high, “no photos” only once an empty view has loaded', async (t) => {

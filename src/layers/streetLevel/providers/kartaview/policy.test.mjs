@@ -7,7 +7,9 @@ import {
   kartaViewPhotoUrl,
   kartaViewTimeMs,
   normalizePhoto,
+  photoFilterParams,
   resizedImageUrl,
+  tileFilterQuery,
 } from './policy.js';
 
 /** A photo record as /2.0/photo returns it (trimmed to what is read). */
@@ -279,4 +281,29 @@ test('the camera looks along the drive: each photo’s course points to the next
     Math.abs(bearingBetween({ lon: 0, lat: 0 }, { lon: 0, lat: -1 }) - 180) <
       1e-9,
   );
+});
+
+test('the imagery filter becomes KartaView’s tile query and photo-search params', () => {
+  // 2026-03-05 23:30 UTC: the cut-off day is the UTC one.
+  const sinceMs = Date.UTC(2026, 2, 5, 23, 30);
+  assert.equal(tileFilterQuery(null), '');
+  assert.equal(tileFilterQuery({ pano: 'all', sinceMs: null }), '');
+  assert.equal(
+    tileFilterQuery({ pano: 'pano', sinceMs: null }),
+    'fieldOfView=360',
+  );
+  assert.equal(
+    tileFilterQuery({ pano: 'flat', sinceMs }),
+    'fieldOfView=plane&startDate=2026-03-05',
+  );
+  assert.equal(tileFilterQuery({ pano: 'all', sinceMs: 0 }), '');
+  // The search ignores fieldOfView; its projection filters instead.
+  assert.deepEqual(photoFilterParams({ pano: 'all', sinceMs: null }), {});
+  assert.deepEqual(photoFilterParams({ pano: 'pano', sinceMs }), {
+    projection: 'SPHERE',
+    startDate: '2026-03-05',
+  });
+  assert.deepEqual(photoFilterParams({ pano: 'flat', sinceMs: null }), {
+    projection: 'PLANE',
+  });
 });
