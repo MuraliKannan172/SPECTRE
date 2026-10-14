@@ -15,8 +15,6 @@
   the five borough cores load and `CCTV_NYC_MAX_SOURCES` changes the cap. The catalog-wide ceiling is
   unchanged; extra cameras share it round-robin with the other packs.
 
-- Cancelled tool calls refuse actions before execution and discard results that settle after cancellation.
-
 - Cancelled catalog queries refuse execution when their signal is already aborted.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
