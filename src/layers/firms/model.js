@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium';
-import { t } from '../../i18n/index.js';
+import { formatNumber, t } from '../../i18n/index.js';
 import {
   satelliteShortName,
   fireDetectionKey,
@@ -351,10 +351,10 @@ export function createModel({
       cullPosition: fireCullPosition(fire),
       gapPx: frpPixelSize(fire.frp),
       accent: accentForSeverity(detectionColorStop(fire).name),
-      title: t('FIRE · {frp} MW', { frp: formatFrp(fire.frp) }),
+      title: t('FIRE · {frp} MW', { frp: formatFrpLabel(fire.frp) }),
       details: [
         meta.join(' · '),
-        formatLatLon(fire.lat, fire.lon) +
+        formatLatLonLabel(fire.lat, fire.lon) +
           (fire.night ? ` · ${t('NIGHT')}` : ''),
       ],
       selected: true,
@@ -388,7 +388,7 @@ export function createModel({
       cullPosition: candidate.cullPosition || candidate.position,
       gapPx: frpPixelSize(fire.frp),
       accent: accentForSeverity(detectionColorStop(fire).name),
-      title: t('▲ {frp} MW', { frp: formatFrp(fire.frp) }),
+      title: t('▲ {frp} MW', { frp: formatFrpLabel(fire.frp) }),
       details: [meta.join(' · ')],
       selected: false,
       priority: Number(fire.frp) || 0,
@@ -407,7 +407,7 @@ export function createModel({
   function buildCellCard(candidate, nowMs) {
     const cell = candidate.cell;
     const noun = cell.count === 1 ? t('FIRE') : t('FIRES');
-    const parts = [t('max {value} MW', { value: formatFrp(cell.maxFrp) })];
+    const parts = [t('max {value} MW', { value: formatFrpLabel(cell.maxFrp) })];
     if (cell.newestAcqMs > 0) {
       const age = formatAgeLabel(nowMs - cell.newestAcqMs);
       if (age) parts.push(t('new {value}', { value: age }));
@@ -481,6 +481,37 @@ export function createModel({
 
   function formatFrp(frp) {
     return frp >= 10 ? frp.toFixed(0) : frp.toFixed(1);
+  }
+
+  /** formatFrp for a card, with the locale's decimal separator ("4,9"). */
+
+  function formatFrpLabel(frp) {
+    const digits = frp >= 10 ? 0 : 1;
+    return formatNumber(frp, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+      useGrouping: false,
+    });
+  }
+
+  /** formatLatLon for a card: "8,389° ю. ш. 44,162° з. д." in Russian. */
+
+  function formatLatLonLabel(lat, lon) {
+    const amount = (value) =>
+      formatNumber(Math.abs(value), {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+        useGrouping: false,
+      });
+    const latPart =
+      lat >= 0
+        ? t('{value}°N', { value: amount(lat) })
+        : t('{value}°S', { value: amount(lat) });
+    const lonPart =
+      lon >= 0
+        ? t('{value}°E', { value: amount(lon) })
+        : t('{value}°W', { value: amount(lon) });
+    return `${latPart} ${lonPart}`;
   }
 
   /** Millisecond delta → "<1h" / "Xh" / "Xd", or '' for invalid input. */
