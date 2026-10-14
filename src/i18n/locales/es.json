@@ -956,6 +956,14 @@
   "Open {names} at the centre of the view": "Abre {names} en el centro de la vista",
   "Zoom in to a street to open {names} here": "Acércate a una calle para abrir {names} aquí",
   "OPEN STREET VIEW": "ABRIR STREET VIEW",
+  "zoom in to see KartaView coverage": "acércate para ver la cobertura de KartaView",
+  "no KartaView photos in view": "no hay fotos de KartaView a la vista",
+  "{names}: by upload date": "{names}: por fecha de subida",
+  "{n} streets in view · click a line for its nearest photo": {
+    "one": "{n} calle a la vista · haz clic en una línea para su foto más cercana",
+    "many": "{n} calles a la vista · haz clic en una línea para su foto más cercana",
+    "other": "{n} calles a la vista · haz clic en una línea para su foto más cercana"
+  },
   "Camera follows view: move the globe camera wherever the street-level view looks": "La cámara sigue la vista: mueve la cámara del globo hacia donde mira la vista a pie de calle",
   "Camera follow needs the Google 3D map: choose Google 3D under MAP SOURCE": "Seguir con la cámara requiere el mapa Google 3D: elige Google 3D en FUENTE DEL MAPA",
   "Switch a provider on to draw its coverage.": "Activa un proveedor para dibujar su cobertura.",

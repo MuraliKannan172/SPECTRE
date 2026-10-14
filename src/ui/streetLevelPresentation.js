@@ -211,18 +211,28 @@ function presentMeta(state) {
           { n: formatNumber(state.sequence.images) },
         );
   const hint = state.coverage.hint ? t(state.coverage.hint) : '';
-  if (state.coverage.count > 0)
-    return [
-      tn(
-        state.coverage.count,
-        '{n} sequence in view · click a line for its photos',
-        '{n} sequences in view · click a line for its photos',
-        { n: formatNumber(state.coverage.count) },
-      ),
-      hint,
-    ]
-      .filter(Boolean)
-      .join(' · ');
+  if (state.coverage.count > 0) {
+    // A provider whose lines are not sequences carries its wording as data
+    // (coverageLabel); its count line needs its own tn pair so every language
+    // gets real plural forms. New wording: add a pair here and to the catalogs.
+    const count = state.coverage.count;
+    const n = () => formatNumber(count);
+    const countLine =
+      state.coverage.label?.noun === 'streets'
+        ? tn(
+            count,
+            '{n} street in view · click a line for its nearest photo',
+            '{n} streets in view · click a line for its nearest photo',
+            { n: n() },
+          )
+        : tn(
+            count,
+            '{n} sequence in view · click a line for its photos',
+            '{n} sequences in view · click a line for its photos',
+            { n: n() },
+          );
+    return [countLine, hint].filter(Boolean).join(' · ');
+  }
   return hint;
 }
 
@@ -249,6 +259,7 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
       since: state.filterControls?.since !== false,
     },
     since: presentSince(filter.sinceDays, now),
+    sinceNote: state.sinceNote || null,
     legend: state.legend || [],
     viewer: presentViewer(state),
     meta: presentMeta(state),

@@ -965,6 +965,15 @@
   "Open {names} at the centre of the view": "Откройте {names} в центре вида",
   "Zoom in to a street to open {names} here": "Приблизьтесь к улице, чтобы открыть {names} здесь",
   "OPEN STREET VIEW": "ОТКРЫТЬ STREET VIEW",
+  "zoom in to see KartaView coverage": "приблизьтесь, чтобы увидеть покрытие KartaView",
+  "no KartaView photos in view": "фотографий KartaView в зоне видимости нет",
+  "{names}: by upload date": "{names}: по дате загрузки",
+  "{n} streets in view · click a line for its nearest photo": {
+    "one": "{n} улица в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",
+    "few": "{n} улицы в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",
+    "many": "{n} улиц в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",
+    "other": "{n} улицы в кадре · щёлкните линию, чтобы открыть ближайшую фотографию"
+  },
   "Camera follows view: move the globe camera wherever the street-level view looks": "Камера следует за видом: камера глобуса поворачивается туда, куда смотрит уличный снимок",
   "Camera follow needs the Google 3D map: choose Google 3D under MAP SOURCE": "Слежению камеры нужна карта Google 3D: выберите Google 3D в разделе «ИСТОЧНИК КАРТЫ»",
   "Switch a provider on to draw its coverage.": "Включите источник, чтобы показать его покрытие.",
