@@ -24,6 +24,9 @@
   the five borough cores load and `CCTV_NYC_MAX_SOURCES` changes the cap. The catalog-wide ceiling is
   unchanged; extra cameras share it round-robin with the other packs.
 
+- Street Level counts unique tiles before ranking so overlapping dateline halves
+  in polar views do not waste slots in the 16-tile overview budget.
+
 - Directions no longer shows a truncation notice for a route with exactly 200
   turns, and a roundabout at the 200th turn keeps its exit distance.
 
