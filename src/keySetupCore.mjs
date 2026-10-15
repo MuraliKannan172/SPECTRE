@@ -28,7 +28,7 @@ export const KEY_SETUP_APPEND_HEADER =
  * Provider credentials, in display order — most magic per
  * minute first. `tier` mirrors the README's color legend: 'metered' (🔴) is a
  * billing-enabled account, 'free' (🟡) is a register-and-paste key.
- * `clientExposed` marks the two keys that are injected into the browser
+ * `clientExposed` marks the keys that are injected into the browser
  * bundle by design (restrict them at the provider, per SECURITY.md).
  * `hidden` keeps advanced configuration out of the panel and missing-key count.
  */
@@ -36,7 +36,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   Object.freeze({
     id: 'google-maps',
     title: 'GOOGLE MAPS',
-    unlocks: 'The photorealistic 3D planet + place search',
+    unlocks: 'The photorealistic 3D planet, place search + Street View',
     getUrl: 'https://developers.google.com/maps/documentation/tile/get-api-key',
     envVars: Object.freeze(['GOOGLE_MAPS_API_KEY']),
     tier: 'metered',
@@ -55,7 +55,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   Object.freeze({
     id: 'openai',
     title: 'OPENAI',
-    unlocks: 'Voice control — talk to the planet',
+    unlocks: 'Voice control — API key or ChatGPT OAuth',
     getUrl: 'https://platform.openai.com/api-keys',
     envVars: Object.freeze(['OPENAI_API_KEY']),
     tier: 'metered',
@@ -80,7 +80,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
     id: 'tomtom',
     title: 'TOMTOM',
     unlocks: 'Real live traffic (keyless runs a simulation)',
-    getUrl: 'https://developer.tomtom.com',
+    getUrl: 'https://my.tomtom.com/keys',
     envVars: Object.freeze(['TOMTOM_API_KEY']),
     tier: 'free',
   }),
@@ -100,6 +100,16 @@ export const KEY_SETUP_KEYS = Object.freeze([
     getUrl: 'https://opensky-network.org',
     envVars: Object.freeze(['OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET']),
     tier: 'free',
+  }),
+  Object.freeze({
+    id: 'mapillary',
+    title: 'MAPILLARY',
+    unlocks:
+      'Street-level imagery and coverage in the Street Level layer. Free: register an app in the Mapillary developer dashboard and paste its Client Token',
+    getUrl: 'https://www.mapillary.com/dashboard/developers',
+    envVars: Object.freeze(['MAPILLARY_CLIENT_TOKEN']),
+    tier: 'free',
+    clientExposed: true,
   }),
   Object.freeze({
     id: 'launch-library',
@@ -340,6 +350,28 @@ export function keySetupRequirement(id) {
   const entry = KEY_SETUP_KEYS.find((candidate) => candidate.id === id);
   if (!entry || entry.hidden) return '';
   return `Needs ${entry.envVars.join(' + ')} — add it in Provider Settings`;
+}
+
+/**
+ * Key guidance that also names switched-off sources whose key is already set.
+ * @param {string} requirement What `keySetupRequirement` said ('' allowed).
+ * @param {Array<{label: string, requiresKeyId?: string|null}>} [alternatives]
+ */
+export function keySetupWithAlternatives(requirement, alternatives = []) {
+  const options = alternatives.map(({ label, requiresKeyId }) => {
+    const entry = KEY_SETUP_KEYS.find(
+      (candidate) => candidate.id === requiresKeyId,
+    );
+    const name = entry
+      ? entry.title
+          .toLowerCase()
+          .replace(/\b\w/g, (letter) => letter.toUpperCase())
+      : null;
+    return name ? `light ${label} to use your ${name} key` : `light ${label}`;
+  });
+  if (!options.length) return requirement;
+  const offer = `or ${options.join(', or ')}`;
+  return requirement ? `${requirement}, ${offer}` : offer.replace(/^or l/, 'L');
 }
 
 /**
