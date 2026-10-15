@@ -165,6 +165,10 @@ const FEED_ERROR_PATTERNS = [
     ([, status]) => t('KartaView answered HTTP {status}', { status }),
   ],
   [
+    /^Panoramax answered HTTP (\d+)$/,
+    ([, status]) => t('Panoramax answered HTTP {status}', { status }),
+  ],
+  [
     /^KartaView refused the request \(code (-?\d+)\)$/,
     ([, code]) => t('KartaView refused the request (code {code})', { code }),
   ],

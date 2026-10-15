@@ -69,7 +69,7 @@ export function createWeatherLayer({
   const satellite = !radar && !lightning;
   let product = radar ? 'radar' : lightning ? 'lightning' : 'clouds-regional';
   let opacity = 'strong';
-  let infrared = 'filtered';
+  let infrared = 100;
   let viewer = null,
     rendering = null,
     manifest = null,
@@ -405,11 +405,20 @@ export function createWeatherLayer({
       }
     },
     setParams(params = {}) {
+      const nextInfrared = satellite
+        ? params.infrared === 'full'
+          ? 0
+          : params.infrared === 'filtered'
+            ? 100
+            : params.infrared
+        : null;
       const infraredChanged =
         satellite &&
-        ['filtered', 'full'].includes(params.infrared) &&
-        params.infrared !== infrared;
-      if (infraredChanged) infrared = params.infrared;
+        Number.isInteger(nextInfrared) &&
+        nextInfrared >= 0 &&
+        nextInfrared <= 100 &&
+        nextInfrared !== infrared;
+      if (infraredChanged) infrared = nextInfrared;
       if (['light', 'strong'].includes(params.opacity)) {
         opacity = params.opacity;
         rendering?.setAlpha(opacity === 'light' ? 0.4 : satellite ? 0.7 : 0.8);
@@ -677,18 +686,20 @@ export function createWeatherLayer({
                 {
                   id: 'filtered',
                   label: t('Clouds only'),
-                  active: infrared === 'filtered',
-                  params: { infrared: 'filtered' },
+                  active: infrared === 100,
+                  params: { infrared: 100 },
                   title: t(
-                    'Dim everything but the bright, cold cloud tops; a brightness filter, not a cloud mask',
+                    'Apply the full cloud brightness key; 100% filter strength',
                   ),
                 },
                 {
                   id: 'full',
                   label: t('Full'),
-                  active: infrared === 'full',
-                  params: { infrared: 'full' },
-                  title: t('The complete infrared image at the chosen opacity'),
+                  active: infrared === 0,
+                  params: { infrared: 0 },
+                  title: t(
+                    'Show the complete infrared image; 0% filter strength',
+                  ),
                 },
               ]
             : []),
@@ -750,7 +761,21 @@ export function createWeatherLayer({
               {
                 id: 'image',
                 label: t('IMAGE'),
-                chips: controls.chips.filter(({ params }) => params.infrared),
+                chips: controls.chips.filter(
+                  ({ params }) => params.infrared !== undefined,
+                ),
+                range: {
+                  id: 'cloud-filter',
+                  param: 'infrared',
+                  min: 0,
+                  max: 100,
+                  step: 1,
+                  value: infrared,
+                  label: t('FILTER'),
+                  unit: '%',
+                  ariaLabel: t('Cloud filter strength'),
+                  commitOnChange: true,
+                },
               },
             ]
           : []),
