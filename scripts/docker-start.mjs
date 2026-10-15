@@ -105,12 +105,19 @@ async function start() {
     );
   }
 
+  const fromOperator = Boolean(
+    String(process.env.GEV_KEY_SETUP_TRUSTED_PEERS ?? '').trim(),
+  );
   const trustedPeers = resolveTrustedPeers({ routeTable: readRouteTable() });
   if (trustedPeers) {
     // Set before Vite is imported: the dev server snapshots process.env during
     // configuration, and the admission gate reads it per request.
     process.env.GEV_KEY_SETUP_TRUSTED_PEERS = trustedPeers;
-    console.log(`[Docker] Provider Settings trusts the container gateway (${trustedPeers}).`);
+    console.log(
+      fromOperator
+        ? `[Docker] Provider Settings trusted peers: ${trustedPeers} (GEV_KEY_SETUP_TRUSTED_PEERS).`
+        : `[Docker] Provider Settings trusts the container gateway (${trustedPeers}).`,
+    );
   } else {
     console.log('[Docker] No default gateway; Provider Settings stays loopback-only.');
   }

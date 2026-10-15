@@ -171,7 +171,11 @@ Open **`http://localhost:4173`** as above. Everything the app saves stays in the
 
 Back up that folder and you've backed up everything; delete `.env` to forget your keys. Source edits still hot-reload. The port is published to `127.0.0.1` only, so the default matches the native one.
 
+The local MCP server and ChatGPT OAuth voice are not available under Docker; use an OpenAI API key for voice.
+
 Publishing it wider is the [Sharing an instance](#-sharing-an-instance) opt-in, and it hands out **Provider Settings** too: the launcher trusts the container gateway as this machine, and a wider publish delivers everyone else from that same address. For an instance you mean to share, put the keys in `.env` by hand instead. [SECURITY.md](SECURITY.md) has the detail.
+
+When you widen the publish, also set `GEV_KEY_SETUP_TRUSTED_PEERS=none` so the launcher trusts no gateway address.
 
 <details>
 <summary>Running on Linux, a NAS, or behind a reverse proxy</summary>

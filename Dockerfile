@@ -3,11 +3,11 @@
 # The dev server is the whole app: Vite serves the client AND runs the API
 # proxies (ADS-B, AIS, Overpass, OpenAI Realtime, ...) as middleware, so there
 # is nothing else to containerise. See compose.yaml for the usual entry point.
-FROM node:24-slim
+# Same Node as CI (package.json engines, .github/workflows), pinned by digest.
+FROM node:24.14.0-slim@sha256:d8e448a56fc63242f70026718378bd4b00f8c82e78d20eefb199224a4d8e33d8
 
 # Puppeteer is only used by the QA scripts; skip its ~150MB Chromium download.
 ENV PUPPETEER_SKIP_DOWNLOAD=1
-WORKDIR /app
 
 # `npm test` builds fixtures with `git init`, so the suite cannot run in a
 # container without it (71 failures on node:24-slim, all ENOENT on git).
@@ -18,19 +18,24 @@ RUN apt-get update   && apt-get install -y --no-install-recommends git   && rm -
 # git. It is the user's own checkout, so trust that one path.
 RUN git config --system --add safe.directory /app
 
-COPY package.json package-lock.json ./
+# Never run as root. The image's own user is `node` (1000); compose overrides
+# it with the host user so bind-mounted files stay yours.
+WORKDIR /app
+RUN chown node:node /app
+USER node
+
+COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci
-# compose runs the container as the host user so bind-mounted files stay
-# yours, but node_modules is baked in as root. Vite only needs to write its
-# dep-optimizer cache, so open up those two directories rather than chowning
-# a few hundred MB to a UID we cannot know at build time.
+# node_modules belongs to `node`, but compose may run as another UID. Vite only
+# needs to write its dep-optimizer cache, so open up those two directories
+# rather than chowning a few hundred MB to a UID we cannot know at build time.
 RUN mkdir -p node_modules/.vite && chmod 777 node_modules node_modules/.vite
 
-COPY . .
+COPY --chown=node:node . .
 
-# Bind to all interfaces, otherwise the published port hits nothing. Vite also
-# relaxes allowedHosts when HOST is 0.0.0.0, which is what lets the browser
-# reach it as "localhost".
+# Bind to all interfaces, otherwise the published port hits nothing. This does
+# not widen the Host allowlist: IP addresses and localhost are accepted, other
+# names only via GEV_ALLOWED_HOSTS (see build/allowedHosts.js).
 ENV HOST=0.0.0.0
 ENV PORT=4173
 EXPOSE 4173

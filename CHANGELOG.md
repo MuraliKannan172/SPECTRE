@@ -235,9 +235,10 @@
   [TheSmokeDev](https://github.com/TheSmokeDev) for the credential handling
   from #653.
 
-- **Docker install path.** `docker compose up` builds the pinned Node image and
-  serves the app on `http://localhost:4173` with no local Node install. The repo
-  is bind-mounted and the container runs as the host user, so `.env`,
+- **Docker install path.** `docker compose up` builds on CI's Node 24.14.0 image,
+  pinned by digest, and serves the app on `http://localhost:4173` with no local
+  Node install. The repo is bind-mounted and the container runs as the host user
+  (never root), so `.env`,
   `.gev-cache`, and `.gev-logs` persist on the host exactly as they do under
   `npm run dev` — Provider Settings included. The launcher
   (`scripts/docker-start.mjs`) trusts the container's gateway address for that
