@@ -251,14 +251,19 @@ export const CATALONIA_CAMERAS_URL =
 /** Byte ceiling for the Catalonia catalog read (~90 KB observed 2026-09-27),
  * so a runaway body cannot be buffered without limit. */
 export const CATALONIA_MAX_CATALOG_BYTES = 1024 * 1024;
-/** Allowed image hosts, one per kept `font` publisher in the feed. */
+/** Allowed image hosts, one per kept `font` publisher in the feed, each
+ * mapped to the one directory its frame links live in (every link in the
+ * 2026-10 feed shares it); a link must name a single file directly inside. */
 export const CATALONIA_IMAGE_HOSTS = Object.freeze(
-  new Set([
-    'mct.gencat.cat', // SCT
-    'www.bcn.cat', // IMI (Ajuntament de Barcelona)
-    'emap.terrassa.cat', // Ajuntament de Terrassa
+  new Map([
+    ['mct.gencat.cat', '/mct2bo/'], // SCT
+    ['www.bcn.cat', '/transit/imatges/'], // IMI (Ajuntament de Barcelona)
+    ['emap.terrassa.cat', '/it_terrassa/'], // Ajuntament de Terrassa
   ]),
 );
+/** SCT `sctidcam` values: a bare image filename, which also keys the camera
+ * id (the feed's `fid` embeds an upstream server-start stamp). */
+export const CATALONIA_SCT_CAMERA_FILE_RE = /^[a-z0-9]+\.(gif|jpe?g)$/i;
 /** Per-`font` partner credit, shown beside the provider in the CCTV panel
  * (same pattern as DriveBC's partner-supplied cameras). SCT is the feed's
  * own publisher and carries no separate credit. */

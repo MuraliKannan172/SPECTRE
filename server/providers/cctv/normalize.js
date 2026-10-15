@@ -406,16 +406,24 @@ export function isLikelyCataloniaCoordinate(lat, lon) {
 }
 
 /**
- * Decode decimal numeric HTML character references ("&#237;" -> "í"), the
- * entity form the Catalonia feed uses for accented place names, plus the
- * handful of named entities XML/HTML text commonly carries.
+ * Decode numeric HTML character references, decimal ("&#237;") and hex
+ * ("&#xED;") alike, the entity form the Catalonia feed uses for accented
+ * place names, plus the handful of named entities XML/HTML text commonly
+ * carries. A reference that names no valid character (NUL, a surrogate, or
+ * anything past U+10FFFF) is left as written rather than thrown on, so one
+ * bad field cannot fail a whole catalog.
  *
  * @param {string} text
  * @returns {string}
  */
 export function decodeNumericEntities(text) {
   return String(text || '')
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#(?:x([0-9a-f]+)|(\d+));/gi, (match, hex, dec) => {
+      const code = hex ? Number.parseInt(hex, 16) : Number(dec);
+      const valid =
+        code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+      return valid ? String.fromCodePoint(code) : match;
+    })
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")

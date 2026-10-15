@@ -58,6 +58,7 @@ import {
   CATALONIA_CAMERAS_URL,
   CATALONIA_MAX_CATALOG_BYTES,
   CATALONIA_IMAGE_HOSTS,
+  CATALONIA_SCT_CAMERA_FILE_RE,
   CATALONIA_FONT_CREDIT,
   CATALONIA_FONT_ELEVATION_M,
   DEFAULT_CATALONIA_MAX_SOURCES,
@@ -1668,10 +1669,11 @@ export function parseCataloniaXml(xml) {
 /**
  * Validate and normalize one Catalonia feed `link` against the publisher
  * host allowlist (CATALONIA_IMAGE_HOSTS), upgrading to https. Rejects
- * anything else, including a host that merely resembles an allowed one, and
- * any URL carrying userinfo (`https://user:pass@www.bcn.cat/...`): the
- * hostname check alone would pass it, letting catalog data inject
- * credentials into the server-side frame request.
+ * anything else, including a host that merely resembles an allowed one, any
+ * URL carrying userinfo (`https://user:pass@www.bcn.cat/...`) or an explicit
+ * port — the hostname check alone would pass either, letting catalog data
+ * inject credentials or steer the server-side frame request to another
+ * service on that host — and any path outside the host's frame directory.
  *
  * SCT's own `RenderService` frame link is a special case, for two stacked
  * reasons (both verified 2026-09-15):
@@ -1688,7 +1690,8 @@ export function parseCataloniaXml(xml) {
  * TransitCamera answers the frame directly over **http**, no redirect, and
  * that is the only transport this host actually serves to this runtime — so
  * this builds that URL itself from RenderService's `sctidcam` id instead of
- * registering the (https, then-redirecting) RenderService link.
+ * registering the (https, then-redirecting) RenderService link. The
+ * `sctidcam` id must be a bare image filename (CATALONIA_SCT_CAMERA_FILE_RE).
  *
  * @param {string} rawUrl
  * @returns {string} Normalized URL, or '' if not accepted.
@@ -1701,12 +1704,16 @@ export function normalizeCataloniaImageUrl(rawUrl) {
     return '';
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
-  if (parsed.username || parsed.password) return '';
-  if (!CATALONIA_IMAGE_HOSTS.has(parsed.hostname)) return '';
+  if (parsed.username || parsed.password || parsed.port) return '';
+  const dir = CATALONIA_IMAGE_HOSTS.get(parsed.hostname);
+  if (!dir || !parsed.pathname.startsWith(dir)) return '';
+  const file = parsed.pathname.slice(dir.length);
+  if (!file || file.includes('/')) return '';
 
   if (parsed.hostname === 'mct.gencat.cat') {
     const camId = parsed.searchParams.get('sctidcam');
-    if (!camId) return '';
+    if (file !== 'RenderService') return '';
+    if (!camId || !CATALONIA_SCT_CAMERA_FILE_RE.test(camId)) return '';
     const direct = new URL('http://mct.gencat.cat/mct2bo/TransitCamera');
     direct.searchParams.set('nom', camId);
     direct.searchParams.set('visualitzacio', 'imatge');
@@ -1715,6 +1722,30 @@ export function normalizeCataloniaImageUrl(rawUrl) {
 
   parsed.protocol = 'https:';
   return parsed.toString();
+}
+
+/**
+ * Stable camera id for one normalized Catalonia frame URL (the output of
+ * normalizeCataloniaImageUrl). The feed's `fid` is not used: it embeds an
+ * upstream server-start stamp and changes on every upstream restart. SCT
+ * cameras key on the `sctidcam` filename stem (`cat-sct-nc87`), partner
+ * cameras on the frame host and path (`cat-www-bcn-cat-transit-imatges-…`).
+ *
+ * @param {string} imageUrl - A URL normalizeCataloniaImageUrl accepted.
+ * @returns {string}
+ */
+export function cataloniaCameraId(imageUrl) {
+  const parsed = new URL(imageUrl);
+  const slug = (text) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  if (parsed.hostname === 'mct.gencat.cat') {
+    const file = parsed.searchParams.get('nom') || '';
+    return `cat-sct-${slug(file.replace(/\.[^.]*$/, ''))}`;
+  }
+  return `cat-${slug(parsed.hostname)}-${slug(parsed.pathname)}`;
 }
 
 /**
@@ -1750,6 +1781,10 @@ export function cataloniaCameraName(carretera, municipi) {
  * Each non-SCT camera carries its publisher as a `credit` alongside the
  * shared `provider`. The feed carries no heading, so every camera takes the
  * id-hash fallback, low-confidence pose (same as TfL and Fintraffic).
+ *
+ * Ids come from the validated frame URL (cataloniaCameraId), not the feed's
+ * restart-dependent `fid`, and rows sharing one are collapsed before the cap
+ * (the live feed repeats a few SCT cameras).
  *
  * The list decides ids, coordinates, labels and which allowlisted frame path
  * is proxied, so it is fetched over https, redirects are refused (the list
@@ -1791,15 +1826,12 @@ export async function loadCataloniaSourcesFromOpenData() {
 
     const cameras = [];
     for (const row of rows) {
-      if (!row.fid) continue;
       if (!isLikelyCataloniaCoordinate(row.lat, row.lon)) continue;
       const imageUrl = normalizeCataloniaImageUrl(row.link);
       if (!imageUrl) continue;
 
       const font = row.font.trim();
-      const cameraId = `cat-${row.fid
-        .replace(/^cameres\.fid-/, '')
-        .replace(/[^a-zA-Z0-9]/g, '')}`;
+      const cameraId = cataloniaCameraId(imageUrl);
 
       cameras.push({
         id: cameraId,
