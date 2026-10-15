@@ -237,6 +237,8 @@ export function createCatalog({ state: layerState, services, parts, source }) {
             ? source.groundHeights
             : null,
         poseSource,
+        model: String(source.model || ''),
+        manufacturer: String(source.manufacturer || ''),
       };
       applyModelEnrichment(
         camera,
