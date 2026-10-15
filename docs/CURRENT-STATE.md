@@ -5209,14 +5209,16 @@ the project's MIT license; see `DATA_SOURCES.md`.
 
 ## Map source factories and coordination
 
-A subscriber removed, or a controller destroyed, during a settled-state delivery receives no further callbacks from that delivery.
-
 Map selection is composed from separate imagery, terrain and 3D factories.
 The default registry retains Google 3D, Bing Aerial/Labels, Esri Satellite and
 OSM, including their setup guidance and existing preset/share IDs. Esri still
 falls back to OSM on construction failure or two active tile failures, and
 credits follow the source actually displayed. Terrain remains lazy while the
 photoreal globe is hidden.
+
+Map-stack subscribers hear each settled activation once. A subscriber removed
+during a delivery, or every subscriber once the controller is destroyed, gets
+no further callback from it, and a destroyed controller accepts no new ones.
 
 Map credentials are passed to each source constructor rather than changing SDK-wide Google or ion defaults.
 

@@ -53,3 +53,37 @@ test('destroying the controller during delivery stops remaining listeners', asyn
   await controller.setStack('fixture');
   assert.deepEqual(calls, ['destroy']);
 });
+
+test('a listener re-added after destroy during delivery is not called', async () => {
+  const controller = fixture();
+  const calls = [];
+  const later = () => calls.push('later');
+  controller.subscribe(() => {
+    calls.push('destroy');
+    controller.destroy();
+    controller.subscribe(later);
+  });
+  controller.subscribe(later);
+  await controller.setStack('fixture');
+  assert.deepEqual(calls, ['destroy']);
+});
+
+test('delivery order: added during delivery waits, duplicates run once, re-added runs', async () => {
+  const controller = fixture();
+  const calls = [];
+  const twice = () => calls.push('twice');
+  const readded = () => calls.push('readded');
+  let offReadded;
+  controller.subscribe(() => {
+    calls.push('first');
+    controller.subscribe(() => calls.push('added-late'));
+    offReadded();
+    controller.subscribe(readded);
+  });
+  controller.subscribe(twice);
+  controller.subscribe(twice);
+  offReadded = controller.subscribe(readded);
+  await controller.setStack('fixture');
+  assert.deepEqual(calls, ['first', 'twice', 'readded']);
+  controller.destroy();
+});
