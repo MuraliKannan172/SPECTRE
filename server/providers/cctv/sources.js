@@ -63,6 +63,7 @@ import {
   KING_COUNTY_IMAGE_ORIGIN,
   DEFAULT_KING_COUNTY_MAX_SOURCES,
   KING_COUNTY_ANCHORS,
+  KING_COUNTY_MAX_CATALOG_BYTES,
   DEFAULT_VEGVESEN_CCTV_URL,
   VEGVESEN_IMAGE_ORIGIN,
   VEGVESEN_VIDEO_URL,
@@ -1734,22 +1735,34 @@ function isLikelyKingCountyCoordinate(lat, lon) {
 }
 
 /**
+ * A King County `Model` value, whitespace-collapsed, or '' when it is a
+ * vendor-generic string ("PTZ", "PTZ IP", "BOSCH/PTZ") that names no model.
+ */
+function kingCountyModel(raw) {
+  const model = String(raw || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return /^(?:[a-z]+\/)?ptz(?: ip)?$/i.test(model) ? '' : model;
+}
+
+/**
  * Fetch King County road cameras (Washington State). Keyless: one public
  * ArcGIS FeatureServer GeoJSON query (King County DOT Road Services), with an
  * explicit `outFields` list so the layer's asset-administration columns are
  * never fetched. Only cameras that are live and active (`Live`,
  * `CurrentStatus`) with a positive integer id, finite in-county coordinates,
  * and a frame on the county's own image handler are kept. WSDOT-owned rows in
- * the layer are skipped — the statewide WSDOT pack is their home — while the
- * handful of city-owned cameras the county hosts (Redmond, Sammamish,
- * Newcastle, Snoqualmie) keep their owner as the per-camera credit,
+ * the layer are skipped because their frames are WSDOT-hosted, outside the
+ * pinned image origin, while partner-city cameras hosted on the county image
+ * handler (e.g. Newcastle) name their owner as the per-camera credit,
  * DriveBC-style. The layer publishes no facing, so every heading is the id
  * hash at low confidence.
  *
  * Uniquely among the packs, the county publishes each camera's hardware
  * `Manufacturer`/`Model`; the model string (whitespace-collapsed — the feed
  * carries stray newlines) rides along as the source's `model` for
- * identified-hardware consumers.
+ * identified-hardware consumers. Vendor-generic strings ("PTZ", "PTZ IP",
+ * "BOSCH/PTZ") name no model and are treated as absent.
  *
  * @returns {Promise<Array<object>>} Normalized camera source objects.
  */
@@ -1757,16 +1770,37 @@ export async function loadKingCountySourcesFromOpenData() {
   try {
     const resp = await fetch(KING_COUNTY_CAMERAS_URL, {
       headers: { Accept: 'application/json' },
+      redirect: 'manual',
       signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
+    // A response this loader will not read still owns its transport until the
+    // body is released, so every rejection path cancels before returning.
+    const discard = async () => {
+      try {
+        await resp.body?.cancel();
+      } catch {
+        /* no-op */
+      }
+      return [];
+    };
+    if (resp.status >= 300 && resp.status < 400) {
+      console.warn(
+        '[CCTV] King County catalog redirected; redirects are not followed',
+      );
+      return discard();
+    }
     if (!resp.ok) {
       console.warn('[CCTV] King County camera download failed:', resp.status);
-      return [];
+      return discard();
     }
-    const payload = await resp.json();
+    const payload = await readResponseJsonCapped(
+      resp,
+      KING_COUNTY_MAX_CATALOG_BYTES,
+    );
     const rows = Array.isArray(payload?.features) ? payload.features : [];
 
     const cameras = [];
+    const seen = new Set();
     for (const row of rows) {
       const attrs = row?.properties;
       const rawId = attrs?.AssetID;
@@ -1774,8 +1808,8 @@ export async function loadKingCountySourcesFromOpenData() {
       if (attrs.Live !== 1) continue;
       if (String(attrs.CurrentStatus || '').trim() !== 'Active') continue;
       const owner = String(attrs.Owner || '').trim();
-      // WSDOT-owned rows belong to the statewide WSDOT pack; skipping them
-      // here keeps one camera from appearing twice on the globe.
+      // WSDOT-owned rows serve WSDOT-hosted frames, outside the pinned
+      // county image origin, so they are skipped.
       if (owner === 'WSDOT') continue;
       // The handler is served over HTTPS; the feed still writes http://.
       const imageUrl = String(attrs.ImageURL || '')
@@ -1788,9 +1822,9 @@ export async function loadKingCountySourcesFromOpenData() {
       if (!isLikelyKingCountyCoordinate(lat, lon)) continue;
 
       const cameraId = `kingcounty-${rawId}`;
-      const model = String(attrs.Model || '')
-        .replace(/\s+/g, ' ')
-        .trim();
+      if (seen.has(cameraId)) continue;
+      seen.add(cameraId);
+      const model = kingCountyModel(attrs.Model);
       const manufacturer = String(attrs.Manufacturer || '')
         .replace(/\s+/g, ' ')
         .trim();

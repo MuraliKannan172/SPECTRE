@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   DEFAULT_KING_COUNTY_MAX_SOURCES,
   KING_COUNTY_CAMERAS_URL,
+  KING_COUNTY_MAX_CATALOG_BYTES,
 } from '../../server/providers/cctv/constants.js';
 import { loadKingCountySourcesFromOpenData } from '../../server/providers/cctv/sources.js';
 import { normalizeSourceItem } from '../../server/providers/cctv/normalize.js';
@@ -73,9 +74,9 @@ test('King County loader keeps live county cameras and upgrades frame URLs to HT
         }),
         // City-owned camera the county hosts: kept, owner becomes the credit.
         kingCountyFeature(90, 47.674, -122.119, {
-          properties: { Owner: 'City of Redmond', Model: null },
+          properties: { Owner: 'City of Newcastle', Model: null },
         }),
-        // WSDOT-owned row: the statewide WSDOT pack is its home.
+        // WSDOT-owned row: its frames are WSDOT-hosted, so it is skipped.
         kingCountyFeature(70, 47.6, -122.3, { properties: { Owner: 'WSDOT' } }),
         // Off-host frame, not live, retired, bad id, bad geometry, out of county.
         kingCountyFeature(71, 47.6, -122.3, {
@@ -118,11 +119,11 @@ test('King County loader keeps live county cameras and upgrades frame URLs to HT
   assert.equal(novelty.fovDeg, 44);
   assert.ok(novelty.headingDeg >= 0 && novelty.headingDeg < 360);
 
-  const redmond = cameras.find((camera) => camera.id === 'kingcounty-90');
-  assert.equal(redmond.credit, 'City of Redmond');
-  assert.equal(redmond.model, undefined);
+  const newcastle = cameras.find((camera) => camera.id === 'kingcounty-90');
+  assert.equal(newcastle.credit, 'City of Newcastle');
+  assert.equal(newcastle.model, undefined);
   // A manufacturer without a model identifies nothing, so it is dropped too.
-  assert.equal(redmond.manufacturer, undefined);
+  assert.equal(newcastle.manufacturer, undefined);
 });
 
 test('normalizeSourceItem passes a hardware model through and omits it otherwise', () => {
@@ -274,4 +275,93 @@ test('King County loader defaults its cap and survives upstream failure', async 
     throw new Error('network down');
   });
   assert.deepEqual(await loadKingCountySourcesFromOpenData(), []);
+});
+
+test('King County loader does not follow a redirected catalog', async (t) => {
+  quiet(t);
+  let init;
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    init = options;
+    return new Response(
+      JSON.stringify({
+        type: 'FeatureCollection',
+        features: [kingCountyFeature(56, 47.70059, -122.02443)],
+      }),
+      { status: 302, headers: { Location: 'https://example.com/cams' } },
+    );
+  });
+
+  assert.deepEqual(await loadKingCountySourcesFromOpenData(), []);
+  assert.equal(init.redirect, 'manual');
+});
+
+test('King County loader rejects an oversized catalog', async (t) => {
+  quiet(t);
+  const features = [kingCountyFeature(56, 47.70059, -122.02443)];
+  const body = JSON.stringify({
+    type: 'FeatureCollection',
+    features,
+    padding: 'x'.repeat(KING_COUNTY_MAX_CATALOG_BYTES),
+  });
+  t.mock.method(globalThis, 'fetch', async () => new Response(body));
+
+  assert.deepEqual(await loadKingCountySourcesFromOpenData(), []);
+});
+
+test('King County loader drops duplicate ids before the per-pack cap', async (t) => {
+  quiet(t);
+  withEnv(t, { CCTV_KINGCOUNTY_MAX_SOURCES: '8' });
+  // Repeats of the camera nearest the anchor would fill an 8-camera cap
+  // before the second, farther camera if duplicates reached prioritization.
+  const features = [];
+  for (let i = 0; i < 10; i += 1) {
+    features.push(kingCountyFeature(56, 47.4829, -122.2171));
+  }
+  features.push(kingCountyFeature(57, 47.70059, -122.02443));
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ type: 'FeatureCollection', features }),
+  );
+
+  const cameras = await loadKingCountySourcesFromOpenData();
+  assert.deepEqual(cameras.map((camera) => camera.id).sort(), [
+    'kingcounty-56',
+    'kingcounty-57',
+  ]);
+});
+
+test('King County loader omits vendor-generic model strings', async (t) => {
+  quiet(t);
+  withEnv(t, { CCTV_KINGCOUNTY_MAX_SOURCES: undefined });
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({
+      type: 'FeatureCollection',
+      features: [
+        kingCountyFeature(61, 47.5, -122.2, {
+          properties: { Model: 'PTZ', Manufacturer: 'Bosch' },
+        }),
+        kingCountyFeature(62, 47.51, -122.2, {
+          properties: { Model: 'PTZ IP', Manufacturer: 'Cohu' },
+        }),
+        kingCountyFeature(63, 47.52, -122.2, {
+          properties: { Model: 'BOSCH/PTZ', Manufacturer: 'Bosch' },
+        }),
+        kingCountyFeature(64, 47.53, -122.2, {
+          properties: { Model: 'AUTODOME IP 5000', Manufacturer: 'Bosch' },
+        }),
+      ],
+    }),
+  );
+
+  const byId = new Map(
+    (await loadKingCountySourcesFromOpenData()).map((camera) => [
+      camera.id,
+      camera,
+    ]),
+  );
+  for (const id of ['kingcounty-61', 'kingcounty-62', 'kingcounty-63']) {
+    assert.equal(byId.get(id).model, undefined, id);
+    assert.equal(byId.get(id).manufacturer, undefined, id);
+  }
+  assert.equal(byId.get('kingcounty-64').model, 'AUTODOME IP 5000');
+  assert.equal(byId.get('kingcounty-64').manufacturer, 'Bosch');
 });

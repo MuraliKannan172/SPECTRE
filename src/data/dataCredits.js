@@ -261,7 +261,7 @@ export const DATA_CREDITS = [
       '<a href="https://kingcounty.gov/en/dept/local-services/roads" target="_blank" rel="noopener">kingcounty.gov</a>, ' +
       'per the ' +
       '<a href="https://kingcounty.gov/en/dept/kcit/data-information-services/gis-center/about/terms-conditions-copyrights" target="_blank" rel="noopener">KCGIS Center terms</a>. ' +
-      'A few cameras are supplied by partner cities (Redmond, Sammamish, Newcastle, Snoqualmie); each names its owner in the CCTV panel.',
+      'Partner-city cameras hosted on the county image handler (e.g. Newcastle) name their owner in the CCTV panel.',
   },
   {
     key: 'vegvesen-cctv',
