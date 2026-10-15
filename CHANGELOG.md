@@ -36,7 +36,9 @@
 
 - Director timeline seeks cross the dateline along the short longitude arc.
 
-- Recent Imagery thumbnails require explicit presence evidence before reporting available pixels.
+- Recent Imagery continues past malformed records in full catalog pages, respects the requested record limit, and reports results as truncated when that limit drops valid records.
+
+- Regional articles retain unknown publication times when compact source dates do not identify a real calendar instant.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
