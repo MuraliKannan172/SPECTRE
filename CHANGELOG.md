@@ -1,5 +1,8 @@
 # Changelog
 
+- Overpass and military-installation disk caches no longer serve answers from a
+  previously configured `OVERPASS_UPSTREAMS` instance after it is repointed.
+
 - A Radio Browser mirror answering 204, 205 or 304, or a status outside
   200–599, no longer crashes the local dev/preview server. Null-body statuses
   get an empty body; anything else that cannot become a response fails that
@@ -44,6 +47,10 @@
 - Recent Imagery continues past malformed records in full catalog pages, respects the requested record limit, and reports results as truncated when that limit drops valid records.
 
 - Regional articles retain unknown publication times when compact source dates do not identify a real calendar instant.
+
+- Add Detroit (MoGo), Pittsburgh (POGOH), Aspen (WE-cycle) and Kona & Hilo
+  (HIBike) to the GBFS bikeshare registry, the layer's first stations in
+  Michigan.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
@@ -139,6 +146,14 @@
   stale, moved-camera, invalid and oversized captures still fail closed.
 
 ## [Unreleased]
+
+- Satellite clouds keep Clouds only / Full as quick endpoints and add a continuous
+  cloud-filter slider: 0% is Full, 100% is the existing brightness key, and
+  intermediate values blend the keyed alpha. The slider commits on release to
+  avoid restaging imagery for every drag event. Filter percentages round-trip in
+  share links; legacy mode codes retain their old endpoint meanings. Background
+  panel refreshes preserve the pending drag value until release. Contributed by
+  [NotProniss](https://github.com/NotProniss) (#1084).
 
 - Flights and Military Flights highlight emergency transponder broadcasts in
   fleet billboards, 3D models and Cockpit contacts. Colors update when a status
