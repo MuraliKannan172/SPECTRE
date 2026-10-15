@@ -437,6 +437,7 @@ export function createCyclonesLayer({
           })),
         },
         chips: [],
+        legendCategorical: true,
         legend: storm
           ? [
               {

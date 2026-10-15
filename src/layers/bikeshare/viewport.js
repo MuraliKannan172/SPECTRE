@@ -1,5 +1,4 @@
 import * as Cesium from 'cesium';
-import { msg } from '../../i18n/index.js';
 import { GBFS_CITY_REGISTRY } from './registry.js';
 import {
   ACTIVATION_EXIT_ALTITUDE_M,
@@ -123,6 +122,9 @@ export function createViewport({ state: layerState, services, parts, source }) {
     const cityIds = Array.from(layerState._activeCityIds);
     for (const cityId of cityIds) deactivateCity(cityId);
     layerState._activeCityIds.clear();
+    // A failure belongs to a city in range; none are once everything is off.
+    layerState._failedCityIds.clear();
+    layerState._count = 0;
   }
 
   /**
@@ -169,12 +171,19 @@ export function createViewport({ state: layerState, services, parts, source }) {
         return;
       parts.rendering.applyStatusToPoints(cityId, statusMap);
       layerState._lastUpdate = Date.now();
-      layerState._error = null;
+      layerState._failedCityIds.delete(cityId);
     } catch (error) {
       if (error?.name === 'AbortError') return;
+      // A rejection from superseded work must not mark (or tear down) a city
+      // that a newer proximity check or re-enable now owns.
+      if (
+        !layerState._enabled ||
+        !layerState._activeCityIds.has(cityId) ||
+        generation !== layerState._proximityGeneration
+      )
+        return;
       console.warn(`[Data:Bikeshare] ${cityId} activate error:`, error);
-      // English data (stats reach the voice tools); the panel translates it.
-      layerState._error = msg('GBFS fetch error');
+      layerState._failedCityIds.add(cityId);
       deactivateCity(cityId);
       layerState._activeCityIds.delete(cityId);
     } finally {
@@ -209,6 +218,10 @@ export function createViewport({ state: layerState, services, parts, source }) {
       if (!nextActive.has(cityId)) {
         deactivateCity(cityId);
       }
+    }
+    // A failure never outlives its city's range.
+    for (const cityId of layerState._failedCityIds) {
+      if (!nextActive.has(cityId)) layerState._failedCityIds.delete(cityId);
     }
 
     layerState._activeCityIds = nextActive;

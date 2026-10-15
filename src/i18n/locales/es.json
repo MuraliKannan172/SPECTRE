@@ -2214,7 +2214,6 @@
   "loading coverage...": "cargando cobertura...",
   "live feed unavailable": "fuente en vivo no disponible",
   "GBFS fetch error": "error al obtener datos GBFS",
-  "GBFS status update failed": "falló la actualización del estado GBFS",
   "Open the Street Level panel to view imagery": "Abre el panel \"A pie de calle\" para ver las imágenes",
   "Image could not be opened": "No se pudo abrir la imagen",
   "Mapillary rejected MAPILLARY_CLIENT_TOKEN — replace it in Provider Settings": "Mapillary rechazó MAPILLARY_CLIENT_TOKEN — sustitúyelo en Ajustes de proveedores",
@@ -2783,5 +2782,16 @@
   "Show the complete infrared image; 0% filter strength": "Muestra la imagen infrarroja completa; intensidad del filtro 0%",
   "FILTER": "FILTRO",
   "Cloud filter strength": "Intensidad del filtro de nubes",
-  "Panoramax answered HTTP {status}": "Panoramax respondió HTTP {status}"
+  "Panoramax answered HTTP {status}": "Panoramax respondió HTTP {status}",
+  "Highest air-quality readings in view": "Lecturas de calidad del aire más altas a la vista",
+  "Low": "Baja",
+  "Moderate": "Moderada",
+  "High": "Alta",
+  "Very High": "Muy alta",
+  "Air quality": "Calidad del aire",
+  "{n} sequences in view · click a line for its nearest photo": {
+    "one": "{n} secuencia a la vista · haz clic en una línea para su foto más cercana",
+    "many": "{n} secuencias a la vista · haz clic en una línea para su foto más cercana",
+    "other": "{n} secuencias a la vista · haz clic en una línea para su foto más cercana"
+  }
 }
