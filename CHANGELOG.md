@@ -27,6 +27,9 @@
 - Street Level counts unique tiles before ranking so overlapping dateline halves
   in polar views do not waste slots in the 16-tile overview budget.
 
+- Directions no longer shows a truncation notice for a route with exactly 200
+  turns, and a roundabout at the 200th turn keeps its exit distance.
+
 - Weather records keep missing conditions unknown and refuse summaries without a measured temperature.
 
 - Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
