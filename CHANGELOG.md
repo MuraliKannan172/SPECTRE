@@ -36,7 +36,7 @@
 
 - Director timeline seeks cross the dateline along the short longitude arc.
 
-- Surface Tab cycling also skips negative-tabindex, fieldset-disabled and inert controls.
+- Recent Imagery thumbnails require explicit presence evidence before reporting available pixels.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
