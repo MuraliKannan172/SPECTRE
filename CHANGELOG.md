@@ -1,6 +1,6 @@
 # Changelog
 
-- Add Lithuania's public Via Lietuva / Eismoinfo road cameras to CCTV, with published coordinates, on-demand snapshots, attribution and bounded catalog requests. No API key is required.
+- Add Lithuania's public Via Lietuva / Eismoinfo road cameras to CCTV, with published coordinates, on-demand snapshots, attribution and bounded catalog requests. No API key is required. The pack is opt-in (`CCTV_LITHUANIA_ENABLED=1`) because its camera endpoints are the eismoinfo.lt website backend, not a service listed in Via Lietuva's open-data statement, so the licence for the photos is unconfirmed.
 
 - Stop one retired bikeshare feed from reporting the whole layer as failed.
   City feeds are fetched independently, but failure was recorded in a single

@@ -81,26 +81,45 @@ export function lithuaniaCameraToSource(row, feature) {
   };
 }
 
-async function readCatalog(url) {
-  const signal = AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS);
-  const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
-    redirect: 'manual',
-    signal,
-  });
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(`Catalog HTTP ${response.status}`);
+async function readCatalog(url, sibling) {
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
+    sibling.signal,
+  ]);
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      redirect: 'manual',
+      signal,
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {});
+      throw new Error(
+        response.status >= 300 && response.status < 400
+          ? 'catalog redirected; redirects are not followed'
+          : `Catalog HTTP ${response.status}`,
+      );
+    }
+    return await readResponseJsonCapped(
+      response,
+      LITHUANIA_MAX_CATALOG_BYTES,
+      signal,
+    );
+  } catch (error) {
+    // The join needs both catalogs; release the other request at once
+    // rather than leaving its body open until the timeout.
+    sibling.abort();
+    throw error;
   }
-  return readResponseJsonCapped(response, LITHUANIA_MAX_CATALOG_BYTES, signal);
 }
 
 /** Two bounded requests per shared catalog refresh, no API key required. */
 export async function loadLithuaniaSources() {
   try {
+    const sibling = new AbortController();
     const [rows, layers] = await Promise.all([
-      readCatalog(LITHUANIA_CAMERAS_URL),
-      readCatalog(LITHUANIA_LOCATIONS_URL),
+      readCatalog(LITHUANIA_CAMERAS_URL, sibling),
+      readCatalog(LITHUANIA_LOCATIONS_URL, sibling),
     ]);
     if (!Array.isArray(rows) || !Array.isArray(layers)) return [];
     const features = layers.find((layer) => layer?.layer === 'VKR')?.features;

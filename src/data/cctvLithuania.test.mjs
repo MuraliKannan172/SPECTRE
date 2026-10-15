@@ -95,25 +95,85 @@ test('loader deduplicates and omits cameras without matching published coordinat
   );
 });
 
-test('catalog includes Lithuania by default and respects the disable switch', async (t) => {
+/** Run one catalog refresh with CCTV_LITHUANIA_ENABLED set to `flag`
+ * (undefined leaves it unset), restoring the environment afterwards. */
+async function runCatalogWithLithuaniaFlag(t, flag) {
   const requested = mockCatalogs(t);
   const saved = process.env.CCTV_LITHUANIA_ENABLED;
   try {
-    delete process.env.CCTV_LITHUANIA_ENABLED;
+    if (flag === undefined) delete process.env.CCTV_LITHUANIA_ENABLED;
+    else process.env.CCTV_LITHUANIA_ENABLED = flag;
     const sources = await createCctvCatalog({ sourceRoot: '/nonexistent' })();
-    assert.equal(
-      sources.find((c) => c.id === 'lithuania-72')?.cityId,
-      'lithuania',
-    );
-    requested.length = 0;
-    process.env.CCTV_LITHUANIA_ENABLED = '0';
-    const disabled = await createCctvCatalog({ sourceRoot: '/nonexistent' })();
-    assert.ok(!disabled.some((c) => c.cityId === 'lithuania'));
-    assert.ok(!requested.includes(LITHUANIA_CAMERAS_URL));
+    return { requested, sources };
   } finally {
     if (saved === undefined) delete process.env.CCTV_LITHUANIA_ENABLED;
     else process.env.CCTV_LITHUANIA_ENABLED = saved;
   }
+}
+
+test('CCTV_LITHUANIA_ENABLED=1 wires the Lithuania pack into the catalog', async (t) => {
+  const { sources } = await runCatalogWithLithuaniaFlag(t, '1');
+  assert.equal(
+    sources.find((c) => c.id === 'lithuania-72')?.cityId,
+    'lithuania',
+  );
+});
+
+// The camera endpoints are the eismoinfo.lt website backend, not a service the
+// open-data statement lists, so an install that has not opted in must never
+// contact them.
+for (const [label, flag] of [
+  ['an unset CCTV_LITHUANIA_ENABLED', undefined],
+  ['an empty CCTV_LITHUANIA_ENABLED', ''],
+  ['CCTV_LITHUANIA_ENABLED=0', '0'],
+  ['CCTV_LITHUANIA_ENABLED=true', 'true'],
+]) {
+  test(`${label} makes no Lithuania request`, async (t) => {
+    const { requested, sources } = await runCatalogWithLithuaniaFlag(t, flag);
+    assert.ok(requested.length > 0, 'the other packs still refreshed');
+    assert.equal(
+      requested.some((href) => href.includes('eismoinfo.lt')),
+      false,
+      'the pack never reaches its upstream',
+    );
+    assert.ok(!sources.some((c) => c.cityId === 'lithuania'));
+  });
+}
+
+test('a failed catalog cancels the sibling request instead of waiting for the timeout', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  let siblingSignal;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === LITHUANIA_CAMERAS_URL) {
+      return new Response('', { status: 503 });
+    }
+    siblingSignal = options.signal;
+    // Never settles on its own; only an abort ends it.
+    return new Promise((_, reject) => {
+      options.signal.addEventListener('abort', () =>
+        reject(options.signal.reason),
+      );
+    });
+  });
+  assert.deepEqual(await loadLithuaniaSources(), []);
+  assert.equal(siblingSignal?.aborted, true);
+  assert.notEqual(siblingSignal.reason?.name, 'TimeoutError');
+});
+
+test('a redirected catalog is reported as not followed', async (t) => {
+  const warnings = [];
+  t.mock.method(console, 'warn', (...args) => warnings.push(args.join(' ')));
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      new Response('', {
+        status: 302,
+        headers: { Location: 'http://127.0.0.1/' },
+      }),
+  );
+  assert.deepEqual(await loadLithuaniaSources(), []);
+  assert.ok(warnings.some((line) => /redirects are not followed/.test(line)));
 });
 
 test('failed, redirected, malformed and oversized catalogs degrade to an empty pack', async (t) => {

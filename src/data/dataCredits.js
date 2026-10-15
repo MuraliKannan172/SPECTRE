@@ -251,7 +251,10 @@ export const DATA_CREDITS = [
   {
     key: 'lithuania-cctv',
     html:
-      'Road-camera stills (Lithuania): ' +
+      // Opt-in: the camera endpoints are the eismoinfo.lt website backend, not
+      // among the services Via Lietuva's open-data statement lists (its
+      // conditions: attribution, reuse on the same terms).
+      'Road-camera stills (Lithuania, when enabled): ' +
       '<a href="https://eismoinfo.lt/" target="_blank" rel="noopener">Via Lietuva / Eismoinfo</a>; periodically updated images',
   },
   {
