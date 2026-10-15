@@ -10,6 +10,8 @@
   cap (8–1,200) and `CCTV_WSDOT_ENABLED=0` turns the pack off (bassem chagra,
   #644).
 
+- Add Lithuania's public Via Lietuva / Eismoinfo road cameras to CCTV, with published coordinates, on-demand snapshots, attribution and bounded catalog requests. No API key is required. The pack is opt-in (`CCTV_LITHUANIA_ENABLED=1`) because its camera endpoints are the eismoinfo.lt website backend, not a service listed in Via Lietuva's open-data statement, so the licence for the photos is unconfirmed.
+
 - Add King County road cameras (Washington State) as a keyless CCTV source
   pack: one public King County DOT ArcGIS layer, fetched with an explicit field
   list so its staff-name columns are never requested, and frames pinned to the
