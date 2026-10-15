@@ -130,3 +130,13 @@ test('complete snapshots age out vanished aircraft and retain position-less ones
   store.data.get('abc123').observedReceiptMs = Date.now() - 300001;
   assert.equal(absent('abc123'), 'stale');
 });
+
+test('civil emergency status follows the latest poll instead of sticking', () => {
+  const store = records();
+  const first = store.receive(observation({ squawk: '7700' }), view());
+  assert.equal(first.meta.squawk, '7700');
+  assert.equal(first.meta.emergency.kind, 'general');
+  const next = store.receive(observation({ squawk: '2000' }), view());
+  assert.equal(next.meta.squawk, '2000');
+  assert.equal(next.meta.emergency, null);
+});
