@@ -27,7 +27,8 @@ const CMR_SEARCH_AFTER = 'CMR-Search-After';
 /**
  * Read one product's granules across CMR pages, sending back each response's
  * `CMR-Search-After` cursor until a short page, a missing cursor or the
- * record cap ends the walk. `truncated` is measured against CMR's `hits`.
+ * record cap ends the walk. `truncated` means CMR's `hits` exceed the rows
+ * read, or the cap dropped valid granules from the last page read.
  * @param {{ product: string, url: string, fetchImpl: typeof fetch, signal?: AbortSignal, maxRecords?: number }} request
  * @returns {Promise<{ granules: Array<object>, truncated: boolean }>}
  */
@@ -41,6 +42,7 @@ export async function fetchCmrPages({
   const granules = [];
   let hits = 0;
   let readCount = 0;
+  let capped = 0;
   let cursor = null;
   for (;;) {
     const init = { signal };
@@ -52,9 +54,12 @@ export async function fetchCmrPages({
     const rawCount = Array.isArray(json?.items) ? json.items.length : 0;
     const page = parseCmrUmm(json, product);
     readCount += rawCount;
-    granules.push(
-      ...page.granules.slice(0, Math.max(0, maxRecords - granules.length)),
+    const admitted = page.granules.slice(
+      0,
+      Math.max(0, maxRecords - granules.length),
     );
+    granules.push(...admitted);
+    capped += page.granules.length - admitted.length;
     hits = Math.max(hits, page.hits);
     cursor = response.headers?.get?.(CMR_SEARCH_AFTER) ?? null;
     if (
@@ -65,7 +70,7 @@ export async function fetchCmrPages({
     )
       break;
   }
-  return { granules, truncated: hits > readCount };
+  return { granules, truncated: hits > readCount || capped > 0 };
 }
 
 function finiteOrNull(value) {
