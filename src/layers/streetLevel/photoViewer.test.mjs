@@ -296,12 +296,17 @@ test('a picture file or bitmap past any real photo’s size is refused', async (
       headers: new Map([['content-length', String(length ?? '')]]),
       blob: async () => ({ size: size ?? 10, bitmap: bitmap(width, height) }),
     }));
+  const refusedForSize = (error) => {
+    assert.match(error.message, /could not be loaded/);
+    assert.equal(error.tooLarge, true, 'marked as a size refusal');
+    return true;
+  };
   respond({ length: MAX_IMAGE_BYTES + 1 });
-  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  await assert.rejects(loadImage('https://x/a.jpg'), refusedForSize);
   respond({ size: MAX_IMAGE_BYTES + 1 });
-  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  await assert.rejects(loadImage('https://x/a.jpg'), refusedForSize);
   respond({ width: MAX_IMAGE_SIDE + 1 });
-  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  await assert.rejects(loadImage('https://x/a.jpg'), refusedForSize);
   assert.equal(closed, 1, 'the oversize bitmap is released');
   // No length given, a body that keeps coming: cut off while it streams.
   let pulled = 0;
@@ -315,8 +320,14 @@ test('a picture file or bitmap past any real photo’s size is refused', async (
       },
     }),
   });
-  await assert.rejects(loadImage('https://x/a.jpg'), /could not be loaded/);
+  await assert.rejects(loadImage('https://x/a.jpg'), refusedForSize);
   assert.ok(pulled * 8 * 1024 * 1024 <= MAX_IMAGE_BYTES + 16 * 1024 * 1024);
+  // Other failures are not size refusals.
+  globalThis.fetch = async () => ({ ok: false, headers: new Map() });
+  await assert.rejects(
+    loadImage('https://x/a.jpg'),
+    (error) => !error.tooLarge,
+  );
   respond({});
   assert.equal((await loadImage('https://x/a.jpg')).width, 100);
 });

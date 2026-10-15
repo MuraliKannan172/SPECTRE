@@ -295,3 +295,39 @@ test('a photo with no author to name is captioned with the instance holding it',
   const named = { ...photo, creator: 'Robot8A' };
   assert.equal(PANORAMAX_SOURCES.describe(named).title, null);
 });
+
+test('an SD panorama refused for its size is not fetched again as a flat photo', async () => {
+  const loads = [];
+  const viewer = createPanoramaxViewer({
+    getPhoto: async () => PHOTOS.pano,
+    step: async () => null,
+    onStep() {},
+    load: async (url, options = {}) => {
+      loads.push({ url, crossOrigin: options.crossOrigin });
+      // The picture host's SD file is past the viewer's size limits.
+      if (url === PHOTOS.pano.urls.sd)
+        throw Object.assign(new Error('too big'), { tooLarge: true });
+      return { src: url };
+    },
+    createRenderer: () => ({
+      setImage() {},
+      setView() {},
+      getView: () => ({ yaw: 0, pitch: 0, fov: 80 }),
+      resize() {},
+      clear() {},
+      destroy() {},
+    }),
+  });
+  const host = fakeHost();
+  await viewer.mount(host);
+  await viewer.open('pano');
+  const sdLoads = loads.filter((l) => l.url === PHOTOS.pano.urls.sd);
+  assert.equal(sdLoads.length, 1, 'tried once, as a bitmap, and refused');
+  assert.equal(sdLoads[0].crossOrigin, true);
+  const { picture } = parts(host);
+  assert.equal(picture.hidden, false, 'the flat fallback shows');
+  assert.notEqual(picture.src, PHOTOS.pano.urls.sd);
+  // Opened again later: the refused file is still not asked for.
+  await viewer.open('pano');
+  assert.equal(loads.filter((l) => l.url === PHOTOS.pano.urls.sd).length, 1);
+});

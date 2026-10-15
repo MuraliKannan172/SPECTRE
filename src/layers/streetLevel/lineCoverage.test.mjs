@@ -433,3 +433,43 @@ test('a selected line outside the cap does not make its tile redraw on every set
   for (let i = 0; i < 3; i++) coverage.recolorSequence('short', true);
   assert.equal(after.added, 0);
 });
+
+test('small share increases add up: a retained tile redraws once its share has grown past the threshold since its last draw', async (t) => {
+  const tuning = {
+    ...TUNING,
+    maxTiles: 1,
+    maxSequences: 900,
+    maxPoints: 100,
+    keepOrder: true,
+  };
+  const { state, coverage } = setup(t, {
+    tuning,
+    decoded: (centre, tile) => ({
+      sequences: Array.from({ length: 30 }, (_, i) =>
+        pointsLine(`l${i}`, 4, tile, centre),
+      ),
+      overview: [],
+    }),
+  });
+  coverage.refresh();
+  assert.ok(
+    await until(
+      () => state.coverage.tiles.size === 1 && !state.coverage.pending.size,
+    ),
+  );
+  const [tile] = state.coverage.tiles.values();
+  assert.equal(tile.pointsDrawn, 100);
+  const settle = async () => {
+    coverage.refresh();
+    await until(() => !state.coverage.pending.size);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  };
+  // +8%: under the threshold, nothing is redrawn.
+  tuning.maxPoints = 108;
+  await settle();
+  assert.equal(tile.pointsDrawn, 100);
+  // +8% again: +16% since the tile was last drawn, so it is redrawn.
+  tuning.maxPoints = 116;
+  await settle();
+  assert.equal(tile.pointsDrawn, 116, 'the grown share is drawn');
+});

@@ -78,7 +78,7 @@ async function loadBitmap(url, timeoutMs, resize, failure, signal) {
     // Picture hosts are not ours: refuse a file or an image past any real
     // photo's size before it is decoded.
     const length = Number(response.headers?.get?.('content-length'));
-    if (length > MAX_IMAGE_BYTES) throw new Error(failure);
+    if (length > MAX_IMAGE_BYTES) throw oversized(failure);
     const blob = await boundedBlob(response, failure);
     const bitmap = await (resize
       ? createImageBitmap(blob, {
@@ -90,15 +90,25 @@ async function loadBitmap(url, timeoutMs, resize, failure, signal) {
     // (A resized decode reports its new size: this guards unresized ones.)
     if (bitmap.width > MAX_IMAGE_SIDE || bitmap.height > MAX_IMAGE_SIDE) {
       bitmap.close?.();
-      throw new Error(failure);
+      throw oversized(failure);
     }
     return bitmap;
-  } catch {
+  } catch (error) {
+    // A size refusal stays one: the viewer must not fetch it another way.
+    if (error?.tooLarge) throw error;
     throw new Error(failure);
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener?.('abort', onAbort);
   }
+}
+
+/**
+ * A picture refused for its size (`tooLarge`): the viewer will not load
+ * that file another way, an <img> having no size limit at all.
+ */
+export function oversized(failure) {
+  return Object.assign(new Error(failure), { tooLarge: true });
 }
 
 /**
@@ -109,7 +119,7 @@ async function boundedBlob(response, failure) {
   const reader = response.body?.getReader?.();
   if (!reader) {
     const blob = await response.blob();
-    if (blob.size > MAX_IMAGE_BYTES) throw new Error(failure);
+    if (blob.size > MAX_IMAGE_BYTES) throw oversized(failure);
     return blob;
   }
   const chunks = [];
@@ -120,7 +130,7 @@ async function boundedBlob(response, failure) {
     total += value.byteLength;
     if (total > MAX_IMAGE_BYTES) {
       reader.cancel().catch(() => {});
-      throw new Error(failure);
+      throw oversized(failure);
     }
     chunks.push(value);
   }
@@ -226,8 +236,17 @@ export function createPhotoViewer({
   /** ‹ › presses run one after another, each from where the last one went. */
   let steps = Promise.resolve();
 
-  const loadAs = (url, options) =>
-    load(url, { failure: LOAD_FAILED, ...options });
+  /** Files refused for their size: never loaded again, by any path. */
+  const refused = new Set();
+  async function loadAs(url, options) {
+    if (refused.has(url)) throw oversized(LOAD_FAILED);
+    try {
+      return await load(url, { failure: LOAD_FAILED, ...options });
+    } catch (error) {
+      if (error?.tooLarge) refused.add(url);
+      throw error;
+    }
+  }
 
   function requestRender() {
     render?.governorRequestRender?.(`${providerId}-viewer`);
@@ -796,6 +815,7 @@ export function createPhotoViewer({
     unmount() {
       openSeq++;
       dropSharpPanorama();
+      refused.clear();
       openingId = null;
       keepViewFor = null;
       flatSharpUrl = null;

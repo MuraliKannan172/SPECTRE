@@ -152,9 +152,10 @@ export function createLineCoverage({
 
   /**
    * A tile's sequences, filtered then capped: capping first could leave a
-   * dense tile of newer flat captures with no 360° lines at all.
+   * dense tile of newer flat captures with no 360° lines at all. `measure`
+   * only records what the lines need, for a draw that follows.
    */
-  function drawnSequences(entry) {
+  function drawnSequences(entry, { measure = false } = {}) {
     const drawn = [];
     const current = filter();
     const selectedId = state.sequence.selectedId ?? null;
@@ -180,7 +181,12 @@ export function createLineCoverage({
     }
     // What every passing line would take: the budget is shared by it.
     entry.pointDemand = demand;
-    entry.pointsDrawn = points;
+    if (!measure) {
+      entry.pointsDrawn = points;
+      // The cap this draw used: a share is judged against it, not against
+      // later shares that redrew nothing (small steps add up).
+      entry.drawnCap = cap;
+    }
     return drawn;
   }
 
@@ -204,7 +210,7 @@ export function createLineCoverage({
       const share = left / (byDemand.length - i);
       const cap = Math.floor(Math.min(entry.pointDemand || 0, share));
       left -= cap;
-      const before = entry.pointCap ?? perTilePointCap;
+      const before = entry.drawnCap ?? perTilePointCap;
       entry.pointCap = cap;
       // Only a change that alters what is drawn, by enough to be worth a
       // rebuild: more room for a tile that had lines left out, or well
@@ -899,7 +905,7 @@ export function createLineCoverage({
     // What each tile's lines need under the new filter, then the shares,
     // then one redraw each.
     for (const entry of state.coverage.tiles.values())
-      if (entry.kind === 'sequence') drawnSequences(entry);
+      if (entry.kind === 'sequence') drawnSequences(entry, { measure: true });
     shareCaps();
     for (const entry of state.coverage.tiles.values()) redrawEntry(entry);
     requestRender();
