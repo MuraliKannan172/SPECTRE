@@ -1,4 +1,12 @@
+export {
+  GROUND_FLOOR_WARM_MAX_ALT_M,
+  POSITION_HISTORY_LIMIT,
+  LANDED_MISSING_POLL_LIMIT,
+  MISSING_POLL_LIMIT,
+  ERROR_BACKOFF_INTERVAL,
+} from './recordPolicy.js';
 import * as Cesium from 'cesium';
+import { EMERGENCY_TINT_CSS } from '../../data/aircraftEmergency.js';
 
 /**
  * @module militaryFlights
@@ -19,11 +27,7 @@ import * as Cesium from 'cesium';
 
 /** @constant {number} Milliseconds to wait before retrying after a transient error */
 
-export const ERROR_BACKOFF_INTERVAL = 20000;
-
 /** @constant {number} Max position samples retained per aircraft for dead reckoning */
-
-export const POSITION_HISTORY_LIMIT = 5;
 
 /** @constant {number} Base billboard display scale */
 
@@ -36,6 +40,11 @@ export const MIL_ICON_COLOR = Cesium.Color.fromCssColorString('#FFB800');
 /** @constant {Cesium.Color} Lighter amber tint applied to the actively tracked aircraft */
 
 export const TRACKED_ICON_COLOR = Cesium.Color.fromCssColorString('#FFD166');
+
+/** @constant {Cesium.Color} Red tint for aircraft broadcasting an emergency (mirror of flights) */
+
+export const EMERGENCY_ICON_COLOR =
+  Cesium.Color.fromCssColorString(EMERGENCY_TINT_CSS);
 
 // --- Ground traffic (owner reversal 2026-07-03; mirror of flights.js) ---------------
 // adsb.lol/readsb flags ground traffic with alt_baro === "ground" (no separate
@@ -186,8 +195,6 @@ export const RENDER_DELAY_SEC = 15;
 
 /** @constant {number} Polls an aircraft may miss before removal (transient adsb.lol dropouts). */
 
-export const MISSING_POLL_LIMIT = 3;
-
 // --- Landed-plane fast cull (mirror of flights.js; owner field report
 // 2026-07-02: "phantom" planes lingered ~2 min at airports after touchdown).
 // The feed's ground flag lags the actual landing, so a landed plane's last
@@ -207,8 +214,6 @@ export const LANDED_SPEED_MAX_MPS = 23;
 
 /** @constant {number} Missed-poll allowance for likely-landed planes (1 = removed on the first missed poll). */
 
-export const LANDED_MISSING_POLL_LIMIT = 1;
-
 // Field-test fix (RS46, 2026-07-06): only contacts rendering below this
 // ellipsoidal height get the below-ground floor clamp + a coarse floor-cell
 // warm. Terrain outside the extreme Himalaya tops out well under this, so
@@ -216,8 +221,6 @@ export const LANDED_MISSING_POLL_LIMIT = 1;
 // lookups; low pattern/heli work — the class that actually clips hillsides —
 // gets the floor.
 /** @constant {number} Max render altitude (m, ellipsoidal) eligible for the ground-floor clamp. */
-
-export const GROUND_FLOOR_WARM_MAX_ALT_M = 4500;
 
 // ---------------------------------------------------------------------------
 // Nadir-stable icon orientation (mirrors flights.js): surface-normal alignment

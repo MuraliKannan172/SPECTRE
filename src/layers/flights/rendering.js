@@ -1,14 +1,9 @@
 import * as Cesium from 'cesium';
-import {
-  CLASS_SCALE_2D,
-  CLASS_MODEL_REAL,
-  CLASS_SCALE_3D,
-  CLASS_MODEL_URL,
-} from '../../data/aircraftClass.js';
-import {
-  visualCenterForModel,
-  trailAnchorForModel,
-} from '../../data/modelVisualAnchor.js';
+import { cyberSonarBaseAlpha } from '../../cyberSonar.js';
+import { selectModelEligible } from '../../data/modelEligibility.js';
+import { civilAircraftModelSpec } from './modelSpec.js';
+import { CLASS_SCALE_2D } from '../../data/aircraftClass.js';
+import { isEmergency } from '../../data/aircraftEmergency.js';
 import { cockpitContactDotImage } from '../../data/cockpitContactDot.js';
 import { aircraftIcon, TRACKED_ICON_PX } from '../../data/aircraftIcons.js';
 import {
@@ -19,12 +14,8 @@ import {
 import { limitCourseStep, courseSlewCapDps } from '../../data/motionModel.js';
 import {
   MIL_TINT,
+  EMERGENCY_TINT,
   GROUND_SCALE,
-  MODEL_COLOR_BLEND_AMOUNT,
-  MODEL_SCALE,
-  PLANE_MODEL_URL,
-  MODEL_NATIVE_RADIUS_M,
-  MODEL_BELLY_OFFSET_NATIVE,
   COCKPIT_CONTACT_SIZE_PX,
   COCKPIT_CIVILIAN_COLOR,
   MODEL_ALT_CEIL_M,
@@ -65,11 +56,32 @@ export function createRendering({
   const { applyAircraftBillboardTreatment, applyAircraftModelTreatment } =
     services.recession;
 
-  /** Fleet (untracked) billboard tint: amber for known-military, white otherwise.
+  /** True while this contact's latest poll broadcast an emergency code. */
+
+  function _isEmergency(icao24, info = flightState.records.data.get(icao24)) {
+    return isEmergency(info?.emergency);
+  }
+
+  /** Fleet (untracked) billboard tint: red while broadcasting an emergency,
+   *  amber for known-military, white otherwise.
    *  Ground traffic gets NO special tint (owner verdict 2026-07-03 field test). */
 
-  function _fleetBillboardColor(icao24) {
+  function _fleetBillboardColor(
+    icao24,
+    info = flightState.records.data.get(icao24),
+  ) {
+    if (_isEmergency(icao24, info)) return EMERGENCY_TINT;
     return isMilitaryIcao(icao24) ? MIL_TINT : Cesium.Color.WHITE;
+  }
+
+  /** Cockpit far-contact dot tint: the emergency red outranks the category tint. */
+
+  function _cockpitContactColor(
+    icao24,
+    info = flightState.records.data.get(icao24),
+  ) {
+    if (_isEmergency(icao24, info)) return EMERGENCY_TINT;
+    return isMilitaryIcao(icao24) ? MIL_TINT : COCKPIT_CIVILIAN_COLOR;
   }
 
   /** Fleet billboard scale: per-class scale, ×GROUND_SCALE while grounded. */
@@ -77,7 +89,7 @@ export function createRendering({
   function _fleetBillboardScale(icao24, klass) {
     return (
       (CLASS_SCALE_2D[klass] || 1) *
-      (flightState._flightData.get(icao24)?.onGround ? GROUND_SCALE : 1)
+      (flightState.records.data.get(icao24)?.onGround ? GROUND_SCALE : 1)
     );
   }
 
@@ -100,31 +112,7 @@ export function createRendering({
   function _modelSpec(klass) {
     const cached = flightState._specCache.get(klass);
     if (cached) return cached;
-    const real = CLASS_MODEL_REAL[klass];
-    let spec;
-    if (real) {
-      spec = {
-        url: real.url,
-        scale: 1,
-        nativeRadiusM: real.radiusM,
-        bellyM: real.bellyM,
-        blendAmount: MODEL_COLOR_BLEND_AMOUNT,
-        visualCenterNative: visualCenterForModel(real.url),
-        trailAnchorNative: trailAnchorForModel(real.url),
-      };
-    } else {
-      const scale = MODEL_SCALE * (CLASS_SCALE_3D[klass] || 1);
-      const url = CLASS_MODEL_URL[klass] || PLANE_MODEL_URL;
-      spec = {
-        url,
-        scale,
-        nativeRadiusM: MODEL_NATIVE_RADIUS_M,
-        bellyM: MODEL_BELLY_OFFSET_NATIVE * scale,
-        blendAmount: MODEL_COLOR_BLEND_AMOUNT,
-        visualCenterNative: visualCenterForModel(url),
-        trailAnchorNative: trailAnchorForModel(url),
-      };
-    }
+    const spec = civilAircraftModelSpec(klass);
     flightState._specCache.set(klass, spec);
     return spec;
   }
@@ -158,20 +146,18 @@ export function createRendering({
     const isCockpitNear =
       isCockpitContact && flightState._cockpitNearContacts.has(icao24);
     if (isCockpitContact && !isCockpitNear) {
-      const freshnessAlpha = bb.color?.alpha ?? 1;
+      const freshnessAlpha = cyberSonarBaseAlpha(bb);
       bb.image = cockpitContactDotImage();
       bb.width = COCKPIT_CONTACT_SIZE_PX;
       bb.height = COCKPIT_CONTACT_SIZE_PX;
       bb.scale = limbScale;
       bb.scaleByDistance = _cockpitBillboardScaleByDistance();
-      bb.color = (
-        isMilitaryIcao(icao24) ? MIL_TINT : COCKPIT_CIVILIAN_COLOR
-      ).withAlpha(freshnessAlpha);
+      bb.color = _cockpitContactColor(icao24).withAlpha(freshnessAlpha);
       bb.rotation = 0;
       return;
     }
 
-    const meta = flightState._flightData.get(icao24);
+    const meta = flightState.records.data.get(icao24);
     bb.image = aircraftIcon(
       _iconKind(icao24, meta?.klass),
       bb._gevIconLarge ? TRACKED_ICON_PX : undefined,
@@ -180,7 +166,7 @@ export function createRendering({
     bb.height = icao24 === flightState._trackedIcao ? 24 : 20;
     bb.scale = _fleetBillboardScale(icao24, meta?.klass) * limbScale;
     bb.scaleByDistance = _normalBillboardScaleByDistance();
-    bb.color = _fleetBillboardColor(icao24).withAlpha(bb.color?.alpha ?? 1);
+    bb.color = _fleetBillboardColor(icao24).withAlpha(cyberSonarBaseAlpha(bb));
   }
 
   /**
@@ -197,7 +183,7 @@ export function createRendering({
 
   function _modelColor(icao24) {
     if (icao24 === flightState._trackedIcao) return Cesium.Color.CYAN;
-    return isMilitaryIcao(icao24) ? MIL_TINT : Cesium.Color.WHITE;
+    return _fleetBillboardColor(icao24);
   }
 
   /** The FLEET's 3D-model regime: models3d enabled AND the camera zoomed in past the altitude
@@ -303,7 +289,7 @@ export function createRendering({
    *  because a resample is mid-backoff. */
 
   function _modelDisplayPosition(icao24, pos, result) {
-    const meta = flightState._flightData.get(icao24);
+    const meta = flightState.records.data.get(icao24);
     if (!meta || !meta.onGround) return pos;
     const h = flightState._groundSnap.heightFor(
       flightState._viewer,
@@ -438,7 +424,7 @@ export function createRendering({
    *  the same rule (its billboard entity is always the fallback visual). */
 
   function _syncModelToClass(icao24) {
-    const key = _specKeyFor(flightState._flightData.get(icao24)?.klass);
+    const key = _specKeyFor(flightState.records.data.get(icao24)?.klass);
     const current = flightState._models.get(icao24);
     if (
       (current && current._gevSpecKey !== key) ||
@@ -510,10 +496,10 @@ export function createRendering({
     // aircraft mid-load, the post-await admission below rejects the stale asset.
     // Boost state likewise: the creation options bake it in, so a mid-load
     // toggle must reject too (the reload queue only covers ADMITTED models).
-    const specKey = _specKeyFor(flightState._flightData.get(icao24)?.klass);
+    const specKey = _specKeyFor(flightState.records.data.get(icao24)?.klass);
     const loadIrBoost = flightState._irBoost;
     try {
-      const spec = _modelSpec(flightState._flightData.get(icao24)?.klass);
+      const spec = _modelSpec(flightState.records.data.get(icao24)?.klass);
       model = await Cesium.Model.fromGltfAsync({
         url: resolveAsset(spec.url),
         asynchronous: false,
@@ -559,12 +545,12 @@ export function createRendering({
       !_modelRegimeActive() ||
       !flightState._modelCollection ||
       flightState._modelCollection.isDestroyed() ||
-      !flightState._flightData.has(icao24) ||
+      !flightState.records.data.has(icao24) ||
       icao24 === flightState._trackedIcao ||
       flightState._models.has(icao24) ||
       flightState._models.size >= _modelCap() ||
       // Class reclassified mid-load → this GLB/scale is for the OLD class.
-      _specKeyFor(flightState._flightData.get(icao24)?.klass) !== specKey ||
+      _specKeyFor(flightState.records.data.get(icao24)?.klass) !== specKey ||
       // IR boost flipped mid-load → this model baked the wrong shader/tint.
       flightState._irBoost !== loadIrBoost;
     if (stale) {
@@ -714,10 +700,10 @@ export function createRendering({
       flightState._trackedModelLoading = true;
       const gen = flightState._trackedModelGen;
       const trackedSpec = _modelSpec(
-        flightState._flightData.get(flightState._trackedIcao)?.klass,
+        flightState.records.data.get(flightState._trackedIcao)?.klass,
       );
       const trackedKey = _specKeyFor(
-        flightState._flightData.get(flightState._trackedIcao)?.klass,
+        flightState.records.data.get(flightState._trackedIcao)?.klass,
       );
       const trackedIrBoost = flightState._irBoost;
       Cesium.Model.fromGltfAsync({
@@ -756,7 +742,7 @@ export function createRendering({
           // _trackedModel was still null): drop the stale asset; driver reloads.
           if (
             _specKeyFor(
-              flightState._flightData.get(flightState._trackedIcao)?.klass,
+              flightState.records.data.get(flightState._trackedIcao)?.klass,
             ) !== trackedKey ||
             flightState._irBoost !== trackedIrBoost
           ) {
@@ -829,7 +815,7 @@ export function createRendering({
       );
       if (!flightState._trackedModel.ready) return;
       const spec = _modelSpec(
-        flightState._flightData.get(flightState._trackedIcao)?.klass,
+        flightState.records.data.get(flightState._trackedIcao)?.klass,
       );
       flightState._trackedModel.scale = trackedModelScaleForPixelCap({
         baseScale: spec.scale,
@@ -953,31 +939,11 @@ export function createRendering({
         );
         flightState._lastModelCapWarnMs = nowMs;
       }
-      modelEligible = new Set();
-      // 1. KEEP on-screen already-modeled (visible retained — no flicker for what you can see).
-      for (const [icao, , inF] of cand) {
-        if (modelEligible.size >= cap) break;
-        if (inF && flightState._models.has(icao)) modelEligible.add(icao);
-      }
-      // 2. ADD on-screen NEW inside the add radius, nearest first (visible additions win the cap).
-      for (const [icao, d2, inF] of cand) {
-        if (modelEligible.size >= cap) break;
-        if (inF && d2 <= addDistSq && !modelEligible.has(icao))
-          modelEligible.add(icao);
-      }
-      // 3. KEEP off-screen already-modeled (hysteresis, but LOWER priority than anything visible — so a
-      //    retained off-screen model can never starve an on-screen plane that wants one; dropping it is
-      //    invisible and it re-adds the moment it's back in view).
-      for (const [icao, , inF] of cand) {
-        if (modelEligible.size >= cap) break;
-        if (!inF && flightState._models.has(icao)) modelEligible.add(icao);
-      }
-      // 4. ADD off-screen NEW inside the add radius with any leftover slots.
-      for (const [icao, d2, inF] of cand) {
-        if (modelEligible.size >= cap) break;
-        if (!inF && d2 <= addDistSq && !modelEligible.has(icao))
-          modelEligible.add(icao);
-      }
+      modelEligible = selectModelEligible(cand, {
+        cap,
+        addDistSq,
+        isModeled: (icao) => flightState._models.has(icao),
+      });
       const toRelease = [];
       for (const icao of flightState._models.keys()) {
         if (icao !== flightState._trackedIcao && !modelEligible.has(icao))
@@ -989,7 +955,7 @@ export function createRendering({
     for (const [icao24, bb] of flightState._billboards) {
       if (icao24 === flightState._trackedIcao) continue; // tracked entity owns its own motion
 
-      const info = flightState._flightData.get(icao24);
+      const info = flightState.records.data.get(icao24);
 
       const dr = parts.motion._deadReckon(icao24, flightState._scratchFleetPos);
       // The dead-reckoned point drifts away from the fix whose cell supplied the
@@ -1018,7 +984,7 @@ export function createRendering({
       // pass would hide a plane that is really just low over high-N terrain
       // waiting for its floor to warm (ATL grounded contacts at geoid −31 m).
       const beyondHorizon = !occluder.isPointVisible(
-        info?.cullPosition || bb.position,
+        flightState._cullPositions.get(icao24) || bb.position,
       );
       // A billboard flipping INTO view (horizon reveal while the camera idles)
       // gets its rotation refreshed THIS tick even without a pose change —
@@ -1062,19 +1028,18 @@ export function createRendering({
       const isCockpitNear =
         flightState._cockpitContactMode &&
         flightState._cockpitNearContacts.has(icao24);
-      const baseColor =
+      const layerBaseColor =
         flightState._cockpitContactMode && !isCockpitNear
-          ? isMilitaryIcao(icao24)
-            ? MIL_TINT
-            : COCKPIT_CIVILIAN_COLOR
-          : _fleetBillboardColor(icao24);
+          ? _cockpitContactColor(icao24, info)
+          : _fleetBillboardColor(icao24, info);
+      const baseColor = layerBaseColor;
       const treatment = applyAircraftBillboardTreatment({
         billboard: bb,
         baseScale:
           flightState._cockpitContactMode && !isCockpitNear
             ? 1
             : _fleetBillboardScale(icao24, info?.klass),
-        baseAlpha: flightState._missingPolls.get(icao24) ? 0.45 : 1,
+        baseAlpha: flightState.records.missingPolls.get(icao24) ? 0.45 : 1,
         baseColor,
         focusFactor: focus.factor,
         cameraDistanceM,

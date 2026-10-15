@@ -1,3 +1,4 @@
+import { installationResponseSaturated } from './source.js';
 import * as Cesium from 'cesium';
 import {
   EARTH_MEAN_RADIUS_M,
@@ -115,45 +116,32 @@ export function createModel({ state: layerState, services, parts, source }) {
       longitude >= box.west &&
       longitude <= box.east;
     if (centreInside) return true;
-    if (Array.isArray(footprint) && footprint.length) {
-      let minLat = Infinity;
-      let maxLat = -Infinity;
-      let minLon = Infinity;
-      let maxLon = -Infinity;
-      for (const [lon, lat] of footprint) {
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        if (lon < minLon) minLon = lon;
-        if (lon > maxLon) maxLon = lon;
-      }
-      return (
-        maxLat >= box.south &&
-        minLat <= box.north &&
-        maxLon >= box.west &&
-        minLon <= box.east
-      );
-    }
+    const footprints =
+      record.footprints?.map((rings) => rings[0]) ||
+      (footprint?.length ? [footprint] : []);
+    if (footprints.length)
+      return footprints.some((footprint) => {
+        let minLat = Infinity;
+        let maxLat = -Infinity;
+        let minLon = Infinity;
+        let maxLon = -Infinity;
+        for (const [lon, lat] of footprint) {
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+        }
+        return (
+          maxLat >= box.south &&
+          minLat <= box.north &&
+          maxLon >= box.west &&
+          minLon <= box.east
+        );
+      });
     // Unknown extent: inclusive. Only a point feature may be excluded on centre.
     return record.osmType !== 'node';
   }
 
-  /**
-   * Whether a response was truncated at the upstream element cap.
-   *
-   * The proxy states this outright, but a `saturated`-less payload is NOT
-   * evidence of a complete answer: entries cached before the saturation guard
-   * shipped predate the field and live for 30 days. Fall back to deriving it from
-   * the element count against the cap the payload itself reports.
-   * @param {{saturated?: boolean, elements?: Array, elementCap?: number}} payload
-   * @returns {boolean}
-   */
-
-  function installationResponseSaturated(payload) {
-    if (typeof payload?.saturated === 'boolean') return payload.saturated;
-    const cap = Number(payload?.elementCap);
-    if (!Number.isFinite(cap) || cap <= 0) return false;
-    return Array.isArray(payload?.elements) && payload.elements.length >= cap;
-  }
   return {
     approximateSurfaceDistanceM,
     colorFor,

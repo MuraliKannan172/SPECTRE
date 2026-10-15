@@ -254,7 +254,9 @@ test('retry: HTTP 429 Retry-After 5s gets one ladder-spaced retry; a second 429 
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 10_000 });
   globalThis.window = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
   const requestTimes = [];
-  globalThis.fetch = async () => {
+  globalThis.fetch = async (url) => {
+    // The one-time capability probe is not an outline request.
+    if (String(url).endsWith('/status')) return httpFailure(404);
     requestTimes.push(Date.now());
     return httpFailure(429, '5');
   };
@@ -311,7 +313,9 @@ test('retry: a plain HTTP 500 still exhausts the existing 8s/25s transient ladde
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 100_000 });
   globalThis.window = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
   const requestTimes = [];
-  globalThis.fetch = async () => {
+  globalThis.fetch = async (url) => {
+    if (String(url).endsWith('/status'))
+      return Response.json({ configured: true });
     requestTimes.push(Date.now());
     return httpFailure(500);
   };
@@ -400,7 +404,7 @@ test('outline upgrade updates the rendered element in place without remove/add',
   };
   let overpassCall = 0;
   globalThis.fetch = async (url) => {
-    if (String(url).startsWith('https://maps.googleapis.com/')) {
+    if (String(url).startsWith('/api/google/geocode')) {
       return { json: async () => ({
         status: 'OK',
         results: [{
@@ -709,4 +713,20 @@ test('a late annotation resolver cannot redraw after destruction', async (t) => 
   await pending;
   assert.equal(calls.add, 0);
   assert.equal(engine.count(), 0);
+});
+
+test('only an explicit navigation request permits resolving distant annotation targets', async (t) => {
+  installAnimationFrameStubs(t);
+  _resetRenderGovernorForTest();
+  t.after(() => _resetRenderGovernorForTest());
+  const { renderer } = throwingRendererHarness();
+  renderer.destroy = () => {};
+  const received = [];
+  const engine = createAnnotationEngine({ viewer: {}, renderer,
+    resolveTarget: async (options) => { received.push(options); return null; },
+  });
+  await engine.annotate([{ type: 'point', target: 'Remote landmark' }]);
+  await engine.annotate([{ type: 'point', target: 'Remote landmark' }], { flyTo: true });
+  assert.deepEqual(received.map(options => options.allowDistant), [false, true]);
+  engine.destroy();
 });

@@ -1,9 +1,12 @@
+import { createStandaloneCatalog } from './catalog.js';
 import { createStandalonePlaceSearch } from './placeSearch.js';
+import { CITY_POIS } from '../locations.js';
 import { createApplication } from '../app/application.js';
 import { createStandaloneScene } from './scene.js';
 import { createStandaloneControls } from './controls.js';
 import { createStandaloneData } from './data.js';
 import { createStandaloneTools } from './tools.js';
+import { createGoogleTokenSource } from '../maps/googleTokens.js';
 
 // The existing controls and layer catalog contain page-scoped state.
 let constructed = false;
@@ -12,6 +15,10 @@ let constructed = false;
 export function createStandaloneApplication({
   googleApiKey,
   cesiumToken,
+  geospatial = {},
+  voice = {},
+  sources = {},
+  streetLevelProviders,
   allowQaRegistration = false,
 }) {
   if (constructed)
@@ -20,24 +27,53 @@ export function createStandaloneApplication({
   const loadingScreen = document.getElementById('loading-screen');
   const loaderStatus = loadingScreen.querySelector('.loader-status');
   let placeSearch;
+  let catalog;
   return createApplication({
-    createScene: (context) => {
+    createScene: async (context) => {
       placeSearch = createStandalonePlaceSearch({
+        // The bundled city and landmark data the offline name provider reads.
+        // The search package takes it as plain data rather than importing it,
+        // so it stays free of application state.
+        presets: CITY_POIS,
+        ...geospatial,
         resolveApiKey: () => googleApiKey,
         signal: context.signal,
       });
-      return createStandaloneScene({
+      const scene = await createStandaloneScene({
         ...context,
         googleApiKey,
+        // Without a key, Google 3D can still load with tokens from the
+        // app's server when it offers them.
+        googleTokens: googleApiKey ? null : createGoogleTokenSource(),
         cesiumToken,
         loaderStatus,
       });
+      catalog = createStandaloneCatalog({
+        sources,
+        streetLevelProviders,
+        nepalBoundaryResolver: (signal) =>
+          scene.operations.annotationResolver.resolveRegionRingForQuery(
+            'Nepal',
+            signal,
+            placeSearch,
+            // The locator draws the border whenever it arrives.
+            { budgetMs: Infinity },
+          ),
+        signal: context.signal,
+        surface: scene.operations.surface,
+      });
+      return scene;
     },
     createControls: (context) =>
-      createStandaloneControls({ ...context, loaderStatus, placeSearch }),
+      createStandaloneControls({
+        ...context,
+        loaderStatus,
+        placeSearch,
+        catalog,
+      }),
     createData: (context) =>
-      createStandaloneData({ ...context, allowQaRegistration }),
+      createStandaloneData({ ...context, allowQaRegistration, catalog }),
     createTools: (context) =>
-      createStandaloneTools({ ...context, loadingScreen, placeSearch }),
+      createStandaloneTools({ ...context, loadingScreen, placeSearch, voice }),
   });
 }

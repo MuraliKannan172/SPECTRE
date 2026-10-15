@@ -15,7 +15,9 @@ body.recording-mode #cctv-panel,
 body.recording-mode #radio-panel,
 body.recording-mode #global-context-panel,
 body.recording-mode #gev-voice-control,
-body.recording-mode #scene-panel {
+body.recording-mode #scene-panel,
+/* The expanded viewer lives on <body>, outside every panel. */
+body.recording-mode .sl-viewer-wrap-expanded {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -27,6 +29,12 @@ body.recording-mode #scene-runtime.active {
 }
 
 /* Scene playback owns layer and camera sequencing until Stop or completion. */
-body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
+body.scene-playback-mode
+  :is(
+    #clear-selected-layers,
+    #tilt-map-view,
+    #north-up-view,
+    #reset-globe-view
+  ) {
   display: none !important;
 }

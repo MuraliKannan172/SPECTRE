@@ -27,8 +27,8 @@ export function createQueries({
   function aisRetryInSec() {
     // A rejected key is terminal until someone changes it; an hour-long
     // countdown would imply waiting is the fix.
-    if (state.transportStatus === 'auth-failed') return 0;
-    const at = Number(state.nextAttemptAt);
+    if (state.feed.transportStatus === 'auth-failed') return 0;
+    const at = Number(state.feed.nextAttemptAt);
     if (!Number.isFinite(at) || at <= 0) return 0;
     return Math.max(0, Math.ceil((at - vesselState._aisRuntime.now()) / 1000));
   }
@@ -36,7 +36,7 @@ export function createQueries({
   /**
    * Chip text for a feed the server has reported as not delivering.
    * @param {string} status - 'stale' | 'reconnecting' | 'down'
-   * @param {Object} payload - Parsed /api/ais-live JSON.
+   * @param {Object} payload - Parsed /api/vessels JSON.
    * @returns {string}
    */
 
@@ -61,12 +61,12 @@ export function createQueries({
   }
 
   /**
-   * Derive a surfaced error string from an /api/ais-live payload, or null when the
+   * Derive a surfaced error string from an /api/vessels payload, or null when the
    * feed has accepted product data. Socket transport, message receipt, and usable
    * vessel positions are separate health stages: an open socket with no message
    * or no accepted positions must not read as a fresh successful update.
    *
-   * @param {Object|null|undefined} payload - Parsed /api/ais-live JSON.
+   * @param {Object|null|undefined} payload - Parsed /api/vessels JSON.
    * @param {number} acceptedRowCount - Number of rows accepted by vessel normalization.
    * @returns {string|null} A short reason for the chip, or null if healthy.
    */
@@ -106,7 +106,7 @@ export function createQueries({
 
   /**
    * Classify one server snapshot before any destructive reconciliation.
-   * @param {Object|null|undefined} payload - Parsed /api/ais-live payload.
+   * @param {Object|null|undefined} payload - Parsed /api/vessels payload.
    * @returns {{transportStatus: string|null, lastMessageAt: number|string|null,
    *   rawRows: Array<Object>, acceptedRows: Array<Object>, rawRowCount: number,
    *   acceptedRowCount: number, error: string|null}}
@@ -119,7 +119,16 @@ export function createQueries({
       typeof payload?.status === 'string' ? payload.status : null;
     const lastMessageAt = payload?.lastMessageAt ?? null;
     const acceptedRowCount = acceptedRows.length;
+    const emptyCoverage =
+      rawRows.length === 0 &&
+      payload?.rawRowCount === 0 &&
+      payload?.complete === true &&
+      payload?.freshness === 'current' &&
+      AIS_HEALTHY_STATUSES.has(transportStatus) &&
+      Number.isFinite(Number(lastMessageAt)) &&
+      Number(lastMessageAt) > 0;
     return {
+      emptyCoverage,
       transportStatus,
       lastMessageAt,
       rawRows,
@@ -130,9 +139,10 @@ export function createQueries({
           ? payload.rawRowCount
           : rawRows.length,
       acceptedRowCount,
-      error:
-        deriveAisFeedError(payload, acceptedRowCount) ||
-        (acceptedRowCount === 0 ? 'awaiting usable AIS positions…' : null),
+      error: emptyCoverage
+        ? null
+        : deriveAisFeedError(payload, acceptedRowCount) ||
+          (acceptedRowCount === 0 ? 'awaiting usable AIS positions…' : null),
     };
   }
 
@@ -140,9 +150,9 @@ export function createQueries({
    * Map one internal vessel record to a plain JSON-safe analyst record
    * (analyst query engine seam). Pure — no Cesium types. Missing/unknown
    * fields are null, never NaN/undefined. navStatus is always null: the
-   * /api/ais-live proxy does not surface AIS NavigationalStatus, so it
+   * /api/vessels proxy does not surface AIS NavigationalStatus, so it
    * cannot be derived client-side.
-   * @param {Object|null|undefined} record - `state.vesselMap`/`state.vesselRecords` entry.
+   * @param {Object|null|undefined} record - `state.records.byMmsi`/`state.records.all` entry.
    * @returns {{id: string|null, mmsi: string|null, name: string|null,
    *   lat: number|null, lon: number|null, speedKts: number|null,
    *   courseDeg: number|null, shipType: string|null, destination: string|null,
@@ -248,14 +258,14 @@ export function createQueries({
      */
     findByQuery(query) {
       if (query === null || query === undefined) return null;
-      const records = state.vesselRecords;
+      const records = state.records.all;
       if (!Array.isArray(records) || !records.length) return null;
       const q = String(query).trim();
       if (!q) return null;
 
       let record = null;
       if (/^\d+$/.test(q)) {
-        record = state.vesselMap.get(q) || null;
+        record = state.records.byMmsi.get(q) || null;
       }
       if (!record) {
         const lower = q.toLowerCase();
@@ -268,7 +278,9 @@ export function createQueries({
       }
       if (!record) return null;
 
-      const position = record.billboard?.position || record.position;
+      const position =
+        components.rendering.getVisual(record).billboard?.position ||
+        components.rendering.getVisual(record).position;
       if (!position) return null;
       return {
         mmsi: record.mmsi,
@@ -290,7 +302,7 @@ export function createQueries({
      * @returns {Array<{ mmsi: string, name: string, position: Cesium.Cartesian3, distanceM: number }>}
      */
     getNearby(centerCartesian, rangeM, maxCount = 25) {
-      const records = state.vesselRecords;
+      const records = state.records.all;
       if (!centerCartesian || !Array.isArray(records) || !records.length)
         return [];
       const range = Number.isFinite(rangeM) && rangeM > 0 ? rangeM : Infinity;
@@ -299,9 +311,10 @@ export function createQueries({
 
       const entries = [];
       for (const record of records) {
+        const visual = components.rendering.getVisual(record);
         if (!Number.isFinite(record.lat) || !Number.isFinite(record.lon))
           continue;
-        const position = record.billboard?.position || record.position;
+        const position = visual.billboard?.position || visual.position;
         if (!position) continue;
         const distanceM = Cesium.Cartesian3.distance(centerCartesian, position);
         if (!Number.isFinite(distanceM) || distanceM > range) continue;
@@ -333,22 +346,27 @@ export function createQueries({
      *   holds no data and therefore cannot answer.
      */
     hasContact(mmsi) {
-      if (!state.enabled || !state.vesselMap || state.vesselMap.size === 0)
+      if (
+        !state.feed.enabled ||
+        !state.records.byMmsi ||
+        state.records.byMmsi.size === 0
+      )
         return null;
       if (!mmsi) return false;
-      return state.vesselMap.has(String(mmsi).trim());
+      return state.records.byMmsi.has(String(mmsi).trim());
     },
 
     getAllPositions(maxCount = 800) {
       const result = [];
-      const records = state.vesselRecords;
+      const records = state.records.all;
       if (!Array.isArray(records)) return result;
       const cap =
         Number.isFinite(maxCount) && maxCount > 0 ? Math.floor(maxCount) : 800;
 
       for (const record of records) {
+        const visual = components.rendering.getVisual(record);
         if (result.length >= cap) break;
-        const position = record.billboard?.position || record.position;
+        const position = visual.billboard?.position || visual.position;
         if (!position) continue;
         result.push({
           id: record.mmsi,
@@ -370,8 +388,8 @@ export function createQueries({
      * @returns {Array<Object>} See mapAnalystRecord for the record shape.
      */
     getAnalystRecords(maxCount = 2000) {
-      if (!state.enabled) return [];
-      const records = state.vesselRecords;
+      if (!state.feed.enabled) return [];
+      const records = state.records.all;
       if (!Array.isArray(records) || !records.length) return [];
       const limit = Number.isFinite(maxCount)
         ? Math.max(1, Math.floor(maxCount))
@@ -394,7 +412,7 @@ export function createQueries({
       if (mmsi === null || mmsi === undefined) return false;
       const target = String(mmsi).trim();
       if (!target) return false;
-      const record = state.vesselMap.get(target);
+      const record = state.records.byMmsi.get(target);
       if (!record) return false;
       components.selection.selectVessel(record);
       return true;
@@ -438,12 +456,12 @@ export function createQueries({
      */
     getDetectableObjects(options = {}) {
       if (
-        !state.enabled ||
+        !state.feed.enabled ||
         !state.billboardCollection ||
         !state.billboardCollection.show
       )
         return [];
-      const records = state.vesselRecords;
+      const records = state.records.all;
       if (!Array.isArray(records) || !records.length) return [];
 
       const maxCount = Number.isFinite(options.maxCount)
@@ -459,8 +477,9 @@ export function createQueries({
       for (let idx = 0; idx < records.length; idx += 1) {
         if ((idx - start) % stride !== 0) continue;
         const record = records[idx];
-        if (record.billboard && !record.billboard.show) continue;
-        const position = record.billboard?.position || record.position;
+        const visual = components.rendering.getVisual(record);
+        if (visual.billboard && !visual.billboard.show) continue;
+        const position = visual.billboard?.position || visual.position;
         if (!position) continue;
         result.push({
           position,
@@ -488,22 +507,26 @@ export function createQueries({
       : {}),
 
     getStats() {
-      const waitingForFirstPosition = state.firstConnectPhase === 'loading';
+      const waitingForFirstPosition =
+        state.feed.firstConnectPhase === 'loading';
       return {
-        count: state.count,
-        lastUpdate: state.lastUpdate,
-        loading: state.loading || waitingForFirstPosition,
+        count: state.feed.count,
+        lastUpdate: state.feed.lastUpdate,
+        loading: state.feed.loading || waitingForFirstPosition,
         loadingLabel: waitingForFirstPosition
           ? AIS_FIRST_CONNECT_LABEL
-          : state.loadingLabel,
-        error: state.error,
-        stale: state.stale,
+          : state.feed.loadingLabel,
+        error: state.feed.error,
+        stale: state.feed.stale,
+        partial: state.feed.partial,
         status:
-          state.firstConnectPhase === 'unavailable' ? 'unavailable' : undefined,
-        transportStatus: state.transportStatus,
-        lastMessageAt: state.lastMessageAt,
-        rawRowCount: state.rawRowCount,
-        acceptedRowCount: state.acceptedRowCount,
+          state.feed.firstConnectPhase === 'unavailable'
+            ? 'unavailable'
+            : undefined,
+        transportStatus: state.feed.transportStatus,
+        lastMessageAt: state.feed.lastMessageAt,
+        rawRowCount: state.feed.rawRowCount,
+        acceptedRowCount: state.feed.acceptedRowCount,
         // Same chip affordance the flights layer uses: when the server is
         // backing off, say how long until the next attempt instead of leaving
         // the user to guess whether anything is still happening.
