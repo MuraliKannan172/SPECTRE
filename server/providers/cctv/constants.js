@@ -309,7 +309,8 @@ export const DELDOT_ANCHORS = [
  * City of Toronto RESCU traffic cameras: the municipal network the province's
  * 511 pack does not cover — downtown arterials plus the Gardiner, DVP, Allen
  * and Lake Shore. One keyless list for the whole city (~336 cameras), from the
- * City's open data portal, refreshed within two minutes of any change.
+ * City's open data portal. It is fetched on every catalog refresh, but the
+ * upstream file is not updated often and may lag the live camera network.
  *
  * The list is served as JSONP (`jsonTMCEarthCamerasCallback({...})`); the
  * portal publishes the same data as .xml and .csv beside it.
@@ -329,10 +330,10 @@ export const DEFAULT_TORONTO_MAX_SOURCES = 336;
 /** Yonge / Queen: the prioritization anchor. */
 export const TORONTO_DOWNTOWN = { lat: 43.6532, lon: -79.3832 };
 /** The city climbs from 76 m at the lake to 209 m at Steeles, so no single
- * number fits: this is the mean across the 336 camera sites. Placement comes
- * from the precomputed ground-height sidecar wherever a camera has an entry;
- * this prior is only the fallback for a sidecar miss or an edited pose, and
- * the client's ground snap corrects it wherever 3D tiles are loaded. */
+ * number fits: this is the mean across the 336 camera sites. The ground-height
+ * sidecar has no Toronto entries yet, so this prior seeds placement; a camera
+ * that gains a sidecar entry uses it instead, and the client's ground snap
+ * corrects the prior wherever 3D tiles are loaded. */
 export const TORONTO_GROUND_ELEVATION_M = 116;
 /** Hard ceiling on the RESCU list body. The whole city is ~336 rows and under
  * 60 KB; this only exists so an upstream that streams an unbounded body cannot
