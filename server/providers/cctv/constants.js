@@ -9,14 +9,11 @@ export const DEFAULT_AUSTIN_MAX_SOURCES = 250;
  * itself (nearest-to-anchor first); this bound only matters when the packs
  * together exceed it, and it is then filled round-robin across packs (see
  * cap.js) so no region is silently dropped. Sized above the sum of the
- * default per-pack caps so a default install never trims (enforced by
- * cctvCatalogCap.test.mjs). The per-pack defaults reach 5,204 with WSDOT and
- * Statens vegvesen, so this is 5,500: room for one more small pack while
- * staying under CCTV_MAX_SOURCES_CEILING, which also sizes the health map.
+ * default per-pack caps so a default install never trims.
  */
-export const DEFAULT_CCTV_MAX_SOURCES = 5500;
+export const DEFAULT_CCTV_MAX_SOURCES = 4000;
 /** Hard upper bound for CCTV_MAX_SOURCES; also sizes the health map. */
-export const CCTV_MAX_SOURCES_CEILING = 6000;
+export const CCTV_MAX_SOURCES_CEILING = 5000;
 /** Reference point for Austin camera prioritization (Congress & 6th). */
 export const AUSTIN_DOWNTOWN = { lat: 30.2672, lon: -97.7431 };
 /** Caltrans CCTV: one JSON feed per district, identical schema statewide. */
@@ -268,6 +265,36 @@ export const NORWAY_ANCHORS = [
   { lat: 58.1467, lon: 7.9956 }, // Kristiansand
   { lat: 67.2804, lon: 14.4049 }, // Bodø
   { lat: 69.6492, lon: 18.9553 }, // Tromsø
+];
+
+/** NYC DOT Traffic Management Center cameras: one keyless JSON list for the
+ * five boroughs (~980 cameras). Frames are stills synthesized from each
+ * camera UUID on the city's webcam host — never taken from the payload. */
+export const NYC_CAMERAS_URL = 'https://webcams.nyctmc.org/api/cameras';
+/** The only origin NYC camera frames may come from. The catalog's `imageUrl`
+ * is ignored; the registered path is always this origin plus a validated
+ * UUID plus `/image`. */
+export const NYC_IMAGE_ORIGIN = 'https://webcams.nyctmc.org/api/cameras/';
+export const NYC_IMAGE_URL = (id) => `${NYC_IMAGE_ORIGIN}${id}/image`;
+export const NYC_CAMERA_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const DEFAULT_NYC_MAX_SOURCES = 250;
+/** Hard ceiling on the NYC catalog body. The live list is ~980 rows / ~250 KB;
+ * this only exists so an upstream that streams an unbounded body cannot be
+ * buffered without limit. */
+export const NYC_MAX_CATALOG_BYTES = 4 * 1024 * 1024;
+/** Ground-elevation prior in metres. Matches the New York CITY_POIS prior;
+ * the client's one-shot ground snap corrects it wherever 3D tiles load. */
+export const NYC_GROUND_ELEVATION_M = 10;
+/** Prioritization anchors: one per borough so a cap keeps citywide coverage
+ * rather than Midtown alone. */
+export const NYC_ANCHORS = [
+  { lat: 40.758, lon: -73.9855 }, // Manhattan (Times Square)
+  { lat: 40.7128, lon: -74.006 }, // Lower Manhattan
+  { lat: 40.6782, lon: -73.9442 }, // Brooklyn
+  { lat: 40.7282, lon: -73.7949 }, // Queens
+  { lat: 40.8448, lon: -73.8648 }, // Bronx
+  { lat: 40.5795, lon: -74.1502 }, // Staten Island
 ];
 
 /** DelDOT CCTV: one keyless statewide JSON catalog; live video via RTMP-over-HTTP (rtmpt:80). */
