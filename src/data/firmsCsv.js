@@ -105,6 +105,8 @@ export function parseFirmsCsv(text) {
     if (parts.length < header.length) continue; // malformed row — skip
     const lat = Number(parts[iLat]);
     const lon = Number(parts[iLon]);
+    // Blank or out-of-range positions are dropped, never read as 0 (see
+    // hasCoordinateValue in firmsAdapt.js for the proxy-record side).
     if (
       !parts[iLat].trim() ||
       !parts[iLon].trim() ||

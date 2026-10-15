@@ -29,3 +29,41 @@ test('missing positions do not become fire detections at zero coordinates', () =
     ],
   );
 });
+
+test('both axes keep their exact bounds and drop values just past them', () => {
+  const row = (lat, lon) => `${lat},${lon},2026-07-16,1200,n,1`;
+  const csv = [
+    'latitude,longitude,acq_date,acq_time,confidence,frp',
+    row(90, 180),
+    row(-90, -180),
+    row(90.000001, 0),
+    row(-90.000001, 0),
+    row(0, 180.000001),
+    row(0, -180.000001),
+    row(' ', 5),
+    row(5, '\t'),
+  ].join('\n');
+  assert.deepEqual(
+    parseFirmsCsv(csv).map((r) => [r.lat, r.lon]),
+    [
+      [90, 180],
+      [-90, -180],
+    ],
+  );
+  const kept = adaptFirmsRecords([
+    { lat: 90, lon: 180 },
+    { lat: '-90', lon: '-180' },
+    { lat: -90.000001, lon: 0 },
+    { lat: 0, lon: -180.000001 },
+    { lat: 5, lon: ' ' },
+    { lat: 5, lon: undefined },
+    { lat: [5], lon: 5 },
+  ]);
+  assert.deepEqual(
+    kept.map((r) => [r.lat, r.lon]),
+    [
+      [90, 180],
+      [-90, -180],
+    ],
+  );
+});
