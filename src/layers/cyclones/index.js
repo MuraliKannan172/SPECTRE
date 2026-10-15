@@ -14,7 +14,13 @@ import {
   CYCLONE_OVERLAY_SOURCE_ID,
   cycloneStormIdFromEntryId,
 } from './labels.js';
-import { formatUtcDayMonth, t, tn, msg } from '../../i18n/index.js';
+import {
+  formatUtcDayMonth,
+  t,
+  tn,
+  msg,
+  translateKnown,
+} from '../../i18n/index.js';
 import { formatQuantity } from '../../ui/unitLabels.js';
 
 // "10-12 15:00 UTC" never breaks across lines: no-break spaces, and a word
@@ -26,6 +32,15 @@ const utc = (value) =>
 const COVERAGE = msg(
   'Atlantic and eastern/central North Pacific; not worldwide cyclone coverage.',
 );
+// The server sends the same English coverage (server/providers/cyclones.js);
+// data stays English and is translated here, where it is shown.
+const coverageText = (coverage) =>
+  !coverage || coverage === COVERAGE ? t(COVERAGE) : translateKnown(coverage);
+const ADVISORIES_UNAVAILABLE = msg('Cyclone advisories unavailable');
+// Reason the server gives with an unavailable snapshot, translated when shown.
+const SERVER_REASONS = new Set([msg('Cyclone data unavailable')]);
+const errorText = (error) =>
+  error && (SERVER_REASONS.has(error) ? t(error) : translateKnown(error));
 const CLASSIFICATION_NAMES = Object.freeze({
   PTC: msg('Potential tropical cyclone'),
   HU: msg('Hurricane'),
@@ -238,7 +253,7 @@ export function createCyclonesLayer({
           snapshot = next;
           selectedId = null;
           ++navigationGeneration;
-          error = next.reason || 'Cyclone advisories unavailable';
+          error = next.reason || ADVISORIES_UNAVAILABLE;
           return true;
         }
         const applied = await rendering.setSnapshot(next, {
@@ -263,7 +278,7 @@ export function createCyclonesLayer({
         return true;
       } catch (cause) {
         if (controller.signal.aborted || request !== controller) return false;
-        error = cause?.message || 'Cyclone advisories unavailable';
+        error = cause?.message || ADVISORIES_UNAVAILABLE;
         // Failed acquisition has no bounded last-good age guarantee at this layer.
         rendering?.clear();
         snapshot = null;
@@ -332,7 +347,7 @@ export function createCyclonesLayer({
               })
             : t('Track/cone unavailable'));
       const status =
-        error ||
+        errorText(error) ||
         (snapshot?.stale
           ? t('Cached advisory · stale source')
           : loading
@@ -435,8 +450,8 @@ export function createCyclonesLayer({
             ]
           : [],
         info: storm
-          ? `${detail}\n${position}\n${intensity}\n${geometry}${status && status !== geometry ? '\n' + status : ''}\n${snapshot.coverage}`
-          : `${detail}${status ? '\n' + status : ''}\n${snapshot?.coverage || t(COVERAGE)}`,
+          ? `${detail}\n${position}\n${intensity}\n${geometry}${status && status !== geometry ? '\n' + status : ''}\n${coverageText(snapshot.coverage)}`
+          : `${detail}${status ? '\n' + status : ''}\n${coverageText(snapshot?.coverage)}`,
         infoTitle: t(
           'Select a storm on the map, or choose a storm in the list to select it and move the camera. Click empty map space to clear the selection. NOAA NHC/CPHC advisory context. The cone describes forecast center-track uncertainty, not storm size or the full hazard area. Forecast point labels are source lead hours, not times computed from advisory issuance. Geometry follows the surface; height is not weather altitude. Consult the official advisory.',
         ),

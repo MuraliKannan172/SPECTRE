@@ -438,18 +438,22 @@ export function classifyAircraft({ typeCode, category } = {}) {
   return 'airliner';
 }
 
-/** Readable name of each class, for cards and readouts. */
+// Portable flight records import this module, so it has no i18n: msg() only
+// marks the labels, and the card translates them where it shows them.
+const msg = (text) => text;
+
+/** Readable name of each class, for cards and readouts (English data). */
 export const AIRCRAFT_CLASS_LABELS = Object.freeze({
-  light: 'Light aircraft',
-  glider: 'Glider',
-  turboprop: 'Turboprop',
-  airliner: 'Airliner',
-  widebody: 'Widebody',
-  quadjet: 'Four-engine jet',
-  helicopter: 'Helicopter',
-  fastjet: 'Fast jet',
-  bizjet: 'Business jet',
-  uav: 'Drone',
+  light: msg('Light aircraft'),
+  glider: msg('Glider'),
+  turboprop: msg('Turboprop'),
+  airliner: msg('Airliner'),
+  widebody: msg('Widebody'),
+  quadjet: msg('Four-engine jet'),
+  helicopter: msg('Helicopter'),
+  fastjet: msg('Fast jet'),
+  bizjet: msg('Business jet'),
+  uav: msg('Drone'),
 });
 
 /** Billboard scale multipliers (skylight GLYPH_SCALE, + fastjet). */

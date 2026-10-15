@@ -11,7 +11,7 @@
 // Messages are the English literals passed to t(), tn() and msg() in src/,
 // plus the markup opted in with data-i18n* in src/ui/templates and index.html.
 // It also lists UI text that is not marked at all (see findUnmarked).
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,23 +62,27 @@ function decodeHtml(text) {
 const normalize = (text) => text.replace(/\s+/g, ' ').trim();
 
 function trackedFiles(...pathspecs) {
-  return execFileSync(
-    'git',
-    [
-      'ls-files',
-      '--cached',
-      '--others',
-      '--exclude-standard',
-      '--',
-      ...pathspecs,
-    ],
-    {
-      cwd: ROOT,
-      encoding: 'utf8',
-    },
-  )
-    .split('\n')
-    .filter(Boolean);
+  return (
+    execFileSync(
+      'git',
+      [
+        'ls-files',
+        '--cached',
+        '--others',
+        '--exclude-standard',
+        '--',
+        ...pathspecs,
+      ],
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+      },
+    )
+      .split('\n')
+      .filter(Boolean)
+      // The index still lists a file moved or deleted without git mv / git rm.
+      .filter((file) => existsSync(path.join(ROOT, file)))
+  );
 }
 
 /**
@@ -213,8 +217,8 @@ const JS_SINKS = [
   /\bsetAttribute\(\s*['"](?:title|aria-label|aria-valuetext|placeholder|alt)['"]\s*,\s*/g,
   /\b(?:createTextNode|insertAdjacentText)\(\s*(?:['"][a-z]+['"]\s*,\s*)?/g,
   /\binsertAdjacentHTML\(\s*['"][a-z]+['"]\s*,\s*/g,
-  /\b(?:showToast|toast|setHint|announce)\(\s*/g,
-  /(?:^|[{,\s])(?:label|title|tooltip|placeholder|hint|ariaLabel|caption|subtitle|kicker|emptyText|blurb|countLabel)\s*:\s*/gm,
+  /\b(?:showToast|toast|setHint|announce|say)\(\s*/g,
+  /(?:^|[{,\s])(?:label|title|tooltip|placeholder|hint|ariaLabel|accessibilityLabel|caption|subtitle|kicker|emptyText|blurb|countLabel)\s*:\s*/gm,
 ];
 const MARKERS = /\b(?:t|tn|msg)\(/y;
 
@@ -438,6 +442,15 @@ export function readSameAsEnglish(locale) {
 /** The English a message shows: its text without the "context|" prefix. */
 const englishOf = (text) => text.slice(text.indexOf('|') + 1);
 
+/** A translation with nothing to show: t() falls back to English for it. */
+const blank = (value) => value.trim() === '';
+
+/** Words to read, beyond {placeholders}, codes and punctuation. */
+const hasLetters = (value) => /\p{L}{2}/u.test(value.replace(/\{[^}]*\}/g, ''));
+
+const STILL_ENGLISH = (text, locale) =>
+  `"${text}" is still English: translate it, or list it under "${locale}" in src/i18n/same-as-english.json`;
+
 /**
  * Compare one catalog with the extracted messages.
  * @param {Set<string>} [sameAsEnglish] Messages allowed to read as English.
@@ -464,30 +477,63 @@ export function checkCatalog(
         errors.push(`"${text}" needs plural forms ${categories.join('/')}`);
         continue;
       }
+      const english = new Set([info.one, englishOf(text)]);
+      const stillEnglish = [];
       for (const category of categories) {
-        if (typeof entry[category] !== 'string')
+        const form = entry[category];
+        if (typeof form !== 'string')
           errors.push(`"${text}" lacks the "${category}" form`);
-        else if (placeholders(entry[category]) !== placeholders(text))
-          errors.push(
-            `"${text}" [${category}] placeholders differ: ${entry[category]}`,
-          );
+        else if (blank(form))
+          errors.push(`"${text}" [${category}] is empty: translate it`);
+        else if (placeholders(form) !== placeholders(text))
+          errors.push(`"${text}" [${category}] placeholders differ: ${form}`);
+        else if (english.has(form) && hasLetters(form))
+          stillEnglish.push(category);
       }
+      if (stillEnglish.length && !sameAsEnglish.has(text))
+        errors.push(
+          `${STILL_ENGLISH(text, locale)} (forms ${stillEnglish.join('/')})`,
+        );
     } else if (typeof entry !== 'string') {
       errors.push(`"${text}" must be a string`);
+    } else if (blank(entry)) {
+      errors.push(`"${text}" is empty: translate it`);
     } else if (placeholders(entry) !== placeholders(text)) {
       errors.push(`"${text}" placeholders differ: ${entry}`);
     } else if (
       entry === englishOf(text) &&
-      /\p{L}{2}/u.test(entry.replace(/\{[^}]*\}/g, '')) &&
+      hasLetters(entry) &&
       !sameAsEnglish.has(text)
     ) {
-      errors.push(
-        `"${text}" is still English: translate it, or list it under "${locale}" in src/i18n/same-as-english.json`,
-      );
+      errors.push(STILL_ENGLISH(text, locale));
     }
   }
   const stale = Object.keys(catalog).filter((text) => !messages.has(text));
   return { missing, stale, errors };
+}
+
+/**
+ * What `--missing <locale>` prints: every missing entry, ready to translate.
+ * A template, not a translation: the check rejects a string left empty and a
+ * plural form left as the English.
+ */
+export function missingTemplate(locale, catalog, messages) {
+  const categories = new Intl.PluralRules(locale).resolvedOptions()
+    .pluralCategories;
+  const out = {};
+  for (const text of checkCatalog(locale, catalog, messages, new Set())
+    .missing) {
+    const info = messages.get(text);
+    out[text] = info.plural
+      ? Object.fromEntries(
+          categories.map((category) => [
+            category,
+            category === 'one' ? info.one : text,
+          ]),
+        )
+      : '';
+  }
+  return out;
 }
 
 function main(args) {
@@ -496,12 +542,7 @@ function main(args) {
     ? args[args.indexOf('--missing') + 1]
     : null;
   if (missingFor) {
-    const catalog = readCatalog(missingFor);
-    const out = {};
-    for (const text of checkCatalog(missingFor, catalog, messages).missing) {
-      const info = messages.get(text);
-      out[text] = info.plural ? { one: info.one, other: text } : '';
-    }
+    const out = missingTemplate(missingFor, readCatalog(missingFor), messages);
     console.log(JSON.stringify(out, null, 2));
     return 0;
   }

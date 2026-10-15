@@ -37,7 +37,14 @@ import { ShellFeedback } from './shellFeedback.js';
 
 import { runCctvLayerEnableTransition } from '../cctvFocusPolicy.js';
 
-import { getLocale, persistLocaleAndReload, t } from '../i18n/index.js';
+import {
+  describeUnsavedWork,
+  getLocale,
+  msg,
+  persistLocaleAndReload,
+  registerUnsavedWork,
+  t,
+} from '../i18n/index.js';
 import { LOCALES, LOCALE_NAMES } from '../i18n/locale.js';
 
 /**
@@ -710,7 +717,8 @@ export class StyleManager extends ShellFacade {
   /**
    * Renders the command-dock locale switch: one button per shipped locale,
    * labelled with its code and named in its own language. A click stores the
-   * choice and reloads, so nothing re-renders live.
+   * choice and reloads, so nothing re-renders live; it asks first when the
+   * reload would lose work (see _confirmLocaleReload).
    * @returns {void}
    */
   _initLocaleSelector() {
@@ -718,6 +726,20 @@ export class StyleManager extends ShellFacade {
       '#control-panel .dock-locale-switch',
     );
     if (!container) return;
+    // Work this shell can see that a reload drops. Other modules register
+    // their own (registerUnsavedWork in src/i18n/index.js).
+    this._unsavedWorkChecks = [
+      registerUnsavedWork(() =>
+        this.services?.cctvLayer
+          ?.getUIState?.()
+          ?.cameras?.some((camera) => camera.calDirty)
+          ? msg('unsaved CCTV calibration')
+          : null,
+      ),
+      registerUnsavedWork(() =>
+        this.cockpitView?.active ? msg('the open cockpit') : null,
+      ),
+    ];
     const active = getLocale();
     for (const locale of LOCALES) {
       const button = document.createElement('button');
@@ -731,10 +753,27 @@ export class StyleManager extends ShellFacade {
       button.classList.toggle('active', isActive);
       button.setAttribute('aria-pressed', String(isActive));
       button.addEventListener('click', () => {
+        if (!this._confirmLocaleReload()) return;
         persistLocaleAndReload(button.dataset.locale);
       });
       container.appendChild(button);
     }
+  }
+
+  /**
+   * Switching language reloads the page. While that would lose work the page
+   * cannot restore, ask first.
+   * @returns {boolean} true to switch.
+   */
+  _confirmLocaleReload() {
+    const lost = describeUnsavedWork();
+    if (!lost.length || typeof globalThis.confirm !== 'function') return true;
+    return globalThis.confirm(
+      t(
+        'Switching language reloads the page. This will be lost: {items}. Switch anyway?',
+        { items: lost.join(', ') },
+      ),
+    );
   }
 
   /**
@@ -1718,6 +1757,8 @@ export class StyleManager extends ShellFacade {
     this._shareState.destroy();
     this._locationNavigation.destroy();
     this._lifetime.destroy();
+    for (const unregister of this._unsavedWorkChecks?.splice(0) ?? [])
+      unregister();
     this._recording.destroy();
     this._panelChrome.destroy();
     this._feedback.destroy();

@@ -3098,11 +3098,18 @@ Shipped locales: **en** (source and fallback), **es** and **ru**. The code lives
   `data-i18n-title` / `-aria-label` / `-placeholder` (that attribute's English
   value). English has no catalog; every other locale is
   `src/i18n/locales/<code>.json`, and a missing entry falls back to English.
-- **Locale choice.** `?lang=` (one-shot) → stored choice (`gev:locale:v1`) →
-  `navigator.languages` → English. The language switch in the Visual Presets dock
-  stores the choice and reloads, so nothing re-renders live.
+- **Locale choice.** `?lang=` → stored choice (`gev:locale:v1`) →
+  `navigator.languages` → English. `?lang=` is not stored: it applies while it
+  stays in the address, and the copied share link drops it, so a recipient keeps
+  their own language. The language switch in the Visual Presets dock stores the
+  choice, removes `?lang=` (keeps it only where storage is blocked) and reloads,
+  so nothing re-renders live; it asks first when the reload would lose work
+  (unsaved CCTV calibration, the open cockpit, Draw marks on the board,
+  imported map files, an active voice session — each registered through
+  `registerUnsavedWork`).
 - **Gate.** `npm run i18n` (and `src/i18n/catalog.test.mjs` under `npm test`)
-  extracts every message and fails on missing, unused, placeholder-mismatched or
+  extracts every message and fails on missing, empty, unused,
+  placeholder-mismatched, still-English (plural forms included) or
   wrongly-shaped plural entries.
 - **Not translated by design:** layer ids, share-link and hash parameters, API
   fields, voice tool schemas, provider names, feed data (callsigns, vessel and

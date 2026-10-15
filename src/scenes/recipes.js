@@ -1047,19 +1047,40 @@ export function displaySceneTitle(scene) {
   const builtin = SCENE_RECIPES.find((recipe) => recipe.id === scene?.id);
   if (builtin?.title && scene.title === builtin.title) return t(builtin.title);
   const title = scene?.title || '';
-  const numbered = /^Scene (\d+)$/.exec(title);
-  return numbered ? t('Scene {n}', { n: Number(numbered[1]) }) : title;
+  // Only the generated "Scene N" localizes; an operator-typed "Scene 007"
+  // keeps its digits, so the number stays a string (no Number() round trip).
+  const numbered = /^Scene ([1-9]\d*)$/.exec(title);
+  return numbered ? t('Scene {n}', { n: numbered[1] }) : title;
 }
 
 /**
  * Display title for a shot: built-in titles and the numbered "Shot N"
  * fallback localize; any other title shows as stored.
+ *
+ * With the shot itself, a built-in title localizes only when the shot came
+ * from a recipe (`sourcePackId`), so an operator-typed title that happens to
+ * match a built-in one is never masked by the catalog. Without it, provenance
+ * is unknown and the title alone decides, as before.
  * @param {string} title
+ * @param {{sourcePackId?: string}} [shot]
+ * @param {{id?: string}} [scene] The shot's scene, for projects saved before
+ *   shots recorded their source pack.
  * @returns {string}
  */
-export function displayShotTitle(title) {
+export function displayShotTitle(title, shot = undefined, scene = undefined) {
   const text = typeof title === 'string' ? title : '';
-  if (BUILTIN_SHOT_TITLES.has(text)) return t(text);
-  const numbered = /^Shot (\d+)$/.exec(text);
-  return numbered ? t('Shot {n}', { n: Number(numbered[1]) }) : text;
+  const fromRecipe = shot
+    ? Boolean(shot.sourcePackId) || recipeDeclaresShotTitle(scene?.id, text)
+    : true;
+  if (fromRecipe && BUILTIN_SHOT_TITLES.has(text)) return t(text);
+  const numbered = /^Shot ([1-9]\d*)$/.exec(text);
+  return numbered ? t('Shot {n}', { n: numbered[1] }) : text;
+}
+
+/** Whether the built-in recipe behind a scene declares a shot with this title. */
+function recipeDeclaresShotTitle(sceneId, title) {
+  const recipe = sceneId ? getSceneRecipeById(sceneId) : null;
+  return Boolean(
+    recipe?.cameraPath?.some((keyframe) => keyframe?.title === title),
+  );
 }

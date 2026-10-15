@@ -21,7 +21,7 @@ export function createScenePlaybackAdapter(director, defaultShotDurationSec) {
           index: index + 1,
           total,
           scene: displaySceneTitle(scene),
-          shot: displayShotTitle(shot.title),
+          shot: displayShotTitle(shot.title, shot, scene),
         }),
       );
       director._logEvent('shot_start', {

@@ -3,6 +3,8 @@
  * `gm_authFailure` (key refused) reaches every `onAuthFailure` listener.
  */
 
+import { msg } from '../../../../i18n/index.js';
+
 const SCRIPT_ORIGIN = 'https://maps.googleapis.com';
 const READY_CALLBACK = '__gevGoogleMapsReady';
 /** The page's one script load, shared by every loader on it. */
@@ -44,7 +46,7 @@ export function createMapsLoader({
   function load() {
     const key = getApiKey?.();
     if (!key)
-      return Promise.reject(new Error('GOOGLE_MAPS_API_KEY is not set'));
+      return Promise.reject(new Error(msg('GOOGLE_MAPS_API_KEY is not set')));
     installAuthHandler();
     if (global[PAGE_LOAD]) return global[PAGE_LOAD];
     if (global.google?.maps?.importLibrary)
@@ -69,7 +71,7 @@ export function createMapsLoader({
         if (global[PAGE_LOAD] === loading) delete global[PAGE_LOAD];
         script.remove();
         delete global[READY_CALLBACK];
-        reject(new Error('The Google Maps JavaScript API could not load'));
+        reject(new Error(msg('The Google Maps JavaScript API could not load')));
       };
       document.head.append(script);
     });

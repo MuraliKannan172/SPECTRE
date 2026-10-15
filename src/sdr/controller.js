@@ -17,7 +17,7 @@ import {
   selectAuthorizedSdrDevice,
 } from './usbDevices.js';
 import { summarizeLocalAdsb } from '../sources/adsbRecords.js';
-import { t } from '../i18n/index.js';
+import { formatNumber, t } from '../i18n/index.js';
 
 export { createRememberingWebUsb } from './usbDevices.js';
 
@@ -1170,7 +1170,7 @@ export class SdrController {
           ? {}
           : {
               message: t('Tuned to {mhz} MHz FM', {
-                mhz: (frequency / 1_000_000).toFixed(1),
+                mhz: formatMhz(frequency),
               }),
             }),
       });
@@ -1206,7 +1206,7 @@ export class SdrController {
     const token = ++this._seekToken;
     this._setState({
       seeking: true,
-      seekMessage: `Seeking ${seekDirection > 0 ? 'up' : 'down'}…`,
+      seekMessage: seekDirection > 0 ? t('Seeking up…') : t('Seeking down…'),
     });
     this._audioNode?.port.postMessage({ type: 'volume', value: 0 });
     try {
@@ -1217,7 +1217,7 @@ export class SdrController {
         const sequence = this._spectrumSequence;
         await this.tuneFm(center, { quiet: true });
         this._setState({
-          seekMessage: `Scanning ${(center / 1_000_000).toFixed(1)} MHz…`,
+          seekMessage: t('Scanning {mhz} MHz…', { mhz: formatMhz(center) }),
         });
         if (
           !(await this._waitForSpectrum(sequence)) ||
@@ -1235,9 +1235,12 @@ export class SdrController {
         await this.tuneFm(peak.frequency, { quiet: true });
         this._setState({
           seeking: false,
-          seekMessage: `Found ${(peak.frequency / 1_000_000).toFixed(1)} MHz · ${peak.snr.toFixed(1)} dB`,
+          seekMessage: t('Found {mhz} MHz · {snr} dB', {
+            mhz: formatMhz(peak.frequency),
+            snr: formatOneDecimal(peak.snr),
+          }),
           message: t('FM signal found at {mhz} MHz', {
-            mhz: (peak.frequency / 1_000_000).toFixed(1),
+            mhz: formatMhz(peak.frequency),
           }),
         });
         return peak;
@@ -1369,6 +1372,19 @@ export class SdrController {
     this.state.audioState = 'closed';
     this._listeners.clear();
   }
+}
+
+/** One decimal in the UI language ("98.5" / "98,5"); status text only. */
+function formatOneDecimal(value) {
+  return formatNumber(value, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    useGrouping: false,
+  });
+}
+
+function formatMhz(hz) {
+  return formatOneDecimal(hz / 1_000_000);
 }
 
 function positiveModulo(value, divisor) {

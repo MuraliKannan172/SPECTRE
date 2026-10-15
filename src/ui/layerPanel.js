@@ -4,8 +4,23 @@ import { layerFeedState } from '../data/feedState.js';
 export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
 import { keyGuidanceText, keyRequirementText } from './keyGuidance.js';
+// Layer and source names at this presentation boundary: registry ids and
+// English module names stay as they are; a layer without an entry renders its
+// module name, and the panel's own English names win (PANEL_LABEL_KEYS).
+import {
+  LAYER_NAME_KEYS,
+  PANEL_LABEL_KEYS as PANEL_LABELS,
+  sourceLabel,
+} from './layerNames.js';
+export { localizeLayerName } from './layerNames.js';
 import { createWeatherPanel } from './weatherPanel.js';
-import { formatNumber, msg, t, translateKnown } from '../i18n/index.js';
+import {
+  formatNumber,
+  getLocale,
+  msg,
+  t,
+  translateKnown,
+} from '../i18n/index.js';
 
 // Feed-state enum VALUES are machine identifiers (layerFeedState contract, QA
 // hooks, CSS feed-* classes); only the final label value translates, at this
@@ -18,39 +33,6 @@ const FEED_STATE_LABEL_KEYS = Object.freeze({
   partial: msg('PARTIAL'),
   fallback: msg('FALLBACK'),
   unavailable: msg('UNAVAILABLE'),
-});
-
-// Layer display names, localized at the same presentation boundary. Registry
-// ids stay English; a layer without an entry here renders its module name,
-// falling back to the English panel override when one exists.
-const LAYER_NAME_KEYS = Object.freeze({
-  flights: msg('Live Flights'),
-  military: msg('Military Flights'),
-  earthquakes: msg('Earthquakes (24h)'),
-  satellites: msg('Satellites'),
-  'rocket-launches': msg('Space Missions (30d)'),
-  traffic: msg('Street Traffic'),
-  cctv: msg('CCTV'),
-  radio: msg('Radio'),
-  bikeshare: msg('Bikeshare'),
-  'ais-live-vessels': msg('Live AIS Vessels'),
-  'military-installations': msg('Mapped Installations'),
-  'military-awareness': msg('Global Context'),
-  'local-datacenters': msg('Datacenters'),
-  'local-dams': msg('Dams'),
-  'telegeography-submarine-cables': msg('Submarine Cables'),
-  'local-firms': msg('FIRMS Active Fires'),
-  'local-adsb': msg('Local ADS-B'),
-  transit: msg('Transit'),
-  'recent-imagery': msg('Recent Imagery'),
-  'fire-perimeters': msg('Fire Perimeters'),
-  'gnss-integrity': msg('GNSS Integrity'),
-  wind: msg('Wind'),
-  'weather-radar': msg('Rain radar'),
-  'weather-satellite': msg('Satellite clouds'),
-  'weather-lightning': msg('Lightning density'),
-  'weather-cyclones': msg('Cyclone advisories'),
-  directions: msg('Directions'),
 });
 
 function lifecycleStateLabel(lifecycleState) {
@@ -126,15 +108,6 @@ const PANEL_ORDER = PANEL_GROUPS.flatMap(({ label, ids }) =>
 const PANEL_POSITIONS = new Map(
   PANEL_ORDER.map(({ id }, index) => [id, index]),
 );
-const PANEL_LABELS = {
-  'ais-live-vessels': msg('Live Vessels'),
-  bikeshare: msg('Bike Share'),
-  cctv: msg('Cameras'),
-  'street-level': msg('Street Level'),
-  'alpr-cameras': msg('Mapped ALPR Cameras'),
-  'local-datacenters': msg('Data Centers'),
-  'local-firms': msg('Active Fires'),
-};
 
 function englishPanelLabel(layer) {
   return PANEL_LABELS[layer.id] || LAYER_NAME_KEYS[layer.id] || layer.name;
@@ -145,59 +118,6 @@ function panelLabel(layer) {
   if (PANEL_LABELS[layer.id]) return t(PANEL_LABELS[layer.id]);
   const key = LAYER_NAME_KEYS[layer.id];
   return key ? t(key) : layer.name;
-}
-
-// English module names (layer.name) that other surfaces print, such as the
-// loading chip's layer roster. Looked up by the English text so that surface
-// keeps its English output and only the presentation translates.
-const MODULE_NAME_KEYS = new Map(
-  [
-    ...Object.values(LAYER_NAME_KEYS),
-    ...Object.values(PANEL_LABELS),
-    msg('ALPR Cameras'),
-  ].map((key) => [key, key]),
-);
-
-/**
- * Translate a layer's English module name for display; any other text
- * (a provider name, an unknown layer) is returned unchanged.
- * @param {string} name English `layer.name`.
- * @returns {string}
- */
-export function localizeLayerName(name) {
-  const key = MODULE_NAME_KEYS.get(String(name ?? '').trim());
-  return key ? t(key) : name;
-}
-
-// Layer-declared source names stay English in layer state, share links and AI
-// tool output; only the row's source line translates them. Provider names
-// (USGS, CelesTrak, GTFS-RT…) are not listed and pass through unchanged.
-const SOURCE_LABEL_KEYS = new Map(
-  [
-    msg('Flights'),
-    msg('Military aircraft'),
-    msg('Vessels'),
-    msg('CCTV + Street View fallback'),
-    msg('OpenStreetMap + optional Google Maps Places'),
-    msg('GFS / ECMWF IFS · FORECAST'),
-    msg('NOAA nowCOAST · OBSERVED'),
-    msg('NASA FIRMS · LIVE'),
-    msg('OSM routing'),
-    msg('Mapped camera locations'),
-    msg('OpenStreetMap · community mapped'),
-  ].map((key) => [key, key]),
-);
-
-function sourceLabel(source) {
-  if (typeof source !== 'string') return source;
-  if (source === 'Local') return t('Local', { context: 'data source' });
-  const key = SOURCE_LABEL_KEYS.get(source);
-  if (key) return t(key);
-  // A layer with several providers joins their names ("Mapillary · Google
-  // Street View"); a name with a translation shows it.
-  return source.includes(' · ')
-    ? source.split(' · ').map(translateKnown).join(' · ')
-    : translateKnown(source);
 }
 
 /**
@@ -222,6 +142,92 @@ export function layerKeyRequirementTooltip(layer = {}) {
     requiresKeyId ? keyRequirementText(requiresKeyId) : '',
     layer.stats.keyAlternatives || [],
   );
+}
+
+// Live-source failures arrive as English data (src/sources/live/contract.js,
+// standalone.js, flights and military ingestion), some with a source name or a
+// number in them; the row shows them in the UI language. Keep these in step
+// with the producers. Anything else shows its catalog entry, or as it came.
+const FEED_ERRORS = new Set([
+  msg('OpenSky OAuth client missing/invalid'),
+  msg('OpenSky OAuth rejected credentials'),
+  msg('OpenSky username/password rejected'),
+  msg('OpenSky auth missing'),
+  msg('OpenSky auth required'),
+  msg('OpenSky auth invalid'),
+  msg('OpenSky auth failed'),
+]);
+const FEED_ERROR_PATTERNS = [
+  // Street Level coverage errors (streetLevel/providers/kartaview/source.js),
+  // ahead of the generic "<source> HTTP <status>".
+  [
+    /^KartaView answered HTTP (\d+)$/,
+    ([, status]) => t('KartaView answered HTTP {status}', { status }),
+  ],
+  [
+    /^KartaView refused the request \(code (-?\d+)\)$/,
+    ([, code]) => t('KartaView refused the request (code {code})', { code }),
+  ],
+  // Weather imagery (weather/source.js, infraredImage.js) and vector tile
+  // (sources/vectorTiles.js) failures carry their own wording; the generic
+  // pattern below would take "Weather image" for a source name.
+  [
+    /^Weather (image )?HTTP (\d+)$/,
+    ([, image, status]) =>
+      image
+        ? t('Weather image HTTP {status}', { status })
+        : t('Weather HTTP {status}', { status }),
+  ],
+  [
+    /^Vector tiles unavailable \(HTTP (\d+)\)$/,
+    ([, status]) => t('Vector tiles unavailable (HTTP {status})', { status }),
+  ],
+  [
+    /^Source snapshot (\d+) min old$/,
+    ([, minutes]) => t('Source snapshot {minutes} min old', { minutes }),
+  ],
+  [
+    /^(.+) rate limited \(anonymous\)$/,
+    ([, source]) =>
+      t('{source} rate limited (anonymous)', { source: sourceLabel(source) }),
+  ],
+  [
+    /^(.+) rate limited$/,
+    ([, source]) => t('{source} rate limited', { source: sourceLabel(source) }),
+  ],
+  [
+    /^(.+) HTTP (\d{3})$/,
+    ([, source, status]) =>
+      t('{source} HTTP {status}', { source: sourceLabel(source), status }),
+  ],
+  [
+    /^(.+) network error$/,
+    ([, source]) =>
+      t('{source} network error', { source: sourceLabel(source) }),
+  ],
+  [
+    /^Malformed (.+) aircraft rows$/,
+    ([, source]) =>
+      t('Malformed {source} aircraft rows', { source: sourceLabel(source) }),
+  ],
+  [
+    /^Malformed (.+) response$/,
+    ([, source]) =>
+      t('Malformed {source} response', { source: sourceLabel(source) }),
+  ],
+];
+
+/** A layer's error text in the UI language (see FEED_ERRORS). */
+export function translateFeedError(text) {
+  if (typeof text !== 'string') return text;
+  if (FEED_ERRORS.has(text)) return t(text);
+  const known = translateKnown(text);
+  if (known !== text) return known;
+  for (const [pattern, format] of FEED_ERROR_PATTERNS) {
+    const match = pattern.exec(text);
+    if (match) return format(match);
+  }
+  return text;
 }
 
 const ROW_TEXT_SEPARATOR = ' · ';
@@ -571,15 +577,19 @@ export class LayerPanel {
 
   /**
    * Write a row's count. A count that is a phrase carrying its own number
-   * ("24 nearby · 2 on screen") moves to its own line under the name: beside
-   * the toggle it squeezes the name to a word per line in any language. The
-   * "—" placeholder is marked so it can give way to a wide status chip.
+   * ("24 nearby · 2 on screen") moves to its own line under the name outside
+   * English: beside the toggle it squeezes a longer translated name to a word
+   * per line. English keeps the count beside the toggle. The "—" placeholder
+   * is marked so it can give way to a wide status chip (translations only,
+   * radio.css).
    */
   _syncCount(row, count, stats) {
     const text = this._layerCountText(stats);
     setRowText(count, text);
     const phrase =
-      typeof stats.countLabel === 'string' && /\d/.test(stats.countLabel);
+      getLocale() !== 'en' &&
+      typeof stats.countLabel === 'string' &&
+      /\d/.test(stats.countLabel);
     row.classList.toggle('data-toggle-row--count-line', phrase);
     count.classList.toggle('data-count-empty', text === '—');
   }
@@ -743,7 +753,7 @@ export class LayerPanel {
         { source },
       );
     }
-    const presentedError = translateKnown(
+    const presentedError = translateFeedError(
       stats.error || stats.lastError || stats.managerRefreshError,
     );
     if (presentedError) {
@@ -768,7 +778,7 @@ export class LayerPanel {
       typeof stats.statusMessage === 'string' &&
       stats.statusMessage.trim()
     ) {
-      return `${source} · ${stats.statusMessage.trim()}`;
+      return `${source} · ${translateKnown(stats.statusMessage.trim())}`;
     }
     const ago = stats.lastUpdate ? this._timeAgo(stats.lastUpdate) : t('never');
     if (stats.loading) {
@@ -885,7 +895,7 @@ export class LayerPanel {
         : stateText;
     const keyGuidance = unavailable
       ? String(
-          translateKnown(layer.stats.error) || t('Data source unavailable'),
+          translateFeedError(layer.stats.error) || t('Data source unavailable'),
         )
       : layerKeyRequirementTooltip(layer);
     // Name the missing key on the control itself: a row reading KEY REQUIRED

@@ -97,6 +97,35 @@ function presentStatus(state) {
     : { text: t('OFF'), tone: '', pressed, title };
 }
 
+// Provider refusals with a number in them stay English data
+// (providers/kartaview/source.js); they go back onto a placeholder here.
+const ERROR_PATTERNS = [
+  [
+    /^KartaView answered HTTP (\d+)$/,
+    ([, status]) => t('KartaView answered HTTP {status}', { status }),
+  ],
+  [
+    /^KartaView refused the request \(code (-?\d+)\)$/,
+    ([, code]) => t('KartaView refused the request (code {code})', { code }),
+  ],
+];
+
+/**
+ * A provider or viewer error in the UI language. Exported for tests.
+ * @param {string} text English error text from a provider.
+ * @returns {string}
+ */
+export function translateStreetLevelError(text) {
+  if (typeof text !== 'string' || !text) return text;
+  const known = translateKnown(text);
+  if (known !== text) return known;
+  for (const [pattern, format] of ERROR_PATTERNS) {
+    const match = pattern.exec(text);
+    if (match) return format(match);
+  }
+  return text;
+}
+
 /** A chip is lit only while the layer and its provider are both on. */
 function presentProviders(state) {
   const enabled = state.enabled === true;
@@ -107,11 +136,11 @@ function presentProviders(state) {
       ? t('{name} imagery on', { name: provider.name })
       : t('{name} imagery off', { name: provider.name });
     if (provider.keyRejected && provider.error)
-      title = `${provider.name}: ${translateKnown(provider.error)}`;
+      title = `${provider.name}: ${translateStreetLevelError(provider.error)}`;
     else if (keyRequired && provider.requiresKeyId)
       title = `${provider.name}: ${keyRequirementText(provider.requiresKeyId)}`;
     else if (provider.error)
-      title = `${provider.name}: ${translateKnown(provider.error)}`;
+      title = `${provider.name}: ${translateStreetLevelError(provider.error)}`;
     return {
       id: provider.id,
       label: translateKnown(provider.label),
@@ -262,8 +291,9 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
     providers: presentProviders(state),
     error: keyMissing
       ? null
-      : translateKnown(state.street.error || state.coverage.error || '') ||
-        null,
+      : translateStreetLevelError(
+          state.street.error || state.coverage.error || '',
+        ) || null,
     filter: { pano: filter.pano, sinceDays: Number(filter.sinceDays) || 0 },
     filterControls: {
       pano: state.filterControls?.pano !== false,

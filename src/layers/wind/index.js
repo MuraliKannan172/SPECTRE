@@ -11,7 +11,7 @@ import {
   createWindInspectionMarker,
   WIND_UNITS,
 } from './inspection.js';
-import { t, msg } from '../../i18n/index.js';
+import { t, msg, translateKnown } from '../../i18n/index.js';
 import { unitLabel } from '../../ui/unitLabels.js';
 
 /** Format a forecast timestamp explicitly in UTC. */
@@ -22,6 +22,25 @@ export function formatWindValidTime(value) {
     : null;
 }
 
+/*
+ * Reasons the server puts in the manifest (server/providers/wind.js). They stay
+ * English in data and are translated where they are shown.
+ */
+const SERVER_REASONS = new Set([msg('Wind upstream unavailable')]);
+const reasonText = (reason) =>
+  SERVER_REASONS.has(reason) ? t(reason) : translateKnown(reason) || null;
+
+/**
+ * A wind problem in the UI language. Source errors are English data; the
+ * HTTP status line carries a number, so it goes back onto a placeholder.
+ */
+function presentWindProblem(problem) {
+  const http = /^Wind HTTP (\d+)$/.exec(problem);
+  if (http)
+    return t('{source} HTTP {status}', { source: t('Wind'), status: http[1] });
+  return t(problem);
+}
+
 /** Forecast issue time is source age; valid time is reported separately. */
 export function windStats(manifest) {
   const run = Date.parse(manifest?.cycle?.runIso);
@@ -29,7 +48,8 @@ export function windStats(manifest) {
     count: manifest?.grid ? manifest.grid.nx * manifest.grid.ny : 0,
     lastUpdate: Number.isFinite(run) ? run : null,
     error:
-      manifest?.reason || (manifest?.unavailable ? 'Wind unavailable' : null),
+      manifest?.reason ||
+      (manifest?.unavailable ? msg('Wind unavailable') : null),
   };
 }
 
@@ -306,8 +326,8 @@ export function createWindLayer({
             ? t('Loading forecast')
             : preparing
               ? t('Preparing flow')
-              : (error && t(error)) ||
-                manifest?.reason ||
+              : (error && presentWindProblem(error)) ||
+                reasonText(manifest?.reason) ||
                 imageryError ||
                 (scalarMissing ? t('Selected field unavailable') : null) ||
                 (manifest?.stale ? t('Cached forecast · stale') : null),
@@ -387,7 +407,7 @@ export function createWindLayer({
           model: model === 'ifs' ? 'ECMWF IFS' : 'GFS',
           field: label,
           unit: unitLabel(legendUnit),
-        })}${historyStatus ? `\n${historyStatus}` : ''}\n${t('Valid: {time}', { time: valid || t('Unavailable') })}${loading ? ` · ${t('loading')}` : preparing ? ` · ${t('preparing')}` : ''}\n${t('Issued: {time}', { time: run || t('Unavailable') })}${manifest?.stale ? ' · STALE' : ''}${error ? `\n${t(error)}` : ''}${scalarMissing ? `\n${t('Selected field unavailable · wind remains visible')}` : ''}${imageryError && !scalarMissing ? `\n${t('{error} · wind remains visible', { error: imageryError })}` : ''}`,
+        })}${historyStatus ? `\n${historyStatus}` : ''}\n${t('Valid: {time}', { time: valid || t('Unavailable') })}${loading ? ` · ${t('loading')}` : preparing ? ` · ${t('preparing')}` : ''}\n${t('Issued: {time}', { time: run || t('Unavailable') })}${manifest?.stale ? ` · ${t('STALE')}` : ''}${error ? `\n${presentWindProblem(error)}` : ''}${scalarMissing ? `\n${t('Selected field unavailable · wind remains visible')}` : ''}${imageryError && !scalarMissing ? `\n${t('{error} · wind remains visible', { error: imageryError })}` : ''}`,
         infoTitle: t(
           'Surface wind at 10 m. Approximately 1° global grid. Curves follow the 10 m wind field, lifted 12 km for visibility; display height is not weather altitude. View lighting is for readability. Animation shows flow through one fixed forecast; it does not advance time. Color fields drape the globe basemap or the active photorealistic 3D Tiles.',
         ),

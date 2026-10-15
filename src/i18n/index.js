@@ -9,7 +9,7 @@
 //
 // English needs no catalog. Every other locale is one flat JSON file,
 // locales/<code>.json, keyed by the English text (for tn, by the English
-// plural form). A missing entry falls back to English.
+// plural form). A missing or empty entry falls back to English.
 // `npm run i18n` keeps the catalogs in step with the code. Guide: docs/I18N.md.
 import {
   DEFAULT_LOCALE,
@@ -66,10 +66,14 @@ function interpolate(pattern, values) {
   );
 }
 
+/** A catalog string with something to show; an empty one counts as missing. */
+const filled = (value) => typeof value === 'string' && value.trim() !== '';
+
 function lookup(text) {
   const catalog = CATALOGS[currentLocale];
   if (!catalog) return undefined;
-  if (Object.hasOwn(catalog, text)) return catalog[text];
+  const entry = Object.hasOwn(catalog, text) ? catalog[text] : undefined;
+  if (filled(entry) || (entry && typeof entry === 'object')) return entry;
   warnMissing(text);
   return undefined;
 }
@@ -101,8 +105,9 @@ export function tn(count, one, other, values) {
   const entry = lookup(other);
   const category = pluralRules(currentLocale).select(count);
   let pattern;
-  if (entry && typeof entry === 'object') {
-    pattern = entry[category] ?? entry.other ?? other;
+  const forms = entry && typeof entry === 'object' ? entry : null;
+  if (forms && (filled(forms[category]) || filled(forms.other))) {
+    pattern = filled(forms[category]) ? forms[category] : forms.other;
   } else {
     pattern = pluralRules(DEFAULT_LOCALE).select(count) === 'one' ? one : other;
   }
@@ -117,8 +122,8 @@ export function tn(count, one, other, values) {
 export function translateKnown(text) {
   const catalog = CATALOGS[currentLocale];
   if (!catalog || typeof text !== 'string') return text;
-  const entry = catalog[text];
-  return typeof entry === 'string' ? entry : text;
+  const entry = Object.hasOwn(catalog, text) ? catalog[text] : undefined;
+  return filled(entry) ? entry : text;
 }
 
 /** Mark English text that is stored in data and translated later by t(). */
@@ -247,10 +252,43 @@ export function applyDocumentTranslations(doc) {
   return applied;
 }
 
+const unsavedWorkChecks = new Set();
+
+/**
+ * Name work that switching language would lose: the switch reloads the page,
+ * and the language switch asks first while any check reports something.
+ * @param {() => string|null|undefined} check Returns a msg() label (e.g.
+ *   msg('unsaved CCTV calibration')) while there is such work, else nothing.
+ * @returns {() => void} Removes the check.
+ */
+export function registerUnsavedWork(check) {
+  if (typeof check !== 'function') return () => {};
+  unsavedWorkChecks.add(check);
+  return () => unsavedWorkChecks.delete(check);
+}
+
+/**
+ * What a reload would lose right now, translated, without repeats.
+ * @returns {string[]}
+ */
+export function describeUnsavedWork() {
+  const labels = new Set();
+  for (const check of unsavedWorkChecks) {
+    try {
+      const label = check();
+      if (typeof label === 'string' && label) labels.add(t(label));
+    } catch {
+      // A failing check must not block the switch.
+    }
+  }
+  return [...labels];
+}
+
 /**
  * Persist a locale choice, then reload preserving window.location.hash exactly
- * and stripping ?lang from the search string, so the override is one-shot.
- * Where storage is blocked, ?lang carries the choice instead.
+ * and stripping ?lang from the search string, so the stored choice applies.
+ * Where storage is blocked, ?lang carries the choice instead (share links
+ * drop it: ShareLinkManager.copyLink).
  * @returns {boolean} true when a reload was triggered.
  */
 export function persistLocaleAndReload(

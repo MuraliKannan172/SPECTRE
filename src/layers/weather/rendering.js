@@ -201,7 +201,8 @@ function createGlobeRendering({
           await Promise.all(
             urls.map(async (url) => {
               const response = await fetchImpl(url, { signal });
-              if (!response.ok) throw new Error('Weather prefetch unavailable');
+              if (!response.ok)
+                throw new Error(msg('Weather prefetch unavailable'));
               await readResponseBytesCapped(response, 4 * 1024 * 1024 + 65_536);
             }),
           );

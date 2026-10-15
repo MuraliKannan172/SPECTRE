@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 import {
   internetRadioAudioActive,
   localSdrCardView,
@@ -198,7 +199,7 @@ export class LocalSdrControls {
     // Internet radio just started: it takes over from local FM.
     if (radioAudioActive && !this._radioAudioActive && this._fmAudioActive) {
       void this.receiver.stop({
-        message: 'Local FM stopped: internet radio started',
+        message: t('Local FM stopped: internet radio started'),
       });
     }
     this._radioAudioActive = radioAudioActive;

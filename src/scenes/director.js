@@ -28,7 +28,7 @@ import {
   getSceneAppendRecipeById,
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
-import { t, tn } from '../i18n/index.js';
+import { t, tn, msg } from '../i18n/index.js';
 import { createSceneDataPacks } from './dataPacks/controller.js';
 import { createSceneInteractions } from './interactions.js';
 import { createSceneSharing } from './sharing.js';
@@ -63,6 +63,7 @@ import {
   stringifySceneDocument,
   SceneDocumentError,
 } from '../director/document.js';
+import { sceneSaveFailureReason } from './sceneSaveError.js';
 
 // Built-in recipe DISPLAY names. Recipe ids, the URL 'scene' param, stored
 // project titles, and voice-matching titles all stay English (keep-English
@@ -131,7 +132,7 @@ export class SceneDirector {
       )
         return;
       if (this._usesAuthoredCamera && !this._claimingCamera)
-        this.stopScene('Camera ownership changed');
+        this.stopScene(msg('Camera ownership changed'));
     };
     this._cameraHandoffUnsubscribe =
       styleManager.subscribeCameraHandoff?.(yieldCamera);
@@ -180,7 +181,9 @@ export class SceneDirector {
 
     this._presentation = {
       status: this._storageReadError
-        ? 'Saved project could not be read; storage preserved. Import a valid file to resume saving.'
+        ? t(
+            'Saved project could not be read; storage preserved. Import a valid file to resume saving.',
+          )
         : t('Ready'),
       progress: 0,
       runtime: '',
@@ -219,7 +222,7 @@ export class SceneDirector {
           return;
         const scene = this._getSelectedScene();
         if (!scene?.releaseLayerIds?.includes(change.layerId)) return;
-        this.stopScene('Scene layer turned off');
+        this.stopScene(msg('Scene layer turned off'));
       });
   }
 
@@ -247,7 +250,7 @@ export class SceneDirector {
     this._controls?.destroy();
     this._state.destroy();
     this._destroyPromise = Promise.resolve().then(async () => {
-      this.stopScene('Stopped');
+      this.stopScene(msg('Stopped'));
       this._loadAbort?.abort();
       this._loadGeneration++;
       this.viewer.camera.cancelFlight();
@@ -323,7 +326,9 @@ export class SceneDirector {
   _saveProject() {
     if (this._storageReadError) {
       this._toastStorageError(
-        'Scene not saved — existing saved project could not be read. Export edits or import a valid file.',
+        t(
+          'Scene not saved — existing saved project could not be read. Export edits or import a valid file.',
+        ),
       );
       return;
     }
@@ -336,13 +341,20 @@ export class SceneDirector {
       // Private browsing / block-all-cookies / quota-exceeded throws here. The
       // in-memory project stays usable this session, but persistence failed —
       // tell the user instead of crashing the caller (M11).
+      // A validation failure is logged with its technical path and check;
+      // the toast says it in words (sceneSaveError.js).
+      const invalid = e instanceof SceneDocumentError;
       console.warn(
-        '[Scenes] Could not persist project (storage unavailable):',
+        invalid
+          ? '[Scenes] Could not persist project (invalid project data):'
+          : '[Scenes] Could not persist project (storage unavailable):',
         e,
       );
       this._toastStorageError(
-        e instanceof SceneDocumentError
-          ? `Scene not saved — ${e.message}`
+        invalid
+          ? t('Scene not saved — {reason}', {
+              reason: sceneSaveFailureReason(e),
+            })
           : undefined,
       );
     }
@@ -350,7 +362,7 @@ export class SceneDirector {
 
   /** Surface a "scene not saved" notice via the global toast + scene status line. */
   _toastStorageError(
-    message = 'Scene not saved — browser storage unavailable',
+    message = t('Scene not saved — browser storage unavailable'),
   ) {
     this._updateStatus(message);
     try {
@@ -381,7 +393,7 @@ export class SceneDirector {
     if (type === 'shot-loaded')
       this._presentation.status = t('Loaded: {scene} / {shot}', {
         scene: displaySceneTitle(scene),
-        shot: displayShotTitle(shot.title),
+        shot: displayShotTitle(shot.title, shot, scene),
       });
     this._publish({
       type,
@@ -409,7 +421,7 @@ export class SceneDirector {
           title: displaySceneTitle(scene),
           shots: scene.shots.map((shot) => ({
             ...shot,
-            displayTitle: displayShotTitle(shot.title),
+            displayTitle: displayShotTitle(shot.title, shot, scene),
           })),
         })),
         selectedSceneId: this._selectedSceneId,
@@ -984,7 +996,7 @@ export class SceneDirector {
     this._updateStatus(
       t('Captured: {scene} / {shot}', {
         scene: displaySceneTitle(scene),
-        shot: displayShotTitle(shot.title),
+        shot: displayShotTitle(shot.title, shot, scene),
       }),
     );
   }
@@ -1017,7 +1029,7 @@ export class SceneDirector {
     this._updateStatus(
       t('Updated: {scene} / {shot}', {
         scene: displaySceneTitle(scene),
-        shot: displayShotTitle(shot.title),
+        shot: displayShotTitle(shot.title, shot, scene),
       }),
     );
   }
@@ -1182,7 +1194,7 @@ export class SceneDirector {
       this._updateStatus(
         t('Seeked: {scene} / {shot}', {
           scene: displaySceneTitle(scene),
-          shot: displayShotTitle(shot.title),
+          shot: displayShotTitle(shot.title, shot, scene),
         }),
       );
       this._activateInteractions(scene, shot);
@@ -1549,7 +1561,7 @@ export class SceneDirector {
     this._updateStatus(
       t('Seeked: {scene} / {shot}', {
         scene: displaySceneTitle(scene),
-        shot: displayShotTitle(shot.title),
+        shot: displayShotTitle(shot.title, shot, scene),
       }),
     );
     return true;
@@ -1558,7 +1570,7 @@ export class SceneDirector {
   /** Seek the complete authored scene state to an exact clock position. */
   seekScene(sceneId, progress) {
     if (this._destroyed) return Promise.resolve(false);
-    this.stopScene('Seeking scene clock');
+    this.stopScene(msg('Seeking scene clock'));
     const generation = ++this._sceneSeekGeneration;
     return this._trackWork(this._seekScene(sceneId, progress, generation));
   }
@@ -1895,9 +1907,11 @@ export class SceneDirector {
    * enabled while the post-await check skips its params. The manager rolls an
    * aborted enable back through the module's own disable().
    *
-   * @param {string} [reason='Stopped'] - Human-readable cancellation reason
+   * @param {string} [reason='Stopped'] - Cancellation reason, in English: it
+   *   is logged as data and translated only for the status line (callers mark
+   *   theirs with msg()).
    */
-  stopScene(reason = 'Stopped') {
+  stopScene(reason = msg('Stopped')) {
     this._setSceneMediaPlayback();
     this._interactions?.clear();
     this._dataPacks?.clear();
@@ -1912,7 +1926,7 @@ export class SceneDirector {
     if (!this._running || !this._runToken) return;
     this._runToken.cancelled = true;
     this._runAbort?.abort();
-    this._updateStatus(reason);
+    this._updateStatus(t(reason));
     this._logEvent('scene_stopped', { reason });
   }
 
@@ -2055,7 +2069,7 @@ export class SceneDirector {
       )
         return false;
       // Validate before touching playback, selection or the saved project.
-      this.stopScene('Importing project');
+      this.stopScene(msg('Importing project'));
       await Promise.allSettled([...(this._pendingWork || [])]);
       if (this._destroyed || generation !== this._importGeneration) return;
       if (
@@ -2316,7 +2330,7 @@ export class SceneDirector {
       token,
     );
     if (!completed && !token.cancelled && !this._destroyed)
-      this.stopScene('Camera move interrupted');
+      this.stopScene(msg('Camera move interrupted'));
   }
 
   /**
@@ -2405,7 +2419,7 @@ export class SceneDirector {
       const pending = readers.filter(({ read }) => read()?.pending === true);
       if (!pending.length) return;
       if (pending.some(({ maxWaitMs }) => Date.now() - began >= maxWaitMs)) {
-        this.stopScene('Scene media timed out');
+        this.stopScene(msg('Scene media timed out'));
         throw new Error(
           'Scene media did not finish within its bounded playback window',
         );

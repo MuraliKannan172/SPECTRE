@@ -1,10 +1,12 @@
 import * as Cesium from 'cesium';
+import { t } from '../../i18n/index.js';
 import {
   vesselTypeCss,
   vesselOverlayCohortLimit,
   VESSEL_OVERLAY_SOURCE_ID,
   applyVesselOverlayPolicy,
   VESSEL_CARD_FADE_DISTANCE_M,
+  VESSEL_CARD_FADE_START_RATIO,
 } from '../../data/vesselLabels.js';
 import {
   cameraPoseSignature,
@@ -365,6 +367,7 @@ export function createRendering({
 
     if (!scene || !records.length || maxLabels <= 0) {
       state.activeLabelCount = entries.length;
+      state.cardedRecords = new Set();
       publishVesselOverlayEntries(entries);
       return;
     }
@@ -402,6 +405,9 @@ export function createRendering({
       if (screen) accepted.push({ x: screen.x, y: screen.y });
     }
     const ranked = [...cells.values()].sort((a, b) => b.score - a.score);
+    // Vessels with an ambient card: the card already shows name, speed and
+    // course, so the detection overlay draws no label of its own under it.
+    const carded = new Set();
     for (const candidate of ranked) {
       if (entries.length >= maxLabels) break;
       if (
@@ -414,8 +420,10 @@ export function createRendering({
         continue;
       accepted.push({ x: candidate.x, y: candidate.y });
       entries.push(components.cards.buildVesselCard(candidate.record));
+      if (cardFullyShown(scene, candidate.record)) carded.add(candidate.record);
     }
     state.activeLabelCount = entries.length;
+    state.cardedRecords = carded;
     publishVesselOverlayEntries(entries);
   }
 
@@ -448,7 +456,10 @@ export function createRendering({
           : '';
         return {
           ...card,
-          accessibilityLabel: `Focus vessel ${card.title}, MMSI ${mmsi}`,
+          accessibilityLabel: t('Focus vessel {name}, MMSI {mmsi}', {
+            name: card.title,
+            mmsi,
+          }),
           activate: () => {
             const record = state.records.byMmsi.get(mmsi);
             if (!record) return false;
@@ -462,6 +473,22 @@ export function createRendering({
         collisionCapacity: ambientLimit,
         moving: false,
       },
+    );
+  }
+
+  /**
+   * Whether the host paints this ambient card at full strength: inside the
+   * start of its distance fade (applyVesselOverlayPolicy). Farther out the
+   * card fades away and the detection label stays the vessel's only text.
+   */
+  function cardFullyShown(scene, record) {
+    const camera = scene.camera?.positionWC;
+    const visual = getVisual(record);
+    const position = visual.billboard?.position || visual.position;
+    if (!camera || !position) return true;
+    return (
+      Cesium.Cartesian3.distance(camera, position) <
+      VESSEL_CARD_FADE_DISTANCE_M * VESSEL_CARD_FADE_START_RATIO
     );
   }
 

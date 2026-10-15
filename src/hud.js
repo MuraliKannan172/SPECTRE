@@ -38,6 +38,7 @@ import {
 import { formatNumber, msg, t } from './i18n/index.js';
 import { unitLabel } from './ui/unitLabels.js';
 import { localizeLayerName } from './ui/layerPanel.js';
+import { localizePlaceName } from './ui/placeNames.js';
 
 /** Color palettes keyed by shader mode; applied as CSS custom properties. */
 const HUD_COLORS = {
@@ -157,7 +158,7 @@ const LOCALIZED_LOCALITY = Object.freeze({
   near: ({ poi, city, distKm }) =>
     t('NEAR {poi} ({city}) {distance}', {
       poi,
-      city,
+      city: localizePlaceName(city),
       distance: hudQuantity(Math.round(distKm), 'km'),
     }),
   sector: ({ latDeg, lonDeg }) =>

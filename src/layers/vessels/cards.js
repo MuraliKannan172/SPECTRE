@@ -1,6 +1,7 @@
 import {
   accentForVesselType,
   displayVesselType,
+  normalizeVesselType,
 } from '../../data/vesselLabels.js';
 import { formatNumber, t } from '../../i18n/index.js';
 
@@ -127,10 +128,18 @@ export function createCards({
     return `vessel:unkeyed:${name}:${lat}:${lon}`;
   }
 
-  /** Uppercased, card-width-bounded AIS type (empty string when unknown). */
+  /**
+   * Uppercased AIS type for the card (empty string when unknown). Free feed
+   * text is bounded to the card width; a translated type token is a short
+   * catalog word and shows whole, never cut mid-word ("AUXILIAR DE PUERTO").
+   */
 
   function vesselTypeShort(record) {
-    return displayVesselType(record.type).toUpperCase().slice(0, 14);
+    const feedType = normalizeVesselType(record.type);
+    const shown = displayVesselType(record.type);
+    return shown === feedType
+      ? feedType.toUpperCase().slice(0, 14)
+      : shown.toUpperCase();
   }
 
   /**

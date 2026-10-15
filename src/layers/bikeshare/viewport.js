@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+import { msg } from '../../i18n/index.js';
 import { GBFS_CITY_REGISTRY } from './registry.js';
 import {
   ACTIVATION_EXIT_ALTITUDE_M,
@@ -172,7 +173,8 @@ export function createViewport({ state: layerState, services, parts, source }) {
     } catch (error) {
       if (error?.name === 'AbortError') return;
       console.warn(`[Data:Bikeshare] ${cityId} activate error:`, error);
-      layerState._error = 'GBFS fetch error';
+      // English data (stats reach the voice tools); the panel translates it.
+      layerState._error = msg('GBFS fetch error');
       deactivateCity(cityId);
       layerState._activeCityIds.delete(cityId);
     } finally {

@@ -119,7 +119,7 @@ export class LocationNavigation {
         }),
       onResult: (destination) => {
         if (destination.outlineUnavailable)
-          this._showToast('Detailed outline unavailable');
+          this._showToast(t('Detailed outline unavailable'));
       },
       onError: (error) => console.error('[Search] Geocoding failed:', error),
     });

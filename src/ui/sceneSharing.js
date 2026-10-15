@@ -87,21 +87,25 @@ export function createSceneDialog(title, onClose) {
   }
   /**
    * The browser draws a file input's button and "no file" text in its own
-   * language. Hide it visually (it stays focusable and is still opened by its
-   * label) and show a translated button and selection line instead.
+   * language. Keep the native input itself as the whole control — stretched
+   * over the row below, fully transparent — so clicking, keyboard focus and
+   * dropping files or folders from the desktop all stay native (a shrunken
+   * input would only accept drops on its own 1 px), and draw a translated
+   * button and selection line underneath it.
    */
   function fileChooser(wrapper, node) {
     wrapper.style.position = 'relative';
     Object.assign(node.style, {
       position: 'absolute',
-      width: '1px',
-      height: '1px',
+      inset: '0',
+      width: '100%',
+      height: '100%',
       margin: '0',
       padding: '0',
-      overflow: 'hidden',
-      clip: 'rect(0 0 0 0)',
-      whiteSpace: 'nowrap',
       border: '0',
+      opacity: '0',
+      cursor: 'pointer',
+      zIndex: '1',
     });
     const row = document.createElement('span');
     row.setAttribute('aria-hidden', 'true');

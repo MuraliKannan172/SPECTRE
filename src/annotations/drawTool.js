@@ -36,6 +36,7 @@ import {
   pointerOwner,
   releasePointer,
 } from '../data/inputOwnership.js';
+import { pointerOwnerName } from '../data/pointerOwnerNames.js';
 import {
   DRAW_SHAPES,
   MAX_VERTICES,
@@ -48,7 +49,7 @@ import {
   removeLastVertex,
 } from './drawMode.js';
 
-import { t } from '../i18n/index.js';
+import { msg, registerUnsavedWork, t, translateKnown } from '../i18n/index.js';
 /** The id this tool claims the pointer under. */
 export const DRAW_POINTER_OWNER = 'draw';
 const PREVIEW_DATA_SOURCE_NAME = 'gev-draw-preview';
@@ -101,6 +102,17 @@ export function initDrawTool({ viewer, annotations }) {
     target.addEventListener(type, listener, options);
     domListeners.push([target, type, listener, options]);
   };
+  // The board lives only in memory: switching language (a reload) asks first
+  // while it holds a lasting mark or a shape is half drawn.
+  const unregisterUnsavedWork = registerUnsavedWork(() => {
+    if (destroyed) return null;
+    const lasting = (annotations.list?.() || []).some(
+      (mark) => mark && mark.ttlMs == null && !mark.expiring,
+    );
+    return lasting || session?.vertices?.length > 0
+      ? msg('drawings on the map')
+      : null;
+  });
 
   const dataSource = new Cesium.CustomDataSource(PREVIEW_DATA_SOURCE_NAME);
   // `add()` resolves on the NEXT tick, so an init-then-immediate-destroy would
@@ -334,7 +346,7 @@ export function initDrawTool({ viewer, annotations }) {
         // half-starting.
         setHint(
           t('{owner} is using the pointer — close it first.', {
-            owner: pointerOwner(),
+            owner: translateKnown(pointerOwnerName(pointerOwner())),
           }),
         );
         return active;
@@ -514,6 +526,7 @@ export function initDrawTool({ viewer, annotations }) {
       generation += 1;
       if (active) setActive(false);
       destroyed = true;
+      unregisterUnsavedWork();
       releaseSceneHandler();
       releasePointer(lease);
       lease = null;

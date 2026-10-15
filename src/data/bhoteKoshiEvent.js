@@ -729,6 +729,19 @@ function ellipsizeEvidenceText(value, limit) {
   return `${text.slice(0, Math.max(1, limit - 3)).trimEnd()}...`;
 }
 
+// The pack names the kind of source in `media.publisher` (event.json); the
+// frame shows it in the UI language. Any other publisher shows as given.
+const EVIDENCE_PUBLISHER_TEXT = new Set([
+  msg('YouTube source'),
+  msg('Facebook source'),
+]);
+
+/** An evidence item's publisher as its frame shows it. */
+function evidencePublisherText(publisher) {
+  const text = String(publisher);
+  return EVIDENCE_PUBLISHER_TEXT.has(text) ? t(text) : bhoteEventText(text);
+}
+
 /** Repaint one stable frame with a poster or the current source-video frame. */
 export function updateEvidenceFrame(
   canvas,
@@ -790,18 +803,71 @@ export function updateEvidenceFrame(
     infoY + 27,
   );
   ctx.fillStyle = WORLD_OVERLAY_STYLE.detail;
-  ctx.font = scaledOverlayFont(WORLD_OVERLAY_STYLE.fontDetail);
-  const publisher = String(
-    observation.media?.publisher || t('SOURCE LINK'),
+  const publisher = (
+    observation.media?.publisher
+      ? evidencePublisherText(observation.media.publisher)
+      : t('SOURCE LINK')
   ).toUpperCase();
   ctx.fillText(
-    t('{publisher} / OPEN', {
-      publisher: ellipsizeEvidenceText(publisher, 24),
-    }),
+    fitEvidenceSourceLine(
+      ctx,
+      publisher,
+      scaledOverlayFont(WORLD_OVERLAY_STYLE.fontDetail),
+      canvas.width - 32,
+    ),
     16,
     infoY + 53,
   );
   return true;
+}
+
+// The smallest the source line's font may shrink to before the publisher is
+// shortened instead.
+const EVIDENCE_SOURCE_MIN_FONT_SCALE = 0.8;
+
+/**
+ * Set the font for the «{publisher} / OPEN» line and return the line so it
+ * fits `maxWidth`: a translation («ИСТОЧНИК YOUTUBE / ОТКРЫТЬ») is longer than
+ * the English and the portrait card cut its action word. A line that fits is
+ * drawn exactly as before; one that does not first shrinks its font (to 80%),
+ * then shortens the publisher — the «/ OPEN» action always stays whole.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {string} publisher Display publisher, already upper-cased.
+ * @param {string} font CSS font with a px size.
+ * @param {number} maxWidth
+ * @returns {string}
+ */
+function fitEvidenceSourceLine(ctx, publisher, font, maxWidth) {
+  const line = (limit) =>
+    t('{publisher} / OPEN', {
+      publisher: ellipsizeEvidenceText(publisher, limit),
+    });
+  let limit = 24;
+  let text = line(limit);
+  ctx.font = font;
+  if (typeof ctx.measureText !== 'function' || !(maxWidth > 0)) return text;
+  const width = () => Number(ctx.measureText(text)?.width) || 0;
+  if (width() <= maxWidth) return text;
+  const size = /(\d+(?:\.\d+)?)px/.exec(font);
+  if (size) {
+    const base = Number(size[1]);
+    const floor = base * EVIDENCE_SOURCE_MIN_FONT_SCALE;
+    // Width scales with the font size; step down until it fits or bottoms out.
+    let next = Math.max(
+      floor,
+      Math.floor(((base * maxWidth) / width()) * 10) / 10,
+    );
+    for (;;) {
+      ctx.font = font.replace(size[0], `${next}px`);
+      if (width() <= maxWidth || next <= floor) break;
+      next = Math.max(floor, next - 0.5);
+    }
+  }
+  while (width() > maxWidth && limit > 4) {
+    limit = Math.min(limit, publisher.length) - 1;
+    text = line(limit);
+  }
+  return text;
 }
 
 /** Compose source imagery and caveats into one stable renderer-owned frame. */

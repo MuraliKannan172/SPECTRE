@@ -2,9 +2,18 @@ import { formatUtcDayMonth, t } from '../i18n/index.js';
 const set = (node, key, value) => {
   if (node[key] !== value) node[key] = value;
 };
+/**
+ * "HH:MM UTC" of a time, or '' when it is not one. Computed on its own rather
+ * than cut from the dated readout: the localized day and month vary in length
+ * ("3/9" in Spanish, "09-03" in English).
+ */
+export const utcClock = (tick) =>
+  Number.isFinite(Date.parse(tick))
+    ? `${new Date(tick).toISOString().slice(11, 16)} UTC`
+    : '';
 const utc = (tick) =>
   Number.isFinite(Date.parse(tick))
-    ? `${formatUtcDayMonth(tick)} ${new Date(tick).toISOString().slice(11, 16)} UTC`
+    ? `${formatUtcDayMonth(tick)} ${utcClock(tick)}`
     : '';
 
 /** Stable native transport with local preview and a coalesced 150 ms drag commit. */
@@ -115,8 +124,8 @@ export function createRailTimeline({
         String(Math.max(0, Math.min(props.index, ticks.length - 1))),
       );
       valueText(ticks[Number(slider.value)]);
-      set(oldest, 'textContent', utc(ticks[0]).slice(6));
-      set(newest, 'textContent', utc(ticks.at(-1)).slice(6));
+      set(oldest, 'textContent', utcClock(ticks[0]));
+      set(newest, 'textContent', utcClock(ticks.at(-1)));
       set(readout, 'textContent', props.readout || '');
     }
     for (const node of [slider, latest, play])

@@ -250,12 +250,8 @@
   gap: 5px;
 }
 .radio-transport button {
-  min-width: 0;
   min-height: 30px;
   padding: 6px 3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   border: 1px solid rgba(65, 220, 231, 0.28);
   border-radius: 5px;
   color: #8feaf2;
@@ -263,6 +259,13 @@
   font: 8px/1 var(--font-mono);
   letter-spacing: 0.06em;
   cursor: pointer;
+}
+/* A longer translated action stays on one line, cut with an ellipsis. */
+html:not([lang='en']) .radio-transport button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .radio-transport button:hover:not(:disabled),
 .radio-transport button:focus-visible:not(:disabled) {
@@ -614,14 +617,10 @@
   gap: 8px;
 }
 
-/* The name takes the room the status column leaves; a long word wraps inside
-   it instead of pushing the toggle out of line. */
 .data-toggle-left {
   display: flex;
-  flex: 1 1 auto;
   align-items: center;
   gap: 8px;
-  min-width: 0;
 }
 
 .data-icon {
@@ -629,37 +628,16 @@
   line-height: 1;
 }
 
-/* A fixed icon box, so every name (and the meta line under it, 26px in)
-   starts at the same x whatever the glyph's width. */
-.data-toggle-left .data-icon {
-  flex: none;
-  width: 18px;
-  text-align: center;
-}
-
 .data-name {
-  min-width: 0;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
   letter-spacing: 0.3px;
-  overflow-wrap: anywhere;
-}
-
-/* Translated layer names are longer: break between words, and hyphenate a
-   word that still does not fit instead of splitting it anywhere. */
-html:not([lang='en']) .data-name {
-  overflow-wrap: break-word;
-  hyphens: auto;
-  /* No two-letter pieces such as "es-paciales": a word hyphenates only when
-     at least four letters stay on each side. */
-  hyphenate-limit-chars: 8 4 4;
 }
 
 .data-toggle-right {
   display: flex;
-  flex: 0 1 auto;
   align-items: center;
   gap: 10px;
 }
@@ -669,34 +647,68 @@ html:not([lang='en']) .data-name {
   font-size: 11px;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
+  min-width: 30px;
   text-align: right;
+}
+
+/* Longer translations below; English keeps the layout above. */
+
+/* The name takes the room the status column leaves; a long word wraps inside
+   it instead of pushing the toggle out of line. */
+html:not([lang='en']) .data-toggle-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A fixed icon box, so every name (and the meta line under it, 26px in)
+   starts at the same x whatever the glyph's width. */
+html:not([lang='en']) .data-toggle-left .data-icon {
+  flex: none;
+  width: 18px;
+  text-align: center;
+}
+
+/* Translated layer names are longer: break between words, and hyphenate a
+   word that still does not fit instead of splitting it anywhere. */
+html:not([lang='en']) .data-name {
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  /* No two-letter pieces such as "es-paciales": a word hyphenates only when
+     at least four letters stay on each side. */
+  hyphenate-limit-chars: 8 4 4;
+}
+
+html:not([lang='en']) .data-count {
+  min-width: auto;
   text-wrap: balance;
 }
 
 /* Row text pieces that must not break inside: a hyphenated code (ADS-B) and
    the space before a " · " separator (see setRowText in layerPanel.js). */
-.data-keep {
+html:not([lang='en']) .data-keep {
   white-space: nowrap;
 }
 
 /* A count phrase ("24 nearby · 2 on screen") takes its own line under the
-   name instead of squeezing it beside the toggle. */
-.data-toggle-row--count-line .data-toggle-top {
+   name instead of squeezing it beside the toggle. layerPanel.js sets the
+   class only outside English. */
+html:not([lang='en']) .data-toggle-row--count-line .data-toggle-top {
   flex-wrap: wrap;
   row-gap: 2px;
 }
 
-.data-toggle-row--count-line .data-toggle-right {
+html:not([lang='en']) .data-toggle-row--count-line .data-toggle-right {
   display: contents;
 }
 
 /* A zero basis, so a long name wraps beside the toggle instead of pushing the
    toggle onto the count's line. */
-.data-toggle-row--count-line .data-toggle-left {
+html:not([lang='en']) .data-toggle-row--count-line .data-toggle-left {
   flex-basis: 0;
 }
 
-.data-toggle-row--count-line .data-count {
+html:not([lang='en']) .data-toggle-row--count-line .data-count {
   order: 1;
   flex: 1 0 100%;
   padding-left: 26px;
@@ -706,7 +718,8 @@ html:not([lang='en']) .data-name {
 
 /* The "—" placeholder gives way to a wide status chip, so the name keeps the
    room it needs. */
-.data-toggle-right:has(
+html:not([lang='en'])
+  .data-toggle-right:has(
     .data-toggle-btn:is(
       .transitioning,
       .feed-loading,
@@ -739,9 +752,12 @@ html:not([lang='en']) .data-name {
     min-width var(--transition-fast),
     letter-spacing var(--transition-fast);
   outline: none;
-  flex: none;
   min-width: 38px;
   text-align: center;
+}
+
+html:not([lang='en']) .data-toggle-btn {
+  flex: none;
   white-space: nowrap;
 }
 
@@ -751,16 +767,28 @@ html:not([lang='en']) .data-name {
   outline-offset: -3px;
 }
 
-/* Status chips up to eight characters share one width; a longer word grows
-   its own chip rather than widening every chip and squeezing every name. */
 .data-toggle-btn.feed-loading,
 .data-toggle-btn.feed-degraded,
 .data-toggle-btn.feed-stale,
 .data-toggle-btn.feed-partial,
 .data-toggle-btn.feed-fallback,
 .data-toggle-btn.feed-unavailable {
-  min-width: 72px;
+  min-width: 82px;
   letter-spacing: 0.8px;
+}
+
+/* Status chips up to eight characters share one width; a longer word grows
+   its own chip rather than widening every chip and squeezing every name. */
+html:not([lang='en'])
+  .data-toggle-btn:is(
+    .feed-loading,
+    .feed-degraded,
+    .feed-stale,
+    .feed-partial,
+    .feed-fallback,
+    .feed-unavailable
+  ) {
+  min-width: 72px;
 }
 
 .data-toggle-btn:hover {
@@ -964,15 +992,27 @@ html:not([lang='en']) .data-name {
 .data-row-list-lead {
   min-width: 34px;
   flex: none;
-  white-space: nowrap;
   opacity: 0.85;
 }
 
-/* The whole instruction wraps under itself rather than losing its tail:
-   "Turn right onto …" says nothing, and Russian or Spanish run longer. */
 .data-row-list-text {
   flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A translated instruction wraps under itself rather than losing its tail:
+   "Gira a la derecha hacia …" says nothing. */
+html:not([lang='en']) .data-row-list-lead {
+  white-space: nowrap;
+}
+
+html:not([lang='en']) .data-row-list-text {
   min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 

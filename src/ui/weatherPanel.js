@@ -1,6 +1,6 @@
 import { formatUtcDayMonth, t } from '../i18n/index.js';
 import { createRailCards } from './railCards.js';
-import { createRailTimeline } from './railTimeline.js';
+import { createRailTimeline, utcClock } from './railTimeline.js';
 
 // Remounting controls must not reopen a panel the user already collapsed.
 const appearedDocuments = new WeakSet();
@@ -15,8 +15,9 @@ const ORDER = [
 const OBSERVED = new Set(ORDER.slice(2));
 const utc = (time) =>
   Number.isFinite(Date.parse(time))
-    ? `${formatUtcDayMonth(time)} ${new Date(time).toISOString().slice(11, 16)} UTC`
+    ? `${formatUtcDayMonth(time)} ${utcClock(time)}`
     : t('Unavailable');
+const clockTime = (time) => utcClock(time) || t('Unavailable');
 const age = (time) => {
   const minutes = Math.max(
     0,
@@ -31,7 +32,7 @@ const age = (time) => {
 };
 const historyTime = (time) =>
   t('{time} · {minutes} min ago', {
-    time: utc(time).slice(6),
+    time: clockTime(time),
     minutes: Math.max(0, Math.floor((Date.now() - Date.parse(time)) / 60_000)),
   });
 const dated = (time) => `${utc(time)} · ${age(time)}`;
@@ -172,7 +173,7 @@ export function createWeatherPanel({
         const shown = product?.shown ?? summary.shownTime;
         if (state.mode === 'history' && product?.selected === null) {
           const gap = summary.maxGapMinutes || 30;
-          const time = utc(state.target).slice(6);
+          const time = clockTime(state.target);
           detail =
             gap < 60
               ? t('No frame within {gap} min of {time}', { gap, time })

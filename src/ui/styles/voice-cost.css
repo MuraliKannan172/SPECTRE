@@ -123,9 +123,10 @@ html:not([lang='en']) #command-dock .gev-voice-cost-value {
   letter-spacing: 0;
 }
 
-/* Live hints ("Ask or command", "Requesting microphone") run longer in other
-   languages; give them a second line from the spare space under the readout
-   rather than cutting them mid-word. */
+/* Live hints ("Ask or command", "Requesting microphone") and the tier switch
+   ("СТАНДАРТ — со следующей сессии") run longer in other languages; give them
+   a second line from the spare space under the readout, without the tracking
+   that would push the tier line onto a third, rather than cutting them. */
 html:not([lang='en'])
   #command-dock
   #gev-voice-control:is(
@@ -139,6 +140,7 @@ html:not([lang='en'])
   -webkit-line-clamp: 2;
   line-clamp: 2;
   line-height: 1.15;
+  letter-spacing: 0;
   white-space: normal;
   overflow-wrap: anywhere;
 }

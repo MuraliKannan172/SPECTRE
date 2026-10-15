@@ -1,6 +1,9 @@
 import { localReceiverFeedName } from './feedNames.js';
 import { LAYER_SOURCE } from './policy.js';
 
+// Marks English that the Layers panel translates when it shows the hint.
+const msg = (text) => text;
+
 /**
  * Layers-panel status for Local ADS-B, from its two inputs: the browser
  * WebUSB receiver and the server's decoder feeds. Pure; no DOM or Cesium.
@@ -58,12 +61,15 @@ function webUsbStatus(receiver, heard, feedState) {
   if (!receiver.webUsbSupported)
     return {
       status: 'idle',
-      statusMessage: 'WebUSB needs desktop Chrome or Edge',
+      statusMessage: msg('WebUSB needs desktop Chrome or Edge'),
     };
   if (!receiver.connected)
-    return { status: 'idle', statusMessage: 'connect a receiver in Radio' };
+    return {
+      status: 'idle',
+      statusMessage: msg('connect a receiver in Radio'),
+    };
   if (receiver.mode !== 'adsb')
-    return { status: 'idle', statusMessage: 'receiver is in FM mode' };
+    return { status: 'idle', statusMessage: msg('receiver is in FM mode') };
   const rate = Number.isFinite(receiver.messagesPerSecond)
     ? `${receiver.messagesPerSecond} msg/s`
     : 'listening';

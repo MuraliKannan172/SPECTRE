@@ -1,4 +1,4 @@
-import { installationClassLabel } from './classLabel.js';
+import { installationClassLabel, installationTitle } from './classLabel.js';
 import * as Cesium from 'cesium';
 import {
   MILITARY_LABEL_CAP,
@@ -163,7 +163,7 @@ export function createNamedMarkers({ state, services, parts, overlayHost }) {
             id: record.id,
             source: LAYER_ID,
             position,
-            title: record.name,
+            title: installationTitle(record.name),
             priority: record.areaM2 || 0,
             accent: COLOR_BY_CLASS[record.class] || '#9ca6b0',
           }),
@@ -183,7 +183,7 @@ export function createNamedMarkers({ state, services, parts, overlayHost }) {
           ]
         : [];
       marker.entry.position = position;
-      marker.entry.title = record.name;
+      marker.entry.title = installationTitle(record.name);
       marker.entry.priority = record.areaM2 || 0;
       entries.push(marker.entry);
       ordered.push(marker);

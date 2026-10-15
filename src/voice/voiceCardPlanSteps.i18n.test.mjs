@@ -1,0 +1,246 @@
+// PDF review C3, B4, E5, E6 and proposal 1: the voice card's plan steps name
+// every tool in the interface language, the "Layer" step agrees in gender,
+// error lines and long headlines show whole, and the Contacts snapshot time
+// reads as a clock, not ISO. What the model receives stays English.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { setLocale } from '../i18n/index.js';
+import { GEV_ACTION_SCHEMAS } from './actionSchemas.js';
+import { presentResult, shownSnapshotTime } from './resultDisplay.js';
+import { attachVoiceResult, planStepLabel } from './speech.js';
+import {
+  initialVoiceCardState,
+  reduceVoiceCard,
+  voiceCardView,
+} from './voiceCardPresentation.js';
+
+const TOOLS = GEV_ACTION_SCHEMAS.map((schema) => schema.name);
+
+function inLocale(locale, run) {
+  setLocale(locale);
+  try {
+    return run();
+  } finally {
+    setLocale('en');
+  }
+}
+
+test('C3: every tool has a plan label, never its raw name', () => {
+  for (const name of TOOLS) {
+    const label = planStepLabel(name, {});
+    assert.notEqual(label, name.replace(/_/g, ' '), name);
+    assert.doesNotMatch(label, /_/, name);
+  }
+  assert.equal(planStepLabel('analyst_query', {}), 'Analyst query');
+  assert.equal(
+    planStepLabel('adjust_camera_zoom', { direction: 'in' }),
+    'Zoom in',
+  );
+  assert.equal(
+    planStepLabel('adjust_camera_zoom', { direction: 'out' }),
+    'Zoom out',
+  );
+  // A tool the card does not know keeps its name in English.
+  assert.equal(planStepLabel('brand_new_tool', {}), 'brand new tool');
+});
+
+for (const locale of ['ru', 'es']) {
+  test(`C3: ${locale} plan labels are all translated`, () => {
+    const english = Object.fromEntries(
+      TOOLS.map((name) => [name, planStepLabel(name, { direction: 'out' })]),
+    );
+    inLocale(locale, () => {
+      for (const name of TOOLS) {
+        // A layer switch without a layer is checked below (B4).
+        const label = planStepLabel(name, { direction: 'out' });
+        assert.notEqual(label, english[name], `${name}: "${label}"`);
+      }
+    });
+  });
+}
+
+test('C3/E10: analyst query and an unknown tool in ru and es', () => {
+  inLocale('ru', () => {
+    assert.equal(planStepLabel('analyst_query', {}), 'Аналитический запрос');
+    assert.equal(planStepLabel('brand_new_tool', {}), 'Действие');
+  });
+  inLocale('es', () => {
+    assert.equal(planStepLabel('analyst_query', {}), 'Consulta analítica');
+    assert.equal(planStepLabel('brand_new_tool', {}), 'Acción');
+  });
+});
+
+test('B4: a layer step with no layer agrees with "Capa"', () => {
+  const step = (enabled) => planStepLabel('set_layer_visibility', { enabled });
+  assert.equal(step(true), 'Layer on');
+  assert.equal(step(false), 'Layer off');
+  inLocale('es', () => {
+    assert.equal(step(true), 'Capa: activada');
+    assert.equal(step(false), 'Capa: desactivada');
+    // A named layer keeps the shared "{label} on" wording.
+    assert.match(
+      planStepLabel('set_layer_visibility', {
+        layerId: 'earthquakes',
+        enabled: true,
+      }),
+      /: activado$/,
+    );
+  });
+  inLocale('ru', () => {
+    assert.equal(step(true), 'Слой: вкл.');
+    assert.equal(step(false), 'Слой: выкл.');
+  });
+});
+
+function cardAfter(name, result, args = {}) {
+  let state = reduceVoiceCard(initialVoiceCardState(), {
+    type: 'action-call',
+    id: 'c1',
+    name,
+    arguments: args,
+  });
+  state = reduceVoiceCard(state, {
+    type: 'action-result',
+    id: 'c1',
+    name,
+    result: attachVoiceResult(name, result, args),
+  });
+  return voiceCardView(state);
+}
+
+const NO_PLACE = {
+  ok: false,
+  action: 'select_nearest_aircraft',
+  stage: 'location',
+  error:
+    'Nearest-aircraft selection needs a preset, place name, or latitude and longitude',
+  feed: {},
+};
+
+test('proposal 1: an error line shows whole, in every language', () => {
+  for (const [locale, expected] of [
+    ['en', NO_PLACE.error],
+    [
+      'ru',
+      'Для выбора ближайшего самолёта нужен пресет, название места или широта и долгота',
+    ],
+    [
+      'es',
+      'Para seleccionar la aeronave más cercana se necesita un preajuste, un nombre de lugar o la latitud y la longitud',
+    ],
+  ]) {
+    const view = inLocale(locale, () =>
+      cardAfter('select_nearest_aircraft', NO_PLACE),
+    );
+    assert.deepEqual(view.result.lines, [expected], locale);
+  }
+});
+
+test('proposal 1: a successful line keeps its 80-character cap', () => {
+  const long = 'x'.repeat(120);
+  const view = voiceCardView({
+    ...initialVoiceCardState(),
+    result: { display: { title: 'T', lines: [long] } },
+  });
+  assert.equal(view.result.lines[0].length, 80);
+});
+
+test('E5: a translated analyst headline fits the card title whole', () => {
+  const title =
+    'Al menos 12 aeronaves militares en un radio de 40 km de Los Angeles';
+  const card = () =>
+    voiceCardView({
+      ...initialVoiceCardState(),
+      result: { display: { title, lines: [] } },
+    }).result.title;
+  assert.equal(inLocale('es', card), title);
+  // English keeps its 64-character title, equal to the spoken headline.
+  assert.equal(card().length, 64);
+});
+
+test('E6: the snapshot time reads as a UTC clock, dated when not today', () => {
+  const iso = '2026-10-15T14:32:05.000Z';
+  const sameDay = Date.parse('2026-10-15T23:00:00Z');
+  const nextDay = Date.parse('2026-10-16T00:10:00Z');
+  assert.equal(shownSnapshotTime(iso, sameDay), iso, 'English as before');
+  inLocale('ru', () => {
+    assert.equal(shownSnapshotTime(iso, sameDay), '14:32:05 UTC');
+    assert.equal(shownSnapshotTime(iso, nextDay), '15.10.2026, 14:32:05 UTC');
+  });
+  inLocale('es', () => {
+    assert.equal(shownSnapshotTime(iso, sameDay), '14:32:05 UTC');
+    assert.equal(shownSnapshotTime(iso, nextDay), '15/10/2026, 14:32:05 UTC');
+    assert.equal(shownSnapshotTime('not a time'), 'not a time');
+  });
+});
+
+test('E6: the Contacts note shows the clock; the model note stays ISO', () => {
+  const evaluatedAt = new Date();
+  evaluatedAt.setUTCHours(14, 32, 5, 0);
+  const iso = evaluatedAt.toISOString();
+  const note = `Contacts panel snapshot at ${iso} — the same retained cohort supplies the card, speech, and follow-up memory.`;
+  const result = {
+    ok: true,
+    count: 12,
+    complete: true,
+    scopeLabel: 'in view',
+    display: { scope: 'in view' },
+    coverage: { note },
+    items: [],
+  };
+  const notes = inLocale('es', () =>
+    presentResult('analyst_query', result).display.notes.join(' | '),
+  );
+  assert.match(notes, /\(14:32:05 UTC\)/);
+  assert.doesNotMatch(notes, /T14:32/);
+  assert.equal(result.coverage.note, note, 'the result is not changed');
+});
+
+// C12: preset places show in the interface language on the card; the model's
+// error and scope stay English.
+test('C12: plan steps and errors name a preset place in the UI language', () => {
+  const failed = {
+    ok: false,
+    action: 'select_nearest_aircraft',
+    stage: 'nearest',
+    error:
+      'Live Flights is enabled, but no airborne aircraft is loaded in the Tokyo view yet',
+    location: { label: 'Tokyo' },
+    feed: { state: 'nominal' },
+  };
+  assert.equal(
+    planStepLabel('fly_to_location', { query: 'Tokyo' }),
+    'Fly to Tokyo',
+  );
+  inLocale('es', () => {
+    assert.match(planStepLabel('fly_to_location', { query: 'Tokyo' }), /Tokio/);
+    assert.match(
+      planStepLabel('select_nearest_aircraft', { locationId: 'tokyo' }),
+      /Tokio/,
+    );
+    const view = cardAfter('select_nearest_aircraft', failed);
+    assert.match(view.result.lines[0], /Tokio/);
+  });
+  inLocale('ru', () => {
+    assert.match(planStepLabel('fly_to_location', { query: 'Tokyo' }), /Токио/);
+  });
+  assert.match(failed.error, /Tokyo view/, 'the result stays English');
+});
+
+test('C12: the analyst scope names Los Angeles in the UI language', () => {
+  const result = {
+    ok: true,
+    count: 12,
+    complete: false,
+    scopeLabel: 'within 40 km of Los Angeles',
+    display: { scope: 'within 40 km of Los Angeles' },
+    coverage: { layersQueried: [{ layerKey: 'military' }] },
+    items: [],
+  };
+  const title = inLocale(
+    'es',
+    () => presentResult('analyst_query', result).display.title,
+  );
+  assert.match(title, /Los Ángeles$/, 'the headline is not cut at 64');
+  assert.equal(result.scopeLabel, 'within 40 km of Los Angeles');
+});

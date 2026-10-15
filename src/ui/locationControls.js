@@ -1,5 +1,6 @@
 import { locationMiniStatus } from '../locationStatus.js';
 import { t } from '../i18n/index.js';
+import { localizePlaceName } from './placeNames.js';
 
 const POI_KEYS = ['Q', 'W', 'E', 'R', 'T'];
 
@@ -51,7 +52,7 @@ export class LocationControls {
       pill.type = 'button';
       pill.className = 'location-pill';
       pill.dataset.locationId = id;
-      pill.textContent = city.name;
+      pill.textContent = localizePlaceName(city.name);
       this.bind(pill, 'click', () => onCity(id));
       elements.pills.appendChild(pill);
     }
@@ -142,9 +143,16 @@ export class LocationControls {
     for (const pill of this.elements.pills.querySelectorAll('.location-pill'))
       pill.classList.toggle('active', pill.dataset.locationId === id);
   }
-  renderStatus(state) {
+  renderStatus(record) {
     if (this.destroyed || !this.elements.statusCity || !this.elements.statusPoi)
       return;
+    // A preset city shows its name in the UI language; the record stays English.
+    const state = record?.city?.name
+      ? {
+          ...record,
+          city: { ...record.city, name: localizePlaceName(record.city.name) },
+        }
+      : record;
     const lines = locationMiniStatus(state);
     // The initial/placeholder states get catalog keys at the writer so a
     // non-English boot never leaks the English sentinels back over the

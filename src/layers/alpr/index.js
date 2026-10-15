@@ -276,7 +276,7 @@ export function createAlprCamerasLayer({ source, services } = {}) {
       state.stale = Boolean(state.lastUpdate);
       setAlprStatus(
         'unavailable',
-        error?.message || 'Camera source temporarily unavailable',
+        error?.message || msg('Camera source temporarily unavailable'),
       );
       if (!isUnavailableCapability(error)) scheduleUnavailableRetry();
     } finally {

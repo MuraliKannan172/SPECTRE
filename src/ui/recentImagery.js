@@ -19,6 +19,7 @@ import {
 } from '../layers/recentImagery/model.js';
 import { displayDay, displayMetres } from '../layers/recentImagery/display.js';
 import { formatQuantity } from './unitLabels.js';
+import { pointerOwnerName } from '../data/pointerOwnerNames.js';
 
 const PANEL_ID = 'recent-imagery-panel';
 const OVERVIEW_MIN_BOX_KM = 25;
@@ -32,12 +33,38 @@ const LAYER_NOTICES = new Set([
   msg('Esri map unavailable · no swipe'),
   msg('Swipe needs a globe map'),
   msg('Imagery stays on Esri · CLEAR to use Google 3D'),
+  // Box refusals the layer writes itself (layers/recentImagery/index.js).
+  msg('Point the camera at the ground to use the view'),
+  msg('That point cannot anchor a box'),
 ]);
 const TOO_LARGE = /^(Box|View) is ([\d,]+) km wide · limit ([\d,]+) km$/;
+// Refusals with a value in them (layers/recentImagery/model.js and
+// imageryBoxTool.js); fixed refusals there are msg() text for translateKnown.
+const POLAR = /^Imagery stops at ±([\d.]+)° latitude$/;
+const POINTER_BUSY = /^(.+) is using the pointer — close it first$/;
 
-function localizeNotice(text) {
+/**
+ * The notice line in the UI language: notices and box refusals arrive in
+ * English. Exported for tests.
+ * @param {string} text
+ * @returns {string}
+ */
+export function localizeNotice(text) {
   if (!text) return '';
   if (LAYER_NOTICES.has(text)) return t(text);
+  const polar = POLAR.exec(text);
+  if (polar)
+    return t('Imagery stops at ±{limit}° latitude', {
+      limit: formatNumber(Number(polar[1]), {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    });
+  const busy = POINTER_BUSY.exec(text);
+  if (busy)
+    return t('{owner} is using the pointer — close it first', {
+      owner: translateKnown(pointerOwnerName(busy[1])),
+    });
   const tooLarge = TOO_LARGE.exec(text);
   if (!tooLarge) return translateKnown(text);
   const values = {

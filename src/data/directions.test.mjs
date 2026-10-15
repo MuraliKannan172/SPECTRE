@@ -740,6 +740,11 @@ test('a refused arming names the tool holding the pointer and how to leave it', 
     pointerBlockedMessage('measure', 'a'),
     'measure is active — turn measure off, then set A',
   );
+  // A registered owner without an exit is named by its tool, not its id.
+  assert.equal(
+    pointerBlockedMessage('recent-imagery-box', 'a'),
+    'Recent imagery is active — turn Recent imagery off, then set A',
+  );
   // Nothing to say when nothing is in the way, or when we are the holder.
   assert.equal(pointerBlockedMessage(null, 'a'), null);
   assert.equal(pointerBlockedMessage('', 'a'), null);

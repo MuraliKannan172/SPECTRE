@@ -18,7 +18,8 @@
 
 import * as Cesium from 'cesium';
 import { roadLabel } from '../../data/routeSteps.js';
-import { t, msg, formatNumber } from '../../i18n/index.js';
+import { t, msg, formatNumber, translateKnown } from '../../i18n/index.js';
+import { pointerOwnerName } from '../../data/pointerOwnerNames.js';
 import { formatQuantity } from '../../ui/unitLabels.js';
 
 export const DIRECTIONS_STEP_OVERLAY_SOURCE_ID = 'directions-step';
@@ -35,6 +36,36 @@ export const DIRECTIONS_MODES = Object.freeze({
   bike: Object.freeze({ chip: msg('BIKE'), word: msg('Bike'), icon: '🚲' }),
 });
 export const DEFAULT_DIRECTIONS_MODE = 'car';
+
+/**
+ * The route proxy's refusal texts (server/providers/places/routes.js). They
+ * stay English on the wire and in the AI tools; the row shows them translated.
+ */
+const ROUTING_REFUSALS = new Set([
+  msg('rate limited'),
+  msg('routing service is rate limited'),
+  msg('route leg too long'),
+  msg('route too long'),
+]);
+
+/** A refusal text from the route proxy in the language; unknown ones as given. */
+export function presentRoutingRefusal(text) {
+  return ROUTING_REFUSALS.has(text) ? t(text) : text;
+}
+
+/** The row text for a failed route request (createDirectionsSource errors). */
+export function presentRoutingFailure(error) {
+  if (error?.status === 429) {
+    return error.refusal
+      ? t('{error} — try again in a moment', {
+          error: presentRoutingRefusal(error.refusal),
+        })
+      : t('Routing is rate limited — try again in a moment');
+  }
+  if (Number.isFinite(error?.status) && error.status > 0)
+    return t('Routing unavailable (HTTP {status})', { status: error.status });
+  return error?.message || t('Routing unavailable');
+}
 
 /** Route colour — the annotation palette's cyan, so voice routes and Directions match. */
 export const DIRECTIONS_ROUTE_COLOR = '#39d0ff';
@@ -471,7 +502,7 @@ export function pointerBlockedMessage(owner, which) {
   const known = POINTER_TOOL_EXITS[id];
   if (!known)
     return t('{name} is active — turn {name} off, then set {endpoint}', {
-      name: id,
+      name: translateKnown(pointerOwnerName(id)),
       endpoint,
     });
   return t('{name} is active — {leave}, then set {endpoint}', {
@@ -1118,7 +1149,9 @@ export function createDirectionsLayer({ services, source }) {
           payload?.error === 'no route found'
             ? t('No route found between A and B')
             : payload?.error
-              ? t('Routing failed: {error}', { error: payload.error })
+              ? t('Routing failed: {error}', {
+                  error: presentRoutingRefusal(payload.error),
+                })
               : t('No route found between A and B');
         return;
       }
@@ -1139,7 +1172,7 @@ export function createDirectionsLayer({ services, source }) {
           ? t('Routing timed out')
           : error?.name === 'TypeError'
             ? t('Routing unavailable — no response from the routing service')
-            : error?.message || t('Routing unavailable');
+            : presentRoutingFailure(error);
     } finally {
       clearTimeout(timer);
       if (_routeAbort === controller) _routeAbort = null;

@@ -68,7 +68,7 @@ export function layerStatesForShot(
       sceneDisplayTitle: displaySceneTitle(scene),
       shotId: shot.id,
       shotTitle: shot.title,
-      shotDisplayTitle: displayShotTitle(shot.title),
+      shotDisplayTitle: displayShotTitle(shot.title, shot, scene),
       shotIndex,
       shotCount: scene.shots.length,
       durationSec: shot.durationSec || DEFAULT_SHOT_DURATION_SEC,

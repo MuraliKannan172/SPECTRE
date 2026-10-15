@@ -569,15 +569,20 @@ export function panelRuntime(config) {
     queued = view;
     if (started) return;
     started = true;
+    // i18n-ignore: this script runs as source text in the host panel, without the app catalogs
     say("Loading God's Eye View…");
     startApp(url, view).catch((error) =>
+      // i18n-ignore: this script runs as source text in the host panel, without the app catalogs
       say(`God's Eye View could not load here: ${error?.message || error}.`),
     );
     setTimeout(() => {
+      // i18n-ignore: this script runs as source text in the host panel
       if (!ready)
         say(
+          // i18n-ignore: see above
           "God's Eye View did not load here" +
             (blocked ? ` (${blocked})` : '') +
+            // i18n-ignore: see above
             ". Use Open in God's Eye View above.",
         );
     }, config.loadTimeoutMs);
@@ -658,6 +663,7 @@ export function panelRuntime(config) {
     },
     (error) =>
       say(
+        // i18n-ignore: this script runs as source text in the host panel, without the app catalogs
         "This client did not accept the God's Eye View panel" +
           (error?.message ? `: ${error.message}` : '.'),
       ),

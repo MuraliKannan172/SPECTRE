@@ -10,6 +10,21 @@ import {
 import { formatUtcDayMonth, t, msg } from '../../i18n/index.js';
 import { formatScaleLabel } from '../../ui/unitLabels.js';
 
+/**
+ * A stored (English) failure in the language. HTTP failures from source.js
+ * and infraredImage.js carry their status in the text, so they are matched
+ * back onto a placeholder; anything else is a plain catalog key.
+ */
+function presentWeatherProblem(problem) {
+  const http = /^Weather (image )?HTTP (\d+)$/.exec(problem);
+  if (http) {
+    return http[1]
+      ? t('Weather image HTTP {status}', { status: http[2] })
+      : t('Weather HTTP {status}', { status: http[2] });
+  }
+  return t(problem);
+}
+
 const STOPS = [
   [10, '#00ecec'],
   [20, '#0000f6'],
@@ -532,7 +547,7 @@ export function createWeatherLayer({
       const diagnostic = rendering?.getDiagnostics();
       // Errors are stored in English (stats, diagnostics); shown translated.
       const problem = error || diagnostic?.error;
-      const shownProblem = problem ? t(problem) : null;
+      const shownProblem = problem ? presentWeatherProblem(problem) : null;
       const shownHost = hostStatus ? t(hostStatus) : null;
       const b = manifest?.bounds;
       const canvas = viewer?.scene?.canvas;

@@ -240,8 +240,6 @@ html:not([lang='en'])
 }
 
 .panel-collapse-btn {
-  /* A long translated title must not squeeze the toggle into a sliver. */
-  flex-shrink: 0;
   width: 22px;
   height: 22px;
   border-radius: 6px;
@@ -256,6 +254,11 @@ html:not([lang='en'])
     background-color var(--transition-fast),
     border-color var(--transition-fast),
     color var(--transition-fast);
+}
+
+/* A long translated title must not squeeze the toggle into a sliver. */
+html:not([lang='en']) .panel-collapse-btn {
+  flex-shrink: 0;
 }
 
 .panel-collapse-btn:hover {
@@ -787,8 +790,9 @@ html:not([lang='en'])
 /* One label column across the Display rows: --pp-label-chars is the longest
    label of the active language (set by applicationShell), and the labels are
    monospace, so every slider track starts at the same x whatever the
-   language. 0.125em is the 1px letter-spacing at 8px. */
-.pp-slider-row > .pp-slider-mini-label {
+   language. 0.125em is the 1px letter-spacing at 8px. English keeps its
+   own label widths. */
+html:not([lang='en']) .pp-slider-row > .pp-slider-mini-label {
   flex: 0 0 auto;
   min-width: calc(var(--pp-label-chars, 0) * (1ch + 0.125em));
 }
@@ -989,9 +993,9 @@ html:not([lang='en'])
 #draw-mode-row {
   min-width: 184px;
 }
-/* Equal thirds with room around the label, so a long shape name never runs
-   edge to edge in its segment. */
-#draw-mode-row .pp-mode-btn {
+/* Equal thirds with room around the label, so a long translated shape name
+   never runs edge to edge in its segment. */
+html:not([lang='en']) #draw-mode-row .pp-mode-btn {
   padding: 0 4px;
 }
 #draw-label-row {
@@ -1015,9 +1019,11 @@ html:not([lang='en'])
 .pp-text-input:focus {
   border-color: var(--accent);
 }
-/* Sized to its longest colour name so a translated one is never clipped;
-   74px keeps the English width. */
 .draw-color-select {
+  flex: 0 0 74px;
+}
+/* Sized to its longest colour name so a translated one is never clipped. */
+html:not([lang='en']) .draw-color-select {
   flex: 0 0 auto;
   min-width: 74px;
 }
@@ -1339,20 +1345,31 @@ body.ui-clean-view #scene-runtime.active {
   );
 }
 
-/* One label column for every parameter, as wide as the longest label in the
-   active language, so all slider tracks start and end at the same x. */
-#param-sliders {
+.param-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.param-slider-row:last-child {
+  margin-bottom: 0;
+}
+
+/* One label column for every parameter, as wide as the longest translated
+   label, so all slider tracks start and end at the same x. */
+html:not([lang='en']) #param-sliders {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
   gap: 10px;
 }
 
-.param-slider-row {
+html:not([lang='en']) .param-slider-row {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
-  align-items: center;
+  margin-bottom: 0;
 }
 
 .param-label {

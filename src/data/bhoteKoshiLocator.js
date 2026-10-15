@@ -574,8 +574,9 @@ export function createBhoteKoshiLocatorLayer({
       protected: true,
       active: true,
       interactive: true,
-      accessibilityLabel:
+      accessibilityLabel: t(
         'Open the USGS initial report for the 26 August 2026 Nepal landslide',
+      ),
       activate: () => {
         const opened = window.open(
           TRIGGER_SOURCE_URL,

@@ -1,3 +1,4 @@
+import { msg } from '../../i18n/index.js';
 import { CITY_BY_ID } from './registry.js';
 
 export function createIngestion({
@@ -188,7 +189,8 @@ export function createIngestion({
               `[Data:Bikeshare] ${cityId} status update error:`,
               error,
             );
-            layerState._error = 'GBFS status update failed';
+            // English data (stats reach the voice tools); the panel translates it.
+            layerState._error = msg('GBFS status update failed');
           }
         }),
       );

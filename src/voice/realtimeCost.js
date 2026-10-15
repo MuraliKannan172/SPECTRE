@@ -105,7 +105,15 @@ export class RealtimeCost {
             warn: formatCostUsd(state.warnUsd),
             cap: formatCostUsd(state.capUsd),
           },
-        ) + (state.note ? ` ${state.note}` : '');
+        ) +
+        // `state.note` is the tracker's English diagnostic; the tooltip says
+        // the same in the interface language.
+        (state.incomplete
+          ? ' ' +
+            t(
+              'Estimate is incomplete — a response was still in flight when the session ended, so its usage was never reported.',
+            )
+          : '');
     }
   }
 
@@ -146,12 +154,12 @@ export class RealtimeCost {
     }
     this.syncCostUi();
     if (this.isActive() && this.ui?.detail) {
-      this.setStatus(
-        this.status,
-        t('{tier} applies next session', {
-          tier: this.voiceTier.toUpperCase(),
-        }),
-      );
+      // The tier as the interface names it; the stored value stays English.
+      const tier =
+        resolveVoiceModel(this.voiceTier).tier === 'mini'
+          ? t('MINI')
+          : t('STANDARD');
+      this.setStatus(this.status, t('{tier} applies next session', { tier }));
     }
     return this.voiceTier;
   }

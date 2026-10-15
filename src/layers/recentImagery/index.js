@@ -632,7 +632,7 @@ export function createRecentImageryLayer({
     } catch (error) {
       if (abort.signal.aborted) return;
       resetCatalog();
-      _catalogError = error?.message || 'Imagery catalog unavailable';
+      _catalogError = error?.message || msg('Imagery catalog unavailable');
     } finally {
       if (_searchAbort === abort) {
         _searchAbort = null;

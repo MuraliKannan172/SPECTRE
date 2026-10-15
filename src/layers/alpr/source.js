@@ -139,7 +139,7 @@ export function createAlprTileSource({
         const metadata = await source.getMetadata(signal);
         const [west, south, east, north] = metadata.bounds || [];
         if (![west, south, east, north].every(Number.isFinite))
-          throw new Error('Camera coverage unavailable');
+          throw new Error(msg('Camera coverage unavailable'));
         if (
           box.east < west ||
           box.west > east ||

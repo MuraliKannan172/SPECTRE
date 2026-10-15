@@ -439,6 +439,7 @@
     "modules": [
       "src/ui/layers.js",
       "src/ui/layerPanel.js",
+      "src/ui/layerNames.js",
       "src/ui/weatherPanel.js",
       "src/ui/railCards.js",
       "src/ui/railCardBlocks.js",
@@ -467,6 +468,7 @@
       "src/ui/location.js",
       "src/ui/locationControls.js",
       "src/ui/locationSearch.js",
+      "src/ui/placeNames.js",
       "src/locationStatus.js",
       "src/app/stateChannel.js",
       "src/i18n/index.js",
@@ -527,7 +529,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/layerNames.js"
     ],
     "external": []
   },
@@ -581,6 +584,7 @@
   "ui-shell": {
     "exports": ["./ui/shell"],
     "modules": [
+      "src/ui/placeNames.js",
       "src/hudLayouts.js",
       "src/hudLayoutPolicy.js",
       "src/cyberSonar.js",
@@ -602,6 +606,7 @@
       "src/data/layerStateCoordinator.js",
       "src/data/layerStateTokenReservations.json",
       "src/data/militaryAwarenessEngine.js",
+      "src/data/installationNames.js",
       "src/data/scenePick.js",
       "src/keySetupCore.mjs",
       "src/localRequestGate.mjs",
@@ -719,7 +724,8 @@
       "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json",
       "src/ui/unitLabels.js",
-      "src/ui/keyGuidance.js"
+      "src/ui/keyGuidance.js",
+      "src/ui/layerNames.js"
     ],
     "external": ["cesium"]
   },
@@ -786,6 +792,7 @@
       "src/data/bhoteKoshiFloodPath.js",
       "src/maps/catalog.js",
       "src/scenes/director.js",
+      "src/scenes/sceneSaveError.js",
       "src/scenes/playbackAdapter.js",
       "src/director/playback.js",
       "src/scenes/recipes.js",
@@ -1078,7 +1085,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/unitLabels.js"
     ],
     "external": ["cesium", "satellite.js"]
   },
@@ -1119,6 +1127,7 @@
       "src/data/cameraSensitivity.js",
       "src/data/installationFeedback.js",
       "src/data/militaryInstallationData.js",
+      "src/data/installationNames.js",
       "src/layers/installations/controls.js",
       "src/layers/installations/index.js",
       "src/layers/installations/ingestion.js",
@@ -1160,6 +1169,7 @@
       "src/cockpitMath.js",
       "src/data/iconOrientation.js",
       "src/data/militaryAwarenessEngine.js",
+      "src/data/installationNames.js",
       "src/layers/awareness/controls.js",
       "src/layers/awareness/dependencies.js",
       "src/layers/awareness/focus.js",
@@ -1219,6 +1229,7 @@
       "src/sources/capability.js",
       "src/sources/httpBody.js",
       "src/sources/openFreeMap.js",
+      "src/data/installationNames.js",
       "src/sources/militaryTileGeometry.js",
       "src/sources/vectorTiles.js",
       "src/sources/phaseTiming.js",
@@ -1537,6 +1548,9 @@
       "src/voice/referents.js",
       "src/voice/layerManifest.js",
       "src/voice/speech.js",
+      "src/ui/layerNames.js",
+      "src/ui/unitLabels.js",
+      "src/ui/placeNames.js",
       "src/voice/narration.js",
       "src/voice/earcon.js",
       "src/voice/pointerContext.js",
@@ -1568,6 +1582,7 @@
       "./standalone/catalog"
     ],
     "modules": [
+      "src/ui/placeNames.js",
       "src/cyberSonarScene.js",
       "src/cyberSonar.js",
       "src/hudLayouts.js",
@@ -1710,6 +1725,7 @@
       "src/data/meshFloorSampler.js",
       "src/data/militaryAwareness.js",
       "src/data/militaryAwarenessEngine.js",
+      "src/data/installationNames.js",
       "src/data/militaryFlights.js",
       "src/data/militaryInstallationData.js",
       "src/data/militaryInstallations.js",
@@ -2005,6 +2021,7 @@
       "src/renderGovernor.js",
       "src/rightRailPolicy.js",
       "src/scenes/director.js",
+      "src/scenes/sceneSaveError.js",
       "src/scenes/playbackAdapter.js",
       "src/director/playback.js",
       "src/scenes/recipes.js",
@@ -2123,6 +2140,7 @@
       "src/voice/control.js",
       "src/voice/gevActions.js",
       "src/voice/speech.js",
+      "src/ui/layerNames.js",
       "src/voice/earcon.js",
       "src/voice/narration.js",
       "src/voice/turnMetrics.js",
@@ -2156,6 +2174,7 @@
       "src/ui/geoFileImport.js",
       "src/data/routeSteps.js",
       "src/layers/directions/index.js",
+      "src/data/pointerOwnerNames.js",
       "src/layers/directions/source.js",
       "src/data/directions.js",
       "src/app/layers/directions.js",
@@ -2486,6 +2505,7 @@
       "src/data/local_data/natural_earth/regions.json",
       "src/data/local_data/neighborhoods/san-francisco.json",
       "src/data/militaryAwarenessEngine.js",
+      "src/data/installationNames.js",
       "src/data/militaryInstallationData.js",
       "src/data/modelVisualAnchor.js",
       "src/data/motionModel.js",
@@ -2767,6 +2787,7 @@
       "src/services/groundFloor.js",
       "src/data/routeSteps.js",
       "src/layers/directions/index.js",
+      "src/data/pointerOwnerNames.js",
       "src/layers/directions/source.js",
       "src/services/terrainHeights.js",
       "src/data/terrainHeights.js",
@@ -3016,7 +3037,11 @@
       "src/navigationPolicy.js",
       "src/ui/navigationController.js",
       "src/app/stateChannel.js",
-      "src/data/cameraArrival.js"
+      "src/data/cameraArrival.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json",
+      "src/i18n/index.js"
     ],
     "external": ["cesium"]
   },
@@ -3170,6 +3195,7 @@
     "exports": ["./layers/directions"],
     "modules": [
       "src/layers/directions/index.js",
+      "src/data/pointerOwnerNames.js",
       "src/layers/directions/source.js",
       "src/data/routeSteps.js",
       "src/i18n/index.js",
@@ -3212,6 +3238,7 @@
   "voice-session-controls": {
     "exports": ["./voice/session-controls"],
     "modules": [
+      "src/ui/placeNames.js",
       "src/voice/sessionCommands.js",
       "src/voice/session.js",
       "src/voice/control.js",
@@ -3221,6 +3248,8 @@
       "src/voice/referents.js",
       "src/voice/layerManifest.js",
       "src/voice/speech.js",
+      "src/ui/layerNames.js",
+      "src/ui/unitLabels.js",
       "src/voice/pointerReticle.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
@@ -3271,6 +3300,7 @@
     "modules": [
       "src/layers/installations/source.js",
       "src/data/militaryInstallationData.js",
+      "src/data/installationNames.js",
       "src/data/tomtomTiles.js",
       "src/sources/capability.js",
       "src/sources/httpBody.js",
@@ -3312,6 +3342,7 @@
       "src/sources/overpassRoads.js",
       "src/sources/httpBody.js",
       "src/sources/openFreeMap.js",
+      "src/data/installationNames.js",
       "src/sources/militaryTileGeometry.js",
       "src/sources/vectorTiles.js",
       "src/sources/phaseTiming.js",
@@ -3496,7 +3527,11 @@
       "scripts/qa-transit-controls.mjs",
       "scripts/qa-transit-browser.mjs",
       "src/layers/transit/source.js",
-      "src/sources/transitHistory.js"
+      "src/sources/transitHistory.js",
+      "src/i18n/index.js",
+      "src/i18n/locale.js",
+      "src/i18n/locales/es.json",
+      "src/i18n/locales/ru.json"
     ],
     "external": ["cesium", "pbf"]
   },
@@ -3670,6 +3705,7 @@
       "src/data/retryableLoad.js",
       "src/data/local_data/osm_military_names/names.json",
       "src/sources/openFreeMap.js",
+      "src/data/installationNames.js",
       "src/sources/vectorTiles.js",
       "src/sources/phaseTiming.js",
       "src/data/tomtomTiles.js",

@@ -3,7 +3,7 @@ import {
   PANO_FOV_DEFAULT_DEG,
   wrapDegrees,
 } from './panorama.js';
-import { t } from '../../../../i18n/index.js';
+import { msg, t } from '../../../../i18n/index.js';
 import {
   FLAT_FULL_SIZE,
   FLAT_VIEW_SIZE,
@@ -17,7 +17,8 @@ import {
   resizedImageUrl,
 } from './policy.js';
 
-const LOAD_FAILED = 'The KartaView photo could not be loaded';
+/** English data: the Street Level panel translates it (translateKnown). */
+const LOAD_FAILED = msg('The KartaView photo could not be loaded');
 
 /**
  * Load an image within the timeout. A CORS-clean one (for WebGL) is decoded

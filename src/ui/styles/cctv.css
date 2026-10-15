@@ -279,12 +279,12 @@ html[lang='es'] .cctv-controls {
   animation: cctv-frame-shimmer 1.4s linear infinite;
 }
 
-/* "Acquiring" caption only when no previous frame is showing underneath */
-.cctv-frame-wrap.loading:not(.has-frame)::before {
-  content: 'ACQUIRING FRAME';
+/* "Acquiring" caption only when no previous frame is showing underneath.
+   The text lives in the markup (data-i18n) so it is translated. */
+.cctv-frame-caption {
+  display: none;
   position: absolute;
   inset: 0;
-  display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
@@ -292,6 +292,10 @@ html[lang='es'] .cctv-controls {
   letter-spacing: 2.2px;
   color: rgba(145, 237, 255, 0.62);
   pointer-events: none;
+}
+
+.cctv-frame-wrap.loading:not(.has-frame) .cctv-frame-caption {
+  display: flex;
 }
 
 @keyframes cctv-frame-shimmer {

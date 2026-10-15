@@ -1,12 +1,32 @@
-import { t } from '../i18n/index.js';
+import { t, translateKnown } from '../i18n/index.js';
 import {
+  SPACE_MISSIONS_LAYER_BLOCK_REASON,
   cockpitEntryAllowed,
   isExplicitUserIntentOrigin,
+  parseContextLayerBlockReason,
   recordContextRestoreExplicitChange,
   recordContextSessionUserChange,
   shouldExitContextForLayerChange,
   spaceMissionEntryCancellationDisposition,
 } from '../contextModePolicy.js';
+import { localizeLayerName } from './layerNames.js';
+
+/**
+ * A blocked-visibility reason in the UI language. The lifecycle keeps reasons
+ * English (they also reach voice and tool callers): the Space Missions guard
+ * is re-composed from its template with the layer name localized, any other
+ * known sentence ("Data source unavailable") is looked up as is, and an
+ * unknown one — a live provider message — passes through.
+ */
+export function localizeVisibilityBlockReason(reason) {
+  if (typeof reason !== 'string' || !reason) return reason;
+  const blocked = parseContextLayerBlockReason(reason);
+  if (blocked)
+    return t(SPACE_MISSIONS_LAYER_BLOCK_REASON, {
+      layer: localizeLayerName(blocked.layer),
+    });
+  return translateKnown(reason);
+}
 
 export function _handleContextLayerChange(change) {
   if (this.destroyed) return;
@@ -95,7 +115,7 @@ export function _handleContextLayerChange(change) {
       !this._userFacingContextNotificationTokens.has(change.notificationToken)
     ) {
       this.showToast(
-        change.reason ||
+        localizeVisibilityBlockReason(change.reason) ||
           t('That layer is unavailable in the current Context mode'),
       );
     }

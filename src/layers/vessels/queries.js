@@ -60,20 +60,22 @@ export function createQueries({
     if (status === 'auth-failed') {
       // Actionable, not a countdown: retrying cannot fix a rejected credential,
       // so the chip asks the operator to do the one thing that can.
-      return 'API key rejected — check AISSTREAM_API_KEY';
+      return t('API key rejected — check AISSTREAM_API_KEY');
     }
     if (status === 'stale') {
       const silentSec = Math.round(Number(payload?.silentForMs) / 1000);
       return Number.isFinite(silentSec) && silentSec > 0
-        ? `feed silent ${silentSec}s — no AIS data`
-        : 'feed silent — no AIS data';
+        ? t('feed silent {seconds}s — no AIS data', { seconds: silentSec })
+        : t('feed silent — no AIS data');
     }
     const attempt = Number(payload?.reconnectAttempt);
-    const suffix =
-      Number.isFinite(attempt) && attempt >= 1 ? ` (attempt ${attempt})` : '';
+    if (Number.isFinite(attempt) && attempt >= 1)
+      return status === 'down'
+        ? t('feed down — retrying slowly (attempt {attempt})', { attempt })
+        : t('reconnecting to feed… (attempt {attempt})', { attempt });
     return status === 'down'
-      ? `feed down — retrying slowly${suffix}`
-      : `reconnecting to feed…${suffix}`;
+      ? t('feed down — retrying slowly')
+      : t('reconnecting to feed…');
   }
 
   /**
@@ -106,7 +108,8 @@ export function createQueries({
       typeof payload.error === 'string' && payload.error.trim()
         ? payload.error.trim()
         : '';
-    const reason = AIS_STATUS_REASON[status] || 'feed unavailable';
+    // The reasons are English in policy.js (msg) and shown in the UI language.
+    const reason = t(AIS_STATUS_REASON[status] || msg('feed unavailable'));
     return detail && !AIS_STATUS_REASON[status]
       ? `${reason} (${detail})`
       : reason;
@@ -468,7 +471,7 @@ export function createQueries({
      * @param {Object} [options={}] - Options from the detection system.
      * @param {number} [options.maxCount] - Maximum objects to return (defaults to all).
      * @param {number} [options.seed] - Seed offset for stride sampling.
-     * @returns {Array<{position: Cesium.Cartesian3, id: string, type: string, skipLabel: boolean}>}
+     * @returns {Array<{position: Cesium.Cartesian3, id: string, type: string, skipLabel: boolean, hideLabel: boolean}>}
      */
     getDetectableObjects(options = {}) {
       if (
@@ -489,6 +492,7 @@ export function createQueries({
       const start = seed % stride;
 
       const selected = state.selectedRecord;
+      const carded = state.cardedRecords;
       const result = [];
       for (let idx = 0; idx < records.length; idx += 1) {
         if ((idx - start) % stride !== 0) continue;
@@ -503,6 +507,9 @@ export function createQueries({
           id: record.name || record.mmsi || 'VESSEL',
           type: 'SEA',
           skipLabel: record === selected,
+          // An open ambient card already names the vessel with its speed and
+          // course; a detection label under it would only cover them.
+          hideLabel: carded?.has(record) === true,
           klass: record.type
             ? String(record.type).toUpperCase().slice(0, 14)
             : undefined,

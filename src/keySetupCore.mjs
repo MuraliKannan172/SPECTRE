@@ -241,7 +241,9 @@ export function isSharingEnabled(env = {}) {
  *    preflight this server never answers, closing the simple-request CSRF
  *    write primitive.
  *
- * @returns {{ok: true} | {ok: false, status: number, error: string}}
+ * A refusal also carries `code`, which the panel turns into its own localized
+ * sentence (keySetup.js); `error` stays the English for logs and API callers.
+ * @returns {{ok: true} | {ok: false, status: number, error: string, code: string}}
  */
 export function admitKeySetupRequest({
   method,
@@ -262,6 +264,7 @@ export function admitKeySetupRequest({
       ok: false,
       status: 403,
       error: 'Provider Settings does not answer proxied requests',
+      code: 'proxied',
     };
   }
   // Every sharing signal the launcher recognizes (scripts/pinokio-preflight.mjs)
@@ -279,6 +282,7 @@ export function admitKeySetupRequest({
       ok: false,
       status: 403,
       error: 'Provider Settings is disabled while sharing is enabled',
+      code: 'sharing',
     };
   }
   if (!LOOPBACK_ADDRESSES.has(String(remoteAddress || ''))) {
@@ -286,6 +290,7 @@ export function admitKeySetupRequest({
       ok: false,
       status: 403,
       error: 'Provider Settings answers only the machine running the server',
+      code: 'not-loopback',
     };
   }
   const authority = localAuthority(hostHeader, protocol);
@@ -294,6 +299,7 @@ export function admitKeySetupRequest({
       ok: false,
       status: 403,
       error: 'Provider Settings answers only local hostnames',
+      code: 'not-local-host',
     };
   }
   if (
@@ -304,6 +310,7 @@ export function admitKeySetupRequest({
       ok: false,
       status: 403,
       error: 'Provider Settings requires an exact local Origin',
+      code: 'origin-required',
     };
   }
   if (origin !== undefined && origin !== null && origin !== '') {
@@ -311,7 +318,12 @@ export function admitKeySetupRequest({
     try {
       parsedOrigin = new URL(String(origin));
     } catch {
-      return { ok: false, status: 403, error: 'Unrecognized Origin refused' };
+      return {
+        ok: false,
+        status: 403,
+        error: 'Unrecognized Origin refused',
+        code: 'origin-unrecognized',
+      };
     }
     const exactOrigin =
       parsedOrigin.username === '' &&
@@ -325,6 +337,7 @@ export function admitKeySetupRequest({
         ok: false,
         status: 403,
         error: 'Cross-origin requests are refused',
+        code: 'cross-origin',
       };
     }
   }
@@ -338,6 +351,7 @@ export function admitKeySetupRequest({
       ok: false,
       status: 415,
       error: 'Content-Type must be application/json',
+      code: 'content-type',
     };
   }
   return { ok: true };
@@ -447,6 +461,8 @@ export function keySetupStatus(env = {}) {
  * below safe to write without quoting rules. A `null` value means REMOVE:
  * the writer comments the assignment back out, returning the file to its
  * template state for that key.
+ * A refusal carries `code` and `params` for the panel's localized sentence
+ * (keySetup.js) besides the English `error`.
  * @param {unknown} body Parsed JSON from the request.
  */
 export function validateKeySetupUpdates(body) {
@@ -454,38 +470,63 @@ export function validateKeySetupUpdates(body) {
     return {
       ok: false,
       error: 'Body must be a JSON object of {ENV_VAR: value}',
+      code: 'not-object',
     };
   }
   const entries = Object.entries(body);
-  if (entries.length === 0) return { ok: false, error: 'No keys provided' };
+  if (entries.length === 0)
+    return { ok: false, error: 'No keys provided', code: 'no-keys' };
   if (entries.length > KEY_SETUP_UPDATE_LIMIT) {
     return {
       ok: false,
       error: `At most ${KEY_SETUP_UPDATE_LIMIT} keys per save`,
+      code: 'too-many',
+      params: { limit: KEY_SETUP_UPDATE_LIMIT },
     };
   }
   const known = knownKeySetupEnvVars();
   const updates = {};
   for (const [name, raw] of entries) {
-    if (!known.has(name)) return { ok: false, error: `Unknown key: ${name}` };
+    if (!known.has(name))
+      return {
+        ok: false,
+        error: `Unknown key: ${name}`,
+        code: 'unknown-key',
+        params: { name },
+      };
     if (raw === null) {
       updates[name] = null;
       continue;
     }
     if (typeof raw !== 'string')
-      return { ok: false, error: `${name} must be a string` };
+      return {
+        ok: false,
+        error: `${name} must be a string`,
+        code: 'not-string',
+        params: { name },
+      };
     const value = raw.trim();
-    if (!value) return { ok: false, error: `${name} is empty` };
+    if (!value)
+      return {
+        ok: false,
+        error: `${name} is empty`,
+        code: 'empty',
+        params: { name },
+      };
     if (value.length > KEY_SETUP_VALUE_LIMIT) {
       return {
         ok: false,
         error: `${name} is longer than any real key (${KEY_SETUP_VALUE_LIMIT} max)`,
+        code: 'too-long',
+        params: { name, limit: KEY_SETUP_VALUE_LIMIT },
       };
     }
     if (!/^[\x21-\x7e]+$/.test(value)) {
       return {
         ok: false,
         error: `${name} may only contain printable characters with no spaces`,
+        code: 'not-printable',
+        params: { name },
       };
     }
     // Reject the dotenv metacharacters that would round-trip WRONG when written
@@ -497,6 +538,8 @@ export function validateKeySetupUpdates(body) {
       return {
         ok: false,
         error: `${name} contains a character that is not valid in a key (#, quotes, $, \\, or backtick)`,
+        code: 'invalid-char',
+        params: { name },
       };
     }
     updates[name] = value;

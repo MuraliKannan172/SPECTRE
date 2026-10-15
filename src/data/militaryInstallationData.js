@@ -1,3 +1,8 @@
+import {
+  UNNAMED_INSTALLATION_FALLBACK,
+  UNNAMED_INSTALLATION_LABEL_BY_CLASS,
+} from './installationNames.js';
+
 /**
  * Normalize the deliberately small, allow-listed installation context returned
  * by `/api/military-installations`. These are mapped features, not assertions
@@ -22,12 +27,17 @@ const CLASS_BY_MILITARY_TAG = {
  * nouns. The OSM id is not lost — it stays on `id` and on `sources[].id`, where
  * attribution and the details panel read it.
  */
-const LABEL_BY_CLASS = {
-  airfield: 'Military airfield',
-  naval_base: 'Naval base',
-  range: 'Firing range',
-  military_land: 'Military land',
-};
+// The labels stay English in data (the server provider and AI tools read the
+// records too); the map card and Contacts translate them (installationNames.js).
+const LABEL_BY_CLASS = UNNAMED_INSTALLATION_LABEL_BY_CLASS;
+const UNNAMED_FALLBACK = UNNAMED_INSTALLATION_FALLBACK;
+
+/** Every name humanizeInstallationClass gives a record of a class
+ * CLASS_BY_MILITARY_TAG can produce, for the display to translate. */
+export const UNNAMED_INSTALLATION_NAMES = Object.freeze([
+  ...Object.values(LABEL_BY_CLASS),
+  UNNAMED_FALLBACK,
+]);
 
 const MAX_FOOTPRINT_POINTS = 400;
 
@@ -44,7 +54,7 @@ export function humanizeInstallationClass(klass) {
   const words = key.replaceAll('_', ' ').trim();
   return words
     ? `${words[0].toUpperCase()}${words.slice(1)}`
-    : 'Mapped installation';
+    : UNNAMED_FALLBACK;
 }
 
 function finiteLatitude(value) {

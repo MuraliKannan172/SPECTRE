@@ -2,7 +2,7 @@ import { planStepLabel, progressStepLabel, spokenLabel } from './speech.js';
 import { presentResult } from './resultDisplay.js';
 import { MAX_DISPLAYED_REFERENTS, normalizeReferents } from './referents.js';
 
-import { msg, t } from '../i18n/index.js';
+import { getLocale, msg, t } from '../i18n/index.js';
 /**
  * Pure presentation of the voice card nested in the voice control: captions,
  * the current plan, the latest result and its numbered referents.
@@ -17,6 +17,16 @@ const MAX_STEPS = 6;
 const MAX_LINES = 6;
 const MAX_NOTES = 6;
 const MAX_CAPTION = 220;
+// Titles and lines wrap in the card; the caps only stop a runaway value. A
+// translated headline runs longer than the English one ("Al menos 12 aeronaves
+// militares en un radio de 40 km de Los Ángeles"), so other languages cut it at
+// 120; English keeps 64. A failed result's lines (its error) are never cut.
+const MAX_TITLE = 64;
+const MAX_TRANSLATED_TITLE = 120;
+const MAX_LINE = 80;
+
+const titleMax = () =>
+  getLocale() === 'en' ? MAX_TITLE : MAX_TRANSLATED_TITLE;
 
 const STATUS_TEXT = Object.freeze({
   running: msg('in progress'),
@@ -205,12 +215,14 @@ export function reduceVoiceCard(state, event) {
         ...next,
         result: {
           display: shown.display,
+          // A failed result's lines are its error: shown whole, wrapped.
+          wholeLines: result.ok === false,
           referents: normalizeReferents(
             shown.referents,
             MAX_DISPLAYED_REFERENTS,
           ),
         },
-        announce: spokenLabel(shown.display.title, 64),
+        announce: spokenLabel(shown.display.title, titleMax()),
       });
     }
     case 'outline': {
@@ -293,10 +305,12 @@ export function voiceCardView(state) {
     })),
     result: {
       visible: Boolean(display?.title),
-      title: spokenLabel(display?.title || '', 64),
+      title: spokenLabel(display?.title || '', titleMax()),
       chips: (display?.chips || []).map((chip) => spokenLabel(chip.label, 24)),
       lines: (display?.lines || [])
-        .map((line) => spokenLabel(line, 80))
+        .map((line) =>
+          spokenLabel(line, state.result?.wholeLines ? Infinity : MAX_LINE),
+        )
         .slice(0, MAX_LINES),
       referents: (state.result?.referents || [])
         .slice(0, MAX_DISPLAYED_REFERENTS)

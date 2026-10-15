@@ -32,10 +32,10 @@ export function renderRadioState(state) {
   }
   this._syncContextRadioLauncherState();
   this._radioLayerState?.classList.toggle('active', enabled);
+  // Lifecycle enum values map to status-chip keys; counts stay machine.
+  const lifecycleLabel =
+    lifecycleState === 'enabling' ? t('ENABLING') : t('DISABLING');
   if (this._radioLayerState) {
-    // Lifecycle enum values map to status-chip keys; counts stay machine.
-    const lifecycleLabel =
-      lifecycleState === 'enabling' ? t('ENABLING') : t('DISABLING');
     this._radioLayerState.textContent = transitioning
       ? lifecycleLabel
       : uncertain
@@ -307,7 +307,10 @@ export function renderRadioState(state) {
       buffering: t('Buffering broadcaster stream…'),
       playing: t('Playing {station}', { station: stationName }),
       paused: t('Paused {station}', { station: stationName }),
-      error: state.audioError || t('Broadcaster stream unavailable'),
+      // Playback keeps its messages in English (msg()); shown in the UI language.
+      error: state.audioError
+        ? t(state.audioError)
+        : t('Broadcaster stream unavailable'),
     };
     const voiceSuffix = state.voiceDucked
       ? t(' · muted during voice interaction')
@@ -332,7 +335,9 @@ export function renderRadioState(state) {
     const uncertainMessage = uncertain
       ? t('Radio lifecycle is uncertain — use Enable or Disable to reconcile')
       : null;
-    this._radioPlaybackState.textContent = `${uncertainMessage || unavailable || lifecycleMessage || state.error || messages[state.audioState] || t('Ready')}${tuningSuffix}${voiceSuffix}${catalogSuffix}${outsideFilter}`;
+    // Directory errors are msg() literals from the radio layer's ingestion.
+    const directoryError = state.error ? t(state.error) : null;
+    this._radioPlaybackState.textContent = `${uncertainMessage || unavailable || lifecycleMessage || directoryError || messages[state.audioState] || t('Ready')}${tuningSuffix}${voiceSuffix}${catalogSuffix}${outsideFilter}`;
     this._radioPlaybackState.classList.toggle(
       'error',
       Boolean(

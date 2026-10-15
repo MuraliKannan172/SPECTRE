@@ -2,7 +2,7 @@
  * Adds the keyboard semantics omitted by Cesium's href-less attribution links.
  * Cesium retains ownership of showing and hiding its required credit lightbox.
  */
-import { t } from './i18n/index.js';
+import { getLocale, t } from './i18n/index.js';
 
 export function configureCreditKeyboardAccess(root = document) {
   const expand = root?.querySelector?.(
@@ -12,6 +12,14 @@ export function configureCreditKeyboardAccess(root = document) {
   const close = lightbox?.querySelector?.('.cesium-credit-lightbox-close');
   if (!expand || !lightbox || !close) return false;
   const overlay = lightbox.parentElement;
+
+  // Cesium writes these two texts in English once, when it builds the credit
+  // display, and never rewrites them; English keeps Cesium's own text.
+  if (getLocale() !== 'en') {
+    expand.textContent = t('Data attribution');
+    const title = lightbox.querySelector?.('.cesium-credit-lightbox-title');
+    if (title) title.textContent = t('Data provided by:');
+  }
 
   if (!lightbox.id) lightbox.id = 'cesium-credit-lightbox';
   expand.setAttribute('role', 'button');

@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium';
 import { roadSurfaceChunks } from './surface.js';
-import { t } from '../../i18n/index.js';
+import { t, translateKnown } from '../../i18n/index.js';
 import {
   flowDensityMult,
   flowBucket,
@@ -252,7 +252,10 @@ export function createModel({ state: layerState, services, parts, source }) {
       // drops `loadingLabel` in its error branch, so the owner's SIMULATED copy
       // has to BE the error text or the steady state reverts to a bare
       // "TomTom daily budget reached" that never says what is on screen.
-      const degraded = `SIMULATED — ${flowError}`;
+      // The reason is ours (flow.js marks it) or carries an HTTP code.
+      const degraded = t('SIMULATED — {reason}', {
+        reason: translateKnown(flowError),
+      });
       return { mode, error: degraded, loadingLabel: degraded };
     }
     // TomTom and Hybrid name their geometry; OpenStreetMap keeps its match copy.

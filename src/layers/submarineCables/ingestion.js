@@ -1,4 +1,4 @@
-import { t } from '../../i18n/index.js';
+import { msg, t } from '../../i18n/index.js';
 import {
   featureLabel,
   featureReference,
@@ -190,7 +190,7 @@ export function createIngestion({ state, parts, source }) {
       // A stale or aborted load reports nothing: its failure belongs to a
       // lifecycle the user already left.
       if (owns() && error?.name !== 'AbortError') {
-        state._error = error?.message || 'TeleGeography load failed';
+        state._error = error?.message || msg('TeleGeography load failed');
         console.warn(
           '[Data:telegeography-submarine-cables]',
           state._error,

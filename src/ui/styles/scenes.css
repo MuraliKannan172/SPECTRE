@@ -160,16 +160,19 @@
   padding: 6px 8px;
   font-family: var(--font-sans);
   font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   outline: none;
 }
 
+html:not([lang='en']) #scene-select {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* A translated action longer than its button wraps inside the button instead
-   of running past it. English labels fit on one line, so the English layout
-   is unchanged. */
-#scene-panel .scene-controls .scene-btn {
+   of running past it. English keeps its one-line buttons ("EXPORT PRESETS"
+   included). */
+html:not([lang='en']) #scene-panel .scene-controls .scene-btn {
   white-space: normal;
   overflow-wrap: break-word;
 }

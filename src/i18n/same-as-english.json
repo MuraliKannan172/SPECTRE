@@ -1,5 +1,7 @@
 {
   "es": [
+    "1090 MHz",
+    "978 MHz UAT",
     "AIS: --",
     "AIS: {name}",
     "ANIME",
@@ -7,6 +9,7 @@
     "AUTO",
     "Ambient",
     "Anime",
+    "Austin",
     "BRG {value}°",
     "BRG —",
     "Blues",
@@ -79,6 +82,7 @@
     "SRC {value}",
     "SSE",
     "STD",
+    "San Francisco",
     "Sector",
     "Sonar",
     "Soul",
@@ -103,6 +107,7 @@
     "panel",
     "view band|GLOBAL",
     "voice|ERROR",
+    "{speed} kn",
     "{type}  SPD: {speed}  HDG: {heading}",
     "{value} KM",
     "{value} KM/H",

@@ -10,7 +10,7 @@ import {
   inciwebNodeId,
   isCurrentPublication,
 } from './inciweb.js';
-import { t } from '../../i18n/index.js';
+import { msg, t } from '../../i18n/index.js';
 export { normalizeFirePerimeterSnapshot } from './records.js';
 export { createWfigsPerimeterSource } from './source.js';
 export * from './cards.js';
@@ -365,7 +365,7 @@ export function createFirePerimetersLayer({
         if (request.signal.aborted || _request !== request || !_enabled)
           return false;
         console.warn('[Data:FirePerimeters] Fetch error:', e);
-        _lastError = e?.message || 'Perimeter source unavailable';
+        _lastError = e?.message || msg('Perimeter source unavailable');
         return false;
       } finally {
         if (_request === request) _request = null;

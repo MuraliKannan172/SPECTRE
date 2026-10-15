@@ -19,11 +19,27 @@
  *
  * Only `display` and the plan/progress labels are interface text, translated
  * with t(). `say`, `identityLine` and the progress lines are not shown: they go
- * to the voice model to be spoken, so they stay as written.
+ * to the voice model to be spoken, so they stay as written. The tool result
+ * itself (layer names, sources, `error`) stays English as the model got it;
+ * the card shows those through the shown-name helpers and `shownError`.
  */
 
 import { analystHeadline } from './resultDisplay.js';
-import { formatNumber, msg, t, tn } from '../i18n/index.js';
+import {
+  formatNumber,
+  getLocale,
+  msg,
+  t,
+  tn,
+  translateKnown,
+} from '../i18n/index.js';
+import {
+  layerNameForId,
+  shownLayerName,
+  sourceLabel,
+} from '../ui/layerNames.js';
+import { localizePlaceName } from '../ui/placeNames.js';
+import { formatQuantity } from '../ui/unitLabels.js';
 
 const LAYER_NOUNS = Object.freeze({
   flights: 'aircraft',
@@ -78,10 +94,150 @@ function shownFeet(meters) {
   return t('{value} feet', { value: formatNumber(rounded) });
 }
 
-function kilometers(km) {
+function roundedKm(km) {
   const value = Number(km);
   if (!Number.isFinite(value)) return null;
-  return `${value < 10 ? Number(value.toFixed(1)) : Math.round(value)} km`;
+  return value < 10 ? Number(value.toFixed(1)) : Math.round(value);
+}
+
+function kilometers(km) {
+  const value = roundedKm(km);
+  return value === null ? null : `${value} km`;
+}
+
+/** The card's distance, in the active language: "2,5 км". */
+function shownKm(km) {
+  const value = roundedKm(km);
+  return value === null ? null : formatQuantity(value, 'km');
+}
+
+/** Sources as the card lists them. */
+function shownSources(source) {
+  return source ? [{ label: sourceLabel(source) }] : [];
+}
+
+/*
+ * Tool errors stay English in the result: the model reads them. The card shows
+ * the ones it knows in the interface language. Each English text here is
+ * exactly what gevActions returns, so English shows as before; an error not
+ * listed shows as given.
+ */
+const KNOWN_ERRORS = new Map(
+  [
+    msg('The flights layer is not enabled'),
+    msg('The military layer is not enabled'),
+    msg('The satellites layer is not enabled'),
+    msg('The ais-live-vessels layer is not enabled'),
+    msg('Could not enable the requested layer'),
+    msg('Could not disable the requested layer'),
+    msg('Radio layer unavailable'),
+    msg('Camera navigation is unavailable in the current view'),
+    msg('Camera navigation policy unavailable'),
+    msg('Nearest-aircraft selection supports Flights or Military Flights only'),
+    msg(
+      'Nearest-aircraft selection needs a preset, place name, or latitude and longitude',
+    ),
+    msg('Could not arrive at the requested place'),
+    msg('The nearest airborne aircraft could not be selected'),
+  ].map((text) => [text, text]),
+);
+
+function noneWithinView(target, radius) {
+  switch (target) {
+    case 'flights':
+      return t('No flights within {radius} of the current view', { radius });
+    case 'military':
+      return t('No military within {radius} of the current view', { radius });
+    case 'satellites':
+      return t('No satellites within {radius} of the current view', {
+        radius,
+      });
+    case 'vessels':
+      return t('No vessels within {radius} of the current view', { radius });
+    default:
+      return null;
+  }
+}
+
+const ERROR_PATTERNS = [
+  [
+    /^(.+) is enabled on the (.+) feed, but no airborne aircraft is loaded in the (.+) view yet$/,
+    ([, layer, source, place]) =>
+      t(
+        '{layer} is enabled on the {source} feed, but no airborne aircraft is loaded in the {place} view yet',
+        {
+          layer: shownLayerName(layer),
+          source: sourceLabel(source),
+          place: localizePlaceName(place),
+        },
+      ),
+  ],
+  [
+    /^(.+) is enabled, but no airborne aircraft is loaded in the (.+) view yet$/,
+    ([, layer, place]) =>
+      t(
+        '{layer} is enabled, but no airborne aircraft is loaded in the {place} view yet',
+        { layer: shownLayerName(layer), place: localizePlaceName(place) },
+      ),
+  ],
+  [
+    /^(.+) is enabled, but its aircraft feed is unavailable$/,
+    ([, layer]) =>
+      t('{layer} is enabled, but its aircraft feed is unavailable', {
+        layer: shownLayerName(layer),
+      }),
+  ],
+  [
+    /^(.+) is enabled, but its destination refresh did not complete$/,
+    ([, layer]) =>
+      t('{layer} is enabled, but its destination refresh did not complete', {
+        layer: shownLayerName(layer),
+      }),
+  ],
+  [
+    /^(.+) is enabled, but (.+) is unavailable$/,
+    ([, layer, source]) =>
+      t('{layer} is enabled, but {source} is unavailable', {
+        layer: shownLayerName(layer),
+        source: sourceLabel(source),
+      }),
+  ],
+  [
+    /^Could not arrive at (.+)$/,
+    ([, place]) =>
+      t('Could not arrive at {place}', { place: localizePlaceName(place) }),
+  ],
+  [
+    /^(.+) is no longer loaded$/,
+    ([, name]) => t('{name} is no longer loaded', { name }),
+  ],
+  [
+    /^Unknown target layer: (.*)$/,
+    ([, target]) => t('Unknown target layer: {target}', { target }),
+  ],
+  [
+    /^No (\S+) within (\d+(?:\.\d+)?) km of the current view$/,
+    ([, target, km]) => noneWithinView(target, shownKm(km)),
+  ],
+];
+
+/** A tool error as the card shows it. */
+function shownError(error) {
+  if (typeof error !== 'string' || !error) return null;
+  const known = KNOWN_ERRORS.get(error);
+  if (known) return t(known);
+  for (const [pattern, show] of ERROR_PATTERNS) {
+    const match = pattern.exec(error);
+    const shown = match ? show(match) : null;
+    if (shown) return shown;
+  }
+  return translateKnown(error);
+}
+
+// The card wraps a failed result's lines rather than cutting them: a
+// translated error runs longer than the English (voiceCardPresentation).
+function errorLines(result) {
+  return [shownError(result?.error)].filter(Boolean);
 }
 
 function sentence(text) {
@@ -189,6 +345,12 @@ function shownPair(items) {
 }
 
 /** Ids such as `austin` or `local-firms` read as names on screen. */
+// A place as the card shows it: a preset city in the interface language,
+// whether the call named it ("Tokyo") or gave its id ("tokyo").
+function shownPlace(value, max) {
+  return localizePlaceName(displayName(value, max));
+}
+
 function displayName(value, max) {
   const label = spokenLabel(value, max);
   return /^[a-z0-9-]+$/.test(label)
@@ -203,6 +365,12 @@ function layerLabel(result) {
   return spokenLabel(result?.label || result?.layerId || 'Layer');
 }
 
+/** The layer as the card names it, in the active language. */
+function shownLayerLabel(result) {
+  const name = shownLayerName(result?.label, result?.layerId);
+  return spokenLabel(name || t('Layer'));
+}
+
 /* ---------------- per-tool builders ---------------- */
 
 function setLayerVisibility(result, args = {}) {
@@ -212,7 +380,7 @@ function setLayerVisibility(result, args = {}) {
     const wanted = args.enabled === false ? 'off' : 'on';
     return {
       say: `Couldn't turn ${wanted} ${label}.`,
-      display: { title: label, lines: [result?.error].filter(Boolean) },
+      display: { title: shownLayerLabel(result), lines: errorLines(result) },
     };
   }
   const on = result.enabled !== false;
@@ -224,30 +392,31 @@ function setLayerVisibility(result, args = {}) {
   return {
     say,
     display: {
-      title: switchedTitle(label, on),
+      title: switchedTitle(shownLayerLabel(result), on),
       chips: on ? feedChips(result.feedState) : [],
-      sources: result.source ? [{ label: result.source }] : [],
+      sources: shownSources(result.source),
     },
   };
 }
 
 function flyToLocation(result) {
   const label = spokenLabel(result?.label || result?.query || 'there');
+  const title = spokenLabel(result?.label || result?.query) || t('there');
   if (result?.cancelled) return null;
   if (!result?.ok) {
     return {
       say: sentence(`Couldn't find ${label}`),
-      display: { title: label, lines: [result?.error].filter(Boolean) },
+      display: { title, lines: errorLines(result) },
     };
   }
   return {
     say: sentence(result.arrived ? `Over ${label}` : `Flying to ${label}`),
     display: {
-      title: label,
+      title,
       lines: result.rangeM
         ? [
             t('Camera range {range}', {
-              range: kilometers(result.rangeM / 1000),
+              range: shownKm(result.rangeM / 1000),
             }),
           ]
         : [],
@@ -274,7 +443,7 @@ function frameOverhead(result) {
       say,
       display: {
         title: frameTitle(result?.layerId),
-        lines: [result?.error].filter(Boolean),
+        lines: errorLines(result),
       },
     };
   }
@@ -294,7 +463,9 @@ function frameOverhead(result) {
     display: {
       title: inFrameTitle(result.layerId, count),
       lines: [
-        t('Within {radius} of the view', { radius }),
+        t('Within {radius} of the view', {
+          radius: shownKm(result?.radiusKm),
+        }),
         result.detectionEnabled ? t('Labels on') : null,
       ].filter(Boolean),
       notes:
@@ -309,8 +480,10 @@ function selectNearestAircraft(result) {
     result?.location?.label || result?.location || 'there',
   );
   const noun = LAYER_NOUNS[result?.layerId] || 'aircraft';
+  const shownLocation =
+    spokenLabel(result?.location?.label || result?.location) || t('there');
   const feed = result?.feed || {};
-  const sources = feed.source ? [{ label: feed.source }] : [];
+  const sources = shownSources(feed.source);
   if (result?.cancelled) return null;
   if (!result?.ok) {
     let say;
@@ -325,7 +498,7 @@ function selectNearestAircraft(result) {
       say,
       display: {
         title: nearestTitle(result?.layerId),
-        lines: [result?.error].filter(Boolean),
+        lines: errorLines(result),
         chips: feedChips(feed.state),
         sources,
       },
@@ -352,7 +525,10 @@ function selectNearestAircraft(result) {
       title: name,
       lines: [
         distance
-          ? t('{distance} from {location}', { distance, location })
+          ? t('{distance} from {location}', {
+              distance: shownKm(aircraft.distanceKm),
+              location: shownLocation,
+            })
           : null,
         altitude
           ? t('Altitude {altitude}', {
@@ -410,8 +586,12 @@ function getEntityContext(result) {
       say: null,
       display: {
         title,
-        lines: [selected.layerName].filter(Boolean),
-        sources: selected.source ? [{ label: selected.source }] : [],
+        lines: [
+          selected.layerName
+            ? shownLayerName(selected.layerName, selected.layerId)
+            : null,
+        ].filter(Boolean),
+        sources: shownSources(selected.source),
       },
     };
   }
@@ -443,7 +623,7 @@ function getEntityContext(result) {
           ? t('Route {route}', { route: routeText(properties, SHOWN_ROUTE) })
           : null,
       ].filter(Boolean),
-      sources: selected.source ? [{ label: selected.source }] : [],
+      sources: shownSources(selected.source),
     },
     referents: [
       {
@@ -491,7 +671,7 @@ function getCurrentViewState(result) {
       title: t('View state'),
       lines: enabled.map(
         (layer) =>
-          `${spokenLabel(layer.name || layer.id, 32)} · ${layer.count ?? 0} · ${feedStateLabel(layer.feedState || 'nominal')}`,
+          `${spokenLabel(shownLayerName(layer.name, layer.id), 32)} · ${layer.count ?? 0} · ${feedStateLabel(layer.feedState || 'nominal')}`,
       ),
     },
     schedule: 'silent',
@@ -627,8 +807,52 @@ function annotationTargets(args) {
     .filter(Boolean);
 }
 
+// frame_overhead's targets as the schema names them; English is unchanged.
+function frameStepLabel(target) {
+  switch (target) {
+    case 'flights':
+      return t('Frame flights');
+    case 'military':
+      return t('Frame military');
+    case 'satellites':
+      return t('Frame satellites');
+    case 'vessels':
+      return t('Frame vessels');
+    default:
+      return t('Frame {target}', { target });
+  }
+}
+
+// The other tools' plan steps, one label per tool in actionSchemas. The tool
+// name itself is English model vocabulary and never shows.
+const STEP_TITLES = Object.freeze({
+  zoom_to_globe: msg('Zoom out to globe'),
+  show_data_layers_menu: msg('Open data layers'),
+  set_panel_open: msg('Open or close a panel'),
+  set_context_mode: msg('Change context mode'),
+  control_cockpit: msg('Control cockpit'),
+  set_visual_style: msg('Change visual style'),
+  set_hud: msg('Adjust HUD'),
+  set_cyber_sonar: msg('Adjust cyber sonar'),
+  set_detection: msg('Adjust detection overlay'),
+  set_map_stack: msg('Change map stack'),
+  set_post_processing: msg('Adjust post-processing'),
+  control_scene: msg('Control scene'),
+  control_cctv: msg('Control CCTV'),
+  control_radio: msg('Control radio'),
+  track_entity: msg('Track contact'),
+  stop_tracking: msg('Stop tracking'),
+  clear_annotations: msg('Clear marks'),
+  move_camera: msg('Move camera'),
+  fly_route: msg('Fly route'),
+  analyst_query: msg('Analyst query'),
+  next_iss_pass: msg('Next ISS pass'),
+  next_satellite_pass: msg('Next satellite pass'),
+});
+
 /** A short on-screen label for one tool call in the voice card's plan. */
 export function planStepLabel(name, args = {}) {
+  if (Object.hasOwn(STEP_TITLES, name)) return t(STEP_TITLES[name]);
   switch (name) {
     case 'annotate_map': {
       const targets = annotationTargets(args);
@@ -641,29 +865,40 @@ export function planStepLabel(name, args = {}) {
           })
         : t('Mark {targets}', { targets: shown });
     }
-    case 'fly_to_location':
-      return t('Fly to {place}', {
-        place: displayName(args.query || args.locationId || 'location', 40),
-      });
-    case 'select_nearest_aircraft':
-      return t('Nearest aircraft to {place}', {
-        place: displayName(args.locationQuery || args.locationId || 'here', 32),
-      });
-    case 'set_layer_visibility':
-      return switchedTitle(
-        displayName(args.layerId || 'Layer', 32),
-        args.enabled !== false,
-      );
+    case 'fly_to_location': {
+      const place = args.query || args.locationId;
+      return place
+        ? t('Fly to {place}', { place: shownPlace(place, 40) })
+        : t('Fly to Location');
+    }
+    case 'select_nearest_aircraft': {
+      const place = args.locationQuery || args.locationId;
+      return place
+        ? t('Nearest aircraft to {place}', { place: shownPlace(place, 32) })
+        : t('Nearest aircraft to Here');
+    }
+    case 'set_layer_visibility': {
+      const on = args.enabled !== false;
+      const label =
+        layerNameForId(args.layerId) ||
+        (args.layerId ? displayName(args.layerId, 32) : '');
+      // "Layer" alone is a noun the languages inflect the state for.
+      if (!label) return on ? t('Layer on') : t('Layer off');
+      return switchedTitle(label, on);
+    }
+    case 'adjust_camera_zoom':
+      return args.direction === 'out' ? t('Zoom out') : t('Zoom in');
     case 'get_entity_context':
       return t('Read the view');
     case 'get_current_view_state':
       return t('Check view state');
     case 'frame_overhead':
-      return t('Frame {target}', {
-        target: spokenLabel(args.target || 'flights', 24),
-      });
+      return frameStepLabel(spokenLabel(args.target || 'flights', 24));
     default:
-      return spokenLabel(String(name || 'Action').replace(/_/g, ' '), 40);
+      // A tool the card has no label for: English shows its name as before.
+      return getLocale() === 'en'
+        ? spokenLabel(String(name || 'Action').replace(/_/g, ' '), 40)
+        : t('Action');
   }
 }
 

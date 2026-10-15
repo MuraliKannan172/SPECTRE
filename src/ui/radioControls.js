@@ -179,9 +179,11 @@ export class RadioControls {
         'aria-expanded',
         String(radioExpanded),
       );
-      const label = radioExpanded
-        ? 'Go to expanded Radio section'
-        : 'Expand Radio section in Context';
+      const label = t(
+        radioExpanded
+          ? msg('Go to expanded Radio section')
+          : msg('Expand Radio section in Context'),
+      );
       this._contextRadioToggleBtn.setAttribute('aria-label', label);
       this._contextRadioToggleBtn.title = label;
       return;

@@ -22,7 +22,7 @@ Every other language is one flat JSON file, `src/i18n/locales/<code>.json`, keye
 
 A `tn()` entry is keyed by the English plural form and holds one string per `Intl.PluralRules` category of that language. A missing entry falls back to English.
 
-The page picks its language from `?lang=`, then the choice stored by the language switch in the Visual Presets dock, then the browser languages, then English. Switching reloads the page.
+The page picks its language from `?lang=`, then the choice stored by the language switch in the Visual Presets dock, then the browser languages, then English. `?lang=` is not stored, and copied share links leave it out. Switching reloads the page.
 
 ## The check
 
@@ -32,7 +32,7 @@ npm run i18n -- --missing ru      # missing ru entries as JSON, ready to transla
 npm run i18n -- --prune           # drop entries the code no longer uses
 ```
 
-`npm test` runs the same check (`src/i18n/catalog.test.mjs`). It fails when a translation is missing, when an entry is no longer used, when placeholders differ from the English, when a plural entry lacks a form, or when a translation is still the English text. If an entry is right as it is in English (a code such as HDG, a product name, a word spelled the same in your language), add it under your language code in `src/i18n/same-as-english.json`.
+`npm test` runs the same check (`src/i18n/catalog.test.mjs`). It fails when a translation is missing or empty, when an entry is no longer used, when placeholders differ from the English, when a plural entry lacks a form, or when a translation, or any form of a plural entry, is still the English text. The `--missing` template is not a translation: its strings are empty and its plural forms are the English, so the check fails until every one is translated. If an entry is right as it is in English (a code such as HDG, a product name, a word spelled the same in your language), add it under your language code in `src/i18n/same-as-english.json`.
 
 Changing English text changes its key: the old translation becomes unused and the new text shows as missing. Translate it and prune.
 

@@ -326,7 +326,7 @@ export function bindCameraOrientationControls({
         : false;
     });
     if (result) {
-      showToast?.(result.tilted ? 'Tilted view' : 'Straight-down view');
+      showToast?.(result.tilted ? t('Tilted view') : t('Straight-down view'));
       // The action reports the state it just commanded, so the button can
       // follow it without a second pick.
       tilted = result.tilted;
@@ -345,7 +345,7 @@ export function bindCameraOrientationControls({
         })
       );
     });
-    if (result) showToast?.('North up');
+    if (result) showToast?.(t('North up'));
     sync();
   });
 

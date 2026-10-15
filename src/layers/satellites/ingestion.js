@@ -1,5 +1,6 @@
 import { twoline2satrec } from 'satellite.js';
 import * as Cesium from 'cesium';
+import { msg } from '../../i18n/index.js';
 import { CATALOG_GROUPS, ISS_NORAD, POINT_STYLES } from './policy.js';
 
 export function createIngestion({
@@ -59,7 +60,8 @@ export function createIngestion({
         // the chip still read "just now". Keep the existing (stale) catalog on
         // screen and surface the outage instead — do NOT stamp _lastUpdate.
         if (results.every((r) => !r.ok)) {
-          layerState._lastError = 'CelesTrak unreachable';
+          // English data (stats reach the voice tools); the panel translates it.
+          layerState._lastError = msg('CelesTrak unreachable');
           console.warn(
             '[Data:Satellites] All CelesTrak groups failed — keeping existing catalog, surfacing outage',
           );

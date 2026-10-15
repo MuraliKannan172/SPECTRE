@@ -9,8 +9,8 @@ import {
   reduceTrafficSyncFeedback,
 } from '../loadingFeedback.js';
 import { setSplitFlapText, disposeSplitFlap } from '../splitFlap.js';
-import { t, msg } from '../i18n/index.js';
-import { localizeLayerName } from './layerPanel.js';
+import { getLocale, t, msg } from '../i18n/index.js';
+import { localizeLayerName, translateFeedError } from './layerPanel.js';
 
 // loadingFeedback.js composes the shared status copy inside the portable
 // node/browser graph (the server-side HUD summary reads the same modules), so
@@ -29,24 +29,66 @@ const STATUS_LABEL_KEYS = Object.freeze({
   'RETRYING ALPR CAMERAS': msg('RETRYING ALPR CAMERAS'),
   'FETCHING ALPR CAMERAS': msg('FETCHING ALPR CAMERAS'),
   'OVERPASS TEMPORARILY UNAVAILABLE': msg('OVERPASS TEMPORARILY UNAVAILABLE'),
+  // The other mapped-site failure reasons (src/data/installationFeedback.js),
+  // upper-cased by presentGlobalLoadingStatus.
+  'OVERPASS RATE-LIMITED': msg('OVERPASS RATE-LIMITED'),
+  'OVERPASS TIMED OUT': msg('OVERPASS TIMED OUT'),
+  'OVERPASS COULD NOT COMPLETE THE QUERY': msg(
+    'OVERPASS COULD NOT COMPLETE THE QUERY',
+  ),
+  'MAP TILES TEMPORARILY UNAVAILABLE': msg('MAP TILES TEMPORARILY UNAVAILABLE'),
+  'MAPPED NAMES TEMPORARILY UNAVAILABLE': msg(
+    'MAPPED NAMES TEMPORARILY UNAVAILABLE',
+  ),
   'TURNING OFF LIVE DATA': msg('TURNING OFF LIVE DATA'),
   'REFRESHING LIVE DATA': msg('REFRESHING LIVE DATA'),
   'syncing road network': msg('syncing road network'),
 });
 
+// The ALPR retry chip shows the layer's English error upper-cased
+// (loadingFeedback.js). These are the camera and vector tile failures it can
+// carry, by their upper-cased text; each is translated through its own
+// sentence-case key, the one the layer row shows, and upper-cased again.
+const CHIP_ERROR_KEYS = new Map(
+  [
+    msg('Vector tile metadata unavailable'),
+    msg('Vector tiles unavailable'),
+    msg('Vector tile request timed out'),
+    msg('Camera coverage unavailable'),
+    msg('Camera source temporarily unavailable'),
+  ].map((key) => [key.toUpperCase(), key]),
+);
+const CHIP_TILE_HTTP_RE = /^VECTOR TILES UNAVAILABLE \(HTTP (\d+)\)$/;
+
 function localizeStatusLabel(label) {
   if (typeof label !== 'string' || !label) return label;
-  const key = STATUS_LABEL_KEYS[label.trim()];
-  return key ? t(key) : label;
+  const text = label.trim();
+  const key = STATUS_LABEL_KEYS[text];
+  if (key) return t(key);
+  const errorKey = CHIP_ERROR_KEYS.get(text);
+  const http = errorKey ? null : CHIP_TILE_HTTP_RE.exec(text);
+  if (!errorKey && !http) return label;
+  return translateFeedError(
+    errorKey || `Vector tiles unavailable (HTTP ${http[1]})`,
+  ).toLocaleUpperCase(getLocale());
 }
 
-const RETRY_DETAIL_RE = /^(?:ALPR cameras · )?retrying in (\d+)s$/;
+// A retry detail is "retrying in Ns" or "retry pending", optionally prefixed
+// by the ALPR layer name (loadingFeedback.js). The prefix is kept in every
+// language: it is what tells the chip apart from a mapped-sites retry.
+const RETRY_DETAIL_RE =
+  /^(?:(ALPR cameras) · )?(?:retrying in (\d+)s|(retry pending))$/;
 
 function localizeStatusDetail(detail) {
   if (typeof detail !== 'string' || !detail) return detail;
-  const match = detail.match(RETRY_DETAIL_RE);
-  if (match) return t('retrying in {seconds}s', { seconds: match[1] });
-  if (detail.trim() === 'retry pending') return t('retry pending');
+  const match = detail.trim().match(RETRY_DETAIL_RE);
+  if (match) {
+    const [, prefix, seconds, pending] = match;
+    const retry = pending
+      ? t('retry pending')
+      : t('retrying in {seconds}s', { seconds });
+    return prefix ? `${t('ALPR cameras')} · ${retry}` : retry;
+  }
   return localizeLayerRoster(detail);
 }
 
@@ -64,7 +106,8 @@ function localizeLayerRoster(detail) {
   );
 }
 
-function localizeLoadingPresentation(presentation) {
+/** The chip's label and detail in the UI language (exported for tests). */
+export function localizeLoadingPresentation(presentation) {
   if (!presentation) return presentation;
   return {
     ...presentation,

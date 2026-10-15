@@ -1,5 +1,5 @@
 import { VESSEL_OVERLAY_SOURCE_ID } from '../../data/vesselLabels.js';
-import { t } from '../../i18n/index.js';
+import { msg, t } from '../../i18n/index.js';
 import { AIS_FIRST_CONNECT_GRACE_MS, AIS_HEALTHY_STATUSES } from './policy.js';
 
 export function createLifecycle({
@@ -82,7 +82,7 @@ export function createLifecycle({
 
   function markAisUnavailable(reason) {
     settleFirstConnectPhase('unavailable');
-    state.feed.error = reason || 'AIS live load failed';
+    state.feed.error = reason || msg('AIS live load failed');
     state.feed.stale = state.feed.count > 0;
   }
 
@@ -129,6 +129,7 @@ export function createLifecycle({
     state.lastFocusUpdate = 0;
     state.activeFocusCount = 0;
     state.activeLabelCount = 0;
+    state.cardedRecords = new Set();
     state.selectedRecord = null;
     state.trail = null;
     state.trailPositions = [];

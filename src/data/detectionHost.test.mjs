@@ -955,6 +955,52 @@ test('a transit vehicle is a contact: box, route, mode and operator on the share
   }
 });
 
+test('hideLabel keeps the bracket but paints no callout over the source card', () => {
+  // C6: an ambient vessel card already names the vessel with its speed; the
+  // callout drawn beside it covered that card's speed and course.
+  const env = installEnvironment();
+  const objects = [
+    {
+      position: new Cesium.Cartesian3(0, 0, 6_356_752),
+      sourceId: '200',
+      id: 'GOLDEN BEAR',
+      type: 'VEH',
+      metric: '10 kn',
+      hideLabel: true,
+    },
+    {
+      position: new Cesium.Cartesian3(0.5, 0.5, 6_356_752),
+      sourceId: '300',
+      id: 'BAY PILOT',
+      type: 'VEH',
+      metric: '4 kn',
+    },
+  ];
+  try {
+    initWorldOverlay(env.viewer);
+    initDetection(
+      env.viewer,
+      [{ id: 'transit', getDetectableObjects: () => objects }],
+      () => {},
+    );
+    setMode('DENSE');
+    env.advance(250);
+    env.postRender.raise();
+    env.advance(250);
+    env.postRender.raise();
+    const painted = env.ctx.calls
+      .filter(([name]) => name === 'fillText')
+      .map(([, text]) => String(text));
+    assert.ok(painted.includes('BAY PILOT'), `painted ${JSON.stringify(painted)}`);
+    assert.ok(
+      !painted.some((text) => text.includes('GOLDEN BEAR')),
+      `no callout under the card; painted ${JSON.stringify(painted)}`,
+    );
+  } finally {
+    env.cleanup();
+  }
+});
+
 test('transit contacts take the vehicle tier, not the civil-air one', () => {
   assert.equal(resolveTier({ type: 'VEH' }), 'vehicle');
   assert.equal(resolveTier({ type: 'AIR' }), 'civil');

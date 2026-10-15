@@ -2,7 +2,7 @@ import { createVoiceControl, voiceStatusLabel } from './control.js';
 import { createVoiceSession } from './session.js';
 import { VoiceCardControls } from './voiceCard.js';
 import { PointerReticle } from './pointerReticle.js';
-import { t } from '../i18n/index.js';
+import { msg, registerUnsavedWork, t } from '../i18n/index.js';
 
 function createDefaultReticle(pointer) {
   const element = pointer?.element;
@@ -107,6 +107,10 @@ export function createVoiceCommands({
     card?.outline(event);
     session.sendMapEvent({ type: 'map_annotation_outline', ...event });
   });
+  // A reload (the language switch) ends the conversation: ask first.
+  const unregisterUnsavedWork = registerUnsavedWork(() =>
+    session.isActive() ? msg('the active voice session') : null,
+  );
   const buttonHandler = () => {
     if (adapter.ignoreButtonClick?.()) return;
     if (session.isActive()) session.stop();
@@ -117,6 +121,7 @@ export function createVoiceCommands({
     'abort',
     () => {
       ui.button.removeEventListener('click', buttonHandler);
+      unregisterUnsavedWork();
       annotationUnsubscribe?.();
       updateStatus();
       updateCard?.();
@@ -130,6 +135,7 @@ export function createVoiceCommands({
   );
   if (session.disposed) {
     ui.button.removeEventListener('click', buttonHandler);
+    unregisterUnsavedWork();
     annotationUnsubscribe?.();
     updateStatus();
     updateCard?.();

@@ -8,6 +8,7 @@ import { SPEECH_BUILDERS, attachVoiceResult } from './speech.js';
 import { resolveDeicticArgs } from './deixis.js';
 export { readLayerLifecycleSummary } from './layerSummary.js';
 import { defaultGeospatial } from '../search/defaults.js';
+import { msg } from '../i18n/index.js';
 import * as Cesium from 'cesium';
 import {
   CITY_POIS,
@@ -1442,7 +1443,7 @@ function controlScene(sceneDirector, args = {}) {
     };
   }
   if (sceneAction === 'stop') {
-    sceneDirector.stopScene('Stopped by voice');
+    sceneDirector.stopScene(msg('Stopped by voice'));
     return { ok: true, action: 'control_scene', running: false };
   }
   if (sceneAction === 'next') {

@@ -132,11 +132,12 @@ const refuse = (reason, message) => ({ ok: false, reason, message });
  */
 export function validateBox(box) {
   const normalized = normalizeBox(box);
-  if (!normalized) return refuse('invalid', 'Box edges must be finite');
+  if (!normalized) return refuse('invalid', msg('Box edges must be finite'));
   const { west, south, east, north } = normalized;
   if (Math.abs(west) > 180 || Math.abs(east) > 180)
-    return refuse('invalid', 'Longitudes must be within ±180°');
-  if (west > east) return refuse('dateline', 'Select one side of the dateline');
+    return refuse('invalid', msg('Longitudes must be within ±180°'));
+  if (west > east)
+    return refuse('dateline', msg('Select one side of the dateline'));
   if (
     Math.abs(south) > MERCATOR_LAT_LIMIT ||
     Math.abs(north) > MERCATOR_LAT_LIMIT
@@ -146,7 +147,7 @@ export function validateBox(box) {
       `Imagery stops at ±${MERCATOR_LAT_LIMIT.toFixed(2)}° latitude`,
     );
   if (east === west || north === south)
-    return refuse('degenerate', 'Box must enclose an area');
+    return refuse('degenerate', msg('Box must enclose an area'));
   const { width, height } = boxSideKm(normalized);
   if (width > MAX_BOX_SIDE_KM || height > MAX_BOX_SIDE_KM)
     return refuse('too-large', tooLargeMessage(Math.max(width, height)));
