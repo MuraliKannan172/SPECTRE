@@ -134,7 +134,7 @@ class FakeElement {
   }
 }
 
-function setup({ load, navigation, flyToSource } = {}) {
+function setup({ load, navigation, flyToSource, subscribeMapSource } = {}) {
   focus.active = null;
   const els = {
     'geo-import-button': new FakeElement('button', 'geo-import-button'),
@@ -150,6 +150,7 @@ function setup({ load, navigation, flyToSource } = {}) {
       return focus.active;
     },
   };
+  Object.setPrototypeOf(document, new FakeElement('document'));
   const added = [];
   const removed = [];
   const flights = [];
@@ -189,7 +190,8 @@ function setup({ load, navigation, flyToSource } = {}) {
     load: load || defaultLoad,
     document,
     ...(navigation ? { navigation } : {}),
-    ...(flyToSource ? { flyToSource } : {}),
+    ...(subscribeMapSource ? { subscribeMapSource } : {}),
+    flyToSource: flyToSource || ((_viewer, ds) => flights.push(ds)),
   });
   return {
     tool,
@@ -301,7 +303,7 @@ test('a refused file says why and does not stop the rest of the batch', async ()
     [false, false, true],
   );
   assert.equal(out[0].error, 'That KML file is not valid XML.');
-  assert.match(out[1].error, /could not be read: boom/);
+  assert.match(out[1].error, /could not be read\./);
   assert.match(
     t.els['geo-import-hint'].textContent,
     /^Added 1 file\. 2 files could not be added \(bad\.kml: That KML file is not valid XML\.\)/,
@@ -329,13 +331,13 @@ test('dropping files on the globe imports them; other drags are left alone', asy
   const c = t.viewer.container;
   const files = { types: ['Files'], files: [file('drop.kmz')] };
   let ev = { dataTransfer: { types: ['text/plain'] } };
-  c.emit('dragover', ev);
+  t.document.emit('dragover', ev);
   c.emit('dragenter', { dataTransfer: files });
   assert.ok(t.document.body.classList.contains('gev-geo-import-drag'));
   c.emit('dragleave', { dataTransfer: files });
   assert.ok(!t.document.body.classList.contains('gev-geo-import-drag'));
   c.emit('dragenter', { dataTransfer: files });
-  c.emit('drop', { dataTransfer: files });
+  t.document.emit('drop', { dataTransfer: files });
   assert.ok(!t.document.body.classList.contains('gev-geo-import-drag'));
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(
@@ -347,7 +349,7 @@ test('dropping files on the globe imports them; other drags are left alone', asy
 test('stripped KML content is mentioned once, for the batch that had it', () => {
   assert.equal(
     summarize([{ name: 'a.kml', ok: true, removed: 3 }]),
-    'Added 1 file. KML descriptions and external references were left out.',
+    'Added 1 file. Some KML content was left out.',
   );
   assert.equal(
     summarize([{ name: 'b.geojson', ok: true, removed: 0 }]),
@@ -477,6 +479,79 @@ function navigationDouble({ immediate = true, reassert = true } = {}) {
     },
   };
 }
+
+test('a direct camera gesture cancels the fly-to of a file still being read', async () => {
+  for (const gesture of ['pointerdown', 'wheel']) {
+    let release;
+    const t = setup({
+      load: async () => {
+        await new Promise((r) => (release = r));
+        return {
+          name: 'slow.geojson',
+          format: 'geojson',
+          entityCount: 1,
+          dataSource: {},
+        };
+      },
+    });
+    const result = t.tool.importFiles([file('slow.geojson')]);
+    await new Promise((r) => setImmediate(r));
+    t.viewer.container.emit(gesture);
+    release();
+    await result;
+    assert.equal(t.added.length, 1);
+    assert.equal(t.flights.length, 0);
+    t.tool.destroy();
+    assert.equal(t.document.listeners.length, 0);
+  }
+});
+
+test('dropping on panel controls is accepted and file drags prevent browser navigation', async () => {
+  const t = setup();
+  let prevented = 0;
+  const event = {
+    target: t.els['geo-import-button'],
+    dataTransfer: { types: ['Files'], files: [file('panel.kml')] },
+    preventDefault: () => prevented++,
+  };
+  t.document.emit('dragover', event);
+  t.document.emit('drop', event);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(prevented, 2);
+  assert.equal(t.tool.list()[0].name, 'panel.kml');
+  t.tool.destroy();
+  assert.equal(t.document.listeners.length, 0);
+});
+
+test('ground refresh coalesces map changes and releases its subscription on teardown', async () => {
+  let changed,
+    unsubscribed = 0,
+    refreshed = 0;
+  const t = setup({
+    subscribeMapSource: (listener) => {
+      changed = listener;
+      return () => unsubscribed++;
+    },
+    load: async () => ({
+      name: 'point.geojson',
+      format: 'geojson',
+      entityCount: 1,
+      dataSource: {},
+      refreshGround: async () => refreshed++,
+    }),
+  });
+  await t.tool.importFiles([file('point.geojson')]);
+  changed();
+  changed();
+  changed();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(refreshed, 1);
+  t.tool.destroy();
+  changed();
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  assert.equal(refreshed, 1);
+  assert.equal(unsubscribed, 1);
+});
 
 test('Fly to is an immediate navigation that Cockpit can refuse', async () => {
   const flown = [];

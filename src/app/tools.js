@@ -63,6 +63,8 @@ export function createApplicationTools({
   const geoFileImport = initGeoFileImport({
     viewer,
     navigation: styleManager,
+    ground: operations.surface?.groundFloor,
+    subscribeMapSource: (listener) => mapStackController?.subscribe?.(listener),
   });
   defer(() => geoFileImport?.destroy());
   // DATA ▸ Recent Imagery: the box tool claims the pointer like Draw and the

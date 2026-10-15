@@ -4,6 +4,7 @@ import { deflateRawSync } from 'node:zlib';
 import * as Cesium from 'cesium';
 import {
   GeoImportError,
+  loadGeoFile,
   MAX_IMPORT_POSITIONS,
   MAX_IMPORT_ENTITIES,
   countGeoJsonGeometry,
@@ -14,7 +15,6 @@ import {
   importFeatureName,
   scrubImportedEntities,
   sanitizeKmlDocument,
-  stripGeoJsonStyleProperties,
   detectGeoFileFormat,
   importDisplayName,
   kmzImageResolver,
@@ -24,6 +24,298 @@ import {
   readZipEntries,
   resolveKmzPath,
 } from './geoFileImport.js';
+import { createImportImageBudget, importImageSize } from './geoImportImages.js';
+
+test('real loader grounds XYZ GeoJSON and strips loader-sensitive metadata before allocation', async () => {
+  const previous = Cesium.PinBuilder.prototype.fromColor;
+  Cesium.PinBuilder.prototype.fromColor = () => ({
+    toDataURL: () => 'data:image/png;base64,local',
+    tagName: 'CANVAS',
+  });
+  try {
+    const object = {
+      type: 'FeatureCollection',
+      crs: { type: 'name', properties: { name: 'unsupported' } },
+      features: [
+        {
+          type: 'Feature',
+          id: 'kartaview-owned',
+          properties: { name: 'Test', addProperty: 1, 'marker-symbol': 'rail' },
+          geometry: { type: 'Point', coordinates: [1, 2, 999] },
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [1, 2, 0],
+                [2, 2, 0],
+                [2, 3, 0],
+                [1, 2, 0],
+              ],
+            ],
+          },
+        },
+      ],
+    };
+    const loaded = await loadGeoFile(
+      new File([JSON.stringify(object)], 'xyz.geojson'),
+      {
+        viewer: {
+          scene: {
+            frameState: { mode: Cesium.SceneMode.SCENE3D },
+            primitives: new Cesium.PrimitiveCollection(),
+            globe: { getHeight: () => 1234 },
+          },
+        },
+      },
+    );
+    const [point, polygon] =
+      loaded.dataSource.importedEntities || loaded.dataSource.entities.values;
+    assert.notEqual(point.id, 'kartaview-owned');
+    assert.equal(point.name, 'Test');
+    assert.equal(point.properties, undefined);
+    assert.equal(
+      point.billboard.heightReference.getValue(),
+      Cesium.HeightReference.NONE,
+    );
+    assert.equal(point.billboard.disableDepthTestDistance.getValue(), Infinity);
+    assert.ok(
+      Math.abs(
+        Cesium.Cartographic.fromCartesian(
+          point.position.getValue(Cesium.JulianDate.now()),
+        ).height - 1234,
+      ) < 1e-6,
+    );
+    assert.notEqual(polygon.polygon.perPositionHeight?.getValue(), true);
+    assert.equal(loaded.dataSource.clock, undefined);
+    assert.equal(
+      loaded.dataSource.entities.values.length,
+      1,
+      'only polygon geometry remains in the per-frame entity collection',
+    );
+    assert.equal(loaded.dataSource.importedBillboards.length, 1);
+    const update = Cesium.BillboardCollection.prototype.update;
+    let passes = 0;
+    Cesium.BillboardCollection.prototype.update = () => passes++;
+    try {
+      const collection = loaded.dataSource.importedBillboards;
+      collection.update({ passes: { pick: true, offscreen: true } });
+      assert.equal(passes, 0, 'height picks ignore imported markers');
+      collection.update({ passes: { pick: true, offscreen: false } });
+      collection.update({ passes: { render: true, offscreen: true } });
+      assert.equal(passes, 2, 'ordinary picks and screenshots include markers');
+    } finally {
+      Cesium.BillboardCollection.prototype.update = update;
+    }
+
+    loaded.mount();
+    loaded.dataSource.show = false;
+    assert.equal(loaded.dataSource.importedBillboards.show, false);
+    loaded.dataSource.show = true;
+    await loaded.refreshGround();
+    assert.equal(
+      point.billboard.heightReference.getValue(),
+      Cesium.HeightReference.NONE,
+    );
+    loaded.revoke();
+    assert.ok(loaded.dataSource.importedBillboards.isDestroyed());
+  } finally {
+    Cesium.PinBuilder.prototype.fromColor = previous;
+  }
+});
+
+test('real loader refuses empty files and malformed nested geometry before allocating entities', async () => {
+  for (const object of [
+    { type: 'Feature', geometry: null },
+    {
+      type: 'FeatureCollection',
+      features: [{ geometry: { type: 'Point', coordinates: [1, 2] } }],
+    },
+    { type: 'Feature', geometry: { type: 'Topology', arcs: [] } },
+    ...[
+      [1, '2'],
+      [Infinity, 0],
+      [0, 91],
+      [0, 0, 1e100],
+    ].map((coordinates) => ({ type: 'Point', coordinates })),
+  ])
+    await assert.rejects(
+      loadGeoFile(new File([JSON.stringify(object)], 'bad.geojson'), {
+        viewer: {},
+      }),
+      GeoImportError,
+    );
+});
+
+test('KML tracks retain their explicit altitude and ground lines are tessellated', () => {
+  const track = xmlEl('Track', {}, [
+    xmlEl('altitudeMode', {}, 'absolute'),
+    xmlEl('coord', {}, '1 2 10000'),
+    xmlEl('coord', {}, '2 3 10000'),
+  ]);
+  const line = xmlEl('LineString', {}, [xmlEl('coordinates', {}, '1,2 2,3')]);
+  const ground = xmlEl('Track', {}, [
+    xmlEl('coord', {}, '1 2 0'),
+    xmlEl('coord', {}, '2 3 0'),
+  ]);
+  const root = xmlEl('kml', {}, [track, line, ground]);
+  sanitizeKmlDocument(xmlDoc(root));
+  assert.equal(
+    root.childNodes[0].childNodes.find((n) => n.localName === 'altitudeMode')
+      .textContent,
+    'absolute',
+  );
+  assert.equal(
+    root.childNodes[1].childNodes.find((n) => n.localName === 'tessellate')
+      .textContent,
+    '1',
+  );
+  assert.equal(
+    root.childNodes[2].childNodes.find((n) => n.localName === 'tessellate')
+      .textContent,
+    '1',
+  );
+});
+
+test('sanitizer normalizes styles, removes incomplete pairs and keeps colored overlays', () => {
+  const local = xmlEl('styleUrl', {}, '  #s  ');
+  const pair = xmlEl('Pair', {}, [
+    xmlEl('key', {}, 'normal'),
+    xmlEl('styleUrl', {}, 'https://example.invalid/s'),
+  ]);
+  const overlay = xmlEl('GroundOverlay', {}, [xmlEl('color', {}, 'ff00ff00')]);
+  const hidden = xmlEl('visibility', {}, '0');
+  const id = xmlEl('Placemark', { id: 'kartaview-123' });
+  const root = xmlEl('kml', {}, [
+    local,
+    xmlEl('StyleMap', { id: 's' }, [pair]),
+    overlay,
+    hidden,
+    id,
+    xmlEl('toString'),
+  ]);
+  sanitizeKmlDocument(xmlDoc(root));
+  assert.equal(local.textContent, '#s');
+  assert.equal(pair.parentNode, null);
+  assert.ok(root.childNodes.includes(overlay));
+  assert.equal(hidden.parentNode, null);
+  assert.equal(id.getAttribute('id'), null);
+  assert.ok(!root.childNodes.some((n) => n.localName === 'toString'));
+});
+
+test('image budget rejects large decoded rasters before decoding and shares repeated images', () => {
+  const png = (w, h) => {
+    const b = new Uint8Array(24);
+    const v = new DataView(b.buffer);
+    v.setUint32(0, 0x89504e47);
+    b.set([73, 72, 68, 82], 12);
+    v.setUint32(16, w);
+    v.setUint32(20, h);
+    return b;
+  };
+  assert.deepEqual(importImageSize(png(4096, 4096)), [4096, 4096]);
+  const charge = createImportImageBudget();
+  charge('shared', png(4096, 4096));
+  charge('shared', png(4096, 4096));
+  assert.throws(() => charge('other', png(1, 1)), /limit/);
+  assert.throws(
+    () => createImportImageBudget()('huge', png(16384, 16384)),
+    /limit/,
+  );
+});
+
+test('pending file reads can be cancelled without waiting for the loader timeout', async () => {
+  const controller = new AbortController();
+  const file = {
+    name: 'waiting.geojson',
+    size: 1,
+    arrayBuffer: () => new Promise(() => {}),
+  };
+  const promise = loadGeoFile(file, { viewer: {}, signal: controller.signal });
+  controller.abort(new Error('cancelled by teardown'));
+  await assert.rejects(promise, /cancelled by teardown/);
+});
+
+test('a hidden coarse globe never seeds a mesh-clamp ray below the surface', async () => {
+  const previous = Cesium.PinBuilder.prototype.fromColor;
+  Cesium.PinBuilder.prototype.fromColor = () => ({
+    tagName: 'CANVAS',
+    toDataURL: () => 'data:image/png;base64,local',
+  });
+  const starts = [];
+  try {
+    for (const terrainProvider of [new Cesium.EllipsoidTerrainProvider(), {}]) {
+      const viewer = {
+        terrainProvider,
+        camera: {
+          positionCartographic: { height: 100000 },
+          computeViewRectangle: () => Cesium.Rectangle.MAX_VALUE,
+        },
+        scene: {
+          frameState: { mode: Cesium.SceneMode.SCENE3D },
+          globe: { show: false, getHeight: () => -12311 },
+          clampToHeightSupported: true,
+          clampToHeightMostDetailed: async (points) =>
+            points.map((p) => {
+              const c = Cesium.Cartographic.fromCartesian(p);
+              starts.push(c.height);
+              return c.height < -9000
+                ? undefined
+                : Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, 2000);
+            }),
+        },
+      };
+      const loaded = await loadGeoFile(
+        new File(
+          [JSON.stringify({ type: 'Point', coordinates: [1, 2] })],
+          'surface.geojson',
+        ),
+        { viewer },
+      );
+      assert.ok(
+        Math.abs(starts.at(-1)) < 1e-6,
+        `ray started at ${starts.at(-1)}`,
+      );
+      assert.ok(
+        Math.abs(
+          Cesium.Cartographic.fromCartesian(
+            loaded.dataSource.importedBillboards.get(0).position,
+          ).height - 2000,
+        ) < 1e-6,
+      );
+      const sampled = starts.length;
+      viewer.camera.computeViewRectangle = () => undefined;
+      await loaded.refreshGround();
+      assert.equal(
+        starts.length,
+        sampled,
+        'distant points do not start a detailed mesh sweep',
+      );
+      assert.ok(
+        Math.abs(
+          Cesium.Cartographic.fromCartesian(
+            loaded.dataSource.importedBillboards.get(0).position,
+          ).height - 2000,
+        ) < 1e-6,
+        'the last valid mesh height survives outside the camera footprint',
+      );
+      const point = loaded.dataSource.importedEntities[0];
+      const other = new Cesium.Entity({ id: 'unrelated-aircraft' });
+      viewer.trackedEntity = starts.length === 1 ? other : point;
+      viewer.selectedEntity = point;
+      loaded.revoke();
+      assert.equal(viewer.selectedEntity, undefined);
+      assert.equal(
+        viewer.trackedEntity,
+        starts.length === 1 ? other : undefined,
+      );
+    }
+  } finally {
+    Cesium.PinBuilder.prototype.fromColor = previous;
+  }
+});
 
 const bytes = (text) => new TextEncoder().encode(text);
 
@@ -754,30 +1046,6 @@ test('a KMZ image gets one blob URL however many hrefs name it', () => {
   assert.equal(resolve('doc.kml'), null);
   assert.equal(made.length, 2);
   assert.deepEqual(kept, ['blob:test/1', 'blob:test/2']);
-});
-
-test('simplestyle is dropped: no icon fetched, the row color is what draws', () => {
-  const fc = {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: {
-          'marker-symbol': 'rail',
-          'marker-color': '#f00',
-          stroke: '#0f0',
-          'stroke-width': 9,
-          fill: '#00f',
-          'fill-opacity': 1,
-          name: 'x',
-        },
-        geometry: null,
-      },
-      { type: 'Feature', properties: null, geometry: null },
-    ],
-  };
-  stripGeoJsonStyleProperties(fc);
-  assert.deepEqual(fc.features[0].properties, { name: 'x' });
 });
 
 test('imported entities keep only a short plain-text name: no description, label or properties', () => {

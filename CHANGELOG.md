@@ -211,25 +211,14 @@
   largest cities) and `CCTV_VEGVESEN_VIDEO=0` keeps stills only. Attributed
   under NLOD 2.0.
 
-- Import your own GeoJSON, KML, KMZ and GPX files (DISPLAY ▸ Import, or drop
-  them onto the globe). GeoJSON and GPX files are drawn on the ground in the
-  color shown on their row; KML and KMZ keep the styles written in them. Each
-  file gets a row to show, hide, fly to or remove it. Files stay in the
-  browser for the session. An import cannot make the page fetch anything (KML
-  network links, remote icons and styles are left out), keeps only plain-text
-  names from the file (no descriptions, balloons or native labels), never
-  moves the app's clock (dated tracks draw for all time), and keeps GPX track
-  segments apart. Size limits are checked before anything is built. The import
-  half of #890. Thanks to Chase Mills (@kapturner). Multipart geometry limits
-  apply before loading, recorded KML tracks retain their original vertices,
-  and queued imports respect navigation made while waiting. Repeated KML styles
-  are shared before the style limit is applied, allowing large files with many
-  copies of the same style to load without changing their graphics. Blocked
-  remote icons now fall back to local pins instead of leaving point markers
-  invisible, including USGS earthquake exports. Generated pins share one image
-  in the GPU atlas; unused time/view metadata is pruned before loading, and
-  obsolete track resampling code is removed. KML vertex counting follows
-  the loader's whitespace rules.
+- Import your own GeoJSON, KML, KMZ and GPX files from DISPLAY or by dropping
+  them onto the app. Show, hide, fly to or remove each file for the session.
+  GeoJSON/GPX draw on the ground; KML retains its styles and explicit heights.
+  Large repeated-style exports use shared local pins, while recorded track
+  vertices and segment gaps stay intact. Imports respect newer camera gestures,
+  leave the shared clock alone, and report malformed or oversized files.
+  File bytes stay on the device; rendered overlays may appear in shared map
+  screenshots. Thanks to [Chase Mills](https://github.com/kapturner) (#925).
 
 - Live HLS cameras play on a page opened over plain HTTP from another machine
   (`HOST=0.0.0.0`). The client lease id came from `crypto.randomUUID`, which

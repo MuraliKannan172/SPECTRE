@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import puppeteer from 'puppeteer';
+import { hookRenderErrors, readRenderErrors } from './qa-browserEvidence.mjs';
 
 const BASE_URL = process.env.QA_BASE_URL || 'http://localhost:4173';
 const SHOT_DIR = process.env.QA_SHOT_DIR || 'qa-shots/geo-import';
@@ -53,12 +54,12 @@ const geojson = JSON.stringify({
         'fill-opacity': 1,
         description: `<img src="https://${TRAP_HOST}/props.png">`,
       },
-      geometry: { type: 'Polygon', coordinates: [ring] },
+      geometry: { type: 'Polygon', coordinates: [ring.map((p) => [...p, 0])] },
     },
     {
       type: 'Feature',
       properties: { name: 'QA pin', 'marker-symbol': 'rail' },
-      geometry: { type: 'Point', coordinates: [-122.4862, 37.7694] },
+      geometry: { type: 'Point', coordinates: [-122.4862, 37.7694, 0] },
     },
   ],
 });
@@ -172,9 +173,14 @@ const browser = await puppeteer.launch({
   ],
 });
 const page = await browser.newPage();
+await hookRenderErrors(page);
 const errors = [];
 const trapped = [];
 page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+page.on('console', (message) => {
+  if (/Ignoring clampToGround/.test(message.text()))
+    errors.push(message.text());
+});
 // Anything a file names, and the icon assets Cesium would load on a file's
 // behalf (KML palette icons from maps.google.com, GeoJSON maki markers).
 const FILE_FETCH = [TRAP_HOST, 'maps.google.com/mapfiles', '/maki/'];
@@ -219,7 +225,7 @@ async function cyanPixels() {
     let n = 0;
     for (let i = 0; i < data.length; i += 4) {
       const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
-      if (b > 150 && g > 120 && r < 140 && b - r > 60) n += 1;
+      if (b > 45 && g > 30 && r < 100 && b - r > 30) n += 1;
     }
     return n;
   }, base64);
@@ -242,8 +248,14 @@ try {
       document.getElementById('loading-screen')?.classList.contains('hidden'),
     { timeout: 90_000 },
   );
-  await page.evaluate((view) => {
+  await page.evaluate(async (view) => {
     const viewer = window.__godsEyeView.viewer;
+    for (const id of window.__godsEyeView.dataManager.layers.keys())
+      await window.__godsEyeView.dataManager.setEnabled(id, false);
+    viewer.imageryLayers.removeAll();
+    viewer.terrainProvider = new window.__CESIUM__.EllipsoidTerrainProvider();
+    viewer.scene.globe.baseColor = window.__CESIUM__.Color.BLACK;
+    viewer.scene.globe.enableLighting = false;
     viewer.camera.cancelFlight?.();
     viewer.camera.setView({
       destination: window.__CESIUM__.Cartesian3.fromDegrees(
@@ -280,6 +292,9 @@ try {
       )),
   );
   const cyanBefore = await cyanPixels();
+  await page.evaluate(() => {
+    window.__godsEyeView.viewer.clock.shouldAnimate = false;
+  });
   const clock = () =>
     page.evaluate(() => {
       const c = window.__godsEyeView.viewer.clock;
@@ -292,7 +307,7 @@ try {
         multiplier: c.multiplier,
         animate: c.shouldAnimate,
         // Wall-clock drift aside, the current time must not jump to 2018/2019.
-        year: Number(iso(c.currentTime).slice(0, 4)),
+        currentTime: window.__CESIUM__.JulianDate.toIso8601(c.currentTime),
       };
     });
   const clockBefore = await clock();
@@ -350,9 +365,12 @@ try {
     const sources = [];
     for (let i = from; i < viewer.dataSources.length; i++)
       sources.push(viewer.dataSources.get(i));
-    const entities = sources.flatMap((ds) => ds.entities.values);
+    const entities = sources.flatMap(
+      (ds) => ds.importedEntities || ds.entities.values,
+    );
     const named = (name) => entities.find((e) => e.name === name);
-    const gpx = sources[3].entities.values;
+    const gpx = sources[3].importedEntities || sources[3].entities.values;
+    const kmz = sources[2].importedEntities || sources[2].entities.values;
     return {
       sources: sources.length,
       clocks: sources.filter((ds) => ds.clock !== undefined).length,
@@ -370,11 +388,26 @@ try {
       ),
       movingVertices:
         named('QA moving')?.polyline?.positions?.getValue(now)?.length,
-      splitTracks: sources[1].entities.values
+      splitTracks: (sources[1].importedEntities || sources[1].entities.values)
         .filter((e) => e.parent?.name === 'QA split tracks' && e.polyline)
         .map((e) => e.polyline.positions.getValue(now).length),
       gpxLines: gpx.filter((e) => e.polyline).length,
       gpxPoints: gpx.filter((e) => e.billboard || e.point).length,
+      kmzLocalImage: kmz.some((e) =>
+        String(e.billboard?.image?.getValue(now) || '').startsWith('blob:'),
+      ),
+      kmzOverlay: kmz.some((e) => e.rectangle),
+      groundedLines: sources
+        .slice(1, 3)
+        .every((ds) =>
+          (ds.importedEntities || ds.entities.values)
+            .filter((e) => e.polyline)
+            .every((e) => e.polyline.clampToGround?.getValue(now)),
+        ),
+      xyzPolygon:
+        (sources[0].importedEntities || sources[0].entities.values)
+          .find((e) => e.polygon)
+          ?.polygon.perPositionHeight?.getValue(now) !== true,
     };
   }, sourcesBefore);
   check(
@@ -411,6 +444,19 @@ try {
     inside.gpxLines === 2 && inside.gpxPoints === 1,
     JSON.stringify(inside),
   );
+  check(
+    'KMZ retains its own packed image and overlay',
+    inside.kmzLocalImage && inside.kmzOverlay,
+  );
+  check(
+    'XYZ polygons and KML/KMZ lines use ground geometry',
+    inside.xyzPolygon && inside.groundedLines,
+  );
+  await page.evaluate((from) => {
+    for (const entity of window.__godsEyeView.viewer.dataSources.get(from)
+      .entities.values)
+      if (entity.billboard) entity.show = false;
+  }, sourcesBefore);
   await page.evaluate((view) => {
     const viewer = window.__godsEyeView.viewer;
     viewer.camera.cancelFlight?.();
@@ -428,7 +474,7 @@ try {
   await shot('imported');
   check(
     'the imported polygon paints on the globe',
-    cyanShown > cyanBefore * 4,
+    cyanShown > cyanBefore * 4 && cyanShown > cyanBefore + 5000,
     `${cyanBefore} → ${cyanShown}`,
   );
 
@@ -536,7 +582,8 @@ try {
     trapped.length === 0,
     trapped.join(' '),
   );
-  check('no page errors', errors.length === 0, errors.join(' | '));
+  errors.push(...(await readRenderErrors(page)));
+  check('no page or rendering errors', errors.length === 0, errors.join(' | '));
 } catch (error) {
   check('harness ran to completion', false, error?.stack || String(error));
 } finally {

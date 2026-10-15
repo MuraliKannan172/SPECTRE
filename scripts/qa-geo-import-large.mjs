@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Large KML acceptance: style equivalence, 25 MB import and optional real file.
+/** Large KML acceptance: style equivalence, 27.6 MB import and optional real file.
  * QA_BASE_URL defaults to http://localhost:4173. Optional --file /path/file.kml.
  * For a USGS fixture with blocked icons, add --expect-local-pins to check paint.
  */
@@ -7,13 +7,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import puppeteer from 'puppeteer';
+import { hookRenderErrors, readRenderErrors } from './qa-browserEvidence.mjs';
 
 const base = process.env.QA_BASE_URL || 'http://localhost:4173';
 const supplied = process.argv.includes('--file')
   ? path.resolve(process.argv[process.argv.indexOf('--file') + 1])
   : null;
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gev-large-kml-'));
-const file = path.join(directory, 'metadata-rich-25mb.kml');
+const file = path.join(directory, 'metadata-rich-27mb.kml');
 const style =
   '<Style><IconStyle><scale>0.6</scale><color>ff00dd66</color></IconStyle></Style>';
 const notes = 'A local observation with supporting detail. '.repeat(120);
@@ -64,6 +65,7 @@ const browser = await puppeteer.launch({
       : ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'],
 });
 const page = await browser.newPage();
+await hookRenderErrors(page);
 const errors = [];
 const fileRequests = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -93,6 +95,7 @@ try {
     const C = window.__CESIUM__;
     for (const id of dataManager.layers.keys())
       await dataManager.setEnabled(id, false);
+    viewer.clock.shouldAnimate = false;
     viewer.imageryLayers.removeAll();
     viewer.terrainProvider = new C.EllipsoidTerrainProvider();
     viewer.camera.cancelFlight();
@@ -111,14 +114,27 @@ try {
       };
       const color = (p) => p?.getValue(now)?.toCssColorString();
       const positions = (p) => p?.getValue(now)?.map((v) => [v.x, v.y, v.z]);
-      return source.entities.values
+      const renderedPins = new Map();
+      const collection = source.importedBillboards;
+      if (collection)
+        for (let i = 0; i < collection.length; i++) {
+          const pin = collection.get(i);
+          renderedPins.set(pin.id, pin);
+        }
+      const actual = (e, key, fallback) => {
+        const pin = renderedPins.get(e);
+        return pin ? pin[key] : (e.billboard?.[key]?.getValue(now) ?? fallback);
+      };
+      return (source.importedEntities || source.entities.values)
         .map((e) => ({
           name: e.name,
-          point: e.position?.getValue(now),
-          scale: e.billboard?.scale?.getValue(now),
-          rotation: e.billboard?.rotation?.getValue(now),
-          image: imageValue(e.billboard?.image),
-          color: color(e.billboard?.color),
+          point: renderedPins.get(e)?.position || e.position?.getValue(now),
+          scale: e.billboard ? actual(e, 'scale', 1) : undefined,
+          rotation: e.billboard ? actual(e, 'rotation', 0) : undefined,
+          image: renderedPins.get(e)?.image || imageValue(e.billboard?.image),
+          color: e.billboard
+            ? actual(e, 'color', C.Color.WHITE).toCssColorString()
+            : undefined,
           width: e.polyline?.width?.getValue(now),
           lineColor: color(e.polyline?.material?.color),
           line: positions(e.polyline?.positions),
@@ -143,7 +159,8 @@ try {
         canvas: viewer.scene.canvas,
         clampToGround: true,
       });
-      for (const e of source.entities.values) e.label = undefined;
+      for (const e of source.importedEntities || source.entities.values)
+        e.label = undefined;
       return source;
     };
   });
@@ -159,7 +176,8 @@ try {
       same:
         JSON.stringify(window.__qaStyleSnapshot(control)) ===
         JSON.stringify(window.__qaStyleSnapshot(candidate)),
-      entities: candidate.entities.values.length,
+      entities: (candidate.importedEntities || candidate.entities.values)
+        .length,
     };
     await window.__gevGeoImport.remove(outcomes[0]?.id);
     return result;
@@ -235,18 +253,21 @@ try {
     const before = await page.evaluate(
       () => window.__godsEyeView.viewer.dataSources.length,
     );
+    const priorIds = await page.evaluate(() =>
+      window.__gevGeoImport.list().map((f) => f.id),
+    );
     const started = performance.now();
     await (await page.$('#geo-import-input')).uploadFile(filename);
     const name = path.basename(filename);
     const loaded = await page
       .waitForFunction(
-        (name) =>
-          window.__gevGeoImport.list().some((f) => f.name === name) ||
+        ({ name, priorIds }) =>
+          window.__gevGeoImport.list().some((f) => !priorIds.includes(f.id)) ||
           document
             .getElementById('geo-import-hint')
             .textContent.startsWith(`${name}:`),
         { timeout: 120000 },
-        name,
+        { name, priorIds },
       )
       .then(
         () => true,
@@ -257,7 +278,7 @@ try {
       hint: document.getElementById('geo-import-hint').textContent,
       sources: window.__godsEyeView.viewer.dataSources.length,
     }));
-    const item = state.files.find((f) => f.name === name);
+    const item = state.files.find((f) => !priorIds.includes(f.id));
     check(
       `picked ${name} loads`,
       loaded &&
@@ -294,6 +315,7 @@ try {
       return [
         C.JulianDate.toIso8601(v.clock.startTime),
         C.JulianDate.toIso8601(v.clock.stopTime),
+        C.JulianDate.toIso8601(v.clock.currentTime),
         v.clock.multiplier,
       ];
     });
@@ -304,6 +326,7 @@ try {
       return [
         C.JulianDate.toIso8601(v.clock.startTime),
         C.JulianDate.toIso8601(v.clock.stopTime),
+        C.JulianDate.toIso8601(v.clock.currentTime),
         v.clock.multiplier,
       ];
     });
@@ -316,9 +339,9 @@ try {
         const { viewer } = window.__godsEyeView,
           C = window.__CESIUM__;
         const source = viewer.dataSources.get(viewer.dataSources.length - 1);
-        const points = source.entities.values.filter(
-          (e) => e.position && e.billboard,
-        );
+        const points = (
+          source.importedEntities || source.entities.values
+        ).filter((e) => e.position && e.billboard);
         const images = points.filter((e) =>
           e.billboard.image?.getValue(viewer.clock.currentTime),
         );
@@ -406,7 +429,12 @@ try {
     fileRequests.length === 0,
     fileRequests.length,
   );
-  check('no uncaught page errors', errors.length === 0, JSON.stringify(errors));
+  errors.push(...(await readRenderErrors(page)));
+  check(
+    'no uncaught page or render errors',
+    errors.length === 0,
+    JSON.stringify(errors),
+  );
   check(
     'all imported sources are removed',
     await page.evaluate(() => window.__gevGeoImport.list().length === 0),

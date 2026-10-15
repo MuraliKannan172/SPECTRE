@@ -1,24 +1,4 @@
-/**
- * DISPLAY ▸ Import: put your own GeoJSON, KML, KMZ or GPX files on the globe.
- *
- * Files come in through the Import button or by dropping them onto the globe.
- * Each one becomes its own Cesium data source, clamped to the ground, with a
- * row in the panel to show or hide it, fly to it, or remove it. Files are read
- * in the browser and never uploaded; see `src/data/geoFileImport.js` for what
- * is accepted and what is stripped from KML before Cesium reads it.
- *
- * Imported files last for the page session: a reload starts empty.
- *
- * Imports run one batch at a time (a second pick or drop waits for the
- * first), so the file cap is checked against what is really on the globe.
- * Fly-to goes through the app's navigation policy (`navigation`, the
- * application shell): the button is an immediate navigation, and the fly
- * after an import is a deferred one, stamped when the import starts and
- * re-asserted just before flying, so a camera move, Cockpit or any newer
- * navigation in between wins over a slow file.
- * `destroy()` removes every imported data source, revokes every blob URL and
- * gives back every listener and the `window.__gevGeoImport` handle.
- */
+/** Session-local file controls, serial loading and application-owned navigation. */
 import {
   GEO_FILE_ACCEPT,
   GeoImportError,
@@ -44,6 +24,8 @@ export function initGeoFileImport({
   document: doc = globalThis.document,
   flyToSource = flyToDataSource,
   navigation = null,
+  ground = null,
+  subscribeMapSource = null,
 }) {
   const button = doc?.getElementById('geo-import-button');
   const input = doc?.getElementById('geo-import-input');
@@ -58,6 +40,9 @@ export function initGeoFileImport({
   let colorAt = 0;
   let destroyed = false;
   let dragDepth = 0;
+  let cameraIntent = 0;
+  const lifetime = new AbortController();
+  let removeMapSource;
 
   const listen = (target, type, listener, options) => {
     if (!target?.addEventListener) return;
@@ -68,6 +53,52 @@ export function initGeoFileImport({
     if (hint) hint.textContent = text || '';
   };
   const render = () => viewer.scene?.requestRender?.();
+  let groundTimer,
+    groundQueued = false,
+    groundAgain = false;
+  const groundRemovers = [];
+  const scheduleGround = () => {
+    if (destroyed || !imports.length) return;
+    if (groundQueued) {
+      groundAgain = true;
+      return;
+    }
+    clearTimeout(groundTimer);
+    groundTimer = setTimeout(() => {
+      groundQueued = true;
+      queue = queue
+        .catch(() => {})
+        .then(async () => {
+          try {
+            for (const item of imports) {
+              if (destroyed) return;
+              if (item.visible) await item.refreshGround?.(lifetime.signal);
+            }
+            render();
+          } catch {
+            if (!destroyed)
+              setHint(
+                'Ground heights could not be refreshed. Try the file again when the map has loaded.',
+              );
+          } finally {
+            groundQueued = false;
+            if (groundAgain) {
+              groundAgain = false;
+              scheduleGround();
+            }
+          }
+        });
+    }, 200);
+  };
+  removeMapSource = subscribeMapSource?.(scheduleGround);
+  const ownEvent = (event, listener) => {
+    const remove = event?.addEventListener?.(listener);
+    if (remove) groundRemovers.push(remove);
+  };
+  ownEvent(viewer.camera?.moveEnd, scheduleGround);
+  ownEvent(viewer.scene?.globe?.tileLoadProgressEvent, (pending) => {
+    if (!pending) scheduleGround();
+  });
 
   /** Which row button has focus, so a re-render can give it back. */
   function focusedAction() {
@@ -108,7 +139,7 @@ export function initGeoFileImport({
         name.className = 'geo-import-name';
         // textContent, never markup: the name comes from the file system.
         name.textContent = item.name;
-        name.title = `${item.name} — ${item.format.toUpperCase()}, ${item.entityCount.toLocaleString()} feature${item.entityCount === 1 ? '' : 's'}${item.ownStyles ? ', drawn with its own styles' : ''}`;
+        name.title = `${item.name} — ${item.format.toUpperCase()}, ${item.entityCount.toLocaleString()} map object${item.entityCount === 1 ? '' : 's'}${item.ownStyles ? ', drawn with its own styles' : ''}`;
         const actions = [
           [
             item.visible ? 'visibility' : 'visibility_off',
@@ -149,6 +180,7 @@ export function initGeoFileImport({
     if (!item) return false;
     item.visible = Boolean(visible);
     item.dataSource.show = item.visible;
+    if (item.visible) scheduleGround();
     renderList();
     render();
     return true;
@@ -158,7 +190,7 @@ export function initGeoFileImport({
   // destination's terrain has loaded (see ./flyToDataSource.js).
   const fly = (item) => {
     if (!item.visible) setVisible(item.id, true);
-    flyToSource(viewer, item.dataSource);
+    flyToSource(viewer, item.dataSource, { ground });
     return true;
   };
 
@@ -216,12 +248,13 @@ export function initGeoFileImport({
     // Capture the user's intent when the files are chosen, including time
     // spent waiting for an earlier batch. Later navigation must still win.
     const generation = beginAutoFly();
-    const run = queue.then(() => importBatch(list, generation));
+    const intent = ++cameraIntent;
+    const run = queue.then(() => importBatch(list, generation, intent));
     queue = run.catch(() => {});
     return run;
   }
 
-  async function importBatch(list, generation) {
+  async function importBatch(list, generation, intent) {
     const outcomes = [];
     if (destroyed || !list.length) return outcomes;
     for (const file of list) {
@@ -239,7 +272,7 @@ export function initGeoFileImport({
       const color = COLORS[colorAt % COLORS.length];
       let loaded;
       try {
-        loaded = await load(file, { viewer, color });
+        loaded = await load(file, { viewer, color, signal: lifetime.signal });
       } catch (error) {
         outcomes.push({
           name: fileName,
@@ -247,7 +280,7 @@ export function initGeoFileImport({
           error:
             error instanceof GeoImportError || error?.name === 'GeoImportError'
               ? error.message
-              : `That file could not be read${error?.message ? `: ${error.message}` : '.'}`,
+              : 'That file could not be read.',
         });
         continue;
       }
@@ -268,6 +301,7 @@ export function initGeoFileImport({
         visible: true,
         dataSource: loaded.dataSource,
         revoke: loaded.revoke,
+        refreshGround: loaded.refreshGround,
       };
       await viewer.dataSources.add(item.dataSource);
       if (destroyed) {
@@ -275,6 +309,7 @@ export function initGeoFileImport({
         item.revoke?.();
         break;
       }
+      loaded.mount?.();
       imports.push(item);
       renderList();
       render();
@@ -288,6 +323,7 @@ export function initGeoFileImport({
       // result, unless something else took the camera meanwhile.
       if (
         outcomes.filter((o) => o.ok).length === 1 &&
+        intent === cameraIntent &&
         autoFlyStillOwns(generation)
       )
         fly(item);
@@ -317,6 +353,15 @@ export function initGeoFileImport({
 
   // ---- drop onto the globe ----------------------------------------------
   const container = viewer.container;
+  const gesture = () => {
+    cameraIntent += 1;
+  };
+  listen(viewer.scene?.canvas || container, 'pointerdown', gesture, {
+    passive: true,
+  });
+  listen(viewer.scene?.canvas || container, 'wheel', gesture, {
+    passive: true,
+  });
   const hasFiles = (event) =>
     [...(event.dataTransfer?.types || [])].includes('Files');
   const setDragging = (on) =>
@@ -327,7 +372,7 @@ export function initGeoFileImport({
     dragDepth += 1;
     setDragging(true);
   });
-  listen(container, 'dragover', (event) => {
+  listen(doc, 'dragover', (event) => {
     if (!hasFiles(event)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
@@ -337,7 +382,7 @@ export function initGeoFileImport({
     dragDepth = Math.max(0, dragDepth - 1);
     if (!dragDepth) setDragging(false);
   });
-  listen(container, 'drop', (event) => {
+  listen(doc, 'drop', (event) => {
     if (!hasFiles(event)) return;
     event.preventDefault();
     dragDepth = 0;
@@ -371,6 +416,10 @@ export function initGeoFileImport({
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      lifetime.abort();
+      removeMapSource?.();
+      clearTimeout(groundTimer);
+      for (const remove of groundRemovers) remove();
       for (const item of imports.splice(0)) {
         viewer.dataSources?.remove?.(item.dataSource, true);
         item.revoke?.();
@@ -408,7 +457,6 @@ export function summarize(outcomes) {
     (n, o) => n + (o.ok ? o.removed || 0 : 0),
     0,
   );
-  if (added && stripped)
-    parts.push('KML descriptions and external references were left out.');
+  if (added && stripped) parts.push('Some KML content was left out.');
   return parts.join(' ');
 }
