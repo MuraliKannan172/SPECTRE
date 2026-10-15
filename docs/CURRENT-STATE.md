@@ -1226,6 +1226,10 @@ The browser layers and their rendering remain in their existing modules.
 
 ## Terrain height cache bound
 
+The terrain proxy parser rejects finite longitudes outside [-180, 180] and
+latitudes outside [-90, 90] for every client before upstream resolution. One
+out-of-range point rejects the whole batch; inclusive WGS84 bounds remain valid.
+
 The client terrain-height resolver's in-memory cache is bounded at 20 000
 entries (`DEFAULT_MAX_CACHE_ENTRIES`, overridable per instance through
 `createTerrainHeights({ maxCacheEntries })`). Coordinate rounding makes repeated
@@ -4132,7 +4136,8 @@ when its own signal aborts.
 Configured endpoints have per-instance cooldowns for 406/429, honoring
 Retry-After; absent delays back off from 30 seconds to five minutes. Empty
 `elements` is a valid answer. Existing byte, query, concurrency and cache caps
-remain. Consumer capability misses never schedule automatic retries.
+remain. Malformed capability-probe responses remain unknown and are retried after the existing 30-second backoff; valid configured decisions remain memoized.
+Consumer capability misses never schedule automatic retries.
 
 Operator-configured Overpass area and focus-footprint queries use body-level
 `out geom` (with `center` for focus), preserving relation member outlines.
