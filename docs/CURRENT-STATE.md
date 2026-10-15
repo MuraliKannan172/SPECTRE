@@ -1198,18 +1198,21 @@ FIRMS CSV, CelesTrak TLE groups, adsb.lol military responses, TomTom flow
 tiles, OpenSky states/all and adsbdb lookups now read their bodies through the
 shared streaming readers in `src/sources/httpBody.js`, so a declared or observed body
 over the cap is refused with `RESPONSE_TOO_LARGE` and cancelled rather than
-buffered. `readResponseBytesCapped` accepts the same optional abort signal as
-the text reader and cancels a body still streaming when it fires; TomTom flow
-tiles use it alongside GTFS-Realtime. Caps are bounds, not budgets, sized well
+buffered. TomTom flow tiles use `readResponseBytesCapped` alongside
+GTFS-Realtime. Each read takes the route's abort signal, so a body still
+streaming when the deadline fires is cancelled. Caps are bounds, not budgets, sized well
 above measured payloads: FIRMS 64 MiB per satellite source, CelesTrak 16 MiB
 per group, OpenSky `states/all` 8 MiB, adsb.lol `/v2/mil` 8 MiB, TomTom tiles
 8 MiB and adsbdb lookups 1 MiB. Where a route already had a deadline (FIRMS
 60 s, CelesTrak 20 s, TomTom 15 s, adsbdb 8 s, and each 10 s OpenSky
-`states/all` attempt) that deadline now covers the body read as well as the
-headers. The adsb.lol military poll, which had no deadline, now waits at most
-12 seconds. A rejected or timed-out body is an upstream miss and follows each
-route's existing error and cached-data paths. FIRMS map-key status, the OpenSky token exchange and CCTV
-media keep their current handling.
+`states/all` attempt) it already bounded the body read, because aborting a
+fetch signal also aborts its body; the capped reader takes the same signal.
+The adsb.lol military poll, which had no deadline, now waits at most 12
+seconds for headers and body together. An oversized OpenSky snapshot is not
+retried, and an OpenSky 429 starts its cooldown from the response headers and
+cancels the body unread. A rejected or timed-out body is an upstream miss and
+follows each route's existing error and cached-data paths. FIRMS map-key
+status, the OpenSky token exchange and CCTV media keep their current handling.
 
 ## Remaining local service modules
 
