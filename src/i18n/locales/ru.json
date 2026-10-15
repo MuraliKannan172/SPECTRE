@@ -2836,6 +2836,12 @@
   "FILTER": "ФИЛЬТР",
   "Cloud filter strength": "Сила фильтра облаков",
   "Panoramax answered HTTP {status}": "Panoramax ответил: HTTP {status}",
+  "Highest air-quality readings in view": "Наивысшие показатели качества воздуха в поле зрения",
+  "Low": "Низкий",
+  "Moderate": "Умеренный",
+  "High": "Высокий",
+  "Very High": "Очень высокий",
+  "Air quality": "Качество воздуха",
   "{n} sequences in view · click a line for its nearest photo": {
     "one": "{n} съёмка в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",
     "few": "{n} съёмки в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",

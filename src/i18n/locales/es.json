@@ -2779,6 +2779,12 @@
   "FILTER": "FILTRO",
   "Cloud filter strength": "Intensidad del filtro de nubes",
   "Panoramax answered HTTP {status}": "Panoramax respondió HTTP {status}",
+  "Highest air-quality readings in view": "Lecturas de calidad del aire más altas a la vista",
+  "Low": "Baja",
+  "Moderate": "Moderada",
+  "High": "Alta",
+  "Very High": "Muy alta",
+  "Air quality": "Calidad del aire",
   "{n} sequences in view · click a line for its nearest photo": {
     "one": "{n} secuencia a la vista · haz clic en una línea para su foto más cercana",
     "many": "{n} secuencias a la vista · haz clic en una línea para su foto más cercana",

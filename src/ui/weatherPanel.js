@@ -11,8 +11,9 @@ const ORDER = [
   'weather-radar',
   'weather-satellite',
   'weather-lightning',
+  'air-quality',
 ];
-const OBSERVED = new Set(ORDER.slice(2));
+const OBSERVED = new Set(ORDER.slice(2, 5));
 const utc = (time) =>
   Number.isFinite(Date.parse(time))
     ? `${formatUtcDayMonth(time)} ${utcClock(time)}`
@@ -166,7 +167,10 @@ export function createWeatherPanel({
           ? t('LATEST · newest per product')
           : historyTime(state.target),
     });
-    const models = active.map(({ id, icon, summary, legend = [], list }) => {
+    const models = active.map((entry) => {
+      const { id, icon, summary, legend = [], list } = entry;
+      // Discrete classes (storm geometry, AQHI bands) list swatches, not a ramp.
+      const categorical = entry.legendCategorical === true;
       let detail = summary.detail;
       const product = state.products.find((item) => item.id === id);
       if (OBSERVED.has(id)) {
@@ -207,17 +211,15 @@ export function createWeatherPanel({
         id: 'legend',
         type: 'legend',
         legend: {
-          categorical: id === 'weather-cyclones',
+          categorical,
           colors: legend.map(({ color }) => color),
           labels: legend.map(({ label }) => label),
-          units: id === 'weather-cyclones' ? '' : summary.units,
+          units: categorical ? '' : summary.units,
           zeroIndex: legend.findIndex(({ label }) => label === '0'),
         },
       };
       const blocks = [
-        ...(id === 'weather-cyclones' && list?.items?.length
-          ? [{ id: 'storms', type: 'list', list }]
-          : []),
+        ...(list?.items?.length ? [{ id: 'list', type: 'list', list }] : []),
         { id: 'details', type: 'lines', lines },
         ...(legend.length ? [legendBlock] : []),
         ...(summary.settings?.length

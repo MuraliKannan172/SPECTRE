@@ -329,3 +329,31 @@ test('the unavailable chip may abbreviate, but its accessible name keeps the ful
   assert.equal(button.dataset.feedState, 'unavailable');
   assert.match(attrs.get('aria-label'), /^Active Fires: UNAVAILABLE\./);
 });
+
+test('the Weather readout receives enabled air-quality alongside weather layers', async () => {
+  const { LayerPanel } = await import('./layerPanel.js');
+  const layers = ['wind', 'air-quality', 'other'].map((id) => ({
+    id,
+    icon: '*',
+    enabled: true,
+  }));
+  layers.push({ id: 'weather-radar', icon: '*', enabled: false });
+  const panel = new LayerPanel({
+    getLayers: () => layers,
+    getRowControls: (id) => ({ readout: true, summary: { label: id } }),
+  });
+  let entries = null;
+  panel._weatherPanel = {
+    update: (next) => {
+      entries = next;
+    },
+  };
+  panel._refreshWeatherPanel();
+  assert.deepEqual(
+    entries.map(({ id, summary }) => [id, summary.label]),
+    [
+      ['wind', 'wind'],
+      ['air-quality', 'air-quality'],
+    ],
+  );
+});
