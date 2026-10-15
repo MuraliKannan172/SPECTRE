@@ -32,6 +32,7 @@
 - Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
 
 - Director timeline seeks cross the dateline along the short longitude arc.
+
 - Frequently reused terrain batches retain their cached heights ahead of unused cells.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
