@@ -133,6 +133,7 @@ function presentViewer(state) {
   const left = [];
   if (street.title) left.push(street.title);
   if (street.creator) left.push(`Image by ${street.creator}`);
+  if (street.license) left.push(street.license);
   return {
     open: street.open === true,
     loading: street.loading === true && !street.imageId,
@@ -193,7 +194,7 @@ function presentMeta(state) {
   const hint = state.coverage.hint || '';
   if (state.coverage.count > 0)
     return [
-      `${state.coverage.count.toLocaleString()} sequences in view · click a line for its photos`,
+      `${state.coverage.count.toLocaleString()} ${state.coverage.label?.noun || 'sequences'} in view · ${state.coverage.label?.action || 'click a line for its photos'}`,
       hint,
     ]
       .filter(Boolean)
@@ -224,6 +225,7 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
       since: state.filterControls?.since !== false,
     },
     since: presentSince(filter.sinceDays, now),
+    sinceNote: state.sinceNote || null,
     legend: state.legend || [],
     viewer: presentViewer(state),
     meta: presentMeta(state),
