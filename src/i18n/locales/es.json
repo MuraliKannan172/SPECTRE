@@ -2779,5 +2779,10 @@
   "Show the complete infrared image; 0% filter strength": "Muestra la imagen infrarroja completa; intensidad del filtro 0%",
   "FILTER": "FILTRO",
   "Cloud filter strength": "Intensidad del filtro de nubes",
-  "Panoramax answered HTTP {status}": "Panoramax respondió HTTP {status}"
+  "Panoramax answered HTTP {status}": "Panoramax respondió HTTP {status}",
+  "{n} sequences in view · click a line for its nearest photo": {
+    "one": "{n} secuencia a la vista · haz clic en una línea para su foto más cercana",
+    "many": "{n} secuencias a la vista · haz clic en una línea para su foto más cercana",
+    "other": "{n} secuencias a la vista · haz clic en una línea para su foto más cercana"
+  }
 }

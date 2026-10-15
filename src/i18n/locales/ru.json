@@ -2836,5 +2836,11 @@
   "Show the complete infrared image; 0% filter strength": "Показать полное ИК-изображение; сила фильтра 0%",
   "FILTER": "ФИЛЬТР",
   "Cloud filter strength": "Сила фильтра облаков",
-  "Panoramax answered HTTP {status}": "Panoramax ответил: HTTP {status}"
+  "Panoramax answered HTTP {status}": "Panoramax ответил: HTTP {status}",
+  "{n} sequences in view · click a line for its nearest photo": {
+    "one": "{n} съёмка в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",
+    "few": "{n} съёмки в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",
+    "many": "{n} съёмок в кадре · щёлкните линию, чтобы открыть ближайшую фотографию",
+    "other": "{n} съёмки в кадре · щёлкните линию, чтобы открыть ближайшую фотографию"
+  }
 }

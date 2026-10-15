@@ -257,27 +257,43 @@ function presentMeta(state) {
         );
   const hint = translateHint(state.coverage.hint);
   if (state.coverage.count > 0) {
-    // A provider whose lines are not sequences carries its wording as data
-    // (coverageLabel); its count line needs its own tn pair so every language
-    // gets real plural forms. New wording: add a pair here and to the catalogs.
-    const count = state.coverage.count;
-    const countLine =
-      state.coverage.label?.noun === 'streets'
-        ? tn(
-            count,
-            '{n} street in view · click a line for its nearest photo',
-            '{n} streets in view · click a line for its nearest photo',
-            { n: formatNumber(count) },
-          )
-        : tn(
-            count,
-            '{n} sequence in view · click a line for its photos',
-            '{n} sequences in view · click a line for its photos',
-            { n: formatNumber(count) },
-          );
+    const countLine = coverageCountLine(state.coverage);
     return [countLine, hint].filter(Boolean).join(' · ');
   }
   return hint;
+}
+
+/**
+ * The coverage count line. Providers carry their wording as data
+ * (coverageLabel noun/action); each combination needs its own literal tn
+ * pair so every language gets real plural forms — the noun cannot inflect
+ * through a placeholder in Russian. New wording: add a pair here and to the
+ * catalogs (es.json/ru.json).
+ * @param {{count: number, label?: {noun?: string, action?: string}|null}} coverage
+ */
+function coverageCountLine(coverage) {
+  const count = coverage.count;
+  const values = { n: formatNumber(count) };
+  if (coverage.label?.action === 'click a line for its nearest photo')
+    return coverage.label.noun === 'streets'
+      ? tn(
+          count,
+          '{n} street in view · click a line for its nearest photo',
+          '{n} streets in view · click a line for its nearest photo',
+          values,
+        )
+      : tn(
+          count,
+          '{n} sequence in view · click a line for its nearest photo',
+          '{n} sequences in view · click a line for its nearest photo',
+          values,
+        );
+  return tn(
+    count,
+    '{n} sequence in view · click a line for its photos',
+    '{n} sequences in view · click a line for its photos',
+    values,
+  );
 }
 
 /** @param {{now?: number}} [options] Clock for the SINCE readout. */
