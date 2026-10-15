@@ -36,18 +36,7 @@
 
 - Director timeline seeks cross the dateline along the short longitude arc.
 
-- Map state updates stop delivering to subscribers removed during the same notification.
-
-- Director assets cancelled during the final stream read are discarded with reader cleanup.
-
-- Analyst queries preserve useful rows when an upstream timestamp is outside the supported date range.
-
-- Fire detections with missing or impossible positions are skipped while genuine zero coordinates remain valid.
-
-- Frequently reused terrain batches retain their cached heights ahead of unused cells.
-
-- Recent Imagery’s exported `setBox` and `searchHls` reject missing, blank or
-  boolean programmatic box edges instead of interpreting them as zero coordinates.
+- Regional articles retain unknown publication times when compact source dates do not identify a real calendar instant.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
