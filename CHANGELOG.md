@@ -24,6 +24,9 @@
   the five borough cores load and `CCTV_NYC_MAX_SOURCES` changes the cap. The catalog-wide ceiling is
   unchanged; extra cameras share it round-robin with the other packs.
 
+- Directions no longer shows a truncation notice for a route with exactly 200
+  turns, and a roundabout at the 200th turn keeps its exit distance.
+
 - Weather records keep missing conditions unknown and refuse summaries without a measured temperature.
 
 - Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
