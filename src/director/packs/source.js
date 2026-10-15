@@ -51,6 +51,8 @@ export function createAssetDirectorySource({
       await reader.cancel().catch(() => {});
       reader.releaseLock();
     }
+    // Cleanup awaits too; a cancel during it must still discard the asset.
+    signal?.throwIfAborted();
     const bytes = new Uint8Array(length);
     let offset = 0;
     for (const chunk of chunks) {

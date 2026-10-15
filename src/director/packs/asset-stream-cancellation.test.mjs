@@ -40,3 +40,40 @@ test('cancellation during the terminating read cannot return a scene asset', asy
     assert.equal(released, 1);
   }
 });
+
+test('cancellation during reader cleanup cannot return a scene asset', async () => {
+  const controller = new AbortController();
+  const reason = new DOMException('scene changed', 'AbortError');
+  let released = 0;
+  const source = createAssetDirectorySource({
+    baseUrl: 'https://fixture.example/assets/',
+    fetchImpl: async () => ({
+      ok: true,
+      headers: new Headers(),
+      body: {
+        getReader() {
+          let reads = 0;
+          return {
+            async read() {
+              reads++;
+              return reads === 1
+                ? { done: false, value: new Uint8Array([1]) }
+                : { done: true };
+            },
+            async cancel() {
+              controller.abort(reason);
+            },
+            releaseLock() {
+              released++;
+            },
+          };
+        },
+      },
+    }),
+  });
+  await assert.rejects(
+    source({ path: 'scene.bin', signal: controller.signal }),
+    (error) => error === reason,
+  );
+  assert.equal(released, 1);
+});
