@@ -2156,5 +2156,41 @@
   "fire confidence|low": "низкая",
   "age|<1h": "<1 ч",
   "age|{count}h": "{count} ч",
-  "age|{count}d": "{count} д"
+  "age|{count}d": "{count} д",
+  "General emergency": "Общая чрезвычайная ситуация",
+  "Unlawful interference": "Незаконное вмешательство",
+  "Radio failure": "Отказ радиосвязи",
+  "Downed aircraft": "Упавшее воздушное судно",
+  "Minimum fuel": "Минимум топлива",
+  "Lifeguard (medical priority)": "Lifeguard (медицинский приоритет)",
+  "Low-accuracy score = 100 × max(0, bad − 1) / total: one aircraft is discounted, so this is not the raw share. Cells need {minAircraft} aircraft over {minutes} minutes. Navigation-integrity anomalies are not a detection of jamming or spoofing.": "Оценка низкой точности = 100 × макс(0, плохих − 1) / всего: один борт вычитается, поэтому это не сырая доля. Ячейкам нужны {minAircraft} бортов в течение {minutes} минут. Аномалии навигационной целостности — не обнаружение глушения или спуфинга.",
+  "{fleet} · {emergency} · {feedState}": "{fleet} · {emergency} · {feedState}",
+  "Ground heights could not be refreshed. Try the file again when the map has loaded.": "Не удалось обновить высоты рельефа. Повторите загрузку файла, когда карта прогрузится.",
+  "{count} map objects": {
+    "one": "{count} объект карты",
+    "few": "{count} объекта карты",
+    "many": "{count} объектов карты",
+    "other": "{count} объекта карты"
+  },
+  "{name} — {format}, {objects}, drawn with its own styles": "{name} — {format}, {objects}, отрисован собственными стилями",
+  "{name} — {format}, {objects}": "{name} — {format}, {objects}",
+  "Hide {name}": "Скрыть {name}",
+  "Show {name}": "Показать {name}",
+  "Fly to {name}": "Перелететь к {name}",
+  "Remove {name}": "Убрать {name}",
+  "At most {max} files at once — remove one first.": "Не больше {max} файлов одновременно — сначала уберите один.",
+  "Reading {file}…": "Чтение {file}…",
+  "Added {count} files.": {
+    "one": "Добавлен {count} файл.",
+    "few": "Добавлено {count} файла.",
+    "many": "Добавлено {count} файлов.",
+    "other": "Добавлено {count} файла."
+  },
+  "{name}: {error}": "{name}: {error}",
+  "{count} files could not be added ({name}: {error})": "Не удалось добавить {count} файлов ({name}: {error})",
+  "Some KML content was left out.": "Часть содержимого KML была пропущена.",
+  "Show your own GeoJSON, KML, KMZ or GPX files on the globe (or drop them onto it). File bytes stay on this device; overlays can appear in map screenshots shared with voice.": "Показывайте свои файлы GeoJSON, KML, KMZ или GPX на глобусе (или перетащите их на него). Байты файла остаются на этом устройстве; наложения могут попасть в снимки карты, которыми делятся голосом.",
+  "Import": "Импорт",
+  "Choose GeoJSON, KML, KMZ or GPX files": "Выберите файлы GeoJSON, KML, KMZ или GPX",
+  "Imported files": "Импортированные файлы"
 }

@@ -13,6 +13,7 @@ import {
   compassDivisions,
   formatAltitudeRulerTick,
   formatCompassDivision,
+  formatCockpitEmergency,
   formatSpeedRulerTick,
   normalizeHeading,
   relativeBearing,
@@ -138,13 +139,22 @@ export function updateHud(
         : info.stale
           ? t('STALE FEED')
           : t('LIVE TRACK');
-    this.aircraftMeta.textContent = t(
-      '{aircraftClass} · {feedState} · COURSE ALIGNED',
-      {
-        aircraftClass:
-          info.layerId === 'military' ? t('MILITARY') : t('COMMERCIAL'),
-        feedState,
-      },
+    const fleet =
+      info.layerId === 'military' ? t('MILITARY') : t('COMMERCIAL');
+    const emergency = formatCockpitEmergency(info.emergency);
+    this.aircraftMeta.textContent = emergency
+      ? t('{fleet} · {emergency} · {feedState}', {
+          fleet,
+          emergency,
+          feedState,
+        })
+      : t('{aircraftClass} · {feedState} · COURSE ALIGNED', {
+          aircraftClass: fleet,
+          feedState,
+        });
+    this.aircraftMeta.classList.toggle(
+      'emergency',
+      info.emergency?.severity === 'emergency',
     );
   }
   this.updateRoute(info);

@@ -96,7 +96,13 @@ const PANEL_GROUPS = [
   },
   {
     label: msg('Events'),
-    ids: ['rocket-launches', 'earthquakes', 'local-firms', 'fire-perimeters'],
+    ids: [
+      'rocket-launches',
+      'earthquakes',
+      'local-firms',
+      'fire-perimeters',
+      'gnss-integrity',
+    ],
   },
   {
     label: msg('Weather'),

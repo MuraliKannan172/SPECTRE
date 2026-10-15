@@ -2123,5 +2123,39 @@
   "fire confidence|low": "baja",
   "age|<1h": "<1 h",
   "age|{count}h": "{count} h",
-  "age|{count}d": "{count} d"
+  "age|{count}d": "{count} d",
+  "General emergency": "Emergencia general",
+  "Unlawful interference": "Interferencia ilícita",
+  "Radio failure": "Fallo de radio",
+  "Downed aircraft": "Aeronave derribada",
+  "Minimum fuel": "Combustible mínimo",
+  "Lifeguard (medical priority)": "Lifeguard (prioridad médica)",
+  "Low-accuracy score = 100 × max(0, bad − 1) / total: one aircraft is discounted, so this is not the raw share. Cells need {minAircraft} aircraft over {minutes} minutes. Navigation-integrity anomalies are not a detection of jamming or spoofing.": "Puntuación de baja precisión = 100 × máx(0, malas − 1) / total: se descuenta una aeronave, así que no es la proporción bruta. Las celdas necesitan {minAircraft} aeronaves durante {minutes} minutos. Las anomalías de integridad de navegación no constituyen una detección de jamming o spoofing.",
+  "{fleet} · {emergency} · {feedState}": "{fleet} · {emergency} · {feedState}",
+  "Ground heights could not be refreshed. Try the file again when the map has loaded.": "No se pudieron refrescar las alturas del terreno. Prueba de nuevo con el archivo cuando el mapa haya cargado.",
+  "{count} map objects": {
+    "one": "{count} objeto de mapa",
+    "many": "{count} objetos de mapa",
+    "other": "{count} objetos de mapa"
+  },
+  "{name} — {format}, {objects}, drawn with its own styles": "{name} — {format}, {objects}, dibujado con sus propios estilos",
+  "{name} — {format}, {objects}": "{name} — {format}, {objects}",
+  "Hide {name}": "Ocultar {name}",
+  "Show {name}": "Mostrar {name}",
+  "Fly to {name}": "Volar a {name}",
+  "Remove {name}": "Quitar {name}",
+  "At most {max} files at once — remove one first.": "Como máximo {max} archivos a la vez — quita uno primero.",
+  "Reading {file}…": "Leyendo {file}…",
+  "Added {count} files.": {
+    "one": "Se añadió {count} archivo.",
+    "many": "Se añadieron {count} archivos.",
+    "other": "Se añadieron {count} archivos."
+  },
+  "{name}: {error}": "{name}: {error}",
+  "{count} files could not be added ({name}: {error})": "No se pudieron añadir {count} archivos ({name}: {error})",
+  "Some KML content was left out.": "Parte del contenido KML se quedó fuera.",
+  "Show your own GeoJSON, KML, KMZ or GPX files on the globe (or drop them onto it). File bytes stay on this device; overlays can appear in map screenshots shared with voice.": "Muestra tus propios archivos GeoJSON, KML, KMZ o GPX sobre el globo (o suéltalos sobre él). Los bytes del archivo se quedan en este dispositivo; las superposiciones pueden aparecer en capturas del mapa compartidas por voz.",
+  "Import": "Importar",
+  "Choose GeoJSON, KML, KMZ or GPX files": "Elige archivos GeoJSON, KML, KMZ o GPX",
+  "Imported files": "Archivos importados"
 }
