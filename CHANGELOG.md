@@ -5,14 +5,19 @@
   flag that only a successful *activation* cleared — and an already-loaded city
   never activates again. A dead feed re-entering camera range therefore latched
   LOAD FAILED permanently over a map still drawing every other city's stations.
-  Failure is now tracked per city and reported only when it leaves the layer
-  with nothing to draw; a city that recovers clears its own failure.
+  Failure is now tracked per city: a city that fails beside others still
+  drawing marks the layer DEGRADED, polls that all fail over previously drawn
+  points read STALE without advancing freshness, and LOAD FAILED is reported
+  only when nothing is left to draw. A city that recovers clears its own
+  failure, a failure is dropped once its city leaves range or the camera rises
+  above the activation altitude, and late results from superseded requests are
+  ignored.
 
   Repointed the three feeds whose operators had moved: Reddy Bikeshare (Buffalo)
   to Social Bicycles, Tugo (Tucson) and Trinity Metro (Fort Worth) to PBSC.
   Dropped CoGo (Columbus) and Broward B-cycle (Fort Lauderdale), whose systems
   have wound down — CoGo's feed reports no stations and last moved a bike in
-  March 2025. All 31 remaining systems were verified live.
+  March 2025. The three repointed feeds were verified live.
 
 - Add Bike Share Toronto (1,069 stations) to the bikeshare registry. The system
   publishes the same PBSC GBFS v2 feeds as the Austin, Honolulu and Chattanooga

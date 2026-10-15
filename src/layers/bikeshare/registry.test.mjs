@@ -23,7 +23,7 @@ test('every registered city is reachable through the GBFS proxy allowlist', () =
         `${city.id}: host ${url.hostname} is not allowlisted`,
       );
       assert.equal(
-        isAllowedGbfsPath(url.pathname),
+        isAllowedGbfsPath(url.pathname, url.hostname),
         true,
         `${city.id}: path ${url.pathname} is not allowlisted`,
       );

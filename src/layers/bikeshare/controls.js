@@ -56,7 +56,7 @@ export function createControls({ state: layerState, services, parts, source }) {
 
     /**
      * Return current layer statistics for the UI status display.
-     * @returns {{ count: number, lastUpdate: number|null, loading: boolean, loadingLabel?: string, error?: string }}
+     * @returns {{ count: number, lastUpdate: number|null, loading: boolean, loadingLabel?: string, error?: string, degraded?: boolean, stale?: boolean }}
      */
     getStats() {
       const stats = {
@@ -71,12 +71,19 @@ export function createControls({ state: layerState, services, parts, source }) {
             : 'scanning nearby systems...';
       }
       // A failed city is only the layer's failure when it left nothing on the
-      // map. While any city still renders, the layer is working and says so.
-      if (
-        layerState._failedCityIds.size > 0 &&
-        layerState._stationRenderMap.size === 0
-      ) {
-        stats.error = 'GBFS fetch error';
+      // map. While other cities still render, the partial failure reads
+      // DEGRADED; when every in-range city failed and only previously drawn
+      // points remain, they read STALE.
+      if (layerState._failedCityIds.size > 0) {
+        if (layerState._stationRenderMap.size === 0) {
+          stats.error = 'GBFS fetch error';
+        } else {
+          stats.degraded = true;
+          const allFailed = Array.from(layerState._activeCityIds).every(
+            (cityId) => layerState._failedCityIds.has(cityId),
+          );
+          if (allFailed) stats.stale = true;
+        }
       }
       return stats;
     },
