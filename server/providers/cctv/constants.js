@@ -306,6 +306,61 @@ export const DELDOT_ANCHORS = [
   { lat: 38.6906, lon: -75.3877 }, // Georgetown (Sussex)
 ];
 
+/** King County, WA road cameras: keyless public ArcGIS FeatureServer layer
+ * ("King County and WSDOT Traffic Cameras", King County DOT Road Services).
+ * GeoJSON with WGS84 point geometry. `outFields` is an explicit list on
+ * purpose: the layer also carries asset-administration columns (including
+ * staff names in `ModifiedBy`) that must never be fetched. Uniquely among the
+ * packs, the county publishes each camera's hardware `Manufacturer`/`Model`
+ * (Cohu 3950/3965, Bosch AUTODOME, Axis Q6135-LE, …), carried through as the
+ * source's `model`. */
+export const KING_COUNTY_CAMERAS_URL =
+  'https://services.arcgis.com/Ej0PsM5Aw677QF1W/arcgis/rest/services/TRAFFICCAMERA_POINT_2029/FeatureServer/0/query?where=1%3D1&outFields=AssetID,Location,ImageURL,Live,Model,Manufacturer,Owner,CurrentStatus&f=geojson';
+/** Frames come only from the county's own image handler host. */
+export const KING_COUNTY_IMAGE_ORIGIN = 'https://info.kingcounty.gov/';
+/** The whole catalog is ~125 rows (~59 live county cameras); no thinning by
+ * default. */
+export const DEFAULT_KING_COUNTY_MAX_SOURCES = 125;
+/** Prioritization anchor: Renton, roughly central to the county road network. */
+export const KING_COUNTY_ANCHORS = [{ lat: 47.4829, lon: -122.2171 }];
+/** Hard ceiling on the King County catalog body. The whole layer is ~125 rows
+ * and well under 100 KB; this only exists so an upstream that streams an
+ * unbounded body cannot be buffered without limit. */
+export const KING_COUNTY_MAX_CATALOG_BYTES = 1024 * 1024;
+/**
+ * City of Toronto RESCU traffic cameras: the municipal network the province's
+ * 511 pack does not cover — downtown arterials plus the Gardiner, DVP, Allen
+ * and Lake Shore. One keyless list for the whole city (~336 cameras), from the
+ * City's open data portal. It is fetched on every catalog refresh, but the
+ * upstream file is not updated often and may lag the live camera network.
+ *
+ * The list is served as JSONP (`jsonTMCEarthCamerasCallback({...})`); the
+ * portal publishes the same data as .xml and .csv beside it.
+ */
+export const TORONTO_RESCU_LIST_URL =
+  'https://opendata.toronto.ca/transportation/tmc/rescucameraimages/Data/tmcearthcameras.json';
+/**
+ * The only origin Toronto camera frames may come from. The list carries no URL
+ * field: frame URLs are BUILT from this origin and a strictly-digits camera
+ * number (`loc####.jpg`, the convention the dataset documents), so no upstream
+ * field can steer the frame proxy off-host.
+ */
+export const TORONTO_RESCU_IMAGE_ORIGIN =
+  'https://opendata.toronto.ca/transportation/tmc/rescucameraimages/CameraImages/';
+/** The whole city fits under this; the cap exists to stay tunable, not to trim. */
+export const DEFAULT_TORONTO_MAX_SOURCES = 336;
+/** Yonge / Queen: the prioritization anchor. */
+export const TORONTO_DOWNTOWN = { lat: 43.6532, lon: -79.3832 };
+/** The city climbs from 76 m at the lake to 209 m at Steeles, so no single
+ * number fits: this is the mean across the 336 camera sites. The ground-height
+ * sidecar has no Toronto entries yet, so this prior seeds placement; a camera
+ * that gains a sidecar entry uses it instead, and the client's ground snap
+ * corrects the prior wherever 3D tiles are loaded. */
+export const TORONTO_GROUND_ELEVATION_M = 116;
+/** Hard ceiling on the RESCU list body. The whole city is ~336 rows and under
+ * 60 KB; this only exists so an upstream that streams an unbounded body cannot
+ * be buffered without limit. */
+export const TORONTO_MAX_CATALOG_BYTES = 4 * 1024 * 1024;
 /** WSDOT Travel Center cameras (Washington State): keyless Esri JSON on the
  * official open-data host — ~1,700 point features in EPSG:3857 (Web Mercator),
  * ETag/Last-Modified served. WSDOT's metadata marks the feed "low volume" use;

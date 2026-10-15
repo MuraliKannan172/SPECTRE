@@ -55,10 +55,21 @@ import {
   DEFAULT_CALGARY_MAX_SOURCES,
   CALGARY_DOWNTOWN,
   CALGARY_MAX_CATALOG_BYTES,
+  TORONTO_RESCU_LIST_URL,
+  TORONTO_RESCU_IMAGE_ORIGIN,
+  DEFAULT_TORONTO_MAX_SOURCES,
+  TORONTO_DOWNTOWN,
+  TORONTO_GROUND_ELEVATION_M,
+  TORONTO_MAX_CATALOG_BYTES,
   CCTV_SOURCE_FETCH_TIMEOUT_MS,
   DELDOT_CCTV_URL,
   DEFAULT_DELDOT_MAX_SOURCES,
   DELDOT_ANCHORS,
+  KING_COUNTY_CAMERAS_URL,
+  KING_COUNTY_IMAGE_ORIGIN,
+  DEFAULT_KING_COUNTY_MAX_SOURCES,
+  KING_COUNTY_ANCHORS,
+  KING_COUNTY_MAX_CATALOG_BYTES,
   WSDOT_CAMERAS_URL,
   WSDOT_IMAGE_ORIGIN,
   DEFAULT_WSDOT_MAX_SOURCES,
@@ -96,6 +107,7 @@ import {
   isLikelyCalgaryCoordinate,
   isLikelyNycCoordinate,
   isLikelyNorwayCoordinate,
+  isLikelyTorontoCoordinate,
   cameraDisplayCode,
   rowArrayToObject,
   prioritizeSources,
@@ -104,6 +116,7 @@ import { directionToHeading } from '../../../src/data/directionText.js';
 import {
   readResponseBytesCapped,
   readResponseJsonCapped,
+  readResponseTextCapped,
 } from '../common/http.js';
 /**
  * Fetch and parse Austin traffic camera records from the city Open Data portal.
@@ -1725,6 +1738,165 @@ export async function loadDelDOTSourcesFromOpenData() {
   }
 }
 
+/** Rough King County, WA bounding box. */
+function isLikelyKingCountyCoordinate(lat, lon) {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= 47.0 &&
+    lat <= 48.0 &&
+    lon >= -123.1 &&
+    lon <= -121.0
+  );
+}
+
+/**
+ * A King County `Model` value, whitespace-collapsed, or '' when it is a
+ * vendor-generic string ("PTZ", "PTZ IP", "BOSCH/PTZ") that names no model.
+ */
+function kingCountyModel(raw) {
+  const model = String(raw || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return /^(?:[a-z]+\/)?ptz(?: ip)?$/i.test(model) ? '' : model;
+}
+
+/**
+ * Fetch King County road cameras (Washington State). Keyless: one public
+ * ArcGIS FeatureServer GeoJSON query (King County DOT Road Services), with an
+ * explicit `outFields` list so the layer's asset-administration columns are
+ * never fetched. Only cameras that are live and active (`Live`,
+ * `CurrentStatus`) with a positive integer id, finite in-county coordinates,
+ * and a frame on the county's own image handler are kept. WSDOT-owned rows in
+ * the layer are skipped because their frames are WSDOT-hosted, outside the
+ * pinned image origin, while partner-city cameras hosted on the county image
+ * handler (e.g. Newcastle) name their owner as the per-camera credit,
+ * DriveBC-style. The layer publishes no facing, so every heading is the id
+ * hash at low confidence.
+ *
+ * Uniquely among the packs, the county publishes each camera's hardware
+ * `Manufacturer`/`Model`; the model string (whitespace-collapsed — the feed
+ * carries stray newlines) rides along as the source's `model` for
+ * identified-hardware consumers. Vendor-generic strings ("PTZ", "PTZ IP",
+ * "BOSCH/PTZ") name no model and are treated as absent.
+ *
+ * @returns {Promise<Array<object>>} Normalized camera source objects.
+ */
+export async function loadKingCountySourcesFromOpenData() {
+  try {
+    const resp = await fetch(KING_COUNTY_CAMERAS_URL, {
+      headers: { Accept: 'application/json' },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
+    });
+    // A response this loader will not read still owns its transport until the
+    // body is released, so every rejection path cancels before returning.
+    const discard = async () => {
+      try {
+        await resp.body?.cancel();
+      } catch {
+        /* no-op */
+      }
+      return [];
+    };
+    if (resp.status >= 300 && resp.status < 400) {
+      console.warn(
+        '[CCTV] King County catalog redirected; redirects are not followed',
+      );
+      return discard();
+    }
+    if (!resp.ok) {
+      console.warn('[CCTV] King County camera download failed:', resp.status);
+      return discard();
+    }
+    const payload = await readResponseJsonCapped(
+      resp,
+      KING_COUNTY_MAX_CATALOG_BYTES,
+    );
+    const rows = Array.isArray(payload?.features) ? payload.features : [];
+
+    const cameras = [];
+    const seen = new Set();
+    for (const row of rows) {
+      const attrs = row?.properties;
+      const rawId = attrs?.AssetID;
+      if (!Number.isSafeInteger(rawId) || rawId <= 0) continue;
+      if (attrs.Live !== 1) continue;
+      if (String(attrs.CurrentStatus || '').trim() !== 'Active') continue;
+      const owner = String(attrs.Owner || '').trim();
+      // WSDOT-owned rows serve WSDOT-hosted frames, outside the pinned
+      // county image origin, so they are skipped.
+      if (owner === 'WSDOT') continue;
+      // The handler is served over HTTPS; the feed still writes http://.
+      const imageUrl = String(attrs.ImageURL || '')
+        .trim()
+        .replace(/^http:\/\/info\.kingcounty\.gov\//, KING_COUNTY_IMAGE_ORIGIN);
+      if (!imageUrl.startsWith(KING_COUNTY_IMAGE_ORIGIN)) continue;
+      const [lon, lat] = Array.isArray(row?.geometry?.coordinates)
+        ? row.geometry.coordinates
+        : [];
+      if (!isLikelyKingCountyCoordinate(lat, lon)) continue;
+
+      const cameraId = `kingcounty-${rawId}`;
+      if (seen.has(cameraId)) continue;
+      seen.add(cameraId);
+      const model = kingCountyModel(attrs.Model);
+      const manufacturer = String(attrs.Manufacturer || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const camera = {
+        id: cameraId,
+        name:
+          String(attrs.Location || '').trim() || `King County camera ${rawId}`,
+        city: 'King County',
+        cityId: 'king-county',
+        provider: 'King County Road Services',
+        lat,
+        lon,
+        headingDeg: fallbackHeadingFromId(cameraId),
+        headingConfidence: 'low',
+        // The low-confidence pose personality shared by the other packs.
+        pitchDeg: -18,
+        fovDeg: 44,
+        rangeM: 145,
+        mountHeightM: 8,
+        feedType: 'image',
+        url: imageUrl,
+        snapshotUrl: imageUrl,
+        sourceKind: 'kingcounty-open-data',
+        license: 'King County GIS open data (KCGIS Center terms of use)',
+        credit: owner && owner !== 'King County' ? owner : '',
+      };
+      if (model) camera.model = model;
+      if (model && manufacturer) camera.manufacturer = manufacturer;
+      cameras.push(camera);
+    }
+
+    const maxRaw = Number(
+      process.env.CCTV_KINGCOUNTY_MAX_SOURCES ||
+        DEFAULT_KING_COUNTY_MAX_SOURCES,
+    );
+    const maxCount = Number.isFinite(maxRaw)
+      ? Math.max(8, Math.min(1200, Math.floor(maxRaw)))
+      : DEFAULT_KING_COUNTY_MAX_SOURCES;
+    const prioritized = prioritizeSources(
+      cameras,
+      maxCount,
+      KING_COUNTY_ANCHORS,
+    );
+    console.log(
+      `[CCTV] Loaded King County camera sources: ${cameras.length} published (using nearest ${prioritized.length})`,
+    );
+    return prioritized;
+  } catch (error) {
+    console.warn(
+      '[CCTV] King County camera download error:',
+      error?.message || error,
+    );
+    return [];
+  }
+}
+
 /** WSDOT `CompassDirection` codes as headings in degrees. The live feed sends
  * single cardinals (N/E/S/W), `B` (both directions — most rows), `O`, and
  * null; the diagonals are mapped in case they appear. `B`, `O`, null, and any
@@ -2175,6 +2347,175 @@ export async function loadNycSourcesFromOpenData() {
     return prioritized;
   } catch (error) {
     console.warn('[CCTV] NYC camera download error:', error?.message || error);
+    return [];
+  }
+}
+
+/**
+ * The JSONP envelope the City of Toronto wraps its camera list in. Anchored at
+ * both ends, so only that exact callback is unwrapped — a payload that merely
+ * contains the name somewhere is not treated as the list.
+ */
+const RESCU_JSONP = /^jsonTMCEarthCamerasCallback\(([\s\S]*)\)\s*;?$/;
+
+/**
+ * Unwrap the RESCU camera list. The portal serves the list as JSONP; should it
+ * ever drop the wrapper, the bare JSON document still parses. Anything else —
+ * a foreign callback, a truncated body, an error page — yields no cameras
+ * rather than a thrown loader.
+ *
+ * @param {string} text - Raw response body.
+ * @returns {Array<object>} The `Data` rows, or [] when the body is unusable.
+ */
+export function parseRescuCameraList(text) {
+  const body = String(text ?? '').trim();
+  if (!body) return [];
+  const unwrapped = RESCU_JSONP.exec(body)?.[1] ?? body;
+  try {
+    const parsed = JSON.parse(unwrapped);
+    const rows = parsed?.Data ?? parsed?.data;
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Convert one RESCU list row into a camera source.
+ *
+ * The row carries no URL: the frame URL is built from the documented
+ * `loc####.jpg` convention and a camera number validated as plain digits, so
+ * the frame proxy is pinned to the city origin by construction and no upstream
+ * field — present or planted — can steer it.
+ *
+ * No compass heading exists in this dataset. `D1`-`D4` are the directions of
+ * the *comparison* images (static reference stills captured in 2016, served
+ * from a different path); the live frame is one pan-tilt-zoom camera pointing
+ * wherever the operator left it. Treating those letters as a facing would put
+ * a confident, wrong bearing on every camera in the city, so every row takes
+ * the id-hash fallback and the low-confidence pose, as headingless Austin,
+ * TfL, Fintraffic and Calgary cameras do.
+ *
+ * @param {object} row - One entry from the RESCU `Data` array.
+ * @returns {object|null} Normalized camera source, or null when unusable.
+ */
+export function torontoCameraToSource(row) {
+  if (!row || typeof row !== 'object') return null;
+  const number = String(row.Number ?? row.number ?? '').trim();
+  // Plain digits only: a number is about to become a URL path segment.
+  if (!/^\d{1,6}$/.test(number)) return null;
+
+  const lat = toFiniteNumber(row.Latitude ?? row.latitude);
+  const lon = toFiniteNumber(row.Longitude ?? row.longitude);
+  if (!isLikelyTorontoCoordinate(lat, lon)) return null;
+
+  const cameraId = `toronto-${number}`;
+  // The feed's own label, verbatim. It is upper-case ("MCCOWAN RD", "ST
+  // HELEN'S AVE"); title-casing it would mangle more names than it fixed.
+  const name =
+    String(row.Name ?? row.name ?? '')
+      .replace(/\s+/g, ' ')
+      .trim() || `Toronto Camera ${number}`;
+
+  return {
+    id: cameraId,
+    name,
+    city: 'Toronto',
+    cityId: 'toronto',
+    provider: 'City of Toronto',
+    lat,
+    lon,
+    headingDeg: fallbackHeadingFromId(cameraId),
+    headingConfidence: 'low',
+    pitchDeg: -18,
+    fovDeg: 44,
+    rangeM: 145,
+    mountHeightM: 8,
+    groundElevationM: TORONTO_GROUND_ELEVATION_M,
+    feedType: 'image',
+    url: `${TORONTO_RESCU_IMAGE_ORIGIN}loc${number}.jpg`,
+    snapshotUrl: `${TORONTO_RESCU_IMAGE_ORIGIN}loc${number}.jpg`,
+    sourceKind: 'toronto-rescu-open-data',
+    license:
+      'Contains information licensed under the Open Government Licence – Toronto',
+    // Unselected-label code: the intersection, so a camera at rest reads as a
+    // place rather than as its id.
+    code: cameraDisplayCode(name.toUpperCase()),
+  };
+}
+
+/**
+ * Fetch City of Toronto RESCU traffic cameras from the City's open data
+ * portal, keyless. One JSONP list for the whole city; frames are stills on the
+ * same portal origin.
+ *
+ * The list fetch refuses redirects (`redirect: 'manual'`) so the list host
+ * cannot be steered, and caps the body it will buffer.
+ *
+ * Attribution: Open Government Licence – Toronto, registered in
+ * src/data/dataCredits.js.
+ *
+ * @returns {Promise<Array<object>>} Normalized camera source objects.
+ */
+export async function loadTorontoSourcesFromOpenData() {
+  try {
+    const endpoint =
+      process.env.CCTV_TORONTO_LIST_URL || TORONTO_RESCU_LIST_URL;
+    const resp = await fetch(endpoint, {
+      headers: { Accept: 'application/json, text/javascript' },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
+    });
+    // A response this loader will not read still owns its transport until the
+    // body is released, so every rejection path cancels before returning.
+    const discard = async () => {
+      try {
+        await resp.body?.cancel();
+      } catch {
+        /* no-op */
+      }
+      return [];
+    };
+    if (resp.status >= 300 && resp.status < 400) {
+      console.warn(
+        '[CCTV] Toronto camera list redirected; redirects are not followed',
+      );
+      return discard();
+    }
+    if (!resp.ok) {
+      console.warn('[CCTV] Toronto camera download failed:', resp.status);
+      return discard();
+    }
+    const text = await readResponseTextCapped(resp, TORONTO_MAX_CATALOG_BYTES);
+    const rows = parseRescuCameraList(text);
+    if (!rows.length) return [];
+
+    const cameras = [];
+    const seen = new Set();
+    for (const record of rows) {
+      const camera = torontoCameraToSource(record);
+      if (!camera || seen.has(camera.id)) continue;
+      seen.add(camera.id);
+      cameras.push(camera);
+    }
+    const maxRaw = Number(
+      process.env.CCTV_TORONTO_MAX_SOURCES || DEFAULT_TORONTO_MAX_SOURCES,
+    );
+    const maxCount = Number.isFinite(maxRaw)
+      ? Math.max(8, Math.min(500, Math.floor(maxRaw)))
+      : DEFAULT_TORONTO_MAX_SOURCES;
+    const prioritized = prioritizeSources(cameras, maxCount, [
+      TORONTO_DOWNTOWN,
+    ]);
+    console.log(
+      `[CCTV] Loaded Toronto camera sources: ${cameras.length} (using nearest ${prioritized.length})`,
+    );
+    return prioritized;
+  } catch (error) {
+    console.warn(
+      '[CCTV] Toronto camera download error:',
+      error?.message || error,
+    );
     return [];
   }
 }
