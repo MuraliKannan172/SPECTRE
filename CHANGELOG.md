@@ -32,6 +32,7 @@
 - Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
 
 - Director timeline seeks cross the dateline along the short longitude arc.
+
 - Map state updates stop delivering to subscribers removed during the same notification.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
