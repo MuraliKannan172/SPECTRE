@@ -38,7 +38,7 @@
 
 - Recent Imagery continues past malformed records in full catalog pages, respects the requested record limit, and reports results as truncated when that limit drops valid records.
 
-- Reject impossible FIRMS acquisition calendar days in the CSV parser before trailing-24-hour filtering.
+- Regional articles retain unknown publication times when compact source dates do not identify a real calendar instant.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
