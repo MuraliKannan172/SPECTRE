@@ -75,6 +75,7 @@
     "SE",
     "SECTOR {lat} {lon}",
     "SIG",
+    "SQUAWK {code} · {status}",
     "SRC {value}",
     "SSE",
     "STD",

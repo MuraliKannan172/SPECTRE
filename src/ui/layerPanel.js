@@ -44,6 +44,7 @@ const LAYER_NAME_KEYS = Object.freeze({
   transit: msg('Transit'),
   'recent-imagery': msg('Recent Imagery'),
   'fire-perimeters': msg('Fire Perimeters'),
+  'gnss-integrity': msg('GNSS Integrity'),
   wind: msg('Wind'),
   'weather-radar': msg('Rain radar'),
   'weather-satellite': msg('Satellite clouds'),
@@ -96,7 +97,13 @@ const PANEL_GROUPS = [
   },
   {
     label: msg('Events'),
-    ids: ['rocket-launches', 'earthquakes', 'local-firms', 'fire-perimeters'],
+    ids: [
+      'rocket-launches',
+      'earthquakes',
+      'local-firms',
+      'fire-perimeters',
+      'gnss-integrity',
+    ],
   },
   {
     label: msg('Weather'),

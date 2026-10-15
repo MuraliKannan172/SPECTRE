@@ -83,6 +83,42 @@ export function cockpitAltitudeDisplayFt(altitudeM, onGround) {
   return Number.isFinite(altitudeM) ? altitudeM * 3.28084 : null;
 }
 
+/** The English emergency line; see formatCockpitEmergency. */
+const ENGLISH_EMERGENCY = Object.freeze({
+  squawk: ({ squawk, label }) => `SQUAWK ${squawk} · ${label}`,
+  adsb: ({ priority, label }) =>
+    `ADS-B ${priority ? 'PRIORITY' : 'EMERGENCY'} · ${label}`,
+});
+
+/**
+ * HUD wording for a tracked aircraft's transponder emergency, or null.
+ * States what was broadcast, never a conclusion about the flight: the Mode A
+ * code when it names the status, else the ADS-B field it came from (an
+ * unrelated squawk is dropped).
+ * The cockpit passes its own formatter so the page shows it in the active
+ * language; this module stays i18n-free.
+ * @param {{label?: string, squawk?: string|null,
+ *   source?: string, severity?: string}|null|undefined} emergency
+ * @param {{squawk: Function, adsb: Function}} [format] Builds the line from
+ *   `{ name, label, squawk }` and `{ name, label, priority }`, where
+ *   `label` is the upper-cased `name`.
+ * @returns {string|null}
+ */
+export function formatCockpitEmergency(emergency, format = ENGLISH_EMERGENCY) {
+  const label = String(emergency?.label || '')
+    .trim()
+    .toUpperCase();
+  if (!label) return null;
+  const name = String(emergency.label).trim();
+  if (emergency.source === 'squawk' && emergency.squawk)
+    return format.squawk({ name, label, squawk: emergency.squawk });
+  return format.adsb({
+    name,
+    label,
+    priority: emergency.severity === 'priority',
+  });
+}
+
 /**
  * The English Context scope line. The cockpit passes its own formatter so the
  * page shows it in the active language; this module stays i18n-free.

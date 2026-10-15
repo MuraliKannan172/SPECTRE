@@ -437,7 +437,9 @@ export function createKartaViewViewer({
     root.setAttribute('role', 'group');
     root.setAttribute(
       'aria-label',
-      t('KartaView photo. ← and → step along the sequence. On a 360° photo, drag or use Shift+← →, ↑ ↓ to look around, and + − to zoom'),
+      t(
+        'KartaView photo. ← and → step along the sequence. On a 360° photo, drag or use Shift+← →, ↑ ↓ to look around, and + − to zoom',
+      ),
     );
     picture = doc.createElement('img');
     picture.className = 'sl-kv-photo';

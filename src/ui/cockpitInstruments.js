@@ -13,6 +13,7 @@ import {
   compassDivisions,
   formatAltitudeRulerTick,
   formatCompassDivision,
+  formatCockpitEmergency,
   formatSpeedRulerTick,
   normalizeHeading,
   relativeBearing,
@@ -24,6 +25,22 @@ import {
   formatCockpitCoordinate,
   setCockpitRollingValue,
 } from './cockpitPresentation.js';
+
+/** A transponder status name (src/data/aircraftEmergency.js) for the HUD. */
+const emergencyLabel = ({ name }) => t(name).toUpperCase();
+
+/** The emergency line in the active language (see cockpitMath.js). */
+const LOCALIZED_EMERGENCY = Object.freeze({
+  squawk: (parts) =>
+    t('SQUAWK {code} · {status}', {
+      code: parts.squawk,
+      status: emergencyLabel(parts),
+    }),
+  adsb: (parts) =>
+    parts.priority
+      ? t('ADS-B PRIORITY · {status}', { status: emergencyLabel(parts) })
+      : t('ADS-B EMERGENCY · {status}', { status: emergencyLabel(parts) }),
+});
 
 export function updateHud(
   info,
@@ -138,13 +155,25 @@ export function updateHud(
         : info.stale
           ? t('STALE FEED')
           : t('LIVE TRACK');
-    this.aircraftMeta.textContent = t(
-      '{aircraftClass} · {feedState} · COURSE ALIGNED',
-      {
-        aircraftClass:
-          info.layerId === 'military' ? t('MILITARY') : t('COMMERCIAL'),
-        feedState,
-      },
+    const aircraftClass =
+      info.layerId === 'military' ? t('MILITARY') : t('COMMERCIAL');
+    const emergency = formatCockpitEmergency(
+      info.emergency,
+      LOCALIZED_EMERGENCY,
+    );
+    this.aircraftMeta.textContent = emergency
+      ? t('{aircraftClass} · {emergency} · {feedState}', {
+          aircraftClass,
+          emergency,
+          feedState,
+        })
+      : t('{aircraftClass} · {feedState} · COURSE ALIGNED', {
+          aircraftClass,
+          feedState,
+        });
+    this.aircraftMeta.classList.toggle(
+      'emergency',
+      info.emergency?.severity === 'emergency',
     );
   }
   this.updateRoute(info);
