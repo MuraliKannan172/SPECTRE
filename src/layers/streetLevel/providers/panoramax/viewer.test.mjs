@@ -140,12 +140,14 @@ test('a 360° picture shows its SD equirectangular image, then HD shrunk to 4,09
   assert.equal(canvas.hidden, false);
   assert.equal(picture.hidden, true);
   assert.equal(viewer.supportsRenderModes(), false, 'no frame to fit');
-  assert.deepEqual(loads[0], {
+  const { signal, ...first } = loads[0];
+  assert.deepEqual(first, {
     url: PHOTOS.pano.urls.sd,
     crossOrigin: true,
-    resize: null,
+    resize: [2048, 1024],
     failure: 'The Panoramax photo could not be loaded',
   });
+  assert.equal(signal.aborted, false, 'the open can stop it');
   assert.equal(poses.at(-1).isPano, true);
   assert.equal(poses.at(-1).bearing, 100);
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -258,7 +260,7 @@ test('without WebGL a 360° picture shows its whole equirectangular image flat',
   assert.equal(picture.src, PHOTOS.pano.urls.sd);
 });
 
-test('a picture whose SD fails falls back to HD, then the thumbnail', async () => {
+test('a picture whose SD fails falls back to the thumbnail; the original only for the expanded viewer', async () => {
   const tried = [];
   const viewer = createPanoramaxViewer({
     getPhoto: async () => PHOTOS.flat,
@@ -273,12 +275,18 @@ test('a picture whose SD fails falls back to HD, then the thumbnail', async () =
   const host = fakeHost();
   await viewer.mount(host);
   await viewer.open('flat');
+  assert.deepEqual(tried, [PHOTOS.flat.urls.sd, PHOTOS.flat.urls.thumb]);
+  assert.equal(parts(host).picture.src, PHOTOS.flat.urls.thumb);
+  // Expanded, the original is worth its megabytes.
+  tried.length = 0;
+  parts(host).root.closest = (selector) =>
+    selector.includes('sl-viewer-wrap-expanded') ? {} : null;
+  await viewer.open('flat');
   assert.deepEqual(tried, [
     PHOTOS.flat.urls.sd,
     PHOTOS.flat.urls.hd,
     PHOTOS.flat.urls.thumb,
   ]);
-  assert.equal(parts(host).picture.src, PHOTOS.flat.urls.thumb);
 });
 
 test('a photo with no author to name is captioned with the instance holding it', () => {

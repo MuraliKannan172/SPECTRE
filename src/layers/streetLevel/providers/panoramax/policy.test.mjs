@@ -224,6 +224,23 @@ test('hostile item data: a malformed link escape, null coordinates, a huge produ
     'Carto@Cité',
     'an @ without a domain is a name',
   );
+  // The address need not follow the first '@'.
+  assert.equal(named('@team someone@example.org'), null);
+  assert.equal(named('Carto@Cité (mapper@example.org)'), null);
+  assert.equal(named(`${'@'.repeat(100_000)}x`), `${'@'.repeat(80)}`);
+});
+
+test('thousands of producers are credited in linear time', () => {
+  const item = stacItem({ id: 'a', lon: 1, lat: 2 });
+  item.providers = Array.from({ length: 50_000 }, (_, i) => ({
+    name: `producer-${i}`,
+    roles: ['producer'],
+  }));
+  const started = performance.now();
+  const { creator } = normalizeItem(item);
+  assert.ok(performance.now() - started < 1000);
+  assert.ok(creator.startsWith('tester, producer-0, producer-1'));
+  assert.ok(creator.length <= 120);
 });
 
 test('the instance holding a picture is named (its via host), never as its author', () => {

@@ -3403,7 +3403,13 @@ provider is on (16, ten minutes, `tileCache.js`, shared with KartaView),
 and above
 60 km the `grid` layer's 0.1°
 density cells, binned to at most 96×96 points a tile (a z0 tile holds
-~70,000 cells) and not counted as sequences: the panel says to zoom in. Both
+~70,000 cells) and not counted as sequences: the panel says to zoom in.
+A tile decodes in slices of about 8 ms, the page getting a turn between
+them (a 2 MB z10 tile is ~200 ms of work). A busy API (429/503) holds the
+tiles back for its Retry-After, which the browser cannot read here (the API
+exposes no headers), so the wait doubles from 5 s to 5 minutes until it
+answers; an answer may take as long as it keeps arriving (silent for 15 s
+is given up), so a slow link still gets its megabyte tiles. Both
 filters apply: lines carry their day and camera type, and a cell stays while
 it holds pictures of the kind asked for (cells are undated). A click on a
 line asks the core (`actions.openNearest`) for that sequence's picture
@@ -3412,8 +3418,8 @@ a click lands well off a line), without framing, then any sequence's within
 50 m. Each lookup is two searches side by side, ranked by distance in the
 browser: `place_position` (nearest first, but even at
 `place_fov_tolerance=180` it leaves out pictures looking away from the
-point) and a bounding box (those too, but in no order); the filters go to
-both (`filter=field_of_view=360`, `datetime=<since>/..`). A line is dated
+point) and a bounding box (those too, roughly nearest first, so 20 are
+asked for: ~60 kB, against ~600 kB for 100); the filters go to both (`filter=field_of_view=360`, `datetime=<since>/..`). A line is dated
 by its sequence's first day, so a sequence still growing can hide under
 SINCE; a line with no camera type or day stays drawn. Lines keep the
 decoded longest-first order under the per-tile cap (`keepOrder`). Once the picture is on screen
@@ -3421,20 +3427,31 @@ its sequence is highlighted and drawn as cones from the z15 tiles around it
 (their `pictures` layer, ~110 bytes a picture, against ~7.5 kB for a STAC
 item), plus the neighbours within 150 m of an edge, on their own connection
 (coverage tiles take three, searches two); each tile's list for the sequence
-is kept, and the cones re-centre when a picture opens outside the tiles
-they were drawn from, judged from the moment their load starts. ‹ › follow the picture's own `prev`/`next`
+is kept. The open picture's own tile draws at once and the neighbours join
+as they arrive; one that fails is not counted, so a picture opening in it
+re-centres the cones there. The cones re-centre when a picture opens outside the tiles
+they were drawn from, judged from the moment their load starts, and centre
+only on a picture actually shown (never on a lookup that came back after
+the user moved on); a lookup nobody waits for any more is stopped. ‹ › follow the picture's own `prev`/`next`
 links, so stepping costs one small search per picture. The viewer shows the
-2,048 px SD derivative (equirectangular for a 360° picture) and swaps in the
-HD original only when the viewer is wider than SD (flat) or, for a
-panorama, expanded; once, shrunk while it decodes, and aborted if another
-photo opens; originals wider than 8,192 px are never fetched, and any
-picture file over 48 MB or 16,384 px is refused. The caption names every
+2,048 px SD derivative (equirectangular for a 360° picture, decoded at
+2,048 × 1,024) and swaps in the HD original only when the viewer is wider
+than SD (flat) or, for a panorama, expanded; once, shrunk while it decodes.
+When SD fails a flat picture falls back to the thumbnail, and to the
+original only in the expanded viewer. Every download of a photo, first or
+sharper, stops when another opens or the viewer closes. Originals wider than
+8,192 px are never fetched; a file's header (JPEG, PNG, WebP, GIF) is read
+before it decodes, and one declaring more than 64 MP or 16,384 px a side
+is refused undecoded, as is an `<img>` that decodes larger and any file
+over 48 MB. The caption names every
 producer (an uploading app and its photographer; never an account named by
 an email address), or else the instance holding the picture ("via
 panoramax.ign.fr"), and the picture's licence (CC BY-SA 4.0, Licence
 Ouverte 2.0…; StreetPose `license`), and links to the picture in the
 Panoramax viewer. Esc anywhere in the docked viewer clears the selected
-sequence before the panel can take it (KartaView too). The MCP globe panel allows the meta-catalogue and the
+sequence before the panel can take it (KartaView too). After a GPU reset
+the viewer draws the same picture again itself (`onReopen`), leaving the
+core's lookups alone. The MCP globe panel allows the meta-catalogue and the
 three biggest instances; a picture on another instance shows only in the
 app.
 

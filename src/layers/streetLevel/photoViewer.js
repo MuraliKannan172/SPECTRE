@@ -3,6 +3,7 @@ import {
   PANO_FOV_DEFAULT_DEG,
   wrapDegrees,
 } from './panorama.js';
+import { imageSize } from './imageSize.js';
 
 /** A photo download (tens of kilobytes to a few megabytes). */
 export const IMAGE_TIMEOUT_MS = 15_000;
@@ -10,6 +11,19 @@ export const IMAGE_TIMEOUT_MS = 15_000;
 /** A picture file or decoded side past these is refused (a photo is a few MB). */
 export const MAX_IMAGE_BYTES = 48 * 1024 * 1024;
 export const MAX_IMAGE_SIDE = 16_384;
+/** 64 MP: 256 MB once decoded to RGBA. A 16,384 px square is four times that. */
+export const MAX_IMAGE_PIXELS = 8_192 * 8_192;
+/** Where in a file to look for its dimensions (a JPEG's EXIF comes first). */
+const HEADER_BYTES = 256 * 1024;
+
+/** Whether a picture this size is past what the viewer decodes. */
+export function tooManyPixels(width, height) {
+  return (
+    width > MAX_IMAGE_SIDE ||
+    height > MAX_IMAGE_SIDE ||
+    width * height > MAX_IMAGE_PIXELS
+  );
+}
 
 /** Panorama texture widths: enough for a docked viewer, and for an expanded one. */
 export const PANO_MID_SIZE = Object.freeze([2048, 1024]);
@@ -43,19 +57,36 @@ export function loadImage(
     return loadBitmap(url, timeoutMs, resize, failure, signal);
   return new Promise((resolve, reject) => {
     if (!url) return reject(new Error(failure));
+    if (signal?.aborted) return reject(new Error(failure));
     const image = new Image();
     if (crossOrigin) image.crossOrigin = 'anonymous';
     image.decoding = 'async';
-    const timer = setTimeout(() => {
+    // Stop the download: another photo opened, or the time ran out.
+    const stop = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener?.('abort', stop);
+      image.onload = image.onerror = null;
       image.src = '';
       reject(new Error(failure));
-    }, timeoutMs);
-    image.onload = () => {
+    };
+    const timer = setTimeout(stop, timeoutMs);
+    signal?.addEventListener?.('abort', stop, { once: true });
+    const settle = () => {
       clearTimeout(timer);
+      signal?.removeEventListener?.('abort', stop);
+    };
+    image.onload = () => {
+      settle();
+      // An <img> reads no header first: refuse what it decoded too large.
+      if (tooManyPixels(image.naturalWidth || 0, image.naturalHeight || 0)) {
+        image.src = '';
+        reject(oversized(failure));
+        return;
+      }
       resolve(image);
     };
     image.onerror = () => {
-      clearTimeout(timer);
+      settle();
       reject(new Error(failure));
     };
     image.src = url;
@@ -80,6 +111,12 @@ async function loadBitmap(url, timeoutMs, resize, failure, signal) {
     const length = Number(response.headers?.get?.('content-length'));
     if (length > MAX_IMAGE_BYTES) throw oversized(failure);
     const blob = await boundedBlob(response, failure);
+    // Its declared size, before anything decodes it.
+    const size = imageSize(
+      new Uint8Array(await blob.slice(0, HEADER_BYTES).arrayBuffer()),
+    );
+    if (size && tooManyPixels(size.width, size.height))
+      throw oversized(failure);
     const bitmap = await (resize
       ? createImageBitmap(blob, {
           resizeWidth: resize[0],
@@ -88,7 +125,7 @@ async function loadBitmap(url, timeoutMs, resize, failure, signal) {
         })
       : createImageBitmap(blob));
     // (A resized decode reports its new size: this guards unresized ones.)
-    if (bitmap.width > MAX_IMAGE_SIDE || bitmap.height > MAX_IMAGE_SIDE) {
+    if (tooManyPixels(bitmap.width, bitmap.height)) {
       bitmap.close?.();
       throw oversized(failure);
     }
@@ -152,7 +189,7 @@ export function panoSizeFor(canvasPixels, fovDeg) {
  *   The panorama shown first, its texture width (0 when it is only a preview), and a size to shrink it to.
  * @property {(photo: object, size: [number, number], view: {expanded: boolean}) => {url: string, resize?: [number, number]|null, timeoutMs?: number}|null} panoSharp
  *   A sharper panorama for a canvas that needs `size`, or null; `expanded` while the viewer is.
- * @property {(photo: object) => Array<string>} flatFirst   Flat versions to try in turn.
+ * @property {(photo: object, view: {expanded: boolean}) => Array<string>} flatFirst   Flat versions to try in turn (`expanded` while the viewer is).
  * @property {(photo: object, pixels: number) => string|null} flatSharp
  *   A sharper flat version for a picture this many device pixels wide, or null.
  * @property {(photo: object) => {title?: string|null, creator?: string|null, license?: string|null, externalUrl: string, capturedAtPrecision?: 'day'|'month'}} describe
@@ -176,6 +213,7 @@ export function panoSizeFor(canvasPixels, fovDeg) {
  * @param {(photo: object, delta: -1|1) => Promise<string|null>} options.step   The photo `delta` along the sequence, or null at its end.
  * @param {(imageId: string) => void} options.onStep   Open the photo ‹ › chose (through the core, so loading and errors show).
  * @param {(photo: object) => void} [options.onShown]   A photo is on screen.
+ * @param {(photo: object) => void} [options.onShowing]   The photo this open shows, just before its pose.
  * @param {(imageId: string) => void} [options.onReopen]   Draw the same photo again after a GPU reset (default: `onStep`).
  * @param {() => boolean} [options.onEscape]   Esc in the docked viewer: true when it was used (e.g. a selection cleared).
  * @param {object} [options.render]   Render governor.
@@ -191,6 +229,7 @@ export function createPhotoViewer({
   step,
   onStep,
   onShown = () => {},
+  onShowing = () => {},
   onReopen = onStep,
   onEscape = () => false,
   render,
@@ -227,8 +266,10 @@ export function createPhotoViewer({
   let panoComing = null;
   /** A resize came while it loaded: look again once it lands. */
   let lookAgain = false;
-  /** The sharper flat version on screen or on its way (one download each). */
-  let flatSharpUrl = null;
+  /** The sharper flat version on screen, and the one on its way. */
+  let flatSharp = { shown: null, loading: null };
+  /** The open in progress: another open, a close or an unmount stops its downloads. */
+  let openAbort = null;
   /** The photo an open is fetching: ‹ › step on from it, not the old one. */
   let openingId = null;
   /** ‹ › chose this photo: keep the panorama's look direction for it. */
@@ -626,6 +667,9 @@ export function createPhotoViewer({
   async function upgrade(target, seq, kind) {
     // A 360° photo shown flat (no WebGL) keeps its front view.
     if (kind === 'flat' && target.isPano) return;
+    // Another photo is opening: the one still shown is not worth more bytes.
+    if (openingId !== null && openingId !== target.id) return;
+    const signal = openAbort?.signal;
     if (kind === 'pano') {
       const size = panoSizeNow();
       if (size[0] <= panoWidth) return;
@@ -636,7 +680,7 @@ export function createPhotoViewer({
         return;
       }
       const sharp = sources.panoSharp(target, size, {
-        expanded: Boolean(root?.closest?.('.sl-viewer-wrap-expanded')),
+        expanded: isExpanded(),
       });
       if (!sharp?.url) return;
       const coming = { seq, width: size[0], controller: new AbortController() };
@@ -674,17 +718,26 @@ export function createPhotoViewer({
       return;
     }
     const url = sources.flatSharp(target, viewerPixels());
-    if (!url || url === flatSharpUrl) return;
-    flatSharpUrl = url;
+    if (!url || url === flatSharp.shown || url === flatSharp.loading) return;
+    const sharp = flatSharp;
+    sharp.loading = url;
     try {
-      const image = await loadAs(url, { crossOrigin: false });
+      const image = await loadAs(url, { crossOrigin: false, signal });
       if (seq !== openSeq || photo !== target || showing !== 'flat') return;
       picture.src = image.src;
+      sharp.shown = url;
       requestRender();
     } catch {
-      // The first version stays; a later resize may try again.
-      if (flatSharpUrl === url && photo === target) flatSharpUrl = null;
+      /* the first version stays; a later resize may try again */
+    } finally {
+      // Discarded or failed: nothing is on its way, so it may be asked again.
+      if (sharp.loading === url) sharp.loading = null;
     }
+  }
+
+  /** The viewer is the expanded dialog, not docked in the panel. */
+  function isExpanded() {
+    return Boolean(root?.closest?.('.sl-viewer-wrap-expanded'));
   }
 
   /** Another photo, or none: a sharper panorama still on its way is not needed. */
@@ -701,14 +754,16 @@ export function createPhotoViewer({
     return panoSizeFor(width, renderer?.getView().fov ?? PANO_FOV_DEFAULT_DEG);
   }
 
-  async function showPano(target, seq, keepView) {
+  async function showPano(target, seq, keepView, signal) {
     // If the panorama fails, the caller shows the front view rather than
     // waiting on it twice.
     const first = sources.panoFirst(target);
     if (!first?.url) throw new Error(LOAD_FAILED);
     const image = await loadAs(first.url, {
       crossOrigin: true,
-      resize: first.resize ?? null,
+      signal,
+      // Never decoded at more than the texture it becomes.
+      resize: first.resize ?? PANO_MID_SIZE,
     });
     if (seq !== openSeq) {
       image.close?.();
@@ -730,17 +785,20 @@ export function createPhotoViewer({
     show('pano');
     renderer.setImage(image);
     panoWidth = first.width || 0;
-    panoComing = null;
+    // A sharper version of the photo before was dropped by `open`; one of
+    // this photo, asked by a resize meanwhile, is still worth having.
     return true;
   }
 
-  async function showFlat(target, seq) {
-    const urls = sources.flatFirst(target).filter(Boolean);
+  async function showFlat(target, seq, signal) {
+    const urls = sources
+      .flatFirst(target, { expanded: isExpanded() })
+      .filter(Boolean);
     let image;
     let failure = null;
     for (const url of urls) {
       try {
-        image = await loadAs(url, { crossOrigin: false });
+        image = await loadAs(url, { crossOrigin: false, signal });
         break;
       } catch (error) {
         failure = error;
@@ -750,26 +808,27 @@ export function createPhotoViewer({
     if (!image) throw failure || new Error(LOAD_FAILED);
     if (seq !== openSeq) return false;
     picture.src = image.src;
-    flatSharpUrl = null;
+    flatSharp = { shown: null, loading: null };
     photo = target;
     show('flat');
     return true;
   }
 
-  async function openPhoto(id, seq, keepView) {
-    const target = await getPhoto(id);
+  async function openPhoto(id, seq, keepView, signal) {
+    const target = await getPhoto(id, { signal });
     if (seq !== openSeq) return;
     let shown = false;
     if (sources.hasPano(target) && ensureRenderer()) {
       try {
-        shown = await showPano(target, seq, keepView);
+        shown = await showPano(target, seq, keepView, signal);
       } catch {
         // The panorama failed: its front view is better than nothing.
         if (seq !== openSeq) return;
-        shown = await showFlat(target, seq);
+        shown = await showFlat(target, seq, signal);
       }
-    } else shown = await showFlat(target, seq);
+    } else shown = await showFlat(target, seq, signal);
     if (!shown) return;
+    onShowing(target);
     emit();
     onShown(target);
     upgrade(target, seq, showing);
@@ -790,11 +849,18 @@ export function createPhotoViewer({
       const id = String(imageId);
       const seq = ++openSeq;
       dropSharpPanorama();
+      // The previous open's downloads stop: only this photo is wanted now.
+      openAbort?.abort();
+      const opening = (openAbort = new AbortController());
       const keepView = keepViewFor === id;
       keepViewFor = null;
       openingId = id;
       try {
-        await openPhoto(id, seq, keepView);
+        await openPhoto(id, seq, keepView, opening.signal);
+      } catch (error) {
+        // A later open, or a close, stopped this one: that is not a failure.
+        if (seq !== openSeq) return;
+        throw error;
       } finally {
         if (openingId === id && seq === openSeq) openingId = null;
       }
@@ -803,10 +869,12 @@ export function createPhotoViewer({
     close() {
       openSeq++;
       dropSharpPanorama();
+      openAbort?.abort();
+      openAbort = null;
       openingId = null;
       keepViewFor = null;
       photo = null;
-      flatSharpUrl = null;
+      flatSharp = { shown: null, loading: null };
       show(null);
       if (picture) picture.removeAttribute('src');
       renderer?.clear?.();
@@ -815,10 +883,12 @@ export function createPhotoViewer({
     unmount() {
       openSeq++;
       dropSharpPanorama();
+      openAbort?.abort();
+      openAbort = null;
       refused.clear();
       openingId = null;
       keepViewFor = null;
-      flatSharpUrl = null;
+      flatSharp = { shown: null, loading: null };
       teardown();
     },
 

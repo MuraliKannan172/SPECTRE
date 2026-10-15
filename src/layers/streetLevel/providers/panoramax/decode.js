@@ -2,6 +2,7 @@ import { PbfReader } from 'pbf';
 import { VectorTile } from '@mapbox/vector-tile';
 import { tileLocalToLonLat } from '../../tileMath.js';
 import {
+  DECODE_SLICE_MS,
   OVERVIEW_BINS_PER_AXIS,
   SIMPLIFY_TOLERANCE_UNITS,
   panoramaxTimeMs,
@@ -66,11 +67,62 @@ function dayMs(value) {
  *   most OVERVIEW_BINS_PER_AXIS² a tile (a z0 tile holds ~70,000 cells). A
  *   cell has 360° and flat counts but no date.
  * - `pictures` (z15) is left for `decodePictures`.
+ *
+ * In one go; `decodeCoverageTileSliced` gives the page a turn between
+ * slices.
  * @param {Uint8Array} bytes
  * @param {{x: number, y: number, z: number}} address
  * @returns {{sequences: Array<{id: string, parts: Array<Array<[number, number]>>, capturedAt: number, isPano: boolean}>, overview: Array<{id: string, lon: number, lat: number, capturedAt: null, isPano: boolean, hasPano: boolean, hasFlat: boolean, weight: number}>}}
  */
 export function decodeCoverageTile(bytes, address) {
+  const steps = coverageSteps(bytes, address);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return step.value;
+}
+
+/** Give the page a turn: input and rendering run before the next slice. */
+function nextTask() {
+  if (typeof globalThis.scheduler?.yield === 'function')
+    return globalThis.scheduler.yield();
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * `decodeCoverageTile` in slices of about `sliceMs`, the page getting a
+ * turn between them: a 2 MB z10 tile over Paris is ~200 ms of decoding on
+ * a fast laptop, more on a phone, and would freeze the globe while the
+ * camera approaches. Stops at the next slice once `signal` aborts.
+ * @param {Uint8Array} bytes
+ * @param {{x: number, y: number, z: number}} address
+ * @param {{signal?: AbortSignal, sliceMs?: number, pause?: () => Promise<void>, now?: () => number}} [options]
+ */
+export async function decodeCoverageTileSliced(
+  bytes,
+  address,
+  {
+    signal,
+    sliceMs = DECODE_SLICE_MS,
+    pause = nextTask,
+    now = () => performance.now(),
+  } = {},
+) {
+  const steps = coverageSteps(bytes, address);
+  let started = now();
+  let step = steps.next();
+  while (!step.done) {
+    if (now() - started >= sliceMs) {
+      await pause();
+      signal?.throwIfAborted();
+      started = now();
+    }
+    step = steps.next();
+  }
+  return step.value;
+}
+
+/** The decode, a step a feature (see `decodeCoverageTile`). */
+function* coverageSteps(bytes, address) {
   const result = { sequences: [], overview: [] };
   if (!bytes || !bytes.length) return result;
   const tile = new VectorTile(new PbfReader(bytes));
@@ -78,7 +130,7 @@ export function decodeCoverageTile(bytes, address) {
 
   const sequences = tile.layers.sequences;
   if (sequences) {
-    const lengths = new Map();
+    const measured = [];
     for (let i = 0; i < sequences.length; i++) {
       const feature = sequences.feature(i);
       const props = feature.properties || {};
@@ -113,10 +165,13 @@ export function decodeCoverageTile(bytes, address) {
               ? false
               : null,
       };
-      lengths.set(sequence, length);
-      result.sequences.push(sequence);
+      measured.push({ sequence, length });
+      yield;
     }
-    result.sequences.sort((a, b) => lengths.get(b) - lengths.get(a));
+    // A turn before the sort: over a city it is thousands of lines.
+    yield;
+    measured.sort((a, b) => b.length - a.length);
+    result.sequences = measured.map(({ sequence }) => sequence);
   }
 
   const grid = tile.layers.grid;
@@ -127,6 +182,7 @@ export function decodeCoverageTile(bytes, address) {
       const feature = grid.feature(i);
       const props = feature.properties || {};
       const point = feature.loadGeometry()?.[0]?.[0];
+      if (i % 64 === 63) yield;
       if (!point) continue;
       const pano = Number(props.nb_360_pictures) || 0;
       const flat = Number(props.nb_flat_pictures) || 0;

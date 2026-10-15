@@ -37,6 +37,7 @@ const KARTAVIEW_SOURCES = Object.freeze({
   panoFirst: (photo) => ({
     url: resizedImageUrl(photo.urls.pano, PANO_PREVIEW_SIZE),
     width: 0,
+    resize: PANO_PREVIEW_SIZE,
   }),
   panoSharp: (photo, size) => ({
     url: resizedImageUrl(photo.urls.pano, size),

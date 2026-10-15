@@ -247,7 +247,6 @@ export function createLineCoverage({
     entry.castRequested = false;
     entry.meshParts = null;
     if (swap && entry.kind === 'sequence' && entry.primitives?.length) {
-      finishSwap(entry);
       redrawTile(entry);
       return;
     }
@@ -373,7 +372,22 @@ export function createLineCoverage({
 
   /** Rebuild a tile's lines; the old ones stay up until the new are ready. */
   function redrawTile(entry) {
-    const previous = entry.primitives;
+    let previous = entry.primitives;
+    if (entry.swap) {
+      // A swap still building: what is on screen is its old lines and
+      // whichever new ones are ready. Those stay; the rest never showed.
+      const shown = [...entry.swap.old];
+      const building = [];
+      for (const record of previous)
+        (record.primitive.ready && !record.primitive.isDestroyed?.()
+          ? shown
+          : building
+        ).push(record);
+      entry.swap.stop();
+      entry.swap = null;
+      removePrimitives(building);
+      previous = shown;
+    }
     entry.primitives = [];
     attachPrimitive(entry);
     removeWhenReady(entry, previous);

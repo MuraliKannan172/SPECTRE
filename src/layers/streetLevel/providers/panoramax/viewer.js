@@ -31,7 +31,13 @@ export const PANORAMAX_SOURCES = Object.freeze({
     Boolean(photo.isPano && (photo.urls.sd || hdDecodable(photo))),
   // Without an SD derivative the original goes straight to the texture size.
   panoFirst: (photo) => {
-    if (photo.urls.sd) return { url: photo.urls.sd, width: SD_WIDTH };
+    // Decoded at SD's own size, whatever the host actually serves.
+    if (photo.urls.sd)
+      return {
+        url: photo.urls.sd,
+        width: SD_WIDTH,
+        resize: [SD_WIDTH, SD_WIDTH / 2],
+      };
     if (!hdDecodable(photo)) return null;
     const width = Math.min(photo.width, PANO_FULL_SIZE[0]);
     return { url: photo.urls.hd, width, resize: [width, width / 2] };
@@ -51,15 +57,20 @@ export const PANORAMAX_SOURCES = Object.freeze({
       timeoutMs: HD_TIMEOUT_MS,
     };
   },
-  // A 360° picture shown flat (no WebGL) is its whole equirectangular image;
-  // an original too big to decode is skipped for the thumbnail.
-  flatFirst: (photo) => [
+  // A 360° picture shown flat (no WebGL) is its whole equirectangular image.
+  // When SD fails the thumbnail stands in; the original (megabytes) only
+  // for the expanded viewer, and only one of a size it may decode.
+  flatFirst: (photo, { expanded = false } = {}) => [
     photo.urls.sd,
-    !photo.isPano || hdDecodable(photo) ? photo.urls.hd : null,
+    expanded && hdDecodable(photo) ? photo.urls.hd : null,
     photo.urls.thumb,
   ],
+  // The original once the viewer is wider than SD, if its width is known
+  // and decodable (a 200 MP phone photo is 16,000 px across).
   flatSharp: (photo, pixels) =>
-    photo.urls.sd && photo.urls.hd && pixels > SD_WIDTH ? photo.urls.hd : null,
+    photo.urls.sd && hdDecodable(photo) && pixels > SD_WIDTH
+      ? photo.urls.hd
+      : null,
   describe: (photo) => ({
     // Where no author can be named, the instance holding the photo is.
     title: !photo.creator && photo.via ? `via ${photo.via}` : null,

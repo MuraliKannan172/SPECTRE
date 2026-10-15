@@ -1,10 +1,8 @@
 import { createLimiter } from '../../limiter.js';
-
-/** Longest wait a Retry-After is honoured for. */
-const RETRY_AFTER_MAX_SEC = 300;
 import {
   API_CONCURRENCY,
   API_TIMEOUT_MS,
+  BUSY_BACKOFF_BASE_SEC,
   MAX_RESPONSE_BYTES,
   NEAREST_BOX_LIMIT,
   NEAREST_FOV_TOLERANCE_DEG,
@@ -12,9 +10,13 @@ import {
   NEAREST_RADIUS_M,
   PANORAMAX_API,
   PICTURE_TILE_CONCURRENCY,
+  STREAM_IDLE_TIMEOUT_MS,
   TILE_CONCURRENCY,
   TILE_TIMEOUT_MS,
 } from './policy.js';
+
+/** Longest wait a Retry-After (or the backoff) asks for. */
+const RETRY_AFTER_MAX_SEC = 300;
 
 /** An HTTP or API failure; `retryAfterSec` is set while Panoramax is busy. */
 export class PanoramaxSourceError extends Error {
@@ -29,17 +31,30 @@ export class PanoramaxSourceError extends Error {
 const NO_ANSWER = 'Panoramax did not answer in time — try again';
 const UNREACHABLE = 'Panoramax could not be reached — check the connection';
 
-/** Seconds from a Retry-After header, or null. */
-function retryAfterSeconds(response) {
+/**
+ * Seconds from a Retry-After header (delay seconds or an HTTP date), or
+ * null. The meta-catalogue exposes no headers to the browser, so in the
+ * app this is usually null and the caller backs off on its own.
+ */
+export function retryAfterSeconds(response, now = Date.now()) {
   const header = response.headers?.get?.('retry-after');
-  const value = header == null || header === '' ? NaN : Number(header);
-  if (!Number.isFinite(value) || value < 0) return null;
+  if (header == null || header === '') return null;
+  let value = Number(header);
+  if (!Number.isFinite(value)) {
+    const at = Date.parse(header);
+    if (!Number.isFinite(at)) return null;
+    value = Math.ceil((at - now) / 1000);
+  }
+  if (value < 0) return null;
   // A maintenance page's hour must not freeze coverage for an hour.
   return Math.min(RETRY_AFTER_MAX_SEC, Math.max(1, value));
 }
 
-/** The body as bytes, refusing more than MAX_RESPONSE_BYTES whatever the headers say. */
-async function readBounded(response) {
+/**
+ * The body as bytes, refusing more than MAX_RESPONSE_BYTES whatever the
+ * headers say. `onChunk` hears each piece arrive (the idle timeout).
+ */
+async function readBounded(response, onChunk = () => {}) {
   const tooMuch = () =>
     new PanoramaxSourceError('Panoramax sent too much data', {
       status: response.status,
@@ -57,6 +72,7 @@ async function readBounded(response) {
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
+    onChunk();
     total += value.byteLength;
     if (total > MAX_RESPONSE_BYTES) {
       reader.cancel().catch(() => {});
@@ -92,30 +108,55 @@ export function createPanoramaxSource({
     lifo: true,
   });
 
-  /** GET within `timeoutMs`; the caller's abort wins over the timeout. */
+  /** Busy answers in a row with no readable Retry-After (the backoff grows). */
+  let busyStreak = 0;
+
+  /**
+   * GET: its headers within `timeoutMs`, then a body that may take as long
+   * as it keeps arriving (silent for STREAM_IDLE_TIMEOUT_MS is given up).
+   * The caller's abort wins over both.
+   */
   async function get(url, { signal, timeoutMs, empty = [] }) {
     const controller = new AbortController();
     const onAbort = () => controller.abort(signal.reason);
     if (signal?.aborted) throw signal.reason;
     signal?.addEventListener('abort', onAbort, { once: true });
-    const timer = setTimeout(
-      () => controller.abort(new PanoramaxSourceError(NO_ANSWER)),
-      timeoutMs,
-    );
+    const giveUp = () => controller.abort(new PanoramaxSourceError(NO_ANSWER));
+    let timer = setTimeout(giveUp, timeoutMs);
     try {
       const response = await fetchImpl(url, { signal: controller.signal });
-      if (empty.includes(response.status)) return null;
-      if (response.status === 429 || response.status === 503)
+      if (empty.includes(response.status)) {
+        busyStreak = 0;
+        return null;
+      }
+      if (response.status === 429 || response.status === 503) {
+        const told = retryAfterSeconds(response);
+        // Not told how long: back off, longer each time (5, 10, 20… 300 s).
+        const wait =
+          told ??
+          Math.min(
+            RETRY_AFTER_MAX_SEC,
+            BUSY_BACKOFF_BASE_SEC * 2 ** Math.min(busyStreak, 8),
+          );
+        busyStreak++;
         throw new PanoramaxSourceError('Panoramax is busy', {
           status: response.status,
-          retryAfterSec: retryAfterSeconds(response) ?? 5,
+          retryAfterSec: wait,
         });
+      }
       if (!response.ok)
         throw new PanoramaxSourceError(
           `Panoramax answered HTTP ${response.status}`,
           { status: response.status },
         );
-      return await readBounded(response);
+      busyStreak = 0;
+      // The answer has begun: from here only silence is timed.
+      clearTimeout(timer);
+      timer = setTimeout(giveUp, STREAM_IDLE_TIMEOUT_MS);
+      return await readBounded(response, () => {
+        clearTimeout(timer);
+        timer = setTimeout(giveUp, STREAM_IDLE_TIMEOUT_MS);
+      });
     } catch (error) {
       if (signal?.aborted) throw signal.reason;
       if (controller.signal.aborted) throw controller.signal.reason;
@@ -180,8 +221,8 @@ export function createPanoramaxSource({
      * Pictures within `radius` metres of a point, unranked: the caller ranks
      * them by distance. Two searches side by side, since neither finds them
      * all: `place_position` (nearest first) leaves out pictures looking
-     * away from the point, whatever the tolerance; a bounding box has them
-     * but in no order, so in a dense spot its page may miss the nearest.
+     * away from the point, whatever the tolerance; a bounding box has them,
+     * roughly nearest first (not exactly: the caller ranks the union).
      * `collections` keeps one sequence's, `pano` and `sinceMs` filter as
      * the imagery filter does.
      */

@@ -726,12 +726,16 @@ test('from high up the density grid draws points, not counted as sequences, and 
 test('switching off clears the cones and forgets a pending line click', async (t) => {
   const items = sequence('s', 3);
   const env = await mounted({ items, tiles: pictureTiles(items) });
-  await withCones(t, env);
+  const cones = await withCones(t, env);
+  await env.instance.viewer.open('s-0');
+  await env.instance.selectSequence('s');
+  assert.ok(await until(() => cones.count() === 3), 'cones to clear');
   env.instance.handlePick(`${PICK_PREFIX.sequence}s`, {
     groundPoint: () => east(0),
   });
   env.instance.deactivate();
   assert.equal(env.instance.sequenceStats().selectedId, null);
+  assert.equal(cones.count(), 0, 'the cones are gone');
   // The click's preference is gone: a later lookup asks any sequence.
   await env.instance.nearestImage(east(0));
   assert.equal(env.source.calls.nearest.at(-1).collections, null);
@@ -1001,15 +1005,242 @@ test('a re-centre while the cones still load does not inherit the aborted load�
   const second = new Set(
     pictureTilesAround({ lon, lat }).map((tile) => `${tile.x}/${tile.y}`),
   );
-  const ids = new Set(cones.ids());
   const covered = items.filter((item) => {
     const tile = tileOf(item);
     return second.has(`${tile.x}/${tile.y}`);
   });
   assert.ok(covered.length > 0);
-  assert.equal(
-    covered.filter((item) => ids.has(item.id)).length,
-    covered.length,
-    'every picture in the re-centred tiles has its cone (the shared ones too)',
+  // The neighbours join as they arrive: wait for them, then every picture
+  // in the re-centred tiles has its cone (the shared ones too).
+  const coneCount = () => {
+    const ids = new Set(cones.ids());
+    return covered.filter((item) => ids.has(item.id)).length;
+  };
+  assert.ok(
+    await until(() => coneCount() === covered.length),
+    `${coneCount()} of ${covered.length}`,
   );
+});
+
+test('after a GPU reset the viewer draws the same picture itself, leaving the core’s lookups alone; a failure is reported', async () => {
+  const items = sequence('p', 2, { pano: true });
+  let failLoads = false;
+  const view = { yaw: 0, pitch: 0, fov: 90 };
+  const definition = createPanoramaxProvider({
+    source: fakeSource({ items }),
+    viewerOptions: {
+      load: async (url) => {
+        if (failLoads)
+          throw new Error('The Panoramax photo could not be loaded');
+        return { src: url, width: 2048, height: 1024 };
+      },
+      createRenderer: () => ({
+        setImage() {},
+        setView: (next) => Object.assign(view, next),
+        getView: () => ({ ...view }),
+        resize() {},
+        clear() {},
+        destroy() {},
+      }),
+    },
+  });
+  const { context, actions } = fakeContext();
+  const instance = definition.create(context);
+  actions.instance = instance;
+  const host = fakeHost();
+  await instance.viewer.mount(host);
+  const poses = [];
+  instance.viewer.onPose((pose) => poses.push(pose.imageId));
+  await instance.viewer.open('p-0');
+  const canvas = () => host.children[0].children[1];
+  const kind = () => host.children[0].dataset.kind;
+  assert.equal(kind(), 'pano');
+  canvas().fire('webglcontextlost');
+  assert.ok(await until(() => kind() === 'pano'), 'drawn again');
+  assert.deepEqual(poses, ['p-0', 'p-0']);
+  assert.deepEqual(actions.opened, [], 'not through the core');
+  failLoads = true;
+  canvas().fire('webglcontextlost');
+  assert.ok(await until(() => actions.errors.some(Boolean)));
+  assert.match(actions.errors.filter(Boolean)[0], /could not be loaded/);
+});
+
+/** A source whose lookup of `heldId` waits for `release()` and ignores aborts. */
+function holdLookup(source, heldId) {
+  const held = { release: null, signals: [] };
+  const getItem = source.getItem;
+  source.getItem = async (id, options = {}) => {
+    held.signals.push({ id, signal: options.signal });
+    if (id === heldId) await new Promise((go) => (held.release = go));
+    return getItem(id);
+  };
+  return held;
+}
+
+test('a lookup that comes back after the user moved on does not move the cones', async (t) => {
+  const items = sequence('long', 400);
+  const env = await mounted({ items, tiles: pictureTiles(items) });
+  await withCones(t, env);
+  const held = holdLookup(env.source, 'long-0');
+  const late = env.instance.viewer.open('long-0');
+  assert.ok(await until(() => held.release !== null));
+  await env.instance.viewer.open('long-399');
+  await late;
+  // The first lookup answers anyway (a source that ignores the abort).
+  held.release();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await env.instance.selectSequence('long');
+  assert.ok(await until(() => !env.instance.sequenceStats().loading));
+  const [lon, lat] = items[399].geometry.coordinates;
+  const [far] = pictureTilesAround({ lon, lat });
+  const [lon0, lat0] = items[0].geometry.coordinates;
+  const [near] = pictureTilesAround({ lon: lon0, lat: lat0 });
+  assert.equal(env.source.calls.tiles[0], `15/${far.x}/${far.y}`);
+  assert.ok(
+    !env.source.calls.tiles.includes(`15/${near.x}/${near.y}`),
+    'nothing around the picture the user left',
+  );
+});
+
+test('a lookup nobody waits for any more is stopped; one still wanted is not', async () => {
+  const items = sequence('s', 3);
+  const env = await mounted({ items });
+  const held = holdLookup(env.source, 's-0');
+  const first = env.instance.viewer.open('s-0');
+  assert.ok(await until(() => held.release !== null));
+  const [{ signal }] = held.signals;
+  assert.equal(signal.aborted, false);
+  await env.instance.viewer.open('s-1');
+  await first;
+  await Promise.resolve();
+  assert.equal(signal.aborted, true, 'the user moved on: its search stops');
+  // The same picture asked again at once shares the lookup, which goes on.
+  held.release = null;
+  held.signals.length = 0;
+  const again = env.instance.viewer.open('s-2');
+  const twice = env.instance.viewer.open('s-2');
+  await Promise.all([again, twice]);
+  assert.equal(held.signals.length, 1);
+  assert.equal(held.signals[0].signal.aborted, false);
+  assert.equal(env.poses.at(-1), 's-2');
+});
+
+/**
+ * Two pictures of sequence `e` either side of a z15 tile's west edge,
+ * half-way down it: the cones around the first read its tile and the
+ * west neighbour.
+ */
+function acrossWestEdge() {
+  const home = tileCentre(ORIGIN.lon, ORIGIN.lat, 15);
+  const box = tileBounds(home.tile.x, home.tile.y, 15);
+  const lat = (box.north + box.south) / 2;
+  const items = [
+    stacItem({
+      id: 'e-0',
+      sequenceId: 'e',
+      lon: box.west + 0.00005,
+      lat,
+      nextId: 'e-1',
+    }),
+    stacItem({
+      id: 'e-1',
+      sequenceId: 'e',
+      lon: box.west - 0.00005,
+      lat,
+      prevId: 'e-0',
+    }),
+  ];
+  const west = `15/${home.tile.x - 1}/${home.tile.y}`;
+  return { items, west };
+}
+
+test(
+  'the open picture’s own tile draws its cones at once; a neighbour’s join as it arrives',
+  { timeout: 10_000 },
+  async (t) => {
+    const { items, west } = acrossWestEdge();
+    const tiles = pictureTiles(items);
+    let release = null;
+    const env = await mounted({
+      items,
+      tiles: async (tile) => {
+        if (`${tile.z}/${tile.x}/${tile.y}` === west)
+          await new Promise((go) => (release = go));
+        return tiles(tile);
+      },
+    });
+    const cones = await withCones(t, env);
+    await env.instance.viewer.open('e-0');
+    const [lon, lat] = items[0].geometry.coordinates;
+    assert.equal(
+      pictureTilesAround({ lon, lat }).length,
+      2,
+      'the west neighbour is read too',
+    );
+    // Not awaited: a load that waited for the neighbour would hang here.
+    env.instance.selectSequence('e');
+    assert.ok(await until(() => release !== null), 'the neighbour is held');
+    assert.ok(
+      await until(() => cones.count() === 1),
+      'the home tile’s cone shows',
+    );
+    assert.deepEqual(cones.ids(), ['e-0']);
+    release();
+    assert.ok(await until(() => cones.count() === 2), 'the neighbour’s joins');
+  },
+);
+
+test('a neighbour tile that failed is not counted as shown: › into it re-centres the cones there', async (t) => {
+  const { items, west } = acrossWestEdge();
+  const tiles = pictureTiles(items);
+  let failing = true;
+  const env = await mounted({
+    items,
+    tiles: (tile) => {
+      if (failing && `${tile.z}/${tile.x}/${tile.y}` === west)
+        throw Object.assign(new Error('Panoramax is busy'), { status: 503 });
+      return tiles(tile);
+    },
+  });
+  const cones = await withCones(t, env);
+  await env.instance.viewer.open('e-0');
+  await env.instance.selectSequence('e');
+  assert.ok(await until(() => cones.count() === 1));
+  // Let the neighbour's failure land.
+  assert.ok(await until(() => env.source.calls.tiles.includes(west)));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  failing = false;
+  const asked = env.source.calls.tiles.filter((key) => key === west).length;
+  env.next.fire('click');
+  assert.ok(await until(() => env.poses.at(-1) === 'e-1'));
+  assert.ok(
+    await until(
+      () => env.source.calls.tiles.filter((key) => key === west).length > asked,
+    ),
+    'the failed tile is asked again',
+  );
+  assert.ok(await until(() => cones.count() === 2), 'e-1 has its cone');
+});
+
+test('a busy or timed-out tile keeps its own message; only a body that is not a tile reads as unreadable', async (t) => {
+  const items = sequence('s', 3);
+  const failures = [
+    Object.assign(new Error('Panoramax is busy'), { status: 429 }),
+    Object.assign(new Error('Panoramax did not answer in time — try again'), {
+      status: 0,
+    }),
+  ];
+  for (const failure of failures) {
+    const env = await mounted({
+      items,
+      tiles: () => {
+        throw failure;
+      },
+    });
+    await withCones(t, env);
+    await env.instance.viewer.open('s-0');
+    await env.instance.selectSequence('s');
+    assert.ok(await until(() => env.actions.errors.some(Boolean)));
+    assert.equal(env.actions.errors.filter(Boolean).at(-1), failure.message);
+  }
 });

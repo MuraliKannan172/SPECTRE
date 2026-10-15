@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PanoramaxSourceError, createPanoramaxSource } from './source.js';
-import { MAX_RESPONSE_BYTES } from './policy.js';
+import {
+  PanoramaxSourceError,
+  createPanoramaxSource,
+  retryAfterSeconds,
+} from './source.js';
+import {
+  MAX_RESPONSE_BYTES,
+  NEAREST_BOX_LIMIT,
+  STREAM_IDLE_TIMEOUT_MS,
+  TILE_TIMEOUT_MS,
+} from './policy.js';
 
 /** A fetch answering from `respond(url)`, recording every URL asked. */
 function fakeFetch(respond) {
@@ -346,6 +355,148 @@ test('a Retry-After is honoured up to five minutes', async () => {
   assert.equal(await wait('99999999999'), 300);
   assert.equal(await wait('0'), 1);
   assert.equal(await wait('12'), 12);
+});
+
+test('a Retry-After may be an HTTP date', () => {
+  const now = Date.parse('2026-10-15T12:00:00Z');
+  const response = (value) =>
+    new Response(null, { status: 429, headers: { 'retry-after': value } });
+  assert.equal(
+    retryAfterSeconds(response('Thu, 15 Oct 2026 12:01:00 GMT'), now),
+    60,
+  );
+  assert.equal(
+    retryAfterSeconds(response('Thu, 15 Oct 2026 14:00:00 GMT'), now),
+    300,
+  );
+  assert.equal(
+    retryAfterSeconds(response('Thu, 15 Oct 2026 11:00:00 GMT'), now),
+    null,
+    'a date already past',
+  );
+  assert.equal(retryAfterSeconds(response('soon'), now), null);
+  assert.equal(
+    retryAfterSeconds(new Response(null, { status: 429 }), now),
+    null,
+  );
+});
+
+test('busy without a readable Retry-After (the browser hides it): the wait doubles, and resets once answered', async () => {
+  let busy = true;
+  const source = createPanoramaxSource({
+    fetchImpl: fakeFetch(() =>
+      busy ? { status: 429 } : { body: new Uint8Array([1]) },
+    ).fetchImpl,
+  });
+  const wait = () =>
+    source.getTile({ x: 0, y: 0, z: 0 }).then(
+      () => 'ok',
+      (error) => error.retryAfterSec,
+    );
+  const waits = [];
+  for (let i = 0; i < 9; i++) waits.push(await wait());
+  assert.deepEqual(waits, [5, 10, 20, 40, 80, 160, 300, 300, 300]);
+  busy = false;
+  assert.equal(await wait(), 'ok');
+  busy = true;
+  assert.equal(await wait(), 5, 'back to the first wait');
+});
+
+test(
+  'a body that keeps arriving is not cut off by the request timeout; one that stalls is',
+  { timeout: 10_000 },
+  async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const settle = async () => {
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+    };
+    // Headers at once, then a chunk every 10 s for twice the tile timeout.
+    const chunks = Math.ceil((2 * TILE_TIMEOUT_MS) / 10_000);
+    let push;
+    const slowBody = (signal) =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            push = (last) => {
+              controller.enqueue(new Uint8Array([7]));
+              if (last) controller.close();
+            };
+            signal.addEventListener('abort', () =>
+              controller.error(signal.reason),
+            );
+          },
+        }),
+        { status: 200 },
+      );
+    const source = createPanoramaxSource({
+      fetchImpl: async (url, { signal }) => slowBody(signal),
+    });
+    const slow = source.getTile({ x: 0, y: 0, z: 0 });
+    await settle();
+    for (let i = 1; i <= chunks; i++) {
+      t.mock.timers.tick(10_000);
+      push(i === chunks);
+      await settle();
+    }
+    assert.equal((await slow).length, chunks, 'every chunk read');
+    const stalled = source.getTile({ x: 0, y: 0, z: 0 });
+    await settle();
+    push(false);
+    await settle();
+    t.mock.timers.tick(STREAM_IDLE_TIMEOUT_MS);
+    await assert.rejects(stalled, /did not answer in time/);
+  },
+);
+
+test('the box search asks for a few pictures: the API returns them nearest first', async () => {
+  const { urls, fetchImpl } = fakeFetch(() => json({ features: [] }));
+  const source = createPanoramaxSource({ fetchImpl });
+  await source.nearestItems({ lon: 2.35, lat: 48.85 });
+  const box = urls
+    .map((url) => new URL(url))
+    .find((url) => url.searchParams.has('bbox'));
+  assert.ok(box, 'a box search');
+  assert.equal(box.searchParams.get('limit'), String(NEAREST_BOX_LIMIT));
+  assert.ok(NEAREST_BOX_LIMIT <= 20);
+});
+
+test('the cones’ tiles have their own connection: never behind coverage tiles, the newest first', async () => {
+  const { PICTURE_TILE_CONCURRENCY, TILE_CONCURRENCY } =
+    await import('./policy.js');
+  assert.equal(PICTURE_TILE_CONCURRENCY, 1);
+  const held = new Map();
+  const asked = [];
+  const source = createPanoramaxSource({
+    fetchImpl: (url) => {
+      asked.push(url.replace(/^.*\/map\//, ''));
+      return new Promise((resolve) =>
+        held.set(url.replace(/^.*\/map\//, ''), () =>
+          resolve(new Response(null, { status: 204 })),
+        ),
+      );
+    },
+  });
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  // Coverage fills its lane and queues.
+  const coverage = Array.from({ length: TILE_CONCURRENCY + 2 }, (_, i) =>
+    source.getTile({ x: i, y: 0, z: 10 }),
+  );
+  await settle();
+  assert.equal(asked.length, TILE_CONCURRENCY);
+  // A cone tile goes at once; two more wait, the newer first.
+  const pictures = [1, 2, 3].map((x) =>
+    source.getTile({ x, y: 9, z: 15 }, { lane: 'pictures' }),
+  );
+  await settle();
+  assert.deepEqual(asked.slice(TILE_CONCURRENCY), ['15/1/9.mvt']);
+  held.get('15/1/9.mvt')();
+  await settle();
+  assert.deepEqual(asked.slice(TILE_CONCURRENCY), ['15/1/9.mvt', '15/3/9.mvt']);
+  for (let round = 0; round < 6; round++) {
+    for (const go of held.values()) go();
+    await settle();
+  }
+  await Promise.all([...coverage, ...pictures]);
 });
 
 test('a lookup near the antimeridian keeps its box on the map', async () => {

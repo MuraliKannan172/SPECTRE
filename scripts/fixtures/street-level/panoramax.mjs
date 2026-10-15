@@ -249,9 +249,11 @@ export function answerPanoramaxRequest({ method, url }) {
           : true,
     )
     .filter((p) => !since || Date.parse(p.datetime) >= Date.parse(since));
-  // A box: every picture in it, in no particular order (id order here).
+  // A box: every picture in it, nearest its centre first, as the live API
+  // returns them (roughly: the browser ranks them again).
   if (q.has('bbox')) {
     const [west, south, east, north] = q.get('bbox').split(',').map(Number);
+    const centre = { lon: (west + east) / 2, lat: (south + north) / 2 };
     return json({
       type: 'FeatureCollection',
       features: kept
@@ -259,9 +261,10 @@ export function answerPanoramaxRequest({ method, url }) {
           (p) =>
             p.lon >= west && p.lon <= east && p.lat >= south && p.lat <= north,
         )
-        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((p) => ({ p, metres: metresApart(centre, p) }))
+        .sort((a, b) => a.metres - b.metres || a.p.id.localeCompare(b.p.id))
         .slice(0, Number(q.get('limit')) || 10)
-        .map((p) => item(p, pictures)),
+        .map(({ p }) => item(p, pictures)),
     });
   }
   const [lon, lat] = (q.get('place_position') || '').split(',').map(Number);

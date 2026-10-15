@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeCoverageTile, decodePictures, simplifyLine } from './decode.js';
+import {
+  decodeCoverageTile,
+  decodeCoverageTileSliced,
+  decodePictures,
+  simplifyLine,
+} from './decode.js';
 import { OVERVIEW_BINS_PER_AXIS } from './policy.js';
 import { encodePanoramaxTile } from '../../../../testSupport/panoramaxFixtures.mjs';
 import { tileCentre } from '../../../../testSupport/streetLevelFakes.mjs';
@@ -69,10 +74,11 @@ test('sequence lines keep their parts apart, with their day and camera type', ()
 
 test('density cells bin to a bounded number of points that keep the counts and kinds', () => {
   const tile = { x: 0, y: 0, z: 0 };
-  // Two cells in one bin, one far away, one empty.
+  // Two cells in one bin (3.75° wide at z0) far enough apart to tell
+  // which it sits on, one far away, one empty.
   const grid = [
-    { lon: 2.35, lat: 48.85, pano: 0, flat: 5 },
-    { lon: 2.36, lat: 48.85, pano: 30, flat: 0 },
+    { lon: 0.3, lat: 48.85, pano: 0, flat: 5 },
+    { lon: 3.4, lat: 48.85, pano: 30, flat: 0 },
     { lon: -73.9, lat: 40.7, pano: 1, flat: 0 },
     { lon: 10, lat: 10, pano: 0, flat: 0 },
   ];
@@ -87,7 +93,10 @@ test('density cells bin to a bounded number of points that keep the counts and k
   assert.equal(paris.hasFlat, true);
   assert.equal(paris.isPano, true, 'mostly 360°');
   assert.equal(paris.capturedAt, null, 'cells are undated');
-  assert.ok(near(paris.lon, 2.36, 0.2), 'sits on the busiest cell');
+  assert.ok(
+    near(paris.lon, 3.4, 0.2),
+    `sits on the busiest cell: ${paris.lon}`,
+  );
   const nyc = overview.find((p) => p.lon < 0);
   assert.deepEqual([nyc.hasPano, nyc.hasFlat, nyc.weight], [true, false, 1]);
 });
@@ -132,6 +141,71 @@ test('a dense grid tile never draws more than the bins allow', () => {
     grid.length,
     'every picture is still counted',
   );
+});
+
+/** A tile with many lines and a dense grid, for the sliced decode. */
+function busyTile() {
+  const { tile, lon, lat } = tileCentre(2.35, 48.85);
+  const sequences = Array.from({ length: 200 }, (_, i) => ({
+    id: `s${i}`,
+    parts: [
+      [
+        [lon, lat + i / 1e6],
+        [lon + (i + 1) / 73_000, lat + i / 1e6],
+      ],
+    ],
+  }));
+  const grid = Array.from({ length: 500 }, (_, i) => ({
+    lon: lon + (i % 25) / 1e4,
+    lat: lat + Math.floor(i / 25) / 1e4,
+  }));
+  return { tile, bytes: encodePanoramaxTile(tile, { sequences, grid }) };
+}
+
+test('a sliced decode gives the page turns and decodes the same as one in one go', async () => {
+  const { tile, bytes } = busyTile();
+  let clock = 0;
+  let pauses = 0;
+  const sliced = await decodeCoverageTileSliced(bytes, tile, {
+    sliceMs: 8,
+    // Each step "takes" a millisecond: a turn every eight features.
+    now: () => clock++,
+    pause: async () => {
+      pauses++;
+    },
+  });
+  assert.ok(pauses > 20, `${pauses} turns`);
+  assert.deepEqual(sliced, decodeCoverageTile(bytes, tile));
+});
+
+test('a sliced decode stops at the next turn once aborted', async () => {
+  const { tile, bytes } = busyTile();
+  const controller = new AbortController();
+  let clock = 0;
+  let pauses = 0;
+  await assert.rejects(
+    decodeCoverageTileSliced(bytes, tile, {
+      signal: controller.signal,
+      now: () => (clock += 10),
+      pause: async () => {
+        if (++pauses === 2) controller.abort();
+      },
+    }),
+    { name: 'AbortError' },
+  );
+  assert.equal(pauses, 2, 'no work after the abort');
+});
+
+test('a fast sliced decode takes no turns', async () => {
+  const { tile, bytes } = busyTile();
+  let pauses = 0;
+  await decodeCoverageTileSliced(bytes, tile, {
+    now: () => 0,
+    pause: async () => {
+      pauses++;
+    },
+  });
+  assert.equal(pauses, 0);
 });
 
 test('an empty tile decodes to nothing', () => {

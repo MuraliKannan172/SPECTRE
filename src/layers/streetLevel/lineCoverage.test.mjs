@@ -397,6 +397,63 @@ test('a tile redrawn for a new share keeps its old lines until the new ones are 
       );
 });
 
+test('a second redraw while a swap still builds keeps the lines on screen', async (t) => {
+  const { state, coverage, viewer } = setup(t, {
+    zoomFor: () => ({ zoom: 18, kind: 'sequence' }),
+    tuning: {
+      ...TUNING,
+      maxTiles: 9,
+      maxSequences: 900,
+      maxPoints: 90,
+      keepOrder: true,
+    },
+    decoded: (centre, tile) => {
+      const dense = tile.x % 2 === 0 && tile.y % 2 === 0;
+      return {
+        sequences: dense
+          ? Array.from({ length: 30 }, (_, i) =>
+              pointsLine(`d${tile.x}/${tile.y}/${i}`, 5, tile, centre),
+            )
+          : [pointsLine(`s${tile.x}/${tile.y}`, 2, tile, centre)],
+        overview: [],
+      };
+    },
+  });
+  coverage.refresh();
+  assert.ok(
+    await until(
+      () => state.coverage.tiles.size > 1 && !state.coverage.pending.size,
+    ),
+  );
+  // A tile mid-swap (its new lines never become ready here) with a line
+  // the cap left out: selecting that line redraws the tile again.
+  const entry = [...state.coverage.tiles.values()].find(
+    (tile) =>
+      tile.swap &&
+      tile.sequenceList.some((sequence) => !tile.sequences.has(sequence.id)),
+  );
+  assert.ok(entry, 'a swapping tile with a line left out');
+  const onScreen = [...entry.swap.old];
+  const building = entry.primitives.map(({ primitive }) => primitive);
+  const left = entry.sequenceList.find(
+    (sequence) => !entry.sequences.has(sequence.id),
+  );
+  state.sequence.selectedId = left.id;
+  coverage.recolorSequence(left.id, true);
+  assert.ok(entry.sequences.has(left.id), 'the selected line is drawn');
+  const onGlobe = (primitive) =>
+    viewer.scene.groundPrimitives.items.has(primitive) ||
+    viewer.scene.primitives.items.has(primitive);
+  for (const { primitive } of onScreen)
+    assert.ok(
+      onGlobe(primitive),
+      'the lines on screen stay until the new ones are ready',
+    );
+  for (const primitive of building)
+    assert.ok(!onGlobe(primitive), 'the first swap’s unready lines are gone');
+  assert.ok(entry.swap, 'still swapping');
+});
+
 test('a selected line outside the cap does not make its tile redraw on every settle, nor does one the filter hides', async (t) => {
   let pano = 'all';
   const { state, coverage, viewer } = setup(t, {

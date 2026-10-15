@@ -66,6 +66,13 @@ export const COVERAGE_TUNING = Object.freeze({
  * within GPS noise), and 6–10% of the points GPS tracks carry.
  */
 export const SIMPLIFY_TOLERANCE_UNITS = 4;
+
+/**
+ * Coverage tiles decode in slices of this many ms, the page getting a turn
+ * between them (decode.js `decodeCoverageTileSliced`): under a frame.
+ */
+export const DECODE_SLICE_MS = 8;
+
 /**
  * Grid cells per overview tile, at most: a z0 tile holds ~70,000 cells
  * (1.9 MB), drawn as this many binned points.
@@ -89,6 +96,14 @@ export const PICTURE_TILE_ZOOM = 15;
 export const PICTURE_TILE_EDGE_M = 150;
 
 export const TILE_TIMEOUT_MS = 20_000;
+/**
+ * Once an answer has started, it may take as long as it keeps coming: a
+ * 2 MB tile on a slow link outlasts any whole-request timeout, so only a
+ * stream silent this long is given up.
+ */
+export const STREAM_IDLE_TIMEOUT_MS = 15_000;
+/** Busy (429/503) without a Retry-After the browser can read: back off from this. */
+export const BUSY_BACKOFF_BASE_SEC = 5;
 export const API_TIMEOUT_MS = 12_000;
 /** Real tiles are under 6 MB (z6 over France); refuse anything absurd. */
 export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
@@ -111,8 +126,12 @@ export const NEAREST_LIMIT = 10;
  * beside it has those).
  */
 export const NEAREST_FOV_TOLERANCE_DEG = 180;
-/** Pictures in the bounding box around a click, at most. */
-export const NEAREST_BOX_LIMIT = 100;
+/**
+ * Pictures in the bounding box around a click, at most. The API returns
+ * them roughly nearest first (the first ten of 100 are the first ten of
+ * 10), and the browser ranks them exactly: 20 is ~60 kB, 100 ~600 kB.
+ */
+export const NEAREST_BOX_LIMIT = 20;
 /**
  * A line clicked from high up may be tens of metres off the click: its
  * sequence is searched within the camera height / 100 (50–400 m).
@@ -194,10 +213,12 @@ function linkedId(item, rel) {
   }
 }
 
-/** An email address anywhere in a name (linear: names come from any instance). */
+/**
+ * An email address anywhere in a name, at any of its '@'s. Linear: names
+ * come from any instance, and each run between '@'s is scanned once.
+ */
 function looksLikeEmail(name) {
-  const at = name.indexOf('@');
-  return at > 0 && name.indexOf('.', at + 2) !== -1;
+  return /[^\s@]@[^\s@]+\.[^\s@]/.test(name);
 }
 
 /**
@@ -217,12 +238,14 @@ function creatorOf(item) {
   // Every producer is credited (an uploading app and its photographer),
   // each name once, none that is an email address.
   const credited = [];
+  const seen = new Set();
   for (const value of names) {
     if (typeof value !== 'string') continue;
     const name = value.trim().slice(0, 80);
     if (!name || looksLikeEmail(value)) continue;
-    if (credited.some((other) => other.toLowerCase() === name.toLowerCase()))
-      continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
     credited.push(name);
   }
   return credited.length ? credited.join(', ').slice(0, 120) : null;

@@ -9,7 +9,7 @@ import {
 } from '../../tileMath.js';
 import { metresBetween } from '../../view.js';
 import { createLru, createTileCache } from '../../tileCache.js';
-import { decodeCoverageTile, decodePictures } from './decode.js';
+import { decodeCoverageTileSliced, decodePictures } from './decode.js';
 import { createPanoramaxSource } from './source.js';
 import { createPanoramaxViewer } from './viewer.js';
 import {
@@ -230,16 +230,23 @@ export function createPanoramaxProvider({
         return photo;
       }
 
-      /** Lookups in flight, shared: ‹ › and the viewer ask for the same picture. */
+      /**
+       * Lookups in flight, shared: ‹ › and the viewer ask for the same
+       * picture. A lookup stops once every caller waiting on it has given up
+       * (its search would hold one of the two API connections for nothing).
+       */
       const inflight = new Map();
-      function getPhoto(photoId) {
+      function getPhoto(photoId, { signal } = {}) {
         const id = String(photoId);
         const cached = photos.get(id);
         if (cached) return Promise.resolve(cached);
+        if (signal?.aborted) return Promise.reject(signal.reason);
         let lookup = inflight.get(id);
         if (!lookup) {
-          lookup = source
-            .getItem(id)
+          const controller = new AbortController();
+          lookup = { controller, waiting: 0 };
+          lookup.promise = source
+            .getItem(id, { signal: controller.signal })
             .catch((error) => {
               // Ids are UUIDs: the API answers 400 to anything else.
               if (error?.status === 400) return null;
@@ -250,10 +257,39 @@ export function createPanoramaxProvider({
               if (!photo) throw new Error(GONE_MESSAGE);
               return photo;
             })
-            .finally(() => inflight.delete(id));
+            .finally(() => {
+              if (inflight.get(id) === lookup) inflight.delete(id);
+            });
+          lookup.promise.catch(() => {});
           inflight.set(id, lookup);
         }
-        return lookup;
+        const shared = lookup;
+        shared.waiting++;
+        if (!signal) shared.waiting = Infinity;
+        return new Promise((resolve, reject) => {
+          const leave = () => {
+            reject(signal.reason);
+            shared.waiting--;
+            // A caller in the same tick (the same photo opened again) may
+            // still join: stop only if nobody has.
+            queueMicrotask(() => {
+              if (shared.waiting > 0) return;
+              shared.controller.abort(signal.reason);
+              if (inflight.get(id) === shared) inflight.delete(id);
+            });
+          };
+          signal?.addEventListener('abort', leave, { once: true });
+          shared.promise.then(
+            (photo) => {
+              signal?.removeEventListener('abort', leave);
+              resolve(photo);
+            },
+            (error) => {
+              signal?.removeEventListener('abort', leave);
+              reject(error);
+            },
+          );
+        });
       }
 
       /**
@@ -281,7 +317,11 @@ export function createPanoramaxProvider({
         size: COVERAGE_TILE_CACHE_SIZE,
         load: (tile, { signal }) =>
           readable(async () =>
-            decodeCoverageTile(await source.getTile(tile, { signal }), tile),
+            decodeCoverageTileSliced(
+              await source.getTile(tile, { signal }),
+              tile,
+              { signal },
+            ),
           ),
       });
       /** A z15 tile's pictures of one sequence, by `z/x/y:sequence`. */
@@ -326,21 +366,40 @@ export function createPanoramaxProvider({
           const tiles = pictureTilesAround(anchor);
           // Known from the start: a picture opening while these load is
           // judged against them (re-centred if outside, left alone inside).
-          drawn = { sequenceId, tiles: new Set(tiles.map(tileKey)) };
-          // The home tile must load; a neighbour that fails only thins the cones.
-          const lists = await Promise.allSettled(
-            tiles.map((tile) => picturesIn(tile, sequenceId, signal)),
-          );
+          const covering = { sequenceId, tiles: new Set(tiles.map(tileKey)) };
+          drawn = covering;
+          const conesOf = (lists) =>
+            thinImages(
+              [
+                ...new Map(
+                  lists.flat().map((image) => [image.id, image]),
+                ).values(),
+              ].sort((a, b) => a.capturedAt - b.capturedAt),
+            );
+          const keyOf = (tile) => `${tileKey(tile)}:${sequenceId}`;
+          // The home tile is needed now (it holds the open picture).
+          const home = await picturesIn(tiles[0], sequenceId, signal);
           signal?.throwIfAborted();
-          if (lists[0].status === 'rejected') throw lists[0].reason;
-          const byId = new Map(
-            lists
-              .flatMap((list) => list.value ?? [])
-              .map((image) => [image.id, image]),
+          // Neighbours already read draw with it; the rest (each up to
+          // 1.4 MB in central Paris) join the cones as they arrive.
+          const neighbours = tiles.slice(1);
+          const kept = neighbours
+            .map((tile) => pictureLists.get(keyOf(tile)))
+            .filter(Boolean);
+          const missing = neighbours.filter(
+            (tile) => !pictureLists.get(keyOf(tile)),
           );
-          return thinImages(
-            [...byId.values()].sort((a, b) => a.capturedAt - b.capturedAt),
-          );
+          if (missing.length)
+            Promise.allSettled(
+              missing.map((tile) => picturesIn(tile, sequenceId, signal)),
+            ).then((lists) => {
+              if (signal?.aborted || drawn !== covering) return;
+              dropFailed(covering, missing, lists);
+              // Only a tile that arrived now redraws (no loop on failures).
+              if (lists.some((list) => list.status === 'fulfilled'))
+                cones.select(sequenceId, { force: true });
+            });
+          return conesOf([home, ...kept]);
         },
         colors: COLORS,
         pickPrefix: PICK_PREFIX.image,
@@ -349,6 +408,17 @@ export function createPanoramaxProvider({
         onHighlight: (sequenceId, selected) =>
           coverage.recolorSequence(sequenceId, selected),
       });
+
+      /**
+       * A tile that failed is not covered: a picture opening in it later
+       * re-centres the cones there (and asks for the tile again).
+       */
+      function dropFailed(covering, tiles, lists) {
+        lists.forEach((list, i) => {
+          if (list.status === 'rejected')
+            covering.tiles.delete(tileKey(tiles[i]));
+        });
+      }
 
       /**
        * The cones show the z15 tiles around one picture: once a picture of
@@ -363,11 +433,23 @@ export function createPanoramaxProvider({
       }
 
       const viewer = createPanoramaxViewer({
-        getPhoto: async (photoId) => {
-          const photo = await getPhoto(photoId);
+        getPhoto,
+        // The cones centre on the picture actually shown, never on a
+        // lookup that came back after the user moved on.
+        onShowing: (photo) => {
           if (photo.sequenceId) anchors.set(photo.sequenceId, photo);
-          return photo;
         },
+        // After a GPU reset the same picture is drawn again by the viewer
+        // itself: through the core it would cancel a lookup the user
+        // started. A failure still shows.
+        onReopen: (photoId) =>
+          viewer
+            .open(photoId)
+            .catch((error) =>
+              context.actions.reportError(
+                error?.message || 'The Panoramax photo could not be loaded',
+              ),
+            ),
         step,
         onStep: (photoId) =>
           context.actions.openImage(photoId, { frame: false }),
@@ -449,9 +531,9 @@ export function createPanoramaxProvider({
         coverageStats() {
           const { kind } = state.coverage;
           const lines = kind === 'sequence';
-          const drawn = coverage.sequenceCount();
+          const shown = coverage.sequenceCount();
           // Density dots are not sequences: they are not counted as such.
-          const count = lines ? drawn : 0;
+          const count = lines ? shown : 0;
           const loading = state.coverage.pending.size > 0;
           const settled = !loading && !state.coverage.lastError;
           let fallback = '';
@@ -461,7 +543,7 @@ export function createPanoramaxProvider({
           );
           if (kind === 'overview')
             fallback =
-              drawn > 0 || !settled
+              shown > 0 || !settled
                 ? OVERVIEW_HINT
                 : filteredOut
                   ? FILTERED_HINT

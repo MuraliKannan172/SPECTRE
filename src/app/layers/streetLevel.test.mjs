@@ -64,6 +64,11 @@ test('the defaults are Mapillary (given its source), Street View, KartaView and 
   assert.equal(layer.getParams().panoramax, true);
   assert.equal(layer.getParams().kartaview, false);
   assert.equal(layer.getParams().mapillary, false);
+  // The form the app writes (the README and CHANGELOG quote it).
+  assert.equal(
+    layer.getParams().providerSwitches,
+    'google-0*kartaview-0*panoramax-1',
+  );
   // Without the application's Street Level source there are none.
   assert.deepEqual(createApplicationStreetLevel({}).providerIds, []);
 });
