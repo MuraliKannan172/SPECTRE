@@ -36,6 +36,8 @@
 
 - Director timeline seeks cross the dateline along the short longitude arc.
 
+- Fire detections with missing or impossible positions are skipped while genuine zero coordinates remain valid.
+
 - Frequently reused terrain batches retain their cached heights ahead of unused cells.
 
 - Recent Imagery’s exported `setBox` and `searchHls` reject missing, blank or
