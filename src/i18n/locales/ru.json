@@ -2246,7 +2246,6 @@
   "loading coverage...": "загрузка покрытия...",
   "live feed unavailable": "поток в реальном времени недоступен",
   "GBFS fetch error": "ошибка загрузки GBFS",
-  "GBFS status update failed": "не удалось обновить статус GBFS",
   "Open the Street Level panel to view imagery": "Откройте панель «Уличные снимки», чтобы их посмотреть",
   "Image could not be opened": "Не удалось открыть снимок",
   "Mapillary rejected MAPILLARY_CLIENT_TOKEN — replace it in Provider Settings": "Mapillary отклонил MAPILLARY_CLIENT_TOKEN — замените его в «Настройках провайдеров»",

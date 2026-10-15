@@ -10,8 +10,7 @@ import { setLocale, translateKnown } from './index.js';
 const SITES = [
   ['../layers/streetLevel/index.js', 'loading coverage...'],
   ['../layers/firms/ingestion.js', 'live feed unavailable'],
-  ['../layers/bikeshare/viewport.js', 'GBFS fetch error'],
-  ['../layers/bikeshare/ingestion.js', 'GBFS status update failed'],
+  ['../layers/bikeshare/controls.js', 'GBFS fetch error'],
   [
     '../layers/streetLevel/viewerHost.js',
     'Open the Street Level panel to view imagery',
