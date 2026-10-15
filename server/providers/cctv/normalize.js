@@ -367,6 +367,28 @@ export function isLikelyCalgaryCoordinate(lat, lon) {
   );
 }
 
+/** New York City's five boroughs, with slack for the harbor and city line. */
+export function isLikelyNycCoordinate(lat, lon) {
+  return (
+    isPlausibleLatLon(lat, lon) &&
+    lat >= 40.45 &&
+    lat <= 40.95 &&
+    lon >= -74.3 &&
+    lon <= -73.65
+  );
+}
+
+/** Mainland Norway, with slack for the coast and the Finnmark border. */
+export function isLikelyNorwayCoordinate(lat, lon) {
+  return (
+    isPlausibleLatLon(lat, lon) &&
+    lat >= 57.9 &&
+    lat <= 71.3 &&
+    lon >= 4.4 &&
+    lon <= 31.3
+  );
+}
+
 export function isLikelyFinlandCoordinate(lat, lon) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
   return lat >= 59.5 && lat <= 70.5 && lon >= 19 && lon <= 32;

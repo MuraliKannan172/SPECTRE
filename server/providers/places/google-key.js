@@ -38,9 +38,10 @@ export function keylessGoogleGeocodeResponse(apiKey) {
  * geocoding, the CCTV Street View fallback). These never reach the browser, so
  * this key can be restricted by server IP and scoped to Places API + Geocoding
  * API + Street View Static API — while GOOGLE_MAPS_API_KEY stays
- * referrer-restricted to Map Tiles for the browser (#33, #363). Splitting them
- * is opt-in: unset, this falls back to the shared browser key, which then has
- * to carry every API both sides use and cannot take a referrer restriction.
+ * referrer-restricted to Map Tiles + Maps JavaScript API for the browser
+ * (#33, #363). Splitting them is opt-in: unset, this falls back to the shared
+ * browser key, which then has to carry every API both sides use and cannot
+ * take a referrer restriction.
  */
 export function googleServerApiKey() {
   return resolveGoogleServerKey(process.env);
