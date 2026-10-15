@@ -174,7 +174,7 @@ export const DATA_CREDITS = [
     html:
       'Air quality (AQHI): Environment and Climate Change Canada — MSC GeoMet ' +
       '(<a href="https://eccc-msc.github.io/open-data/" target="_blank" rel="noopener">eccc-msc.github.io/open-data</a>) ' +
-      '· ECCC Data Servers End-use Licence',
+      '· <a href="https://eccc-msc.github.io/open-data/licence/readme_en/" target="_blank" rel="noopener">ECCC Data Servers End-use Licence</a>',
   },
   {
     key: 'overture-military-names',

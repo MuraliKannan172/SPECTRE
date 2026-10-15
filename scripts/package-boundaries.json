@@ -3587,7 +3587,8 @@
     "modules": [
       "src/layers/airQuality/index.js",
       "src/layers/airQuality/model.js",
-      "src/layers/airQuality/source.js"
+      "src/layers/airQuality/source.js",
+      "src/sources/httpBody.js"
     ],
     "external": ["cesium"]
   },
@@ -3595,7 +3596,8 @@
     "exports": ["./layers/air-quality/source"],
     "modules": [
       "src/layers/airQuality/model.js",
-      "src/layers/airQuality/source.js"
+      "src/layers/airQuality/source.js",
+      "src/sources/httpBody.js"
     ],
     "external": []
   }

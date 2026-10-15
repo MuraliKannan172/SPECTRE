@@ -5,6 +5,7 @@ import {
   AIR_QUALITY_PROVIDERS,
   AIR_QUALITY_UNKNOWN_COLOR,
   OBSERVATION_MAX_AGE_MS,
+  STALE_AFTER_MS,
   airQualityColor,
   aqhiDisplayValue,
   bandForValue,
@@ -12,6 +13,7 @@ import {
   mapAnalystRecord,
   normalizeAqhiObservations,
   normalizeAqhiStations,
+  readingsAreStale,
   readingsInView,
   selectAirQualityOverlayCohort,
   valueLabel,
@@ -144,6 +146,23 @@ test('a stale reading is dropped rather than shown as current', () => {
   assert.deepEqual(
     rows.map((r) => r.stationId),
     ['OAAAA'],
+  );
+});
+
+test('a snapshot whose every observation was too old is stale, not nominal', () => {
+  const stations = normalizeAqhiStations(STATIONS);
+  const old = new Date(NOW - OBSERVATION_MAX_AGE_MS - 60_000).toISOString();
+  const rows = normalizeAqhiObservations(
+    collection([observation('IAKID', 3, old), observation('OAAAA', 4, old)]),
+    stations,
+    NOW,
+  );
+  assert.deepEqual(rows, []);
+  assert.equal(readingsAreStale(rows, NOW), true);
+  assert.equal(readingsAreStale([{ observedMs: NOW - 60_000 }], NOW), false);
+  assert.equal(
+    readingsAreStale([{ observedMs: NOW - STALE_AFTER_MS - 1 }], NOW),
+    true,
   );
 });
 

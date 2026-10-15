@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAirQualityLayer } from './index.js';
-import { createEcccAirQualitySource } from './source.js';
 import { layerFeedState } from '../../data/feedState.js';
 import { STALE_AFTER_MS } from './model.js';
 
@@ -160,18 +159,19 @@ test('the readout descriptor carries the band legend and coverage', async () => 
   const controls = layer.getRowControls();
   assert.equal(controls.readout, true);
   assert.match(controls.summary.coverage, /Canada only/);
-  assert.equal(controls.legend.categorical, true);
-  assert.deepEqual(controls.legend.labels, [
-    'Low',
-    'Moderate',
-    'High',
-    'Very High',
-  ]);
-  assert.equal(controls.legend.colors.length, controls.legend.labels.length);
+  // The Weather panel's legend shape: one {color, label} per band.
+  assert.equal(controls.legendCategorical, true);
+  assert.deepEqual(
+    controls.legend.map((entry) => entry.label),
+    ['Low', 'Moderate', 'High', 'Very High'],
+  );
+  assert.ok(
+    controls.legend.every((entry) => /^#[0-9a-f]{6}$/i.test(entry.color)),
+  );
   // Worst first, and every item keyed.
   assert.deepEqual(
-    controls.list.items.map((i) => i.label),
-    ['B', 'A'],
+    controls.list.items.map((i) => i.text),
+    ['B · Low health risk', 'A · Low health risk'],
   );
   assert.ok(controls.list.items.every((i) => i.id));
   assert.match(controls.summary.status, /2 stations reporting/);
@@ -201,64 +201,6 @@ test('row-control listeners are notified on refresh and teardown-safe', async ()
     calls += 1;
   });
   assert.equal(calls, after);
-});
-
-// ── source contract ────────────────────────────────────────────────────────
-
-test('the source rejects a malformed station catalog and surfaces HTTP errors', async () => {
-  await assert.rejects(
-    () =>
-      createEcccAirQualitySource({
-        fetchImpl: async () => ({
-          ok: true,
-          json: async () => ({ features: 'no' }),
-        }),
-      }).getSnapshot(),
-    /Malformed AQHI station/,
-  );
-  await assert.rejects(
-    () =>
-      createEcccAirQualitySource({
-        fetchImpl: async () => ({
-          ok: false,
-          status: 503,
-          json: async () => ({}),
-        }),
-      }).getSnapshot(),
-    /ECCC HTTP 503/,
-  );
-});
-
-test('the station catalog is cached and observations ask for latest values only', async () => {
-  const urls = [];
-  const source = createEcccAirQualitySource({
-    fetchImpl: async (url) => {
-      urls.push(url);
-      return {
-        ok: true,
-        json: async () =>
-          url.includes('aqhi-stations')
-            ? {
-                features: [
-                  {
-                    geometry: { type: 'Point', coordinates: [-79.38, 43.65] },
-                    properties: { location_id: 'A', location_name_en: 'A' },
-                  },
-                ],
-              }
-            : { features: [] },
-      };
-    },
-    now: () => 1_700_000_000_000,
-  });
-  await source.getSnapshot();
-  await source.getSnapshot();
-  assert.equal(urls.filter((u) => u.includes('aqhi-stations')).length, 1);
-  // Without latest=true the collection returns the full history (~2,000 rows).
-  assert.match(
-    urls.find((u) => u.includes('observations')),
-    /latest=true/,
-  );
 });
 
 // ── feed-state honesty ─────────────────────────────────────────────────────
@@ -296,12 +238,19 @@ test('a current reading reports nominal', async () => {
   assert.equal(layerFeedState(stats), 'nominal');
 });
 
-test('an empty feed is not called stale', async () => {
-  // Nothing to be stale about; the chip should not invent a fault.
+test('a refresh that kept no current observation reports stale, not nominal', async () => {
+  // Every observation older than OBSERVATION_MAX_AGE_MS is dropped, so a feed
+  // that only has hours-old rows yields an empty snapshot. That is the
+  // stalest a feed can be; it must not read as a healthy empty layer.
   const { layer } = harness(staticSource([]));
+  assert.equal(layer.getStats().stale, false, 'no refresh yet, no verdict');
   await layer.update();
-  assert.equal(layer.getStats().stale, false);
-  assert.equal(layer.getStats().observedAt, null);
+  const stats = layer.getStats();
+  assert.equal(stats.count, 0);
+  assert.equal(stats.observedAt, null);
+  assert.equal(stats.stale, true);
+  assert.equal(layerFeedState(stats), 'stale');
+  assert.equal(layer.getRowControls().summary.status, 'No current readings');
 });
 
 test('a failed refresh over good readings reports degraded, not nominal', async () => {

@@ -224,24 +224,25 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
           status: _lastError
             ? _lastError
             : _count === 0
-              ? 'No readings available'
+              ? _lastUpdate === null
+                ? 'No readings available'
+                : 'No current readings'
               : `${_count} stations reporting`,
           units: provider.scale,
         },
-        legend: {
-          colors: AIR_QUALITY_BANDS.map((band) => band.color),
-          labels: AIR_QUALITY_BANDS.map((band) => band.label),
-          units: provider.scale,
-          categorical: true,
-        },
+        legend: AIR_QUALITY_BANDS.map((band) => ({
+          color: band.color,
+          label: band.label,
+        })),
+        legendCategorical: true,
         list: {
           ariaLabel: 'Highest air-quality readings in view',
-          items: inView.map((reading) => ({
+          items: inView.map((reading, index) => ({
             id: reading.id,
-            label: reading.name,
-            value: `${reading.scale} ${reading.label}`,
+            ordinal: index + 1,
+            lead: `${reading.scale} ${reading.label}`,
+            text: `${reading.name} · ${reading.risk}`,
             accent: reading.color,
-            detail: reading.risk,
           })),
         },
       };
@@ -249,30 +250,6 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
 
     setRowControlsListener(listener) {
       rowControlsListener = typeof listener === 'function' ? listener : null;
-    },
-
-    /**
-     * The current reading nearest a point — what "the air quality here" means.
-     * @param {number} lat
-     * @param {number} lon
-     * @returns {object|null} Reading with distanceKm, or null when none loaded.
-     */
-    nearestReading(lat, lon) {
-      if (!Number.isFinite(lat) || !Number.isFinite(lon) || !_readings.length)
-        return null;
-      const cosLat = Math.cos((lat * Math.PI) / 180);
-      let best = null;
-      let bestDistance = Infinity;
-      for (const reading of _readings) {
-        const dLat = (reading.lat - lat) * 111.32;
-        const dLon = (reading.lon - lon) * 111.32 * cosLat;
-        const distance = Math.hypot(dLat, dLon);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          best = reading;
-        }
-      }
-      return best ? { ...best, distanceKm: bestDistance } : null;
     },
 
     /**
@@ -300,7 +277,8 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
         lastUpdate: _lastUpdate,
         error: _lastError,
         observedAt: newestObservation(_readings),
-        stale: readingsAreStale(_readings),
+        // Only a completed refresh can be stale; before one there is no feed.
+        stale: _lastUpdate !== null && readingsAreStale(_readings),
       };
     },
   };

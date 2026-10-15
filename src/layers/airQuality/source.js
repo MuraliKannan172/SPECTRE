@@ -1,3 +1,4 @@
+import { readResponseJsonCapped } from '../../sources/httpBody.js';
 import { normalizeAqhiStations, normalizeAqhiObservations } from './model.js';
 
 const COLLECTIONS_ROOT = 'https://api.weather.gc.ca/collections';
@@ -9,6 +10,8 @@ const STATION_LIMIT = 500;
 const OBSERVATION_LIMIT = 500;
 /** Station geometry is near-static — a few changes a year. Refetch twice a day. */
 const STATION_TTL_MS = 12 * 60 * 60 * 1000;
+/** A full 500-row GeoJSON page is a few hundred KB; anything past this is not a page. */
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
 /**
  * Request and validate a complete ECCC AQHI snapshot before it can replace
@@ -26,26 +29,47 @@ const STATION_TTL_MS = 12 * 60 * 60 * 1000;
  * @param {object} [options]
  * @param {Function} [options.fetchImpl] - Injected fetch, for tests.
  * @param {() => number} [options.now] - Clock seam, for tests.
+ * @param {number} [options.timeoutMs=15000] - Deadline for each request.
  * @returns {{getSnapshot: Function}}
  */
 export function createEcccAirQualitySource({
   fetchImpl = (...args) => globalThis.fetch(...args),
   now = () => Date.now(),
+  timeoutMs = 15_000,
 } = {}) {
   /** @type {Map<string, object>} */
   let stations = new Map();
   let stationsFetchedAt = 0;
 
-  const getJson = async (url, signal) => {
-    signal?.throwIfAborted();
-    const response = await fetchImpl(url, {
-      headers: { Accept: 'application/json' },
-      signal,
-    });
-    if (!response.ok) throw new Error(`ECCC HTTP ${response.status}`);
-    const payload = await response.json();
-    signal?.throwIfAborted();
-    return payload;
+  /** One bounded GeoJSON page: deadline, caller abort, byte cap, row cap. */
+  const getJson = async (url, limit, signal) => {
+    const controller = new AbortController();
+    const abort = () => controller.abort(signal.reason);
+    signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(
+      () => controller.abort(new Error('ECCC request timed out')),
+      timeoutMs,
+    );
+    try {
+      signal?.throwIfAborted();
+      const response = await fetchImpl(url, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`ECCC HTTP ${response.status}`);
+      const payload = await readResponseJsonCapped(
+        response,
+        MAX_RESPONSE_BYTES,
+        controller.signal,
+      );
+      // The server's `limit` is a request, not a guarantee.
+      if (Array.isArray(payload?.features) && payload.features.length > limit)
+        return { ...payload, features: payload.features.slice(0, limit) };
+      return payload;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+    }
   };
 
   return {
@@ -54,6 +78,7 @@ export function createEcccAirQualitySource({
       if (stations.size === 0 || clock - stationsFetchedAt > STATION_TTL_MS) {
         const payload = await getJson(
           `${STATIONS_URL}?f=json&limit=${STATION_LIMIT}`,
+          STATION_LIMIT,
           signal,
         );
         const next = normalizeAqhiStations(payload);
@@ -68,6 +93,7 @@ export function createEcccAirQualitySource({
 
       const payload = await getJson(
         `${OBSERVATIONS_URL}?f=json&latest=true&limit=${OBSERVATION_LIMIT}`,
+        OBSERVATION_LIMIT,
         signal,
       );
       const readings = normalizeAqhiObservations(payload, stations, clock);

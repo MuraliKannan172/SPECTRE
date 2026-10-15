@@ -67,14 +67,17 @@ export function newestObservation(readings) {
 }
 
 /**
- * Is a set of readings stale, judged on source observation time?
+ * Is a set of readings stale, judged on source observation time? An empty
+ * set is stale: a refresh that kept no current observation has nothing live.
  * @param {Array<object>} readings
  * @param {number} [now=Date.now()]
  * @returns {boolean}
  */
 export function readingsAreStale(readings, now = Date.now()) {
   const newest = newestObservation(readings);
-  if (newest === null) return false; // nothing to be stale about
+  // No current observation at all — every row was dropped as too old or
+  // unusable — is the stalest a feed can be, not a nominal one.
+  if (newest === null) return true;
   return now - newest > STALE_AFTER_MS;
 }
 
