@@ -11,6 +11,18 @@
   sets the cap and `CCTV_KINGCOUNTY_ENABLED=0` turns the pack off
   (bassem chagra, #645).
 
+- Add City of Toronto RESCU traffic cameras as a keyless CCTV source pack: the
+  ~336 municipal cameras the Ontario 511 pack does not carry — downtown
+  arterials plus the Gardiner, DVP, Allen and Lake Shore. The list is the
+  City's own open data feed; frames are built from the documented
+  `loc####.jpg` convention and a digits-only camera number, so the frame proxy
+  is pinned to the portal origin by construction. The dataset publishes no
+  camera facing — its `D1`-`D4` fields describe static 2016 comparison images,
+  not the live pan-tilt-zoom frame — so headings use the shared id-hash
+  fallback at low confidence and are corrected with the calibration gizmo.
+  Carries the required Open Government Licence – Toronto attribution. Disable
+  with `CCTV_TORONTO_ENABLED=0`.
+
 - Stop one retired bikeshare feed from reporting the whole layer as failed.
   City feeds are fetched independently, but failure was recorded in a single
   flag that only a successful *activation* cleared — and an already-loaded city
