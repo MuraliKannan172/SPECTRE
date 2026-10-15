@@ -130,7 +130,7 @@ export function fetchPinnedRadioResponse(url, options, addresses) {
         // Nothing thrown here may escape: this callback runs outside the
         // promise, so an exception would be uncaught and crash the server.
         try {
-          const status = response.statusCode;
+          const status = response.statusCode || 500;
           // A `Response` only represents statuses up to 599; Node never hands
           // this callback a 1xx.
           if (status > 599)
