@@ -37,6 +37,30 @@
   @meirm (#601), with the Russian catalog started from #312. It also fails on UI text that is
   not marked at all, so the whole interface, including surfaces added after
   the original extraction, is translated (1,679 messages).
+- Street Level counts unique tiles before ranking so overlapping dateline halves
+  in polar views do not waste slots in the 16-tile overview budget.
+
+- Directions no longer shows a truncation notice for a route with exactly 200
+  turns, and a roundabout at the 200th turn keeps its exit distance.
+
+- Weather records keep missing conditions unknown and refuse summaries without a measured temperature.
+
+- Tool string length validation counts Unicode characters correctly, including characters outside the basic multilingual plane.
+
+- Director timeline seeks cross the dateline along the short longitude arc.
+
+- Map state updates stop delivering to subscribers removed during the same notification.
+
+- Director assets cancelled during the final stream read are discarded with reader cleanup.
+
+- Analyst queries preserve useful rows when an upstream timestamp is outside the supported date range.
+
+- Fire detections with missing or impossible positions are skipped while genuine zero coordinates remain valid.
+
+- Frequently reused terrain batches retain their cached heights ahead of unused cells.
+
+- Recent Imagery’s exported `setBox` and `searchHls` reject missing, blank or
+  boolean programmatic box edges instead of interpreting them as zero coordinates.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
