@@ -40,10 +40,10 @@ let upstreamMemo = { raw: null, endpoints: [], tag: 'none' };
  */
 function upstreamTag(endpoints) {
   if (!endpoints.length) return 'none';
-  return createHash('sha1')
-    .update(endpoints.join('\n'))
-    .digest('hex')
-    .slice(0, 12);
+  // Sorted, so reordering the same instances for failover keeps the cache.
+  return createHash('sha256')
+    .update([...endpoints].sort().join('\n'))
+    .digest('hex');
 }
 
 /** Resolve after environment loading. Public Overpass instances are not used by default. */
