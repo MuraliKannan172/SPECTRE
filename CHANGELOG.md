@@ -3,11 +3,12 @@
 - Add WSDOT highway cameras (Washington State) as a keyless CCTV source pack:
   WSDOT's official Travel Center camera layer, with frames registered only on
   WSDOT's own image host (partner-hosted cameras such as Oregon DOT and City of
-  Seattle are skipped). Cameras with a single `CompassDirection`, cardinal or
-  diagonal, get a high-confidence heading; `BW` (Bothways) cameras use the
-  shared id-hash fallback at low confidence. By default the 250 cameras nearest
-  Seattle and Spokane load; `CCTV_WSDOT_MAX_SOURCES` sets the cap and
-  `CCTV_WSDOT_ENABLED=0` turns the pack off (bassem chagra, #644).
+  Seattle are skipped). Cameras with a single cardinal `CompassDirection` get
+  a high-confidence heading; `B` (both directions), `O`, and unset directions
+  use the shared id-hash fallback at low confidence. By default the 250
+  cameras nearest Seattle and Spokane load; `CCTV_WSDOT_MAX_SOURCES` sets the
+  cap (8–1,200) and `CCTV_WSDOT_ENABLED=0` turns the pack off (bassem chagra,
+  #644).
 
 - Stop one retired bikeshare feed from reporting the whole layer as failed.
   City feeds are fetched independently, but failure was recorded in a single

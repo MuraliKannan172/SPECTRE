@@ -1,8 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createCctvCatalog } from '../../server/providers/cctv/catalog.js';
 import {
   DEFAULT_WSDOT_MAX_SOURCES,
   WSDOT_CAMERAS_URL,
+  WSDOT_MAX_CATALOG_BYTES,
 } from '../../server/providers/cctv/constants.js';
 import {
   loadWsdotSourcesFromOpenData,
@@ -89,7 +94,7 @@ test('WSDOT loader keeps official-host cameras and maps compass directions', asy
           },
         }),
         wsdotFeature(9059, 47.66, -117.43, {
-          attributes: { CompassDirection: 'BW' },
+          attributes: { CompassDirection: 'B' },
         }),
         // Partner-hosted frame (Oregon DOT): skipped, never proxied.
         wsdotFeature(1002, 45.62, -122.675, {
@@ -127,7 +132,7 @@ test('WSDOT loader keeps official-host cameras and maps compass directions', asy
   assert.ok(Math.abs(seattle.lat - 47.6097) < 0.001);
   assert.ok(Math.abs(seattle.lon - -122.3331) < 0.001);
 
-  // `BW` (Bothways) carries no single facing: id-hash fallback at low
+  // `B` (both directions) carries no single facing: id-hash fallback at low
   // confidence, with the low-confidence pose personality.
   const spokane = cameras.find((camera) => camera.id === 'wsdot-9059');
   assert.equal(spokane.headingConfidence, 'low');
@@ -135,7 +140,7 @@ test('WSDOT loader keeps official-host cameras and maps compass directions', asy
   assert.ok(spokane.headingDeg >= 0 && spokane.headingDeg < 360);
 });
 
-test('WSDOT loader maps every documented CompassDirection code', async (t) => {
+test('WSDOT loader maps every CompassDirection code', async (t) => {
   quiet(t);
   withEnv(t, { CCTV_WSDOT_MAX_SOURCES: undefined });
   const codes = {
@@ -150,7 +155,8 @@ test('WSDOT loader maps every documented CompassDirection code', async (t) => {
     // Lower-case and padded codes are the same code.
     ' nw ': 315,
   };
-  const noFacing = ['BW', 'O', null];
+  // The live feed's no-facing codes, plus an unknown one.
+  const noFacing = ['B', 'O', null, 'BW'];
   const entries = [...Object.keys(codes), ...noFacing];
   t.mock.method(globalThis, 'fetch', async () =>
     cp1252Response({
@@ -206,4 +212,91 @@ test('WSDOT loader defaults its cap and survives upstream failure', async (t) =>
     throw new Error('network down');
   });
   assert.deepEqual(await loadWsdotSourcesFromOpenData(), []);
+});
+
+test('the catalog fetch refuses a redirect and cancels its body', async (t) => {
+  quiet(t);
+  // A redirect is never followed, and its still-open body is cancelled.
+  const seen = [];
+  const state = { cancelled: false };
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    seen.push([String(url), init.redirect]);
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{'));
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    });
+    return new Response(body, {
+      status: 302,
+      headers: { location: 'https://evil.example/Cameras.json' },
+    });
+  });
+  assert.deepEqual(await loadWsdotSourcesFromOpenData(), []);
+  assert.deepEqual(seen, [[WSDOT_CAMERAS_URL, 'manual']]);
+  assert.equal(state.cancelled, true, 'the redirect body is cancelled');
+});
+
+test('the catalog fetch refuses a body over the byte cap', async (t) => {
+  quiet(t);
+  // A valid catalog padded past the cap is refused rather than buffered.
+  t.mock.method(globalThis, 'fetch', async () => {
+    const text = JSON.stringify({
+      features: [wsdotFeature(1001, 47.6097, -122.3331)],
+    });
+    const padded = text + ' '.repeat(WSDOT_MAX_CATALOG_BYTES);
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(padded));
+          controller.close();
+        },
+      }),
+      { headers: { 'Content-Type': 'application/json' } },
+    );
+  });
+  assert.deepEqual(await loadWsdotSourcesFromOpenData(), []);
+});
+
+test('CCTV_WSDOT_ENABLED=0 skips the WSDOT request', async (t) => {
+  quiet(t);
+  const sourceRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'gev-cctv-catalog-'),
+  );
+  t.after(() => fs.rmSync(sourceRoot, { recursive: true, force: true }));
+  withEnv(t, {
+    CCTV_SOURCES_FILE: undefined,
+    CCTV_SOURCES_JSON: undefined,
+    CCTV_FORCE_AUSTIN: undefined,
+    CCTV_PREFER_AUSTIN: undefined,
+    CCTV_MAX_SOURCES: undefined,
+    CCTV_WSDOT_ENABLED: undefined,
+    CCTV_WSDOT_MAX_SOURCES: undefined,
+  });
+  const requested = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    requested.push(String(url));
+    // Every other live pack is down; only WSDOT answers.
+    return String(url) === WSDOT_CAMERAS_URL
+      ? cp1252Response({ features: [wsdotFeature(1001, 47.6097, -122.3331)] })
+      : new Response('unavailable', { status: 503 });
+  });
+
+  const sources = await createCctvCatalog({ sourceRoot })();
+  assert.deepEqual(
+    sources.map((source) => source.id),
+    ['wsdot-1001'],
+  );
+
+  process.env.CCTV_WSDOT_ENABLED = '0';
+  requested.length = 0;
+  assert.deepEqual(await createCctvCatalog({ sourceRoot })(), []);
+  assert.ok(requested.length > 0, 'the other live packs still load');
+  assert.equal(
+    requested.includes(WSDOT_CAMERAS_URL),
+    false,
+    'a disabled pack makes no request',
+  );
 });

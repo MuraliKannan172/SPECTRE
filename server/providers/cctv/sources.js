@@ -63,6 +63,7 @@ import {
   WSDOT_IMAGE_ORIGIN,
   DEFAULT_WSDOT_MAX_SOURCES,
   WSDOT_ANCHORS,
+  WSDOT_MAX_CATALOG_BYTES,
   DEFAULT_VEGVESEN_CCTV_URL,
   VEGVESEN_IMAGE_ORIGIN,
   VEGVESEN_VIDEO_URL,
@@ -100,7 +101,10 @@ import {
   prioritizeSources,
 } from './normalize.js';
 import { directionToHeading } from '../../../src/data/directionText.js';
-import { readResponseJsonCapped } from '../common/http.js';
+import {
+  readResponseBytesCapped,
+  readResponseJsonCapped,
+} from '../common/http.js';
 /**
  * Fetch and parse Austin traffic camera records from the city Open Data portal.
  *
@@ -1721,10 +1725,10 @@ export async function loadDelDOTSourcesFromOpenData() {
   }
 }
 
-/** WSDOT `CompassDirection` codes as headings in degrees, per the layer's own
- * metadata (N/E/S/W, NE/NW/SE/SW, BW = Bothways). `BW` and anything else
- * (`O`, null, unknown codes) carry no single facing and fall through to the
- * id hash. */
+/** WSDOT `CompassDirection` codes as headings in degrees. The live feed sends
+ * single cardinals (N/E/S/W), `B` (both directions — most rows), `O`, and
+ * null; the diagonals are mapped in case they appear. `B`, `O`, null, and any
+ * other code carry no single facing and fall through to the id hash. */
 const WSDOT_COMPASS_HEADINGS = Object.freeze({
   N: 0,
   NE: 45,
@@ -1770,9 +1774,9 @@ function isLikelyWashingtonCoordinate(lat, lon) {
  * finite in-state coordinates, and a frame on WSDOT's own image host are
  * kept — the catalog's ~70 partner cameras (Oregon DOT, City of Seattle,
  * lodges, airports) are skipped rather than proxied under someone else's
- * terms. A single-facing `CompassDirection` (cardinal or diagonal) gives a
- * high-confidence heading; `BW` (Bothways) and `O`/null fall back to the id
- * hash.
+ * terms. A single-facing `CompassDirection` (a cardinal) gives a
+ * high-confidence heading; `B` (both directions), `O`, and null fall back to
+ * the id hash.
  * The feed carries Windows-1252 bytes (en-dashes in titles) with no charset
  * declaration, so the body is decoded explicitly before parsing.
  *
@@ -1782,14 +1786,31 @@ export async function loadWsdotSourcesFromOpenData() {
   try {
     const resp = await fetch(WSDOT_CAMERAS_URL, {
       headers: { Accept: 'application/json' },
+      redirect: 'manual',
       signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
+    const discard = async () => {
+      try {
+        await resp.body?.cancel();
+      } catch {
+        /* no-op */
+      }
+      return [];
+    };
+    if (resp.status >= 300 && resp.status < 400) {
+      console.warn(
+        '[CCTV] WSDOT catalog redirected; redirects are not followed',
+      );
+      return discard();
+    }
     if (!resp.ok) {
       console.warn('[CCTV] WSDOT camera download failed:', resp.status);
-      return [];
+      return discard();
     }
     const payload = JSON.parse(
-      new TextDecoder('windows-1252').decode(await resp.arrayBuffer()),
+      new TextDecoder('windows-1252').decode(
+        await readResponseBytesCapped(resp, WSDOT_MAX_CATALOG_BYTES),
+      ),
     );
     const rows = Array.isArray(payload?.features) ? payload.features : [];
 
