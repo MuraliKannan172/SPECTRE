@@ -9,9 +9,8 @@ import {
 } from './keySetup.js';
 
 test('setup placement moves the same button only in Cyber and disconnects on teardown', () => {
-  const home = {};
+  const home = { prepend: (node) => { node.parentNode = home; } };
   const chip = { parentNode: home, hidden: true };
-  const root = { parentNode: home, before: (node) => { node.parentNode = home; } };
   let moves = 0;
   const toolbar = { append: (node) => { moves++; node.parentNode = toolbar; } };
   const theme = { dataset: { uiTheme: 'tactical' } };
@@ -28,7 +27,7 @@ test('setup placement moves the same button only in Cyber and disconnects on tea
     documentElement: theme,
     getElementById: () => toolbar,
     defaultView: { MutationObserver: Observer },
-  }, chip, root);
+  }, chip);
   assert.equal(chip.parentNode, home);
   for (const variant of ['cyber', 'operator', 'cyber', 'minimal']) {
     theme.dataset.uiTheme = variant;
