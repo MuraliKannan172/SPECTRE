@@ -178,6 +178,17 @@
 
 ## [Unreleased]
 
+- Bound six upstream body reads (FIRMS CSV, CelesTrak TLE groups, adsb.lol
+  `/v2/mil`, TomTom flow tiles, OpenSky `states/all` and adsbdb lookups) with
+  streaming size caps that cancel the body at the cap or the route's deadline;
+  the adsb.lol military poll gains a deadline of its own. An oversized OpenSky
+  snapshot is not retried, and an OpenSky 429 starts its cooldown before the
+  body is read.
+
+- Keep later satellites when a TLE catalog entry is missing an orbital line.
+  The parser skips the incomplete set and resumes at the next complete named
+  set, instead of losing the rest of the group (#906).
+
 - Satellite clouds keep Clouds only / Full as quick endpoints and add a continuous
   cloud-filter slider: 0% is Full, 100% is the existing brightness key, and
   intermediate values blend the keyed alpha. The slider commits on release to
