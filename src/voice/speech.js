@@ -401,7 +401,9 @@ function setLayerVisibility(result, args = {}) {
 
 function flyToLocation(result) {
   const label = spokenLabel(result?.label || result?.query || 'there');
-  const title = spokenLabel(result?.label || result?.query) || t('there');
+  const title =
+    spokenLabel(localizePlaceName(result?.label || result?.query)) ||
+    t('there');
   if (result?.cancelled) return null;
   if (!result?.ok) {
     return {
@@ -481,7 +483,9 @@ function selectNearestAircraft(result) {
   );
   const noun = LAYER_NOUNS[result?.layerId] || 'aircraft';
   const shownLocation =
-    spokenLabel(result?.location?.label || result?.location) || t('there');
+    spokenLabel(
+      localizePlaceName(result?.location?.label || result?.location),
+    ) || t('there');
   const feed = result?.feed || {};
   const sources = shownSources(feed.source);
   if (result?.cancelled) return null;
