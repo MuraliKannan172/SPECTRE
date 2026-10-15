@@ -36,7 +36,7 @@
 
 - Director timeline seeks cross the dateline along the short longitude arc.
 
-- Reject impossible FIRMS acquisition calendar days in the CSV parser before trailing-24-hour filtering.
+- Regional articles retain unknown publication times when compact source dates do not identify a real calendar instant.
 
 - Treat explicitly current, complete empty vessel coverage as a successful update,
   clearing obsolete contacts while retaining stale or incomplete snapshots.
