@@ -14,6 +14,8 @@ export const NAVIGATION_AUTHORITY_EVENT = 'gev:navigation-authority-taken';
 // The Cockpit refusal per destination noun. Nouns are English identifiers
 // from the callers ('camera', 'location', 'photo'…); a noun without its own
 // sentence falls back to the template with the noun as given.
+// navigationPolicyFrame.test.mjs collects every noun the callers pass and
+// fails when one has no sentence here.
 const COCKPIT_REFUSALS = Object.freeze({
   camera: msg('Exit cockpit to fly to a camera'),
   location: msg('Exit cockpit to fly to a location'),
@@ -29,7 +31,17 @@ const COCKPIT_REFUSALS = Object.freeze({
   // «View coverage» button); the cyclone layer flies to the selected storm.
   weather: msg('Exit cockpit to view weather coverage'),
   cyclone: msg('Exit cockpit to fly to a cyclone'),
+  // Voice track_entity (TRACKABLE_FAMILIES kinds in gevActions.js) and
+  // frame_overhead, which frames the contacts around the current view.
+  aircraft: msg('Exit cockpit to fly to an aircraft'),
+  satellite: msg('Exit cockpit to fly to a satellite'),
+  frame: msg('Exit cockpit to frame contacts'),
 });
+
+/** The destination nouns with their own Cockpit refusal (for tests). */
+export const COCKPIT_REFUSAL_NOUNS = Object.freeze(
+  Object.keys(COCKPIT_REFUSALS),
+);
 
 function cockpitRefusal(noun) {
   const ready = COCKPIT_REFUSALS[noun];

@@ -2854,5 +2854,95 @@
   },
   "FOV {value}° (DATASHEET)": "ОБЗОР {value}° (ПО ПАСПОРТУ)",
   "SPEC FOV {span}° (CAPABILITY)": "ОБЗОР ПО ПАСПОРТУ {span}° (ВОЗМОЖНОСТИ)",
-  "{spec} · SPECS: CCTV-DATABASE.COM": "{spec} · ХАРАКТЕРИСТИКИ: CCTV-DATABASE.COM"
+  "{spec} · SPECS: CCTV-DATABASE.COM": "{spec} · ХАРАКТЕРИСТИКИ: CCTV-DATABASE.COM",
+  "Canada only · ECCC AQHI network": "Только Канада · сеть AQHI ECCC",
+  "{count} stations reporting": {
+    "one": "{count} станция передаёт данные",
+    "few": "{count} станции передают данные",
+    "many": "{count} станций передают данные",
+    "other": "{count} станции передают данные"
+  },
+  "No readings available": "Нет доступных показаний",
+  "No current readings": "Нет актуальных показаний",
+  "Low health risk": "Низкий риск для здоровья",
+  "Moderate health risk": "Умеренный риск для здоровья",
+  "High health risk": "Высокий риск для здоровья",
+  "Very High health risk": "Очень высокий риск для здоровья",
+  "Air quality request failed": "Не удалось запросить данные о качестве воздуха",
+  "ECCC request timed out": "Истекло время ожидания запроса к ECCC",
+  "Malformed AQHI station response": "Некорректный ответ со станциями AQHI",
+  "Malformed AQHI observation response": "Некорректный ответ с наблюдениями AQHI",
+  "No AQHI stations available": "Нет доступных станций AQHI",
+  "{n} air quality": {
+    "one": "{n} станция качества воздуха",
+    "few": "{n} станции качества воздуха",
+    "many": "{n} станций качества воздуха",
+    "other": "{n} станции качества воздуха"
+  },
+  "GNSS feed rate limited (HTTP 429)": "Поток GNSS: превышен лимит запросов (HTTP 429)",
+  "GNSS feed unavailable (HTTP {status})": "Поток GNSS недоступен (HTTP {status})",
+  "GNSS snapshot needs a view anchor": "Для снимка GNSS нужна опорная точка вида",
+  "Malformed GNSS integrity snapshot": "Некорректный снимок целостности GNSS",
+  "GNSS integrity snapshot has no observation time": "В снимке целостности GNSS нет времени наблюдения",
+  "{feed} feed unavailable": "Поток {feed} недоступен",
+  "Loading {feeds}": "Загрузка: {feeds}",
+  "{count} CelesTrak groups unavailable": {
+    "one": "{count} группа CelesTrak недоступна",
+    "few": "{count} группы CelesTrak недоступны",
+    "many": "{count} групп CelesTrak недоступны",
+    "other": "{count} группы CelesTrak недоступны"
+  },
+  "Malformed launch snapshot": "Некорректный снимок запусков",
+  "Malformed perimeter snapshot": "Некорректный снимок периметров",
+  "Overpass returned an incomplete camera response": "Overpass вернул неполный ответ о камерах",
+  "Fly below {km} km to a covered region": "Опуститесь ниже {km} км над регионом с покрытием",
+  "No feed here yet · {n} regions available": {
+    "one": "Здесь пока нет потока данных · доступен {n} регион",
+    "few": "Здесь пока нет потока данных · доступно {n} региона",
+    "many": "Здесь пока нет потока данных · доступно {n} регионов",
+    "other": "Здесь пока нет потока данных · доступно {n} региона"
+  },
+  "Wind speed field unavailable": "Поле скорости ветра недоступно",
+  "Decoder feeds": "Потоки декодера",
+  "WebUSB + decoder feeds": "WebUSB + потоки декодера",
+  "opening receiver": "открытие приёмника",
+  "checking decoder feeds": "проверка потоков декодера",
+  "listening": "приём",
+  "USB error": "ошибка USB",
+  "{count} heard": {
+    "one": "слышно бортов: {count}",
+    "few": "слышно бортов: {count}",
+    "many": "слышно бортов: {count}",
+    "other": "слышно бортов: {count}"
+  },
+  "{rate} msg/s": "{rate} сообщ./с",
+  "USB {rate} msg/s": "USB {rate} сообщ./с",
+  "{count} feeds live": {
+    "one": "{count} поток онлайн",
+    "few": "{count} потока онлайн",
+    "many": "{count} потоков онлайн",
+    "other": "{count} потока онлайн"
+  },
+  "feeds {names} stale": {
+    "one": "поток {names} устарел",
+    "few": "потоки {names} устарели",
+    "many": "потоки {names} устарели",
+    "other": "потоки {names} устарели"
+  },
+  "feeds {names} unreachable": {
+    "one": "поток {names} недоступен",
+    "few": "потоки {names} недоступны",
+    "many": "потоки {names} недоступны",
+    "other": "потоки {names} недоступны"
+  },
+  "feeds {names} invalid": {
+    "one": "поток {names} некорректен",
+    "few": "потоки {names} некорректны",
+    "many": "потоки {names} некорректны",
+    "other": "потоки {names} некорректны"
+  },
+  "unsaved provider keys": "несохранённые ключи провайдеров",
+  "Exit cockpit to fly to an aircraft": "Выйдите из кабины, чтобы перелететь к самолёту",
+  "Exit cockpit to fly to a satellite": "Выйдите из кабины, чтобы перелететь к спутнику",
+  "Exit cockpit to frame contacts": "Выйдите из кабины, чтобы показать контакты в кадре"
 }

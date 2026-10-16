@@ -344,12 +344,37 @@ function shownPair(items) {
     : items[0] || '';
 }
 
-/** Ids such as `austin` or `local-firms` read as names on screen. */
-// A place as the card shows it: a preset city in the interface language,
-// whether the call named it ("Tokyo") or gave its id ("tokyo").
-function shownPlace(value, max) {
-  return localizePlaceName(displayName(value, max));
+/**
+ * The preset city ids the voice tools take (the `locationId` enum in
+ * actionSchemas.js) and the CITY_POIS names they stand for, so `sf` reads
+ * "San Francisco", not "Sf". A copy, not an import: src/locations.js pulls in
+ * Cesium. planStepPresetIds.i18n.test.mjs keeps it in step with CITY_POIS.
+ */
+const PRESET_PLACE_NAMES = Object.freeze({
+  austin: 'Austin',
+  sf: 'San Francisco',
+  nyc: 'New York',
+  tokyo: 'Tokyo',
+  london: 'London',
+  paris: 'Paris',
+  dubai: 'Dubai',
+  dc: 'Washington DC',
+  tallinn: 'Tallinn',
+});
+
+/** A preset city id as its English name; any other value unchanged. */
+function presetPlaceName(value) {
+  const id = typeof value === 'string' ? value.trim() : '';
+  return Object.hasOwn(PRESET_PLACE_NAMES, id) ? PRESET_PLACE_NAMES[id] : value;
 }
+
+// A place as the card shows it: a preset city in the interface language,
+// whether the call named it ("Tokyo") or gave its id ("tokyo", "nyc").
+function shownPlace(value, max) {
+  return localizePlaceName(displayName(presetPlaceName(value), max));
+}
+
+/** Ids such as `austin` or `local-firms` read as names on screen. */
 
 function displayName(value, max) {
   const label = spokenLabel(value, max);
@@ -915,9 +940,15 @@ export function narrationLabel(name, args = {}) {
     case 'annotate_map':
       return annotationTargets(args)[0] || '';
     case 'fly_to_location':
-      return displayName(args.query || args.locationId || '', 32);
+      return displayName(
+        presetPlaceName(args.query || args.locationId || ''),
+        32,
+      );
     case 'select_nearest_aircraft':
-      return displayName(args.locationQuery || args.locationId || '', 32);
+      return displayName(
+        presetPlaceName(args.locationQuery || args.locationId || ''),
+        32,
+      );
     default:
       return '';
   }

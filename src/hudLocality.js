@@ -29,7 +29,7 @@ export const NEAR_POI_MAX_KM = 150;
  */
 const ENGLISH_LOCALITY = Object.freeze({
   near: ({ poi, city, distKm }) =>
-    `NEAR ${poi} (${city}) ${Math.round(distKm)}KM`,
+    `NEAR ${poi.toUpperCase()} (${city.toUpperCase()}) ${Math.round(distKm)}KM`,
   sector: ({ latDeg, lonDeg }) =>
     `SECTOR ${coordinateTag(latDeg, 'N', 'S')} ${coordinateTag(lonDeg, 'E', 'W')}`,
 });
@@ -54,7 +54,9 @@ function coordinateTag(value, positive, negative) {
  * @param {number} latDeg Camera latitude in decimal degrees.
  * @param {number} lonDeg Camera longitude in decimal degrees.
  * @param {{near: Function, sector: Function}} [format] Builds the line from
- *   `{ poi, city, distKm }` (names upper-cased) or `{ latDeg, lonDeg }`.
+ *   `{ poi, city, distKm }` or `{ latDeg, lonDeg }`. The names arrive as
+ *   catalogued (`Tokyo`), so a formatter can translate them first and
+ *   upper-case the result in the page's language.
  * @returns {string} `NEAR <POI> (<CITY>) <N>KM` within the bound (inclusive),
  *   otherwise `SECTOR <lat> <lon>`.
  */
@@ -67,8 +69,8 @@ export function composeLocalityTag(
   const distKm = Number(nearest?.distKm);
   if (nearest && Number.isFinite(distKm) && distKm <= NEAR_POI_MAX_KM) {
     return format.near({
-      poi: String(nearest.poi).toUpperCase(),
-      city: String(nearest.city).toUpperCase(),
+      poi: String(nearest.poi),
+      city: String(nearest.city),
       distKm,
     });
   }

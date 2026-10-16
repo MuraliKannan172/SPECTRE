@@ -31,6 +31,14 @@ const LEVEL_LABELS = Object.freeze({
   high: msg('Low-accuracy score > 10%'),
 });
 
+/** A source failure (English data, source.js) in the UI language. */
+function shownSourceError(text) {
+  const http = /^GNSS feed unavailable \(HTTP (\d{3})\)$/.exec(text);
+  return http
+    ? t('GNSS feed unavailable (HTTP {status})', { status: http[1] })
+    : translateKnown(text);
+}
+
 /** Degrees at the centre of the current view, or null before the camera settles. */
 export function defaultGnssViewAnchor(viewer) {
   const canvas = viewer?.scene?.canvas;
@@ -377,7 +385,7 @@ export function createGnssIntegrityLayer({
             'Regional sample · 250 nm radius · cells from visited views over 30 min',
           ) +
           (_lastError && _retryAt
-            ? ` · ${translateKnown(_lastError)} · ${
+            ? ` · ${shownSourceError(_lastError)} · ${
                 _retryAt <= 8640000000000000
                   ? t('Retrying automatically at {time} UTC', {
                       time: new Date(_retryAt).toISOString().slice(11, 19),

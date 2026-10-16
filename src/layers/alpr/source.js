@@ -245,7 +245,7 @@ export function createOverpassAlprSource({
     // The shared proxy already rejects query errors. Validate here too so a
     // malformed or partial response never becomes an authoritative empty map.
     if (!Array.isArray(payload?.elements) || payload.remark) {
-      throw new Error('Overpass returned an incomplete camera response');
+      throw new Error(msg('Overpass returned an incomplete camera response'));
     }
     return {
       records: [

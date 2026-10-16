@@ -35,7 +35,7 @@ import {
   DEFAULT_HUD_LAYOUT,
   normalizeHudLayout,
 } from './hudLayouts.js';
-import { formatNumber, msg, t } from './i18n/index.js';
+import { formatNumber, getLocale, msg, t } from './i18n/index.js';
 import { unitLabel } from './ui/unitLabels.js';
 import { localizeLayerName } from './ui/layerPanel.js';
 import { localizePlaceName } from './ui/placeNames.js';
@@ -155,10 +155,12 @@ function hudCoordinate(value, positive, negative) {
 
 /** The summary's locality line in the active language (see hudLocality.js). */
 const LOCALIZED_LOCALITY = Object.freeze({
+  // Translate the catalogued name (`Tokyo`), then upper-case it in the page's
+  // language: the place-name table knows `Tokyo`, not `TOKYO`.
   near: ({ poi, city, distKm }) =>
     t('NEAR {poi} ({city}) {distance}', {
-      poi,
-      city: localizePlaceName(city),
+      poi: poi.toLocaleUpperCase(getLocale()),
+      city: localizePlaceName(city).toLocaleUpperCase(getLocale()),
       distance: hudQuantity(Math.round(distKm), 'km'),
     }),
   sector: ({ latDeg, lonDeg }) =>

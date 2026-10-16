@@ -94,11 +94,13 @@ export function t(text, values) {
 /**
  * Translate a count-dependent message. The catalog entry for `other` holds
  * one form per Intl.PluralRules category of the locale ({ one, few, many, other }
- * for Russian). `{count}` is always available to the pattern.
+ * for Russian). `{count}` is always available to the pattern: the raw number,
+ * unless `values.count` gives its display text, e.g. `formatNumber(n)`.
  * @param {number} count
  * @param {string} one English singular, e.g. '{count} camera'
  * @param {string} other English plural, e.g. '{count} cameras'
- * @param {object} [values] Extra interpolation values
+ * @param {object} [values] Extra interpolation values; a `count` here is
+ *   shown in place of the number (the plural form still follows `count`)
  * @returns {string}
  */
 export function tn(count, one, other, values) {
@@ -111,7 +113,7 @@ export function tn(count, one, other, values) {
   } else {
     pattern = pluralRules(DEFAULT_LOCALE).select(count) === 'one' ? one : other;
   }
-  return interpolate(pattern, { ...values, count });
+  return interpolate(pattern, { count, ...values });
 }
 
 /**

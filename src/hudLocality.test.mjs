@@ -122,6 +122,8 @@ test('a missing or malformed nearest POI never crashes the summary', () => {
   assert.match(composeLocalityTag({ ...LINCOLN }, 10, 10), /^SECTOR /);
 });
 
+// The names reach a formatter as catalogued, so the HUD can translate the
+// city before upper-casing it (N-04: `TOKYO` never matched the `Tokyo` key).
 test('a formatter builds the line from the same parts', () => {
   const format = {
     near: ({ poi, city, distKm }) => `near:${poi}|${city}|${distKm}`,
@@ -129,7 +131,7 @@ test('a formatter builds the line from the same parts', () => {
   };
   assert.equal(
     composeLocalityTag({ ...ALCATRAZ, distKm: 2.4 }, 37.8, -122.4, format),
-    'near:ALCATRAZ ISLAND|SAN FRANCISCO|2.4',
+    'near:Alcatraz Island|San Francisco|2.4',
   );
   assert.equal(
     composeLocalityTag(null, 21.3, -157.8, format),

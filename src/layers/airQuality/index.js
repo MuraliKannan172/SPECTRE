@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium';
-import { t } from '../../i18n/index.js';
+import { msg, t, tn, translateKnown } from '../../i18n/index.js';
 import {
   AIR_QUALITY_BANDS,
   AIR_QUALITY_OVERLAY_SOURCE_ID,
@@ -110,7 +110,7 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
         return true;
       } catch (error) {
         if (request.signal.aborted || _request !== request) return false;
-        _lastError = error?.message || 'Air quality request failed';
+        _lastError = error?.message || msg('Air quality request failed');
         console.warn('[Data:AirQuality] Refresh failed:', _lastError);
         notify();
         return false;
@@ -215,25 +215,32 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
         (max, reading) => Math.max(max, reading.observedMs || 0),
         0,
       );
+      // Readings and errors stay English data (analyst records, stats); the
+      // card shows them in the UI language. A provider's own error text has
+      // no catalog entry and shows as it came.
       return {
         readout: true,
         summary: {
-          label: provider.label,
-          coverage: provider.coverage,
+          label: t(provider.label),
+          coverage: t(provider.coverage),
           validTime: newest ? new Date(newest).toISOString() : undefined,
           detail: `${provider.network} · ${provider.scale}`,
           status: _lastError
-            ? _lastError
+            ? translateKnown(_lastError)
             : _count === 0
               ? _lastUpdate === null
-                ? 'No readings available'
-                : 'No current readings'
-              : `${_count} stations reporting`,
+                ? t('No readings available')
+                : t('No current readings')
+              : tn(
+                  _count,
+                  '{count} station reporting',
+                  '{count} stations reporting',
+                ),
           units: provider.scale,
         },
         legend: AIR_QUALITY_BANDS.map((band) => ({
           color: band.color,
-          label: band.label,
+          label: t(band.label),
         })),
         legendCategorical: true,
         list: {
@@ -242,7 +249,7 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
             id: reading.id,
             ordinal: index + 1,
             lead: `${reading.scale} ${reading.label}`,
-            text: `${reading.name} · ${reading.risk}`,
+            text: `${reading.name} · ${reading.risk ? t(reading.risk) : reading.risk}`,
             accent: reading.color,
           })),
         },

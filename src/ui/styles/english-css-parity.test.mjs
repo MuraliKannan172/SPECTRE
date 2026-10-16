@@ -210,3 +210,10 @@ test('K-44: Recent Imagery readout keeps its English layout', () => {
   assert.equal(declaration(swap, 'width'), '40px');
   assert.equal(declaration(swap, 'min-width'), undefined);
 });
+
+test('N-13: CCTV control buttons stay on one line in English', () => {
+  assert.equal(
+    unguardedRules(css('cctv.css'), '.cctv-controls .scene-btn').length,
+    0,
+  );
+});

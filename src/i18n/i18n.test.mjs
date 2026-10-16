@@ -234,3 +234,15 @@ test('persistLocaleAndReload stores the choice, keeps the hash, strips ?lang', (
     ['reload'],
   ]);
 });
+
+test('tn() shows a caller-formatted count and still picks the form by number', () => {
+  const label = (n) =>
+    tn(n, '{count} map object', '{count} map objects', {
+      count: formatNumber(n),
+    });
+  assert.equal(label(12345), '12,345 map objects');
+  assert.equal(tn(12345, '{count} file', '{count} files'), '12345 files');
+  setLocale('ru');
+  assert.equal(label(12345), '12 345 объектов на карте');
+  assert.equal(label(1), '1 объект на карте');
+});

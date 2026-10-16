@@ -2796,5 +2796,86 @@
   },
   "FOV {value}° (DATASHEET)": "FOV {value}° (FICHA TÉCNICA)",
   "SPEC FOV {span}° (CAPABILITY)": "FOV DE FICHA {span}° (CAPACIDAD)",
-  "{spec} · SPECS: CCTV-DATABASE.COM": "{spec} · ESPECIFICACIONES: CCTV-DATABASE.COM"
+  "{spec} · SPECS: CCTV-DATABASE.COM": "{spec} · ESPECIFICACIONES: CCTV-DATABASE.COM",
+  "Canada only · ECCC AQHI network": "Solo Canadá · red AQHI de ECCC",
+  "{count} stations reporting": {
+    "one": "{count} estación con datos",
+    "many": "{count} de estaciones con datos",
+    "other": "{count} estaciones con datos"
+  },
+  "No readings available": "No hay lecturas disponibles",
+  "No current readings": "Sin lecturas actuales",
+  "Low health risk": "Riesgo bajo para la salud",
+  "Moderate health risk": "Riesgo moderado para la salud",
+  "High health risk": "Riesgo alto para la salud",
+  "Very High health risk": "Riesgo muy alto para la salud",
+  "Air quality request failed": "Falló la petición de calidad del aire",
+  "ECCC request timed out": "La petición a ECCC agotó el tiempo de espera",
+  "Malformed AQHI station response": "Respuesta de estaciones AQHI mal formada",
+  "Malformed AQHI observation response": "Respuesta de observaciones AQHI mal formada",
+  "No AQHI stations available": "No hay estaciones AQHI disponibles",
+  "{n} air quality": {
+    "one": "{n} estación de calidad del aire",
+    "many": "{n} de estaciones de calidad del aire",
+    "other": "{n} estaciones de calidad del aire"
+  },
+  "GNSS feed rate limited (HTTP 429)": "Fuente GNSS: límite de peticiones superado (HTTP 429)",
+  "GNSS feed unavailable (HTTP {status})": "Fuente GNSS no disponible (HTTP {status})",
+  "GNSS snapshot needs a view anchor": "La instantánea GNSS necesita un punto de referencia de la vista",
+  "Malformed GNSS integrity snapshot": "Instantánea de integridad GNSS mal formada",
+  "GNSS integrity snapshot has no observation time": "La instantánea de integridad GNSS no tiene hora de observación",
+  "{feed} feed unavailable": "Fuente {feed} no disponible",
+  "Loading {feeds}": "Cargando {feeds}",
+  "{count} CelesTrak groups unavailable": {
+    "one": "{count} grupo de CelesTrak no disponible",
+    "many": "{count} de grupos de CelesTrak no disponibles",
+    "other": "{count} grupos de CelesTrak no disponibles"
+  },
+  "Malformed launch snapshot": "Instantánea de lanzamientos mal formada",
+  "Malformed perimeter snapshot": "Instantánea de perímetros mal formada",
+  "Overpass returned an incomplete camera response": "Overpass devolvió una respuesta de cámaras incompleta",
+  "Fly below {km} km to a covered region": "Desciende por debajo de {km} km sobre una región con cobertura",
+  "No feed here yet · {n} regions available": {
+    "one": "Aún no hay fuente aquí · {n} región disponible",
+    "many": "Aún no hay fuente aquí · {n} de regiones disponibles",
+    "other": "Aún no hay fuente aquí · {n} regiones disponibles"
+  },
+  "Wind speed field unavailable": "Campo de velocidad del viento no disponible",
+  "Decoder feeds": "Fuentes del decodificador",
+  "WebUSB + decoder feeds": "WebUSB + fuentes del decodificador",
+  "opening receiver": "abriendo el receptor",
+  "checking decoder feeds": "comprobando las fuentes del decodificador",
+  "listening": "escuchando",
+  "USB error": "error de USB",
+  "{count} heard": {
+    "one": "{count} aeronave captada",
+    "many": "{count} de aeronaves captadas",
+    "other": "{count} aeronaves captadas"
+  },
+  "{rate} msg/s": "{rate} msg/s",
+  "USB {rate} msg/s": "USB {rate} msg/s",
+  "{count} feeds live": {
+    "one": "{count} fuente en vivo",
+    "many": "{count} de fuentes en vivo",
+    "other": "{count} fuentes en vivo"
+  },
+  "feeds {names} stale": {
+    "one": "fuente {names} desactualizada",
+    "many": "fuentes {names} desactualizadas",
+    "other": "fuentes {names} desactualizadas"
+  },
+  "feeds {names} unreachable": {
+    "one": "fuente {names} inaccesible",
+    "many": "fuentes {names} inaccesibles",
+    "other": "fuentes {names} inaccesibles"
+  },
+  "feeds {names} invalid": {
+    "one": "fuente {names} no válida",
+    "many": "fuentes {names} no válidas",
+    "other": "fuentes {names} no válidas"
+  },
+  "unsaved provider keys": "las claves de proveedores sin guardar",
+  "Exit cockpit to fly to an aircraft": "Sal de la cabina para volar a una aeronave",
+  "Exit cockpit to fly to a satellite": "Sal de la cabina para volar a un satélite",
+  "Exit cockpit to frame contacts": "Sal de la cabina para encuadrar contactos"
 }

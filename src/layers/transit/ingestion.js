@@ -476,6 +476,8 @@ export function createIngestion({ state, services, parts, source }) {
           `[Data:Transit] ${feed.id} poll failed:`,
           error?.message || error,
         );
+        // English data; the panel shows it through FEED_ERROR_PATTERNS
+        // (ui/layerPanel.js).
         status.error = `${feed.name} feed unavailable`;
         status.retryInSec = Number.isFinite(error?.retryInSec)
           ? error.retryInSec

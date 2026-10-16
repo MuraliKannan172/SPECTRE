@@ -20,7 +20,7 @@ import {
  * the chip and the dialog are removed outright.
  */
 
-import { t, msg, tn } from './i18n/index.js';
+import { t, msg, tn, registerUnsavedWork } from './i18n/index.js';
 
 /**
  * Chip label — pure, exported for tests. The exact English values are pinned
@@ -386,9 +386,24 @@ export async function initKeySetup({
   let disposed = false;
   let disposeControls = () => {};
   let disposePlacement = () => {};
+  // A pasted key lives only in its field until Save: switching language (a
+  // reload) asks first while any field holds one.
+  const unregisterUnsavedWork = registerUnsavedWork(() =>
+    !disposed &&
+    Object.keys(
+      collectKeyUpdates(
+        [...(root.querySelectorAll?.('input[data-env-var]') || [])].map(
+          (input) => ({ envVar: input.dataset?.envVar, value: input.value }),
+        ),
+      ),
+    ).length
+      ? msg('unsaved provider keys')
+      : null,
+  );
   const destroy = () => {
     if (disposed) return;
     disposed = true;
+    unregisterUnsavedWork();
     lifetime.abort();
     signal?.removeEventListener('abort', destroy);
     disposeControls();

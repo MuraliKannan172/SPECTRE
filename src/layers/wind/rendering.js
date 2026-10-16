@@ -14,6 +14,19 @@ import {
   windTrailColor,
 } from './fields.js';
 
+// A scalar overlay that cannot be drawn, in English for diagnostics; the
+// panel status shows it translated (index.js). The scalar texts are the ones
+// the source reports (source.js).
+const FIELD_UNAVAILABLE = Object.freeze({
+  speed: msg('Wind speed field unavailable'),
+  temperature: msg('Temperature field unavailable'),
+  pressure: msg('Mean sea level pressure field unavailable'),
+});
+
+/** English status for a scalar overlay with no drawable field. */
+export function fieldUnavailableText(overlay) {
+  return FIELD_UNAVAILABLE[overlay] || `${overlay} field unavailable`;
+}
 const WIND_FIELD_FADE_HIGH_METERS = 1_200_000;
 const WIND_FIELD_FADE_LOW_METERS = 200_000;
 const WIND_FIELD_LOG_RANGE = Math.log(
@@ -337,7 +350,7 @@ export function createWindRendering({
     }
     const raster = createFieldRaster(snapshot, overlay);
     if (!raster) {
-      imageryError = `${overlay} field unavailable`;
+      imageryError = fieldUnavailableText(overlay);
       return;
     }
     if (

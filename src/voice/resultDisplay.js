@@ -135,6 +135,8 @@ function shownCount(count, noun) {
       return tn(count, '{n} datacenters', '{n} datacenters', values);
     case 'dams':
       return tn(count, '{n} dams', '{n} dams', values);
+    case 'air quality':
+      return tn(count, '{n} air quality', '{n} air quality', values);
     case 'results':
       return tn(count, '{n} results', '{n} results', values);
     default:
@@ -327,6 +329,27 @@ const NOTE_PATTERNS = [
         : t(
             'Contacts panel snapshot — the same retained cohort supplies the card, speech, and follow-up memory',
           )) + period,
+  ],
+  // Transit's empty note when no feed covers the view (transit/queries.js);
+  // the model gets the English.
+  [
+    /^Fly below ([\d,]+) km to a covered region$/,
+    ([, km]) =>
+      t('Fly below {km} km to a covered region', {
+        km: formatNumber(Number(km.replace(/,/g, ''))),
+      }),
+  ],
+  [
+    /^No feed here yet · ([\d,]+) regions available$/,
+    ([, regions]) => {
+      const count = Number(regions.replace(/,/g, ''));
+      return tn(
+        count,
+        'No feed here yet · {n} region available',
+        'No feed here yet · {n} regions available',
+        { n: formatNumber(count) },
+      );
+    },
   ],
   [
     /^([a-z0-9-]+) (off|loading|error)$/,
