@@ -4,7 +4,9 @@
   YRT/Viva, Guelph, Burlington, Barrie and Kingston, each carrying its own
   licence quote and attribution. A feed can now name its own modes, so Toronto's
   trams read "Streetcar" while Helsinki's stay "Tram", and a feed whose route ids
-  are internal keys can translate them to the number a rider would say.
+  are internal keys can translate them to the number a rider would say. TTC
+  vehicles take their mode from the fleet number first, so replacement buses on
+  streetcar routes read as buses and out-of-service streetcars stay streetcars.
 
 - Cyclone advisories no longer go dark while NHC publishes an advisory ahead
   of its nominal time: advisory and position times up to 90 minutes ahead of

@@ -131,6 +131,20 @@ function ttcRouteMode(routeId) {
 }
 
 /**
+ * The fleet number settles TTC's mode before the route does: buses replace
+ * streetcars on 5xx routes during track work, and streetcars running out of
+ * service report no route at all. Flexity streetcars are numbered 4400–4699;
+ * every other TTC number is a bus.
+ * @param {string|null} vehicleId GTFS-RT vehicle id (the fleet number).
+ * @returns {string}
+ */
+function ttcVehicleMode(vehicleId) {
+  if (!/^\d{4}$/.test(String(vehicleId ?? ''))) return 'unknown';
+  const fleet = Number(vehicleId);
+  return fleet >= 4400 && fleet < 4700 ? 'tram' : 'bus';
+}
+
+/**
  * Guelph Transit's realtime feed publishes the internal database key of a
  * route (`2991`), not the number on the front of the bus (`1`). Without this
  * table the detection label reads "Route 2991", which is not what anyone at
@@ -541,6 +555,7 @@ export const TRANSIT_FEED_REGISTRY = Object.freeze([
       tram: Object.freeze({ word: 'Streetcar', abbr: 'STREETCAR' }),
     }),
     routeMode: ttcRouteMode,
+    vehicleMode: ttcVehicleMode,
   }),
   Object.freeze({
     id: 'miway-mississauga',
@@ -795,14 +810,32 @@ export function transitFeedsInRange(lat, lon, slackKm = 0) {
 }
 
 /**
- * Mode for a vehicle: the feed's route hint when it has one, else its default.
+ * The feed's own hint for a vehicle: its fleet number when the feed maps
+ * those (`vehicleMode`), else its route (`routeMode`). Null when neither knows.
+ * @param {object} feed Registry entry.
+ * @param {string|null} routeId
+ * @param {string|null} vehicleId
+ * @returns {string|null}
+ */
+function hintedMode(feed, routeId, vehicleId) {
+  const byVehicle =
+    typeof feed?.vehicleMode === 'function'
+      ? feed.vehicleMode(vehicleId)
+      : null;
+  if (byVehicle && byVehicle !== 'unknown') return byVehicle;
+  return typeof feed?.routeMode === 'function' ? feed.routeMode(routeId) : null;
+}
+
+/**
+ * Mode for a vehicle: the feed's fleet or route hint when it has one, else
+ * its default.
  * @param {object} feed Registry entry.
  * @param {string|null} routeId GTFS route_id from the vehicle's trip.
+ * @param {string|null} [vehicleId] GTFS-RT vehicle id.
  * @returns {string} One of TRANSIT_MODES.
  */
-export function transitModeFor(feed, routeId) {
-  const hinted =
-    typeof feed?.routeMode === 'function' ? feed.routeMode(routeId) : null;
+export function transitModeFor(feed, routeId, vehicleId = null) {
+  const hinted = hintedMode(feed, routeId, vehicleId);
   const mode =
     hinted && hinted !== 'unknown' ? hinted : feed?.defaultMode || 'unknown';
   return TRANSIT_MODES.includes(mode) ? mode : 'unknown';
@@ -815,11 +848,11 @@ export function transitModeFor(feed, routeId) {
  * not hold a defaulted vehicle to a bus's limits.
  * @param {object} feed Registry entry.
  * @param {string|null} routeId
+ * @param {string|null} [vehicleId]
  * @returns {boolean}
  */
-export function transitModeResolved(feed, routeId) {
-  const hinted =
-    typeof feed?.routeMode === 'function' ? feed.routeMode(routeId) : null;
+export function transitModeResolved(feed, routeId, vehicleId = null) {
+  const hinted = hintedMode(feed, routeId, vehicleId);
   return (
     Boolean(hinted) && hinted !== 'unknown' && TRANSIT_MODES.includes(hinted)
   );

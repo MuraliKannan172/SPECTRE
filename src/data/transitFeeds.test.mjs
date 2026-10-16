@@ -279,6 +279,22 @@ test('TTC route numbers tell a streetcar from a bus', () => {
   );
 });
 
+test('a TTC fleet number outranks the route', () => {
+  // Buses replace streetcars on 5xx routes during track work, and streetcars
+  // out of service report no route; the Flexity fleet is 4400–4699.
+  const ttc = getTransitFeed('ttc-toronto');
+  assert.equal(transitModeFor(ttc, '506', '8515'), 'bus');
+  assert.equal(transitModeFor(ttc, '512', '3101'), 'bus');
+  assert.equal(transitModeFor(ttc, null, '4507'), 'tram');
+  assert.equal(transitModeResolved(ttc, null, '4507'), true);
+  assert.equal(transitModeFor(ttc, '504', '4400'), 'tram');
+  assert.equal(transitModeFor(ttc, '29', '4699'), 'tram');
+  assert.equal(transitModeFor(ttc, '501', '4700'), 'bus');
+  // A vehicle id that is not a fleet number leaves the route to decide.
+  assert.equal(transitModeFor(ttc, '501', 'abc'), 'tram');
+  assert.equal(transitModeFor(ttc, '501'), 'tram');
+});
+
 test('the TTC row records that BusTime carries no subway', () => {
   const sources = readFileSync(
     new URL('../../DATA_SOURCES.md', import.meta.url),
