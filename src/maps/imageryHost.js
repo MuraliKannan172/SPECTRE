@@ -5,11 +5,9 @@
  * neither exists there is nowhere to drape and the caller says so.
  */
 
-/** Guidance shown when the active map stack cannot host draped imagery. */
-// Marks text for i18n extraction without importing i18n here; the UI
-// translates it where it is shown.
-const msg = (text) => text;
+import { msg } from '../i18n/marker.js';
 
+/** Guidance shown when the active map stack cannot host draped imagery. */
 export const NO_IMAGERY_HOST = msg(
   'Hidden by this map source · choose a globe map',
 );

@@ -1,7 +1,6 @@
-// K-44 (+ refront-opus-1): layout rules written for long translations must not change the
-// English rendering ("English renders as before"). Every rule below is read
-// from the stylesheet without a `html:not([lang='en'])` guard, so it applies
-// to English too; the expected values are the ones on main (9beadbda).
+// Layout rules written for long translations must not change the English
+// rendering: every rule checked here has no `html:not([lang='en'])` guard,
+// so it applies to English too.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -33,7 +32,7 @@ function declaration(block, prop) {
   return m ? m[1].replace(/\s+/g, ' ').trim() : undefined;
 }
 
-test('K-44: layer status chip keeps its English width (82px)', () => {
+test('layer status chip keeps its English width (82px)', () => {
   const rules = unguardedRules(
     css('radio.css'),
     `.data-toggle-btn.feed-loading, .data-toggle-btn.feed-degraded,
@@ -44,14 +43,14 @@ test('K-44: layer status chip keeps its English width (82px)', () => {
   assert.equal(declaration(rules[0], 'min-width'), '82px');
 });
 
-test('K-44: Directions steps keep one line with an ellipsis in English', () => {
+test('Directions steps keep one line with an ellipsis in English', () => {
   const [rule] = unguardedRules(css('radio.css'), '.data-row-list-text');
   assert.ok(rule);
   assert.equal(declaration(rule, 'white-space'), 'nowrap');
   assert.equal(declaration(rule, 'text-overflow'), 'ellipsis');
 });
 
-test('K-44: count-line layout is not reachable from an unguarded selector', () => {
+test('count-line layout is not reachable from an unguarded selector', () => {
   const source = css('radio.css');
   assert.equal(
     unguardedRules(source, '.data-toggle-row--count-line .data-count').length,
@@ -59,7 +58,7 @@ test('K-44: count-line layout is not reachable from an unguarded selector', () =
   );
 });
 
-test('K-44: weather status line keeps its fixed English height', () => {
+test('weather status line keeps its fixed English height', () => {
   const [rule] = unguardedRules(
     css('weather.css'),
     ".weather-card [data-line-id='status']",
@@ -68,7 +67,7 @@ test('K-44: weather status line keeps its fixed English height', () => {
   assert.equal(declaration(rule, 'height'), '1.45em');
 });
 
-test('K-44: cockpit number separators keep the English cell width', () => {
+test('cockpit number separators keep the English cell width', () => {
   assert.equal(
     unguardedRules(css('cockpit.css'), '.cockpit-roll-token.is-separator')
       .length,
@@ -76,7 +75,7 @@ test('K-44: cockpit number separators keep the English cell width', () => {
   );
 });
 
-test('K-44: Bhote Koshi callout keeps its English footer layout', () => {
+test('Bhote Koshi callout keeps its English footer layout', () => {
   const source = css('bhote-koshi.css');
   const [strong] = unguardedRules(
     source,
@@ -87,7 +86,7 @@ test('K-44: Bhote Koshi callout keeps its English footer layout', () => {
   assert.equal(declaration(link, 'grid-row'), '1 / span 2');
 });
 
-test('K-44: SCENES actions stay on one line in English (refront-opus-1)', () => {
+test('SCENES actions stay on one line in English', () => {
   assert.equal(
     unguardedRules(css('scenes.css'), '#scene-panel .scene-controls .scene-btn')
       .length,
@@ -97,7 +96,7 @@ test('K-44: SCENES actions stay on one line in English (refront-opus-1)', () => 
   assert.equal(declaration(select, 'white-space'), undefined);
 });
 
-test('K-44: Display and parameter rows keep their English layout', () => {
+test('Display and parameter rows keep their English layout', () => {
   const source = css('controls.css');
   assert.equal(
     unguardedRules(source, '.pp-slider-row > .pp-slider-mini-label').length,
@@ -110,7 +109,7 @@ test('K-44: Display and parameter rows keep their English layout', () => {
   assert.equal(declaration(color, 'flex'), '0 0 74px');
 });
 
-test('K-44: weather setting rows keep the 56px English label column', () => {
+test('weather setting rows keep the 56px English label column', () => {
   const source = css('weather.css');
   assert.equal(unguardedRules(source, '.rail-card-settings').length, 0);
   const [row] = unguardedRules(source, '.rail-card-setting');
@@ -120,14 +119,14 @@ test('K-44: weather setting rows keep the 56px English label column', () => {
   );
 });
 
-test('K-44: cockpit brief controls keep their English sizes', () => {
+test('cockpit brief controls keep their English sizes', () => {
   const source = css('cockpit.css');
   const [auto] = unguardedRules(source, '#cockpit-brief-auto');
   assert.equal(declaration(auto, 'width'), '50px');
   assert.equal(unguardedRules(source, '.cockpit-brief-actions > *').length, 0);
 });
 
-test('K-44: the count-line class is set only outside English', async () => {
+test('the count-line class is set only outside English', async () => {
   const { setLocale } = await import('../../i18n/index.js');
   const { LayerPanel } = await import('../layerPanel.js');
   const classes = () => {
@@ -153,7 +152,7 @@ test('K-44: the count-line class is set only outside English', async () => {
   }
 });
 
-test('K-44: Recent Imagery readout keeps its English layout', () => {
+test('Recent Imagery readout keeps its English layout', () => {
   const source = css('recent-imagery.css');
   const one = (selector) => {
     const rules = unguardedRules(source, selector);
@@ -211,7 +210,7 @@ test('K-44: Recent Imagery readout keeps its English layout', () => {
   assert.equal(declaration(swap, 'min-width'), undefined);
 });
 
-test('N-13: CCTV control buttons stay on one line in English', () => {
+test('CCTV control buttons stay on one line in English', () => {
   assert.equal(
     unguardedRules(css('cctv.css'), '.cctv-controls .scene-btn').length,
     0,

@@ -68,9 +68,8 @@ const NUMERIC_TYPE_FAMILIES = {
   9: 'OTHER',
 };
 
-// Display keys for the normalized English type tokens above. The tokens stay
-// machine values — TYPE_STYLES matches on them and tests pin them — so card
-// text translates only through this map at the presentation boundary.
+// Card text for the type tokens above. The tokens stay English: TYPE_STYLES
+// and tests match on them.
 const TYPE_DISPLAY_KEYS = Object.freeze({
   FISHING: msg('FISHING'),
   TOWING: msg('TOWING'),

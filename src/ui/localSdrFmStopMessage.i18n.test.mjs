@@ -86,7 +86,7 @@ for (const locale of ['es', 'ru']) {
   });
 }
 
-test('FM stop message after internet radio start reads as before in English', async (t) => {
+test('FM stop message after internet radio start stays English', async (t) => {
   const view = await stopLocalFmForInternetRadio(t, 'en');
   assert.equal(view.statusText, 'Local FM stopped: internet radio started');
 });

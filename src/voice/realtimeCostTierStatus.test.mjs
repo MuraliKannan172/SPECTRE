@@ -1,4 +1,4 @@
-// K-11: the status after a tier switch names the tier in the interface
+// The status after a tier switch names the tier in the interface
 // language, as the tier button does; the stored tier value stays English.
 import test from 'node:test';
 import assert from 'node:assert/strict';

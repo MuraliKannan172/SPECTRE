@@ -1,7 +1,7 @@
 /**
  * Preset place names as the page shows them.
  *
- * The preset cities in src/locations.js keep their English names in data:
+ * The preset cities in src/cityPois.js keep their English names in data:
  * those are what voice tools, the AI model, share links and lookups match on.
  * This helper translates a known English name at a presentation boundary
  * only; any other place (a geocoded address, a name the model chose) is shown

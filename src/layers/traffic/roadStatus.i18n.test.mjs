@@ -1,4 +1,4 @@
-// K-37: the traffic road-status notes follow the UI language; English keeps
+// The traffic road-status notes follow the UI language; English keeps
 // its wording.
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
-// K-8: the analyst card shows its headline, scope, chips and caveats in the
-// interface language; the spoken headline stays English for the model.
+// The analyst card shows its headline, scope, chips and caveats in the UI
+// language; the spoken headline stays English for the model.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setLocale } from '../i18n/index.js';
@@ -56,7 +56,7 @@ const radius = {
   },
 };
 
-test('K-8: analyst card in es has no English text', () => {
+test('analyst card in es has no English text', () => {
   setLocale('es');
   try {
     const { view } = cardFor('analyst_query', analyst);
@@ -69,7 +69,7 @@ test('K-8: analyst card in es has no English text', () => {
   }
 });
 
-test('K-8: analyst scope, window and caveats in ru', () => {
+test('analyst scope, window and caveats in ru', () => {
   setLocale('ru');
   try {
     const { shaped, view } = cardFor('analyst_query', radius);
@@ -84,7 +84,7 @@ test('K-8: analyst scope, window and caveats in ru', () => {
   }
 });
 
-test('K-8: the English card reads as before, layers by name', () => {
+test('en: the card keeps its English text and names layers', () => {
   const { shaped, view } = cardFor('analyst_query', analyst);
   assert.equal(view.result.title, '3 aircraft anywhere in the loaded data');
   assert.deepEqual(view.result.chips, ['degraded', 'partial']);

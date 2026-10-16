@@ -32,7 +32,6 @@ export function renderRadioState(state) {
   }
   this._syncContextRadioLauncherState();
   this._radioLayerState?.classList.toggle('active', enabled);
-  // Lifecycle enum values map to status-chip keys; counts stay machine.
   const lifecycleLabel =
     lifecycleState === 'enabling' ? t('ENABLING') : t('DISABLING');
   if (this._radioLayerState) {

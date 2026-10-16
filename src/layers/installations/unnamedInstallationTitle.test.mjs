@@ -6,7 +6,7 @@ import { setLocale } from '../../i18n/index.js';
 import { installationTitle } from './classLabel.js';
 import { formatAwarenessLabel } from '../../data/militaryAwarenessEngine.js';
 
-// K-33: unnamed installations get an English label in data ("Firing range",
+// Unnamed installations get an English label in data ("Firing range",
 // "Military land", "Military airfield"; OpenFreeMap polygons: "Military area").
 // The data stays English; the map card title reads in the UI language.
 const { records } = normalizeMilitaryInstallations({
@@ -24,7 +24,7 @@ const { records } = normalizeMilitaryInstallations({
 });
 const names = [...records.map((r) => r.name), UNNAMED_MILITARY_AREA];
 
-test('K-33: unnamed installations keep English names in data', () => {
+test('unnamed installations keep English names in data', () => {
   assert.deepEqual(names, [
     'Firing range',
     'Military land',
@@ -34,7 +34,7 @@ test('K-33: unnamed installations keep English names in data', () => {
   ]);
 });
 
-test('K-33: unnamed installation card title reads in the UI language', () => {
+test('unnamed installation card title reads in the UI language', () => {
   try {
     for (const locale of ['es', 'ru']) {
       setLocale(locale);
@@ -55,13 +55,13 @@ test('K-33: unnamed installation card title reads in the UI language', () => {
   }
 });
 
-test('K-33: English card titles are unchanged', () => {
+test('English card titles are unchanged', () => {
   setLocale('en');
   for (const name of names) assert.equal(installationTitle(name), name);
   assert.equal(installationTitle(''), '');
 });
 
-test('K-33: the Contacts line names an unnamed installation in the UI language', () => {
+test('the Contacts line names an unnamed installation in the UI language', () => {
   try {
     setLocale('en');
     for (const name of names)

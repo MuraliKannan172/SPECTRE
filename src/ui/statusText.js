@@ -28,7 +28,7 @@ const FEED_ERRORS = new Set([
   msg('OpenSky auth failed'),
 ]);
 const FEED_ERROR_PATTERNS = [
-  // Street Level coverage errors (streetLevel/providers/kartaview/source.js),
+  // Street Level provider errors (providers/{kartaview,panoramax}/source.js),
   // ahead of the generic "<source> HTTP <status>".
   [
     /^KartaView answered HTTP (\d+)$/,
@@ -133,9 +133,11 @@ export function translateFeedError(text) {
   if (typeof text !== 'string') return text;
   const whole = feedErrorText(text);
   if (whole !== null) return whole;
+  // feedErrorText has already looked the text up in the catalog.
+  if (!text.includes(STATUS_SEPARATOR)) return statusPatternText(text) ?? text;
   return text
     .split(STATUS_SEPARATOR)
-    .map((piece) => feedErrorText(piece) ?? translateStatusPiece(piece))
+    .map((piece) => feedErrorText(piece) ?? statusPatternText(piece) ?? piece)
     .join(STATUS_SEPARATOR);
 }
 
@@ -206,15 +208,20 @@ const STATUS_PIECE_PATTERNS = [
   ],
 ];
 
-/** One piece of a status line in the UI language, or as it came. */
-export function translateStatusPiece(piece) {
-  const known = translateKnown(piece);
-  if (known !== piece) return known;
+/** A status piece by its shape in the UI language, or null. */
+function statusPatternText(piece) {
   for (const [pattern, format] of STATUS_PIECE_PATTERNS) {
     const match = pattern.exec(piece);
     if (match) return format(match);
   }
-  return piece;
+  return null;
+}
+
+/** One piece of a status line in the UI language, or as it came. */
+export function translateStatusPiece(piece) {
+  const known = translateKnown(piece);
+  if (known !== piece) return known;
+  return statusPatternText(piece) ?? piece;
 }
 
 /** A status line of " · " joined pieces in the UI language, piece by piece. */
@@ -223,9 +230,4 @@ export function translateStatusLine(text) {
     .split(STATUS_SEPARATOR)
     .map(translateStatusPiece)
     .join(STATUS_SEPARATOR);
-}
-
-/** A loading label is English data, at times several joined by " · ". */
-export function translateLoadingLabel(label) {
-  return translateStatusLine(label.trim());
 }

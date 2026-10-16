@@ -36,8 +36,6 @@ export const FIRST_RUN_SESSION_KEY = 'gev:first-run-mission-session:v1';
  */
 export const ENVIRONMENTAL_LABEL_CHOICE = 'ENVIRONMENTAL';
 
-// Catalog keys per label choice. Resolved through t() at CALL time (init),
-// never at module load — the locale is not resolved until main.js's body runs.
 const ENVIRONMENTAL_LABEL_KEYS = Object.freeze({
   ENVIRONMENTAL: msg('ENVIRONMENTAL'),
   EARTH_WATCH: msg('EARTH WATCH'),
@@ -361,11 +359,8 @@ export function initFirstRunExperience({
   }
 
   // The tile name is owner-switchable from one constant, so paint it from the
-  // module rather than trusting the markup to have been edited to match. The
-  // persuasive description line and the tile's feed subcopy are the two
-  // phase-2 exceptions whose static sites are pinned verbatim by
-  // firstRunExperience.test.mjs — the runtime write is their only legal
-  // localization point (docs/TRANSLATORS.md, runtime-only static sites).
+  // module rather than trusting the markup to match. The description and the
+  // tile subcopy are data-i18n-runtime in welcome.html and translated here.
   const environmentalTitle = root.querySelector(
     '[data-first-run-environmental-title]',
   );

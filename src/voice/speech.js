@@ -17,11 +17,9 @@
  * Builders are small pure functions keyed by tool name. Tools without one are
  * returned unchanged.
  *
- * Only `display` and the plan/progress labels are interface text, translated
- * with t(). `say`, `identityLine` and the progress lines are not shown: they go
- * to the voice model to be spoken, so they stay as written. The tool result
- * itself (layer names, sources, `error`) stays English as the model got it;
- * the card shows those through the shown-name helpers and `shownError`.
+ * Only `display` and plan/progress labels are UI text (t()). `say`,
+ * `identityLine`, spoken progress lines and the tool result stay English for
+ * the model; the card shows them through the shown* helpers.
  */
 
 import { analystHeadline } from './resultDisplay.js';
@@ -118,10 +116,8 @@ function shownSources(source) {
 }
 
 /*
- * Tool errors stay English in the result: the model reads them. The card shows
- * the ones it knows in the interface language. Each English text here is
- * exactly what gevActions returns, so English shows as before; an error not
- * listed shows as given.
+ * Tool errors stay English in the result (the model reads them). The card
+ * translates the known ones; the English must match gevActions exactly.
  */
 const KNOWN_ERRORS = new Map(
   [
@@ -818,7 +814,7 @@ function annotationTargets(args) {
     .filter(Boolean);
 }
 
-// frame_overhead's targets as the schema names them; English is unchanged.
+// frame_overhead targets as the schema names them.
 function frameStepLabel(target) {
   switch (target) {
     case 'flights':
@@ -834,8 +830,8 @@ function frameStepLabel(target) {
   }
 }
 
-// The other tools' plan steps, one label per tool in actionSchemas. The tool
-// name itself is English model vocabulary and never shows.
+// Plan-step labels for the other tools in actionSchemas. A tool missing here
+// shows its raw name in English only.
 const STEP_TITLES = Object.freeze({
   zoom_to_globe: msg('Zoom out to globe'),
   show_data_layers_menu: msg('Open data layers'),
@@ -906,7 +902,7 @@ export function planStepLabel(name, args = {}) {
     case 'frame_overhead':
       return frameStepLabel(spokenLabel(args.target || 'flights', 24));
     default:
-      // A tool the card has no label for: English shows its name as before.
+      // A tool with no label: its name in English, "Action" elsewhere.
       return getLocale() === 'en'
         ? spokenLabel(String(name || 'Action').replace(/_/g, ' '), 40)
         : t('Action');

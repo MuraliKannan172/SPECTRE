@@ -13,11 +13,9 @@ import { getLocale, t, msg } from '../i18n/index.js';
 import { localizeLayerName } from './layerPanel.js';
 import { translateFeedError } from './statusText.js';
 
-// loadingFeedback.js composes the shared status copy inside the portable
-// node/browser graph (the server-side HUD summary reads the same modules), so
-// its labels stay English there. This chip is the presentation boundary: map
-// the closed label vocabulary to the catalog, and pass anything unrecognized
-// (a live provider error) through verbatim (docs/TRANSLATORS.md).
+// The server also loads loadingFeedback.js (through the HUD summary), so its
+// labels stay English. Translate the known ones; pass anything else (a live
+// provider error) through.
 const STATUS_LABEL_KEYS = Object.freeze({
   'LOADING LIVE DATA': msg('LOADING LIVE DATA'),
   'LOAD COMPLETE': msg('LOAD COMPLETE'),

@@ -179,7 +179,7 @@ const UTC_DAY_MONTH = Object.freeze({
 
 /**
  * The UTC day and month of a time, for "MM-DD HH:MM UTC" readouts: "10-13" in
- * English (as before), "13.10" in Russian, "13/10" in Spanish, never read as a
+ * English, "13.10" in Russian, "13/10" in Spanish, never read as a
  * range. Takes an ISO string (its date part is used as written) or a time.
  * @param {string|number|Date} value
  * @returns {string} '' when the value is not a time.

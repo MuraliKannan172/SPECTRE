@@ -301,7 +301,7 @@ test('common button and annotation bindings work with an alternate adapter and c
     assert.equal(ui.helpDetail.textContent, 'Activate to toggle voice');
     assert.equal(ui.status.textContent, 'LISTENING');
     assert.equal(ui.detail.textContent, 'Ready');
-    // K-27: switching language (a reload) asks first during a session.
+    // Switching language (a reload) asks first during a session.
     assert.deepEqual(describeUnsavedWork(), ['the active voice session']);
     subscribed({ status: 'resolved' });
     assert.deepEqual(events, [

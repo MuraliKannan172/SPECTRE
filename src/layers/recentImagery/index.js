@@ -47,8 +47,8 @@ export const SPLIT_PUBLISH_MS = 400;
 /** The three modes, in share-link order (`m` = index). */
 export const MODES = Object.freeze(['image', 'basemap', 'ab']);
 
-const COMPARISON_IN_USE = msg('Comparison in use by another scene');
 // Kept English in the snapshot (AI tools read it); the card translates them.
+const COMPARISON_IN_USE = msg('Comparison in use by another scene');
 const COMPARISON_UNAVAILABLE = msg('Esri map unavailable · no swipe');
 const COMPARISON_NEEDS_GLOBE = msg('Swipe needs a globe map');
 const ESRI_KEPT = msg('Imagery stays on Esri · CLEAR to use Google 3D');

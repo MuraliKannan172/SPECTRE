@@ -826,11 +826,9 @@ export function updateEvidenceFrame(
 const EVIDENCE_SOURCE_MIN_FONT_SCALE = 0.8;
 
 /**
- * Set the font for the «{publisher} / OPEN» line and return the line so it
- * fits `maxWidth`: a translation («ИСТОЧНИК YOUTUBE / ОТКРЫТЬ») is longer than
- * the English and the portrait card cut its action word. A line that fits is
- * drawn exactly as before; one that does not first shrinks its font (to 80%),
- * then shortens the publisher — the «/ OPEN» action always stays whole.
+ * Set the font for the «{publisher} / OPEN» line and return a line that fits
+ * `maxWidth`. Translations run longer: first shrink the font (to 80%), then
+ * shorten the publisher; «/ OPEN» always stays whole.
  * @param {CanvasRenderingContext2D} ctx
  * @param {string} publisher Display publisher, already upper-cased.
  * @param {string} font CSS font with a px size.

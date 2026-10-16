@@ -715,10 +715,8 @@ export class StyleManager extends ShellFacade {
   }
 
   /**
-   * Mounts the interface language picker in the bottom-right corner
-   * (src/ui/localePicker.js). Choosing another language stores it and
-   * reloads, so nothing re-renders live; it asks first when the reload would
-   * lose work (see _chooseLocale).
+   * Mounts the language picker (src/ui/localePicker.js). A choice reloads the
+   * page; _confirmLocaleReload asks first when that would lose work.
    * @returns {void}
    */
   _initLocaleSelector() {
@@ -776,11 +774,9 @@ export class StyleManager extends ShellFacade {
   }
 
   /**
-   * Gives every Display-panel row label one shared column, sized in
-   * characters to the longest label of the active language, so the slider
-   * tracks of separate rows start at the same x. The labels are monospace and
-   * often hidden (collapsed rows have no layout), so this counts characters
-   * instead of measuring; the CSS turns the count into a width.
+   * Sizes one Display-panel label column to the longest label in the active
+   * language, so slider tracks line up. Counts characters (labels are
+   * monospace and often hidden); CSS turns the count into a width.
    * @returns {void}
    */
   _sizeDisplayLabelColumn() {
@@ -800,11 +796,8 @@ export class StyleManager extends ShellFacade {
   }
 
   /**
-   * Rewrites a header's trailing text node in place, preserving the leading
-   * dock-label-icon span that a textContent write would destroy (the phase-2
-   * "key-only" headers: .panel-title / .pp-header-label share their element
-   * with the icon, so no data-i18n attribute could target them — see
-   * docs/TRANSLATORS.md, runtime-only static sites).
+   * Rewrites a header's last text node, keeping the leading icon span that a
+   * textContent write would destroy.
    * @param {Element|null} element
    * @param {string} text
    * @returns {void}
@@ -821,9 +814,8 @@ export class StyleManager extends ShellFacade {
   }
 
   /**
-   * Localizes the key-only dock/panel headers at boot: VISUAL PRESETS,
-   * LOCATION, and the DISPLAY rail label. English output is byte-identical to
-   * the static markup these replace.
+   * Translates at boot the header texts that share their element with an
+   * icon or a <br> (data-i18n-runtime in the templates).
    * @returns {void}
    */
   _applyRuntimeStaticHeaderText() {
@@ -835,22 +827,7 @@ export class StyleManager extends ShellFacade {
       document.querySelector('#location-bar .location-toolbar-label'),
       t('LOCATION'),
     );
-    this._setHeaderText(
-      document.querySelector('#pp-toggles .pp-header-label'),
-      t('DISPLAY'),
-    );
-    // The cockpit context kicker ('CONTACT') is visible on the map itself, and
-    // the briefing kicker shares its element with the live-dot <i>; both are
-    // phase-2 key-only sites (see docs/TRANSLATORS.md). The briefing
-    // text node keeps renderBriefPage's leading-space convention.
-    this._setHeaderText(
-      document.querySelector('.cockpit-context-kicker'),
-      t('CONTACT'),
-    );
-    // The phase-2 key-only standby description: one span holds BOTH mode
-    // descriptions split by a literal <br>, so no attribute write was possible
-    // without destroying the markup (docs/TRANSLATORS.md). Split into
-    // two keys and write them at boot, preserving the <br>.
+    // One span holds both mode descriptions around a <br>; keep the <br>.
     const standbyDescription = document.querySelector(
       '#context-mode-standby span',
     );
@@ -865,6 +842,7 @@ export class StyleManager extends ShellFacade {
         ),
       );
     }
+    // Leading space after the live dot, as showBriefPage writes it.
     const briefKicker = document.querySelector('#cockpit-brief-kicker');
     if (briefKicker) {
       this._setHeaderText(briefKicker, ` ${t('LIVE SIGNALS')}`);
@@ -879,14 +857,6 @@ export class StyleManager extends ShellFacade {
    */
   _initMapStackControl() {
     if (!this.mapStackController) return;
-
-    // Key-only i18n sites (mapStackChips.test.mjs pins the static markup
-    // verbatim, so no data-i18n* attribute can be added): localize at this
-    // runtime write instead. The locale resolves before UI init and never
-    // changes without a reload, so an init-time write is sufficient.
-    if (this._mapSourceLabel)
-      this._mapSourceLabel.textContent = t('MAP SOURCE');
-    this._mapStackChips.setAttribute('aria-label', t('Map source'));
 
     this._mapSourceControls?.destroy();
     this._mapSourceControls = createMapSourceControls({

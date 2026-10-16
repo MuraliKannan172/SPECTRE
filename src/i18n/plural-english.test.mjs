@@ -6,9 +6,7 @@ import {
   missingTemplate,
 } from '../../scripts/i18n.mjs';
 
-// A plural entry whose every form is still the English text must be reported
-// the same way a string entry is ("is still English"). Today the plural
-// branch of checkCatalog never compares forms with the English.
+// A plural entry with forms left in English is reported like a string entry.
 const fixture = new Map([
   ['{count} cameras', { plural: true, one: '{count} camera' }],
   ['Save keys', { plural: false }],
@@ -64,9 +62,8 @@ for (const [locale, entry] of [
   });
 }
 
-// `npm run i18n -- --missing <code>` prints a template; pasted without edits,
-// none of its entries may pass as a translation (K-21, K-52), and a plural
-// entry carries every form the language needs (K-97).
+// The `--missing` template, pasted without edits, must fail entry by entry,
+// and its plural entries carry every form the language needs.
 const messages = extractMessages();
 for (const locale of ['de', 'ja', 'es', 'ru']) {
   test(`${locale}: an untouched --missing template fails the check entry by entry`, () => {

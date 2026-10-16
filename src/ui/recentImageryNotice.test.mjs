@@ -1,4 +1,4 @@
-// K-43: box-tool and model refusals on the Recent Imagery notice line are
+// Box-tool and model refusals on the Recent Imagery notice line are
 // shown in the UI language; the layer keeps them in English.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,7 +35,7 @@ const SHOWN_EN = new Map([
   ],
 ]);
 
-test('K-43 en: refusals read as before', () => {
+test('en: refusals stay English', () => {
   setLocale('en');
   for (const text of REFUSALS)
     assert.equal(localizeNotice(text), SHOWN_EN.get(text) ?? text);
@@ -83,7 +83,7 @@ test('E3/E12: the pointer owner is named by its tool, never by its id', () => {
 });
 
 for (const locale of ['es', 'ru']) {
-  test(`K-43 ${locale}: box-tool and model refusals are translated`, () => {
+  test(`${locale}: box-tool and model refusals are translated`, () => {
     setLocale(locale);
     try {
       for (const text of REFUSALS)

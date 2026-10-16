@@ -1,6 +1,5 @@
-// Proposal 8: «Scene not saved — {reason}» showed the validator's JSON path
-// and English check. Known failures read as a sentence; the rest get a
-// general reason (the technical text is logged by director.js).
+// «Scene not saved — {reason}» never shows the validator's JSON path: known
+// failures read as a sentence, the rest get a general reason.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

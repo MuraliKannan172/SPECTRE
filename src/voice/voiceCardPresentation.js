@@ -17,10 +17,8 @@ const MAX_STEPS = 6;
 const MAX_LINES = 6;
 const MAX_NOTES = 6;
 const MAX_CAPTION = 220;
-// Titles and lines wrap in the card; the caps only stop a runaway value. A
-// translated headline runs longer than the English one ("Al menos 12 aeronaves
-// militares en un radio de 40 km de Los Ángeles"), so other languages cut it at
-// 120; English keeps 64. A failed result's lines (its error) are never cut.
+// Titles and lines wrap; the caps only stop runaway values. Translations run
+// longer (resultDisplay.js), so they cap at 120. Error lines are never cut.
 const MAX_TITLE = 64;
 const MAX_TRANSLATED_TITLE = 120;
 const MAX_LINE = 80;

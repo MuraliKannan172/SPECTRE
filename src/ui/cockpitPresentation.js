@@ -55,7 +55,6 @@ export const COCKPIT_BRIEF_PAGES = [
     id: 'news',
     kickerKey: msg('REGIONAL NEWS'),
     subtitleKey: msg('LATEST LOCATION-MATCHED REPORTING'),
-    // The RSS provider name stays English; the rest of the line translates.
     sourceKey: msg('{source} · LOCATION QUERY · RECENT'),
     sourceName: 'GOOGLE NEWS RSS', // i18n-ignore: provider name
   },
@@ -63,7 +62,7 @@ export const COCKPIT_BRIEF_PAGES = [
     id: 'local',
     kickerKey: msg('LOCAL INFO'),
     subtitleKey: msg('PLACE / CONDITIONS / POSITION'),
-    // Data-source attribution is a keep-English boundary string.
+    // Attribution stays English.
     source: 'NATURAL EARTH · OPEN-METEO · UTC',
   },
 ];
@@ -117,7 +116,7 @@ export function compassPointLabel(code) {
     : code;
 }
 
-/** `30.203°N` in the active language: `30,203°С`. */
+/** `30.203°N` in the active language: `30,203° с. ш.` in Russian. */
 export function formatCockpitCoordinate(value, positive, negative) {
   const amount = formatNumber(Math.abs(value), {
     useGrouping: false,
@@ -125,8 +124,7 @@ export function formatCockpitCoordinate(value, positive, negative) {
     maximumFractionDigits: 3,
   });
   const code = value >= 0 ? positive : negative;
-  // Russian writes the hemisphere out ("30,203° с. ш."): a lone «С» after a
-  // degree sign reads as Celsius.
+  // Not «30,203°С»: after a degree sign «С» reads as Celsius.
   switch (code) {
     case 'N':
       return t('{value}°N', { value: amount });

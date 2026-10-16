@@ -58,7 +58,7 @@ test('a built-in shot title localizes only for a recipe-sourced shot', () => {
     userScene,
   );
   assert.notEqual(fromRecipe, title);
-  // Without provenance the title alone decides, as before.
+  // Without provenance the title alone decides.
   assert.equal(displayShotTitle(title), fromRecipe);
   // A project saved before shots recorded their source pack: the scene's
   // recipe still vouches for a title its keyframes declare (only when such a

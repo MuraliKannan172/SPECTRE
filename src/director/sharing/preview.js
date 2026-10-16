@@ -1,8 +1,7 @@
+import { msg } from '../../i18n/marker.js';
 import { BUNDLE_SOURCE } from './bundle.js';
 
-// Pack statuses stay English in the report; the import dialog shows them
-// through t() (scenes/sharing.js).
-const msg = (text) => text;
+// Statuses stay English; scenes/sharing.js translates them for the dialog.
 
 /** Describe an import without fetching assets, applying state or exposing source configuration. */
 export function describeSceneShare(

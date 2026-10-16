@@ -5,10 +5,8 @@ import { localizePlaceName } from './placeNames.js';
 const POI_KEYS = ['Q', 'W', 'E', 'R', 'T'];
 
 /**
- * locationStatus.js sentinel outputs used as localized-rewrite triggers for
- * the collapsed LOCATION mini-status. Built by calling the module with no
- * real data, so the comparisons track that module's copy without restating
- * English strings here. Resolved destinations (place names) stay verbatim.
+ * locationStatus.js placeholder lines, built by the module itself; renderStatus
+ * swaps them for translated text. Place names are shown as they are.
  */
 const LOCATION_MINI_EMPTY = Object.freeze(locationMiniStatus());
 const LOCATION_MINI_SEARCHED_PLACEHOLDER = Object.freeze(
@@ -154,9 +152,6 @@ export class LocationControls {
         }
       : record;
     const lines = locationMiniStatus(state);
-    // The initial/placeholder states get catalog keys at the writer so a
-    // non-English boot never leaks the English sentinels back over the
-    // localized static readout (resolved place names stay verbatim data).
     this.elements.statusCity.textContent =
       lines.city === LOCATION_MINI_EMPTY.city
         ? t('📍 Location: --')

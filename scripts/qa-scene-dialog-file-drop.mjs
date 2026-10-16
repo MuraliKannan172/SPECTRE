@@ -3,12 +3,10 @@
  * qa-scene-dialog-file-drop — the SHARE SCENE dialog's file control accepts a
  * file dropped from the desktop, proved in a real browser.
  *
- * The dialog replaces the browser-drawn "Choose files / No file chosen" line
- * with a translated one (src/ui/sceneSharing.js, fileChooser). The native
- * input must stay the whole control underneath it: a shrunken 1 px input
- * accepts drops only on its own pixel, so dragging a data-pack file onto the
- * visible row selected nothing. This harness drops a file onto the centre of
- * the visible row through CDP and expects `input.files` to hold it.
+ * The dialog draws a translated row over the native file input
+ * (src/ui/sceneSharing.js, fileChooser). The input must still cover the row,
+ * or drops miss it. Drops a file on the row's centre via CDP and expects
+ * `input.files` to hold it.
  *
  * Usage:
  *   node scripts/qa-scene-dialog-file-drop.mjs

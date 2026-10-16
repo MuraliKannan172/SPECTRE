@@ -1,4 +1,4 @@
-// K-26: every status line of the ChatGPT OAuth flow in Provider Settings goes
+// Every status line of the ChatGPT OAuth flow in Provider Settings goes
 // through t(), and the i18n check treats say() as a place UI text lands.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ const OAUTH_STATUS_TEXTS = [
   'ChatGPT sign-in complete. OAuth will be used for the next cloud voice session.',
 ];
 
-test('K-26: OAuth status-line texts are extractable messages with es/ru entries', () => {
+test('OAuth status-line texts are extractable messages with es/ru entries', () => {
   const messages = extractMessages();
   const missing = OAUTH_STATUS_TEXTS.filter((text) => !messages.has(text));
   assert.deepEqual(missing, [], 'texts not wrapped in t() in src/keySetup.js');
@@ -39,7 +39,7 @@ test('K-26: OAuth status-line texts are extractable messages with es/ru entries'
   }
 });
 
-test('K-26: the i18n check sees an unmarked literal passed to say()', () => {
+test('the i18n check sees an unmarked literal passed to say()', () => {
   const sample =
     "const say = (x) => { el.textContent = x; };\nsay('Checking local ChatGPT OAuth sign-in…');\n";
   const found = unmarkedScript('sample.js', sample);
@@ -49,7 +49,7 @@ test('K-26: the i18n check sees an unmarked literal passed to say()', () => {
   );
 });
 
-test('K-26: src/keySetup.js has no unmarked say() literals once say is a sink', () => {
+test('src/keySetup.js has no unmarked say() literals', () => {
   const source = readFileSync(
     new URL('./keySetup.js', import.meta.url),
     'utf8',

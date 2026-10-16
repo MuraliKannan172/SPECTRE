@@ -211,3 +211,70 @@ test('unmarkedScript sees human-readable status, loadingLabel and statusMessage 
   assert.deepEqual(texts("return { status: 'auth-failed' };"), []);
   assert.deepEqual(texts("return { status: msg('Source unavailable') };"), []);
 });
+
+// The Layers panel shows `stats.error || stats.lastError`, so a
+// lastError is status text like error.
+test('unmarkedScript sees status text assigned to lastError', () => {
+  const texts = (js) => unmarkedScript('f.js', js).map((f) => f.text);
+  assert.deepEqual(
+    texts(
+      "state.coverage.lastError = error?.message || 'Coverage tile failed';",
+    ),
+    ['Coverage tile failed'],
+  );
+  assert.deepEqual(texts("layerState._lastError = 'CelesTrak unreachable';"), [
+    'CelesTrak unreachable',
+  ]);
+  assert.deepEqual(
+    texts(
+      "state.coverage.lastError = error?.message || msg('Coverage tile failed');",
+    ),
+    [],
+  );
+  assert.deepEqual(texts('this._lastError = message;'), []);
+});
+
+test('unmarkedScript skips default values and ternary branches, not later assignments', () => {
+  const texts = (js) => unmarkedScript('f.js', js).map((f) => f.text);
+  // A default value in a parameter list or destructuring is a local's.
+  assert.deepEqual(texts("function f(error = 'Feed went away') {}"), []);
+  assert.deepEqual(texts("const f = (status = 'Not ready', x) => x;"), []);
+  assert.deepEqual(
+    texts("function f(\n  status = 'Not ready',\n  x,\n) {}"),
+    [],
+  );
+  assert.deepEqual(texts("const { status = 'Ready now' } = options;"), []);
+  assert.deepEqual(
+    texts("const {\n  error = 'No data yet',\n} = options;"),
+    [],
+  );
+  assert.deepEqual(
+    texts("for (const [id, status = 'Waiting'] of rows) {}"),
+    [],
+  );
+  // A name right after `?` is a ternary branch, not a `status:` property.
+  assert.deepEqual(texts("const s = ok ? status : 'Source unavailable';"), []);
+  assert.deepEqual(texts("const s = ok\n  ? title\n  : 'Untitled view';"), []);
+  // …while the property itself still is.
+  assert.deepEqual(texts("return { title: x ? title : 'Untitled view' };"), [
+    'Untitled view',
+  ]);
+  // A later assignment is checked even when the name is a declared local:
+  // a layer keeps its status in `let error` (wind, AIS watchdog) and builds
+  // `loadingLabel` in a `let` before returning it (FIRMS).
+  assert.deepEqual(
+    texts(
+      "function f() {\n  let error = null;\n  if (x) error = 'Feed closed';\n}",
+    ),
+    ['Feed closed'],
+  );
+  assert.deepEqual(
+    texts(
+      "let loadingLabel = '';\nif (x) {\n  loadingLabel = 'KEY REQUIRED';\n}",
+    ),
+    ['KEY REQUIRED'],
+  );
+  assert.deepEqual(texts("let a = 1,\n  error = 'Feed closed';"), [
+    'Feed closed',
+  ]);
+});

@@ -62,7 +62,7 @@ for (const locale of ['es', 'ru']) {
   });
 }
 
-test('radio playback errors read as before in English', () => {
+test('radio playback errors stay English', () => {
   setLocale('en');
   for (const message of PLAYBACK_ERRORS) {
     assert.equal(render(message), message);

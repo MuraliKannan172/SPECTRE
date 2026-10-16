@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { setLocale } from '../../i18n/index.js';
 import { createWindLayer } from './index.js';
 
-test('stale wind forecast is marked in the UI language (K-40)', async () => {
+test('stale wind forecast is marked in the UI language', async () => {
   const rendering = Object.fromEntries(
     ['attach', 'start', 'stop', 'clear', 'destroy', 'setField'].map((n) => [
       n,

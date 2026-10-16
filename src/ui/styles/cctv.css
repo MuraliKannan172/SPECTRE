@@ -70,17 +70,13 @@
   margin-bottom: 0;
 }
 
-/* Spanish labels run ~25% longer than English and overflow the nowrap
-   .scene-btn rows inside the fixed-width CCTV panel (e.g. ENFOCAR ·
-   COBERTURA DESACTIVADA · AUTO HOP DESACTIVADO). Let the rows wrap under
-   es only; the English layout stays pixel-identical. */
+/* Spanish labels overflow the nowrap .scene-btn row of the fixed-width
+   panel; wrap the row under es only, English stays as is. */
 html[lang='es'] .cctv-controls {
   flex-wrap: wrap;
 }
 
-/* A translated label longer than its button wraps inside the button instead
-   of running past the panel edge. English is excluded so its labels (AUTO HOP
-   OFF) stay on one line. */
+/* A label longer than its button wraps inside it, not past the panel edge. */
 html:not([lang='en']) .cctv-controls .scene-btn {
   white-space: normal;
   overflow-wrap: break-word;
@@ -389,9 +385,8 @@ html:not([lang='en']) .cctv-controls .scene-btn {
   text-shadow: 0 0 10px rgba(0, 212, 255, 0.18);
 }
 
-/* Longer translated labels and units: tighter calibration chips keep the
-   seven values to two rows so SAVE / RESET stay in view, and the camera
-   select uses the compact mono face. English keeps its original look. */
+/* Tighter calibration chips keep the seven values to two rows, so
+   SAVE / RESET stay in view. */
 html:not([lang='en']) .cctv-cal-readout {
   gap: 4px;
 }

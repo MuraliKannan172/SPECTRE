@@ -2950,5 +2950,7 @@
   "Included in bundle": "Входит в архив",
   "Missing bundle file — reimport its bundle": "Файла нет в архиве — импортируйте этот архив снова",
   "Source configured; file checked when loaded": "Источник настроен; файл будет проверен при загрузке",
-  "Source unavailable": "Источник недоступен"
+  "Source unavailable": "Источник недоступен",
+  "Coverage tile failed": "Не удалось загрузить тайл покрытия",
+  "Unknown": "Неизвестно"
 }

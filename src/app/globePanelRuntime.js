@@ -541,7 +541,7 @@ export function panelRuntime(config) {
         const notice = document.createElement('div');
         notice.id = 'status';
         notice.textContent =
-          // i18n-ignore: panel runtime runs as source text in the host page, with no i18n module or app locale
+          // i18n-ignore: host-panel script, no app catalogs
           "This panel lost its 3D graphics, likely because other God's Eye " +
           "View panels in this conversation hold them. Use Open in God's " +
           'Eye View above, or show it in a new conversation.';
@@ -569,20 +569,18 @@ export function panelRuntime(config) {
     queued = view;
     if (started) return;
     started = true;
-    // i18n-ignore: this script runs as source text in the host panel, without the app catalogs
+    // i18n-ignore: host-panel script, no app catalogs
     say("Loading God's Eye View…");
     startApp(url, view).catch((error) =>
-      // i18n-ignore: this script runs as source text in the host panel, without the app catalogs
+      // i18n-ignore: host-panel script, no app catalogs
       say(`God's Eye View could not load here: ${error?.message || error}.`),
     );
     setTimeout(() => {
-      // i18n-ignore: this script runs as source text in the host panel
       if (!ready)
         say(
           // i18n-ignore: see above
           "God's Eye View did not load here" +
             (blocked ? ` (${blocked})` : '') +
-            // i18n-ignore: see above
             ". Use Open in God's Eye View above.",
         );
     }, config.loadTimeoutMs);
@@ -622,7 +620,7 @@ export function panelRuntime(config) {
     if (context?.displayMode) displayMode = context.displayMode;
     if (context?.availableDisplayModes)
       expand.hidden = !context.availableDisplayModes.includes('fullscreen');
-    // i18n-ignore: panel runtime runs as source text in the host page, with no i18n module or app locale
+    // i18n-ignore: host-panel script, no app catalogs
     expand.textContent = displayMode === 'fullscreen' ? 'Collapse' : 'Expand';
   };
   expand.addEventListener('click', () => {
@@ -663,7 +661,7 @@ export function panelRuntime(config) {
     },
     (error) =>
       say(
-        // i18n-ignore: this script runs as source text in the host panel, without the app catalogs
+        // i18n-ignore: host-panel script, no app catalogs
         "This client did not accept the God's Eye View panel" +
           (error?.message ? `: ${error.message}` : '.'),
       ),

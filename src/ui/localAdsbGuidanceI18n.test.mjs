@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-test('Local ADS-B guidance hint is translated in the layer row (K-20)', async () => {
+test('Local ADS-B guidance hint is translated in the layer row', async () => {
   const { setLocale, t } = await import('../i18n/index.js');
   const { LayerPanel } = await import('./layerPanel.js');
   const { localAdsbStatus } = await import('../layers/localAdsb/status.js');

@@ -2,7 +2,6 @@
  * @module cityPois
  * @description The preset cities and their landmarks — plain data with no
  * Cesium, so modules that only need the names (voice cards) can import it.
- * `locations.js` re-exports it.
  */
 
 /**

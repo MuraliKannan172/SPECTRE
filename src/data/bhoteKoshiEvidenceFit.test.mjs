@@ -1,7 +1,6 @@
-// Proposal 5 / E4: the evidence frame's «{publisher} / OPEN» line is drawn on
-// a canvas, so CSS cannot widen it; on the portrait card the Russian
-// «ИСТОЧНИК YOUTUBE / ОТКРЫТЬ» lost its last letter. The line is measured and
-// shrunk to fit, keeping the action word whole; English draws as before.
+// The «{publisher} / OPEN» line is drawn on a canvas, so CSS cannot wrap it:
+// a long translation shrinks to fit the portrait card, action word whole.
+// English is drawn at full size.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';

@@ -1,6 +1,5 @@
 // Vector tile and weather image failures reach the DATA LAYERS row and the
-// ALPR retry chip in the UI language; the sources keep them in English, and
-// English shows them as before.
+// ALPR retry chip in the UI language; the sources keep them in English.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale } from '../i18n/index.js';
@@ -41,7 +40,7 @@ test('the vector tile source fails with the catalog key', async () => {
   });
 });
 
-test('en: tile and weather image failures read as before', () => {
+test('en: tile and weather image failures stay English', () => {
   setLocale('en');
   assert.match(
     row('alpr-cameras', 'Vector tile metadata unavailable'),

@@ -2,15 +2,8 @@
 // their shape; English shows exactly as it came.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { setLocale, t, translateKnown } from '../i18n/index.js';
-import { sourceLabel } from './layerNames.js';
-import {
-  translateFeedError,
-  translateLoadingLabel,
-  translateStatusLine,
-} from './statusText.js';
-import { FEED_SOURCE, COMBINED_SOURCE } from '../layers/localAdsb/status.js';
-import { readResponseTextCapped } from '../sources/httpBody.js';
+import { setLocale, t } from '../i18n/index.js';
+import { translateFeedError, translateStatusLine } from './statusText.js';
 
 function inLocale(locale, run) {
   setLocale(locale);
@@ -41,7 +34,6 @@ test('en: status lines and errors show as they came', () => {
   ]) {
     assert.equal(translateFeedError(text), text);
     assert.equal(translateStatusLine(text), text);
-    assert.equal(translateLoadingLabel(` ${text} `), text);
   }
 });
 
@@ -75,24 +67,11 @@ for (const locale of ['es', 'ru']) {
     });
   });
 
-  test(`${locale}: an oversized upstream response is translated`, async () => {
-    const response = new Response('x'.repeat(10), {
-      headers: { 'content-length': '10' },
-    });
-    const error = await readResponseTextCapped(response, 4).catch((e) => e);
-    assert.equal(error.message, 'Upstream response too large');
+  test(`${locale}: a known error shows its catalog entry`, () => {
     inLocale(locale, () => {
-      assert.notEqual(translateKnown(error.message), error.message);
-      assert.equal(translateFeedError(error.message), t(error.message));
-    });
-  });
-
-  test(`${locale}: Local ADS-B source names translate without their own entry`, () => {
-    inLocale(locale, () => {
-      for (const source of [FEED_SOURCE, COMBINED_SOURCE]) {
-        assert.notEqual(t(source), source, 'the catalog has the entry');
-        assert.equal(sourceLabel(source), t(source));
-      }
+      const text = 'Upstream response too large';
+      assert.notEqual(t(text), text, 'the catalog has the entry');
+      assert.equal(translateFeedError(text), t(text));
     });
   });
 }

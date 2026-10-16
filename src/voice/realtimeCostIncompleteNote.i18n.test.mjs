@@ -1,4 +1,4 @@
-// K-10: the API-key cost tooltip states an incomplete estimate in the
+// The API-key cost tooltip states an incomplete estimate in the
 // interface language; the tracker keeps its English note for diagnostics.
 import test from 'node:test';
 import assert from 'node:assert/strict';

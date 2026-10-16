@@ -217,9 +217,8 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
         0,
       );
       // Readings and errors stay English data (analyst records, stats); the
-      // card shows them in the UI language, errors as the Layers panel row
-      // does. A provider's own error text has no catalog entry and shows as
-      // it came.
+      // card translates them as the Layers panel row does. A provider's own
+      // error text has no catalog entry and shows as it came.
       return {
         readout: true,
         summary: {

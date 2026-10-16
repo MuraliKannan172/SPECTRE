@@ -216,8 +216,7 @@ button.sl-status:focus-visible {
   display: none;
 }
 
-/* Longer translations: rather than squeeze the hint into a narrow column
-   beside the button, put the button on its own line when both do not fit. */
+/* When the hint and the button do not both fit, the button takes its own line. */
 html:not([lang='en']) .sl-meta-row {
   flex-wrap: wrap;
 }

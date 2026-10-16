@@ -1,10 +1,8 @@
 import * as Cesium from 'cesium';
 import { t, msg } from '../../i18n/index.js';
 
-// The vessels ingestion owner is a portable module graph (it also runs in the
-// server-side source builds), so it writes stable English feed labels into
-// state. Localize those known labels here, at the presentation read; anything
-// else (a bespoke manager label) passes through verbatim.
+// ingestion.js is a portable export (package.json) and writes English labels
+// into state; translate the known ones here, pass anything else through.
 const FEED_STATE_LABEL_KEYS = Object.freeze({
   'refreshing...': msg('refreshing...'),
   'loading...': msg('loading...'),

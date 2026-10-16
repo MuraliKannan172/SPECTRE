@@ -84,7 +84,7 @@ test('the current language comes first, the rest by their own names', () => {
   );
 });
 
-test('each row names the language in the interface language too, unless that only repeats it', () => {
+test('each row gets the interface-language name for search, unless it only repeats the native one', () => {
   const local = createLocalNameReader('ru');
   const rows = buildLocaleOptions({
     locales: LOCALES,

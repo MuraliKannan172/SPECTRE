@@ -2883,5 +2883,7 @@
   "Included in bundle": "Incluido en el paquete",
   "Missing bundle file — reimport its bundle": "Falta el archivo en el paquete — vuelve a importar su paquete",
   "Source configured; file checked when loaded": "Fuente configurada; el archivo se comprobará al cargarlo",
-  "Source unavailable": "Fuente no disponible"
+  "Source unavailable": "Fuente no disponible",
+  "Coverage tile failed": "No se pudo cargar la tesela de cobertura",
+  "Unknown": "Desconocido"
 }

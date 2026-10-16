@@ -3,10 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { setLocale, translateKnown } from './index.js';
 
-// Status and error texts the layers write straight into their state
-// (loadingLabel / _error / street.error) as English data; the layer panel and
-// the Street Level panel show them through translateKnown, so each needs a
-// catalog entry in every language (K-36).
+// Layers keep these status texts as English data, and the panels show them
+// through translateKnown, so each needs an entry in every catalog.
 const SITES = [
   ['../layers/streetLevel/index.js', 'loading coverage...'],
   ['../layers/firms/ingestion.js', 'live feed unavailable'],
@@ -33,8 +31,8 @@ const SITES = [
   ['../layers/wind/source.js', 'Wind request timed out'],
   ['../layers/wind/source.js', 'Malformed wind manifest'],
   ['../layers/wind/source.js', 'Malformed wind grid'],
-  ['../layers/wind/source.js', 'Temperature field unavailable'],
-  ['../layers/wind/source.js', 'Mean sea level pressure field unavailable'],
+  ['../layers/wind/fields.js', 'Temperature field unavailable'],
+  ['../layers/wind/fields.js', 'Mean sea level pressure field unavailable'],
 ];
 
 // A fallback that reaches the panel must be marked, or `npm run i18n` cannot
@@ -55,7 +53,7 @@ for (const locale of ['es', 'ru']) {
   for (const [file, text] of SITES) {
     test(`${locale}: "${text}" from ${file} is translated`, () => {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
-      assert.ok(source.includes(`'${text}'`), `literal still in ${file}`);
+      assert.ok(source.includes(`'${text}'`), `literal not found in ${file}`);
       setLocale(locale);
       try {
         assert.notEqual(translateKnown(text), text);

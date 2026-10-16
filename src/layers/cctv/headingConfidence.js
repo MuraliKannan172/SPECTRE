@@ -45,8 +45,6 @@ export function isHeadingEstimated(camera) {
  */
 export function headingHudToken(camera) {
   const hdg = Math.round(Number(camera?.headingDeg) || 0);
-  // The token copy lives in the layers catalog (en is byte-identical to the
-  // literals these replace); presentation stays here, translation at read.
   return isHeadingEstimated(camera)
     ? t('HDG {value}° (ESTIMATED)', { value: hdg })
     : t('HDG {value}°', { value: hdg });

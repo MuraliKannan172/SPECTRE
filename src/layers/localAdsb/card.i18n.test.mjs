@@ -1,4 +1,4 @@
-// K-37: the Local ADS-B click card follows the UI language; English keeps its
+// The Local ADS-B click card follows the UI language; English keeps its
 // wording (index.test.mjs pins the full English card).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -86,7 +86,7 @@ test('the class line names the aircraft class in the UI language', async () => {
   }
 });
 
-// C8: the receiver bands follow the UI language too ("1090 МГц").
+// The receiver bands follow the UI language too ("1090 МГц").
 test('ru: the receiver line names the bands in Russian', async () => {
   const { localAdsbReceiverLine } = await import('./card.js');
   setLocale('ru');

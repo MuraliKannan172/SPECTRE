@@ -4,9 +4,6 @@ import { layerFeedState } from '../data/feedState.js';
 export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
 import { keyGuidanceText, keyRequirementText } from './keyGuidance.js';
-// Layer and source names at this presentation boundary: registry ids and
-// English module names stay as they are; a layer without an entry renders its
-// module name, and the panel's own English names win (PANEL_LABEL_KEYS).
 import {
   LAYER_NAME_KEYS,
   PANEL_LABEL_KEYS as PANEL_LABELS,
@@ -14,7 +11,7 @@ import {
 } from './layerNames.js';
 export { localizeLayerName } from './layerNames.js';
 import { createWeatherPanel } from './weatherPanel.js';
-import { translateFeedError, translateLoadingLabel } from './statusText.js';
+import { translateFeedError, translateStatusLine } from './statusText.js';
 import {
   formatNumber,
   getLocale,
@@ -23,9 +20,8 @@ import {
   translateKnown,
 } from '../i18n/index.js';
 
-// Feed-state enum VALUES are machine identifiers (layerFeedState contract, QA
-// hooks, CSS feed-* classes); only the final label value translates, at this
-// presentation boundary. See docs/TRANSLATORS.md keep-English boundary.
+// Feed-state values are machine ids (QA hooks, CSS feed-* classes); only the
+// label translates.
 const FEED_STATE_LABEL_KEYS = Object.freeze({
   nominal: msg('ON'),
   loading: msg('LOADING'),
@@ -39,15 +35,6 @@ const FEED_STATE_LABEL_KEYS = Object.freeze({
 function lifecycleStateLabel(lifecycleState) {
   return t(lifecycleState === 'enabling' ? msg('ENABLING') : msg('DISABLING'));
 }
-const FEED_STATE_LABELS = Object.freeze({
-  nominal: 'ON',
-  loading: 'LOADING',
-  degraded: 'DEGRADED',
-  stale: 'STALE',
-  partial: 'PARTIAL',
-  fallback: 'FALLBACK',
-  unavailable: 'UNAVAILABLE',
-});
 
 // Presentation order is independent of catalog registration and startup order.
 const PANEL_GROUPS = [
@@ -115,7 +102,7 @@ function englishPanelLabel(layer) {
   return PANEL_LABELS[layer.id] || LAYER_NAME_KEYS[layer.id] || layer.name;
 }
 
-// The panel's own English names win, as before i18n; module names otherwise.
+// PANEL_LABELS win over layer-name keys; otherwise the module's own name.
 function panelLabel(layer) {
   if (PANEL_LABELS[layer.id]) return t(PANEL_LABELS[layer.id]);
   const key = LAYER_NAME_KEYS[layer.id];
@@ -485,12 +472,10 @@ export class LayerPanel {
   }
 
   /**
-   * Write a row's count. A count that is a phrase carrying its own number
-   * ("24 nearby · 2 on screen") moves to its own line under the name outside
-   * English: beside the toggle it squeezes a longer translated name to a word
-   * per line. English keeps the count beside the toggle. The "—" placeholder
-   * is marked so it can give way to a wide status chip (translations only,
-   * radio.css).
+   * Write a row's count. Outside English a count phrase ("24 nearby · 2 on
+   * screen") gets its own line, or it squeezes a longer translated name to a
+   * word per line. "—" is marked so a wide status chip can replace it
+   * (radio.css).
    */
   _syncCount(row, count, stats) {
     const text = this._layerCountText(stats);
@@ -693,14 +678,14 @@ export class LayerPanel {
     if (stats.loading) {
       const loadingLabel =
         typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
-          ? translateLoadingLabel(stats.loadingLabel)
+          ? translateStatusLine(stats.loadingLabel.trim())
           : t('loading...');
       return t('{source} · {loadingLabel}', { source, loadingLabel });
     }
     if (feedState === 'fallback') {
       const detail =
         typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
-          ? translateLoadingLabel(stats.loadingLabel)
+          ? translateStatusLine(stats.loadingLabel.trim())
           : stats.coverage || ago;
       return t('{state} · {source} · {detail}', {
         state: stateLabel,
@@ -745,7 +730,7 @@ export class LayerPanel {
     if (typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()) {
       return t('{source} · {loadingLabel}', {
         source,
-        loadingLabel: translateLoadingLabel(stats.loadingLabel),
+        loadingLabel: translateStatusLine(stats.loadingLabel.trim()),
       });
     }
     return t('{source} · {ago}', { source, ago });
@@ -767,7 +752,7 @@ export class LayerPanel {
     button.classList.toggle('enabling', layer.lifecycleState === 'enabling');
     button.classList.toggle('disabling', layer.lifecycleState === 'disabling');
     button.classList.toggle('lifecycle-uncertain', uncertain);
-    for (const state of Object.keys(FEED_STATE_LABELS)) {
+    for (const state of Object.keys(FEED_STATE_LABEL_KEYS)) {
       button.classList.toggle(
         `feed-${state}`,
         (layer.enabled || unavailable) && !uncertain && feedState === state,

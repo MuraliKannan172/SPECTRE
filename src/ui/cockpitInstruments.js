@@ -146,8 +146,6 @@ export function updateHud(
     this.position.textContent = `${lat} · ${lon}`;
   }
   if (this.aircraftMeta) {
-    // State-sibling keys at the writer: each feed state translates
-    // independently so no state can leak English under other locales.
     const feedState = this.surfaceAcquiring
       ? t('ACQUIRING SURFACE')
       : this.surfaceFallback

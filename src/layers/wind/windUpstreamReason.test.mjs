@@ -39,7 +39,7 @@ async function serverManifestOnUpstreamFailure() {
   return JSON.parse(body);
 }
 
-test('en: the upstream failure reason reads as before (K-17)', async () => {
+test('en: the upstream failure reason reads as before', async () => {
   const manifest = await serverManifestOnUpstreamFailure();
   const layer = harness({ getSnapshot: async () => manifest });
   await layer.update();

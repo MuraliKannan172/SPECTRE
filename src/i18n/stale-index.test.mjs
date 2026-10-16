@@ -1,5 +1,5 @@
-// K-23: scripts/i18n.mjs must skip index entries that are gone from the
-// working tree (plain `mv`/`rm` without `git mv`/`git rm`).
+// scripts/i18n.mjs must skip index entries gone from the working tree
+// (plain `mv`/`rm` without `git mv`/`git rm`).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

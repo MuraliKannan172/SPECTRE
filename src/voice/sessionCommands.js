@@ -63,12 +63,10 @@ export function createVoiceCommands({
   const updateStatus = session.subscribe((event) => {
     if (event.type !== 'state') return;
     ui.root.dataset.status = event.state;
-    // Session states are machine values (dataset.status); only the label
-    // shown for them is translated. Unknown states show as they are.
+    // States are machine values; only the label is translated.
     ui.status.textContent = voiceStatusLabel(event.state);
-    // The session reports 'Voice off' in English: it is portable and has no
-    // locale, so that detail shows as the idle label. Other details are
-    // provider messages and show as they arrive.
+    // The portable session reports 'Voice off' in English: show the idle
+    // label instead. Other details are provider messages, shown as they come.
     const idle = event.state === 'idle';
     const detail = event.detail === 'Voice off' ? '' : event.detail;
     ui.detail.textContent =

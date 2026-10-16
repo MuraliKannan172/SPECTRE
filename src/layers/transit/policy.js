@@ -321,10 +321,8 @@ export function aggregateTransitFeedHealth(statuses, nowMs) {
   };
 }
 
-// AI tools (src/tools/queries/mobility.js) import this module, so it stays
-// free of i18n: the card copy below calls the translate function `t` that the
-// caller hands in. The browser selection passes the real one from src/i18n;
-// without it the copy is English.
+// AI tools (src/tools/queries/mobility.js) import this module, so no i18n here:
+// the card copy takes `t` from the caller (selection.js); without it, English.
 const msg = (text) => text;
 
 /** English {placeholder} interpolation, the default `t` of the card copy. */

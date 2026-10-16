@@ -1,15 +1,9 @@
-/**
- * The tool name to show for a pointer owner.
- *
- * Pointer-owner ids (src/data/inputOwnership.js) are stable internal
- * identifiers — 'draw', 'recent-imagery-box' — and never belong on screen.
- * This maps each to the English name of the tool, which the caller translates
- * with translateKnown() where it is shown. Pure and stateless, so any package
- * can carry it without a second copy of the pointer claim.
- */
+import { msg } from '../i18n/marker.js';
 
-// English marker for the i18n extractor; this module imports no i18n.
-const msg = (text) => text;
+/**
+ * Tool name for a pointer owner. Owner ids (inputOwnership.js) never go on
+ * screen; callers translate the English name with translateKnown().
+ */
 
 const POINTER_OWNER_NAMES = Object.freeze({
   draw: msg('Draw'),

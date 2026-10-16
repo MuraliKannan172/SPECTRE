@@ -4,9 +4,8 @@
 //   npm run i18n -- --prune          also drop entries the code no longer uses
 //   npm run i18n -- --missing ru     print what ru lacks, as JSON to translate
 //
-// A translation identical to the English is reported too, unless it is
-// listed for that locale in src/i18n/same-as-english.json (codes, product
-// names, words spelled the same in both languages).
+// A translation left as the English fails unless src/i18n/same-as-english.json
+// lists it.
 //
 // Messages are the English literals passed to t(), tn() and msg() in src/,
 // plus the markup opted in with data-i18n* in src/ui/templates and index.html.
@@ -220,12 +219,30 @@ const JS_SINKS = [
   // Also showToast?.(…) and this._showToast(…).
   /\b_?(?:showToast|toast|setHint|announce|say)(?:\?\.)?\(\s*/g,
   // `status` values are often codes ('ok', 'auth-failed'); visibleText drops
-  // those, so only readable text is reported.
-  /(?:^|[{,\s])(?:label|title|tooltip|placeholder|hint|ariaLabel|accessibilityLabel|caption|subtitle|kicker|emptyText|blurb|countLabel|status|loadingLabel|statusMessage)\s*:\s*/gm,
-  // Layer status set by assignment: this._error = …, stats.loadingLabel = ….
-  // A declared local (`const error = …`) is scratch, not a status field.
-  /(?<![\w$])(?<!\b(?:const|let|var)\s+)_?(?:error|loadingLabel|statusMessage|status)\s*(?:\?\?|\|\|)?=(?![=>])\s*/g,
+  // those, so only readable text is reported. A name right after `?` is a
+  // ternary branch (`ok ? status : 'Fallback'`), not a property.
+  /(?:^|[{,\s])(?<!\?\s*)(?:label|title|tooltip|placeholder|hint|ariaLabel|accessibilityLabel|caption|subtitle|kicker|emptyText|blurb|countLabel|status|loadingLabel|statusMessage)\s*:\s*/gm,
 ];
+// Layer status set by assignment: this._error = …, stats.lastError = …,
+// error = … (a layer factory keeps its status in `let error`). Not checked:
+// the declaration itself (`const error = …`, `let status = …`) and a default
+// value in a parameter list or destructuring (see defaultValue).
+const ASSIGNMENT_SINK =
+  /(?<![\w$])(?<!\b(?:const|let|var)\s+)_?(?:error|lastError|loadingLabel|statusMessage|status)\s*(?:\?\?|\|\|)?=(?![=>])\s*/g;
+JS_SINKS.push(ASSIGNMENT_SINK);
+
+/**
+ * Whether `name = value` at `nameStart` is a default (`(status = 'idle') =>`,
+ * `const { error = '…' } = options`): it follows `(`, `[`, `{` or `,` and its
+ * value ends at `,` or a closing bracket. An assignment statement ends at `;`.
+ */
+function defaultValue(source, nameStart, valueStart) {
+  const before = source.slice(0, nameStart).trimEnd().at(-1);
+  if (!before || !'([{,'.includes(before)) return false;
+  const end = valueStart + expressionAt(source, valueStart).length;
+  const after = source.slice(end).trimStart()[0];
+  return Boolean(after) && ',)]}'.includes(after);
+}
 const MARKERS = /\b(?:t|tn|msg)\(/y;
 
 /** The expression starting at `start`, up to its end at bracket depth 0. */
@@ -364,6 +381,8 @@ export function unmarkedScript(file, original) {
       const start = match.index + match[0].length;
       const line = lineAt(source, start);
       if (ignored(line)) continue;
+      if (sink === ASSIGNMENT_SINK && defaultValue(source, match.index, start))
+        continue;
       const html = /HTML/.test(match[0]);
       for (const literal of valueLiterals(expressionAt(source, start))) {
         const text = visibleText(literal, html);
@@ -377,8 +396,7 @@ export function unmarkedScript(file, original) {
 /**
  * UI text that is not marked for translation: markup without data-i18n* and
  * string literals that reach the page without t(), tn() or msg().
- * Opt out with translate="no" in markup or an `// i18n-ignore` comment on
- * (or just above) the line in code.
+ * Opt-outs: see unmarkedMarkup; in code, `// i18n-ignore` on or above the line.
  * @returns {{where: string, text: string}[]}
  */
 export function findUnmarked() {

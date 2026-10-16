@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-// K-30: the publisher on the evidence frame ("YouTube source") is pack text
-// and is shown in the UI language; English stays "YOUTUBE SOURCE / OPEN".
+// The publisher on the evidence frame ("YouTube source") is pack text shown
+// in the UI language; English stays "YOUTUBE SOURCE / OPEN".
 import { setLocale } from '../i18n/index.js';
 import { createEvidenceFrame } from './bhoteKoshiEvent.js';
 

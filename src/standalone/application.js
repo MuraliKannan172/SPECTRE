@@ -1,6 +1,6 @@
 import { createStandaloneCatalog } from './catalog.js';
 import { createStandalonePlaceSearch } from './placeSearch.js';
-import { CITY_POIS } from '../locations.js';
+import { CITY_POIS } from '../cityPois.js';
 import { createApplication } from '../app/application.js';
 import { createStandaloneScene } from './scene.js';
 import { createStandaloneControls } from './controls.js';

@@ -362,10 +362,8 @@ export function bindRadioControls() {
             origin: 'user',
             notificationToken,
           }),
-        // Lifecycle toast copy: the English template below is pinned
-        // verbatim by contextSessionOrdering.test.mjs, so it stays the
-        // argument and localizedMessage rewrites it at the toast boundary
-        // (identical value under 'en').
+        // contextSessionOrdering.test.mjs pins this English argument; the
+        // toast shows localizedMessage.
         `Radio could not ${enabling ? 'start' : 'stop'} cleanly`,
         {
           localizedMessage: t('Radio could not {action} cleanly', {

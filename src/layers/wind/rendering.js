@@ -7,17 +7,16 @@ import { orderWeatherImagery } from '../weather/imageryOrder.js';
 import { NO_IMAGERY_HOST } from '../weather/imageryHost.js';
 import { msg } from '../../i18n/index.js';
 import { createWindGpuRendering } from './gpuRendering.js';
-import { SCALAR_UNAVAILABLE } from './source.js';
 import { advectParticle, sampleWind } from './model.js';
 import {
   createFieldRaster,
+  SCALAR_UNAVAILABLE,
   trailEraseAlpha,
   windTrailColor,
 } from './fields.js';
 
-// A scalar overlay that cannot be drawn, in English for diagnostics; the
-// panel status shows it translated (index.js). The scalar texts are the ones
-// the source reports. setOptions only accepts these overlays.
+// English for diagnostics; the row status shows it translated (index.js). The
+// scalar texts are the source's own; setOptions accepts only these overlays.
 const FIELD_UNAVAILABLE = Object.freeze({
   speed: msg('Wind speed field unavailable'),
   ...SCALAR_UNAVAILABLE,

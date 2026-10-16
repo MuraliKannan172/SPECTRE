@@ -99,9 +99,8 @@ export const STEP_ANCHOR_FAST_ATTEMPTS = 5;
 export const FLIGHT_PROGRESS_MS = 250;
 
 // ---------------------------------------------------------------------------
-// Display text: distances, durations and maneuvers in the page's language.
-// The proxy's English `instruction` stays the machine value; the row and the
-// cards phrase each step from its OSRM type/modifier/road instead.
+// Display text in the page's language. The proxy's English `instruction` stays
+// the machine value; steps are phrased from their OSRM type/modifier/road.
 // ---------------------------------------------------------------------------
 
 /**
@@ -639,8 +638,7 @@ export function directionsStats(state) {
     armed,
     pointerBlocked,
   } = state;
-  // English in layer state; the layer row translates it.
-  const source = 'OSM routing'; // i18n-ignore: source name, translated by layerPanel
+  const source = 'OSM routing'; // English in layer state; the layer row translates it
   if (pointerBlocked) {
     return {
       count: route?.steps.length || 0,

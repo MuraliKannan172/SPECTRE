@@ -1,5 +1,5 @@
-// Marks restore labels for i18n extraction; shareRestoration translates them.
-// Kept local so this module stays free of the i18n import.
+// Restore labels are marked with msg(); ui/shareRestoration.js translates them.
+// Local, not i18n/marker.js: the token-ledger tests run this file in isolation.
 const msg = (text) => text;
 import { normalizeIdSwitches, patchRequestedIdSwitches } from './idSwitches.js';
 import reservationRows from './layerStateTokenReservations.json' with { type: 'json' };

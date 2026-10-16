@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale } from '../i18n/index.js';
-import { CITY_POIS } from '../locations.js';
+import { CITY_POIS } from '../cityPois.js';
 import { KNOWN_PLACE_NAMES, localizePlaceName } from './placeNames.js';
 import { LocationControls } from './locationControls.js';
 

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { APPLICATION_LAYER_METADATA } from '../app/constructCatalog.js';
-import { LAYER_NAME_KEYS, PANEL_LABEL_KEYS } from './layerNames.js';
+import { setLocale, t } from '../i18n/index.js';
+import { FEED_SOURCE, COMBINED_SOURCE } from '../layers/localAdsb/status.js';
+import {
+  LAYER_NAME_KEYS,
+  PANEL_LABEL_KEYS,
+  sourceLabel,
+} from './layerNames.js';
 
 // Layers whose module name is a proper name and stays as it is in every
 // language: the Bhote Koshi pair belong to a scripted scene.
@@ -31,3 +37,17 @@ test('the name tables list only catalog layers', () => {
   ].filter((id) => !catalogIds.includes(id));
   assert.deepEqual(unknown, []);
 });
+
+for (const locale of ['es', 'ru']) {
+  test(`${locale}: Local ADS-B source names translate without their own entry`, () => {
+    setLocale(locale);
+    try {
+      for (const source of [FEED_SOURCE, COMBINED_SOURCE]) {
+        assert.notEqual(t(source), source, 'the catalog has the entry');
+        assert.equal(sourceLabel(source), t(source));
+      }
+    } finally {
+      setLocale('en');
+    }
+  });
+}

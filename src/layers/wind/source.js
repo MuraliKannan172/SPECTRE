@@ -1,14 +1,9 @@
 import { readWindBody } from '../../sources/windBody.js';
+import { SCALAR_UNAVAILABLE } from './fields.js';
 
 // Imported by src/tools: no i18n here. The texts stay English data and the
 // wind layer and layer panel show them translated.
 const msg = (text) => text;
-
-/** Status of a scalar overlay the provider could not supply, by overlay. */
-export const SCALAR_UNAVAILABLE = Object.freeze({
-  temperature: msg('Temperature field unavailable'),
-  pressure: msg('Mean sea level pressure field unavailable'),
-});
 
 /** Create a bounded, cancellable source for the same-origin wind provider. */
 export function createWindSource({

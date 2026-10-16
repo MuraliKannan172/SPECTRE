@@ -1,4 +1,4 @@
-// K-12: a translated vessel type is never cut mid-word on the card.
+// A translated vessel type is never cut mid-word on the card.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';

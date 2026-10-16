@@ -87,11 +87,8 @@ export function createSceneDialog(title, onClose) {
   }
   /**
    * The browser draws a file input's button and "no file" text in its own
-   * language. Keep the native input itself as the whole control — stretched
-   * over the row below, fully transparent — so clicking, keyboard focus and
-   * dropping files or folders from the desktop all stay native (a shrunken
-   * input would only accept drops on its own 1 px), and draw a translated
-   * button and selection line underneath it.
+   * language. Stretch the native input, transparent, over the whole row (so
+   * click, focus and drops stay native) and draw translated text under it.
    */
   function fileChooser(wrapper, node) {
     wrapper.style.position = 'relative';

@@ -1,4 +1,4 @@
-// K-37: the Transit selection card follows the UI language. The copy builder
+// The Transit selection card follows the UI language. The copy builder
 // stays free of i18n (AI tools import policy.js); the browser hands it t().
 import test from 'node:test';
 import assert from 'node:assert/strict';

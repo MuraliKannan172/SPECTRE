@@ -12,11 +12,9 @@ import {
 import { localizeLayerName } from './layerNames.js';
 
 /**
- * A blocked-visibility reason in the UI language. The lifecycle keeps reasons
- * English (they also reach voice and tool callers): the Space Missions guard
- * is re-composed from its template with the layer name localized, any other
- * known sentence ("Data source unavailable") is looked up as is, and an
- * unknown one — a live provider message — passes through.
+ * A blocked-visibility reason in the UI language. Reasons stay English (voice
+ * and tools read them): the Space Missions refusal is rebuilt with the layer
+ * name localized, a known sentence is looked up, anything else passes.
  */
 export function localizeVisibilityBlockReason(reason) {
   if (typeof reason !== 'string' || !reason) return reason;

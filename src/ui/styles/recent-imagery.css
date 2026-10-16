@@ -362,10 +362,9 @@ html:not([lang='en'])
   color: var(--text-secondary);
   font-style: italic;
 }
-/* In a translation the slot rows share the bar's columns (subgrid), so the
-   tag column fits the longest tag in either row and both rows stay aligned.
-   A translated slot line (date · source · resolution · state) is longer:
-   let it take a second line rather than cut off the state at the end. */
+/* The slot rows share the bar's columns (subgrid), so the tag column fits
+   the longest tag and both rows align; a long slot line (date · source ·
+   resolution · state) takes a second line instead of losing the state. */
 html:not([lang='en']) .recent-imagery-readout .ri-selection {
   grid-template-columns: minmax(44px, max-content) minmax(0, 1fr) 22px;
   column-gap: 6px;

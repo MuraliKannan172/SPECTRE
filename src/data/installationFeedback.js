@@ -1,8 +1,6 @@
-// Portable node/browser module (the HUD summary in loadingFeedback.js reads
-// it too), so it marks its copy with a local msg() instead of importing i18n;
-// installations/controls.js translates describeInstallationFeedback().
-const msg = (text) => text;
+import { msg } from '../i18n/marker.js';
 
+// layers/installations/controls.js translates describeInstallationFeedback().
 const REASONS = Object.freeze({
   rate_limited: msg('Overpass rate-limited'),
   timeout: msg('Overpass timed out'),

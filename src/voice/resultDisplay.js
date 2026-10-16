@@ -263,10 +263,9 @@ const UTC_DATE = Object.freeze({
 });
 
 /**
- * The snapshot time the note carries (ISO, as the model got it) as the card
- * shows it: "14:32:05 UTC", with the date first ("15.10.2026, 14:32:05 UTC")
- * when the snapshot is not from today (UTC). English shows the ISO time as
- * before; a value that is not a time shows as written.
+ * The note's ISO snapshot time as the card shows it: "14:32:05 UTC", dated
+ * ("15.10.2026, 14:32:05 UTC") when not from today (UTC). English and
+ * non-time values show as given.
  */
 export function shownSnapshotTime(iso, now = Date.now()) {
   const time = Date.parse(iso);

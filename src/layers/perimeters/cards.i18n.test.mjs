@@ -1,4 +1,4 @@
-// K-37 / K-29: the selected-fire card of Fire Perimeters and its accessible
+// The selected-fire card of Fire Perimeters and its accessible
 // label follow the UI language, like the legend of the same layer
 // (perimeters/index.js). cards.test.mjs pins the English card.
 import test from 'node:test';
@@ -82,7 +82,7 @@ for (const locale of ['es', 'ru']) {
   });
 }
 
-// C5 / C11 / E7: known WFIGS values, the cost and the unnamed title follow the
+// Known WFIGS values, the cost and the unnamed title follow the
 // UI language; the row keeps the feed's English for the AI tools.
 const expected = {
   es: {

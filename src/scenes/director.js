@@ -65,12 +65,6 @@ import {
 } from '../director/document.js';
 import { sceneSaveFailureReason } from './sceneSaveError.js';
 
-// Built-in recipe DISPLAY names. Recipe ids, the URL 'scene' param, stored
-// project titles, and voice-matching titles all stay English (keep-English
-// boundary + persisted data); only the presentation of an UNRENAMED built-in
-// localizes, so an operator's renamed scene is never masked by the catalog.
-// Recipe and built-in shot titles are marked with msg() in recipes.js.
-
 /** @constant {string} localStorage key for the serialized project */
 const STORAGE_KEY = 'godsEyeView.sceneProject.v2';
 const STORAGE_CHECKPOINT_KEY = 'godsEyeView.sceneProject.checkpoint.v1';
@@ -413,9 +407,8 @@ export class SceneDirector {
     this._controls = new SceneControls({
       subscribe: (listener) => this.subscribe(listener),
       read: () => ({
-        // Scene titles surface in the panel through SceneControls; built-in
-        // recipe and shot titles display their localized name until renamed
-        // by the user. Shots keep the stored title for editing and matching.
+        // The panel shows display titles; shots keep the stored title for
+        // editing and matching.
         scenes: this._project.scenes.map((scene) => ({
           ...scene,
           title: displaySceneTitle(scene),

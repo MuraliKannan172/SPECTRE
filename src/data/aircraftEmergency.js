@@ -13,11 +13,10 @@
  * broadcast, which does not confirm an incident or its resolution.
  */
 
+import { msg } from '../i18n/marker.js';
+
 /** @constant {string} Tint for aircraft broadcasting an emergency (not a priority). */
 export const EMERGENCY_TINT_CSS = '#FF4444';
-
-// Marks catalog text without importing i18n: tools and the server load this module.
-const msg = (text) => text;
 
 const SQUAWK_KINDS = { 7500: 'unlawful', 7600: 'nordo', 7700: 'general' };
 

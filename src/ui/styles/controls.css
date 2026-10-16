@@ -788,10 +788,8 @@ html:not([lang='en']) .panel-collapse-btn {
 }
 
 /* One label column across the Display rows: --pp-label-chars is the longest
-   label of the active language (set by applicationShell), and the labels are
-   monospace, so every slider track starts at the same x whatever the
-   language. 0.125em is the 1px letter-spacing at 8px. English keeps its
-   own label widths. */
+   label of the active language (set in applicationShell.js); the labels are
+   monospace. 0.125em is the 1px letter-spacing at 8px. */
 html:not([lang='en']) .pp-slider-row > .pp-slider-mini-label {
   flex: 0 0 auto;
   min-width: calc(var(--pp-label-chars, 0) * (1ch + 0.125em));

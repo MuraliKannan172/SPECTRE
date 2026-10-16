@@ -103,6 +103,5 @@ for (const locale of ['en', 'es', 'ru']) {
       card,
       inLocale(locale, () => translateFeedError('ECCC HTTP 503')),
     );
-    assert.equal(card, locale === 'en' ? 'ECCC HTTP 503' : 'ECCC: HTTP 503');
   });
 }

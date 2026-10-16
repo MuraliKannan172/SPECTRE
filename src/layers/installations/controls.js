@@ -7,10 +7,8 @@ import {
 } from './policy.js';
 import { formatNumber, t, tn } from '../../i18n/index.js';
 
-// installationFeedback.js composes its guidance inside the portable
-// node/browser graph (the HUD summary in loadingFeedback.js reads the same
-// module), so it hands back English marked with msg() plus the values;
-// getStats is the browser presentation boundary that translates them.
+// installationFeedback.js is shared with the HUD (src/loadingFeedback.js) and
+// hands back msg()-marked English plus values; getStats translates them here.
 function localizeInstallationFeedback(feedback) {
   if (feedback.text !== undefined) {
     const values = {};

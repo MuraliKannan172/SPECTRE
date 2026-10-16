@@ -1,14 +1,8 @@
 /**
- * The reason shown in «Scene not saved — {reason}» when the project fails its
- * own validation on save.
- *
- * A SceneDocumentError names a JSON path and an English check
- * («$.scenes[6].title: expected nonempty text, at most 4096 characters») —
- * right for the console and for import diagnostics, meaningless in a toast.
- * The failures an author can cause from the panel get a plain sentence with
- * 1-based scene and shot numbers. Anything else keeps the technical text in
- * English and gets a general sentence in a translation; director.js logs the
- * error either way.
+ * The reason for «Scene not saved — {reason}» when the project fails
+ * validation. The validator's text («$.scenes[6].title: expected …») is for
+ * the console: known failures get a sentence with 1-based numbers, others a
+ * general one (English keeps the raw text). director.js logs the full error.
  */
 
 import { formatNumber, getLocale, t } from '../i18n/index.js';

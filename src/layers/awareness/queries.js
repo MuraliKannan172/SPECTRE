@@ -1,8 +1,7 @@
 import { AWARENESS_RADIUS_M } from '../../data/militaryAwarenessEngine.js';
 
 // The reason stays English for the voice analyst; the Contacts panel shows it
-// in the UI language from `reasonTemplate`. Kept local so this module stays
-// free of the i18n import.
+// in the UI language from `reasonTemplate`.
 const msg = (text) => text;
 const fillTemplate = (template, values = {}) =>
   template.replace(/\{(\w+)\}/g, (_, name) => String(values[name]));

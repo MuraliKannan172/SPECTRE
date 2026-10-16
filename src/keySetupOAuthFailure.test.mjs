@@ -1,7 +1,5 @@
-// C9: a failed ChatGPT OAuth check whose only reason is our own fallback
-// sentence shows that sentence alone — «OAuth check failed: Could not check
-// ChatGPT sign-in. Try again.» repeated itself. A server-sent reason keeps the
-// wrapper.
+// A failed ChatGPT OAuth check whose only reason is our own fallback sentence
+// shows it alone; a server-sent reason keeps the «OAuth check failed» wrapper.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { oauthCheckFailureText, waitForChatGptOAuth } from './keySetup.js';

@@ -23,9 +23,7 @@ import {
 import { t, msg, tn, registerUnsavedWork } from './i18n/index.js';
 
 /**
- * Chip label — pure, exported for tests. The exact English values are pinned
- * by keySetup.test.mjs; t() resolves them from the catalog, so the default
- * locale renders byte-identical text and 'es' localizes at the same site.
+ * Chip label — pure, exported for tests (keySetup.test.mjs pins the English).
  * @param {{total?: number, setCount?: number}|null} status
  * @returns {string}
  */
@@ -55,10 +53,9 @@ export function collectKeyUpdates(fields) {
 }
 
 /**
- * Why /api/setup/keys refused a save, by the `code` the server sends with its
- * English `error` (src/keySetupCore.mjs, server/standalone/key-setup.js). The
- * English here is the server's own sentence, so the default locale reads the
- * same as before.
+ * Why /api/setup/keys refused a save, by the `code` the server sends beside
+ * its English `error` (src/keySetupCore.mjs, server/standalone/key-setup.js).
+ * The English matches the server's text.
  */
 const SAVE_REFUSALS = Object.freeze({
   proxied: msg('Provider Settings does not answer proxied requests'),
@@ -141,10 +138,8 @@ function sleepWithSignal(ms, signal) {
 }
 
 /**
- * An OAuth check error. A server-sent reason is kept as-is and later wrapped
- * in «OAuth check failed: …»; when there is none, the error carries our own
- * already-translated sentence and is flagged so the toast shows it unwrapped
- * (the wrapper would only repeat it).
+ * An OAuth check error. A server reason is later wrapped in «OAuth check
+ * failed: …»; our own translated fallback is flagged to show unwrapped.
  * @param {unknown} serverError
  * @param {string} fallback Already-translated fallback sentence.
  * @returns {Error}

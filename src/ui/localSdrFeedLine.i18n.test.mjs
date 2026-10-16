@@ -37,7 +37,7 @@ test('an unknown feed status is shown as given', () => {
   );
 });
 
-// B6: a feed status agrees with "fuente" in Spanish; the shared "invalid" key
+// A feed status agrees with "fuente" in Spanish; the shared "invalid" key
 // (any other masculine noun) is left alone.
 test('es: an invalid decoder feed reads "no válida"', () => {
   setLocale('es');

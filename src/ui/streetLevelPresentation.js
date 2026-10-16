@@ -97,8 +97,8 @@ function presentStatus(state) {
     : { text: t('OFF'), tone: '', pressed, title };
 }
 
-// Provider refusals with a number in them stay English data
-// (providers/kartaview/source.js); they go back onto a placeholder here.
+// Provider refusals with a number stay English data (kartaview and panoramax
+// source.js); they go back onto a placeholder here.
 const ERROR_PATTERNS = [
   [
     /^KartaView answered HTTP (\d+)$/,

@@ -12,8 +12,6 @@ import { cancelCameraArrival } from './data/cameraArrival.js';
 import { guardCameraAboveGround } from './cameraGroundGuard.js';
 import { CITY_POIS } from './cityPois.js';
 
-export { CITY_POIS };
-
 /** Newest landmark arrival; an older post-arrival ground guard yields to it. */
 let arrivalGeneration = 0;
 

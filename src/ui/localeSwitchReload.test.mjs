@@ -1,4 +1,4 @@
-// K-27: the language picker reloads the page, so it asks first while the
+// The language picker reloads the page, so it asks first while the
 // reload would lose work (unsaved CCTV calibration, the open cockpit, anything
 // a module registers). Choosing the language already active does nothing.
 import { test } from 'node:test';

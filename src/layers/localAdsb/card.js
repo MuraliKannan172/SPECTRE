@@ -58,10 +58,6 @@ export function localAdsbReceiverLine(record) {
     .join(' · ');
 }
 
-// policy.js keeps these labels in English (HEARD_BY_RECEIVER, BAND_LABELS,
-// SOURCE_LABELS); the card writes them out here so that it can show them
-// translated.
-
 /** A receiver band (policy.js BAND_LABELS) in the UI language: "1090 МГц". */
 function bandLabel(band) {
   switch (String(band)) {

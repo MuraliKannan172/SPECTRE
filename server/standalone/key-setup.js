@@ -134,8 +134,7 @@ function keySetupEndpoint({ sourceRoot = defaultSourceRoot } = {}) {
   };
   // The gate itself is pure and unit-tested (admitKeySetupRequest in
   // src/keySetupCore.mjs) — this just feeds it the request.
-  // A refusal as the panel reads it: `code` (and `params`) pick its localized
-  // sentence in src/keySetup.js; `error` is the English for logs and scripts.
+  // `code`/`params` pick the panel's sentence (src/keySetup.js); `error` is for logs.
   const refusal = ({ error, code, params }) => ({ error, code, params });
   const admit = (req) =>
     admitKeySetupRequest({

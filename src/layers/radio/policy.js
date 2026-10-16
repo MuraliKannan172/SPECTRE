@@ -62,8 +62,8 @@ export const DEFAULT_RADIO_FILTER = 'all';
 
 export const GLOBAL_RADIO_ALTITUDE_M = 2_000_000;
 
-// Genre labels are marked for i18n extraction; categories.js translates them.
-// Kept local so this module stays free of the i18n import.
+// Genre labels stay English data (the radio source, shared with the AI tools,
+// imports this module); categories.js translates them.
 const msg = (text) => text;
 
 export const MUSIC_GENRES = Object.freeze([

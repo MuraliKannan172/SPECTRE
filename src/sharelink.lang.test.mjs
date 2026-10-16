@@ -1,4 +1,4 @@
-// K-22: a copied share link must not carry the sender's ?lang override: on the
+// A copied share link must not carry the sender's ?lang override: on the
 // recipient's side ?lang would beat their own stored choice.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ function installClipboard(writeText) {
   });
 }
 
-test('K-22: the copied link does not carry the sender ?lang override', async () => {
+test('the copied link does not carry the sender ?lang override', async () => {
   let copied = null;
   installClipboard(async (url) => {
     copied = url;
@@ -38,8 +38,6 @@ test('K-22: the copied link does not carry the sender ?lang override', async () 
   const link = new URL(copied);
   assert.equal(link.searchParams.get('lang'), null, `copied link: ${copied}`);
 
-  // Why it matters: on the recipient's side ?lang beats the stored choice and
-  // the browser language.
   const store = new Map([['gev:locale:v1', 'es']]);
   const recipient = resolveLocale({
     location: { search: link.search },
@@ -49,7 +47,7 @@ test('K-22: the copied link does not carry the sender ?lang override', async () 
   assert.equal(recipient, 'es');
 });
 
-test('K-22: with storage blocked the dock switch keeps the choice in ?lang', () => {
+test('with storage blocked the language picker keeps the choice in ?lang', () => {
   let href = 'https://gev.example/#v=2';
   const location = {
     get href() {
@@ -71,7 +69,6 @@ test('K-22: with storage blocked the dock switch keeps the choice in ?lang', () 
     },
   };
   persistLocaleAndReload('ru', { location, history, storage: blocked });
-  // Documented behaviour (persistLocaleAndReload): the choice survives only in
-  // the URL, which is why copyLink has to drop it.
+  // Storage blocked: the choice survives only in ?lang.
   assert.equal(new URL(href).searchParams.get('lang'), 'ru');
 });

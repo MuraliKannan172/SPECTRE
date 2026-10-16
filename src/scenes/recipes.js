@@ -27,7 +27,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
     fromShotTitles: ['Shot 1', 'Shot 2', 'Shot 3'],
     cameraPath: [
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Global Incident Context',
         lat: 27.5962,
         lon: 78.5718,
@@ -45,7 +45,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
         },
       },
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Nepal-Focused Globe Rotation',
         lat: 28.7248,
         lon: 81.3226,
@@ -63,7 +63,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
         },
       },
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Bhote Koshi Regional Approach',
         lat: 27.0354,
         lon: 84.6287,
@@ -81,7 +81,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
         },
       },
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Bhote Koshi Nearby Cities',
         lat: 27.891,
         lon: 85.428,
@@ -99,7 +99,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
         },
       },
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Bhote Koshi Incident Corridor',
         lat: 28.0529,
         lon: 85.2189,
@@ -117,7 +117,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
         },
       },
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Bhote Koshi Flood Path',
         lat: 28.1691,
         lon: 85.352,
@@ -135,7 +135,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
         },
       },
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Bhote Koshi Corridor Overview',
         lat: 27.8986,
         lon: 84.8723,
@@ -153,7 +153,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
         },
       },
       {
-        // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+        // i18n-ignore: stored shot title, matched verbatim
         title: 'Bhote Koshi Upper Valley',
         lat: 28.4187,
         lon: 85.4341,
@@ -230,7 +230,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
   },
   shotPatches: [
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Global Incident Context',
       visual: { mapStack: 'photoreal' },
       layers: {
@@ -246,7 +246,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Nepal-Focused Globe Rotation',
       visual: { mapStack: 'photoreal' },
       layers: {
@@ -262,7 +262,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bhote Koshi Regional Approach',
       visual: { mapStack: 'photoreal' },
       layers: {
@@ -278,7 +278,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bhote Koshi Nearby Cities',
       visual: { mapStack: 'photoreal' },
       layers: {
@@ -294,7 +294,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bhote Koshi Incident Corridor',
       camera: {
         lat: 28.0529,
@@ -319,7 +319,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bhote Koshi Flood Path',
       visual: { mapStack: 'photoreal' },
       layers: {
@@ -335,7 +335,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bhote Koshi Corridor Overview',
       visual: { mapStack: 'photoreal' },
       layers: {
@@ -351,7 +351,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bhote Koshi Upper Valley',
       holdSec: 8,
       visual: { mapStack: 'photoreal' },
@@ -374,7 +374,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Upper Valley Collapse',
       camera: {
         lat: 28.417,
@@ -398,29 +398,29 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Nepal-China Border Gate',
       visual: { mapStack: 'photoreal' },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Timure Evidence Cluster',
       visual: { mapStack: 'photoreal' },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Syabru Besi Passage',
       visual: { mapStack: 'photoreal' },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bidur / Trishuli Consequence',
       visual: { mapStack: 'photoreal' },
     },
   ],
   cameraPath: [
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Upper Valley Collapse',
       lat: 28.417,
       lon: 85.3937,
@@ -444,7 +444,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Debris-Dammed Lake',
       lat: 28.392914,
       lon: 85.570921,
@@ -468,7 +468,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Nepal-China Border Gate',
       mapStack: 'photoreal',
       lat: 28.316789,
@@ -499,7 +499,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Timure Evidence Cluster',
       mapStack: 'photoreal',
       lat: 28.285968,
@@ -528,7 +528,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Syabru Besi Passage',
       mapStack: 'photoreal',
       lat: 28.210306,
@@ -557,7 +557,7 @@ const BHOTE_KOSHI_NEPAL_BASE_RECIPE = Object.freeze({
       },
     },
     {
-      // i18n-ignore: shot title, matched by title when the recipe upgrades a saved project
+      // i18n-ignore: stored shot title, matched verbatim
       title: 'Bidur / Trishuli Consequence',
       mapStack: 'photoreal',
       lat: 27.981737,
@@ -1057,10 +1057,9 @@ export function displaySceneTitle(scene) {
  * Display title for a shot: built-in titles and the numbered "Shot N"
  * fallback localize; any other title shows as stored.
  *
- * With the shot itself, a built-in title localizes only when the shot came
- * from a recipe (`sourcePackId`), so an operator-typed title that happens to
- * match a built-in one is never masked by the catalog. Without it, provenance
- * is unknown and the title alone decides, as before.
+ * With `shot`, a built-in title localizes only for a recipe shot
+ * (`sourcePackId`), so a typed title that matches a built-in one stays as
+ * typed. Without `shot`, the title alone decides.
  * @param {string} title
  * @param {{sourcePackId?: string}} [shot]
  * @param {{id?: string}} [scene] The shot's scene, for projects saved before

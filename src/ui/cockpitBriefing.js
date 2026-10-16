@@ -12,9 +12,8 @@ import {
   formatCockpitWindDirection,
 } from './cockpitPresentation.js';
 
-// regionalModel.weatherCodeLabel lives in the shared node/browser source graph,
-// so it returns stable English labels; localize them here, at the cockpit
-// presentation boundary (docs/TRANSLATORS.md).
+// regionalModel.weatherCodeLabel is shared with node code and returns
+// English; translate it here.
 const WEATHER_CONDITION_KEYS = Object.freeze({
   'CONDITIONS UNKNOWN': msg('CONDITIONS UNKNOWN'),
   CLEAR: msg('CLEAR'),
@@ -79,9 +78,8 @@ export function setBriefAutoRotate(enabled) {
       : COCKPIT_BRIEF_CYCLE_OFF_HELP;
     this.briefAutoToggle.setAttribute('aria-label', label);
     this.briefAutoToggle.title = help;
-    // The English writes above are pinned verbatim by cockpitMarkup.test.mjs;
-    // these t() re-writes are same-value overrides that localize the toggle
-    // under other locales (byte-identical under 'en').
+    // cockpitMarkup.test.mjs pins the English writes above; these translate
+    // them.
     const labelKey = this.briefAutoRotateEnabled
       ? msg('CYCLE ON')
       : msg('CYCLE OFF');

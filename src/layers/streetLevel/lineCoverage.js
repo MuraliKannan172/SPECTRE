@@ -704,7 +704,7 @@ export function createLineCoverage({
         state.coverage.pending.get(key) !== controller
       )
         return;
-      state.coverage.lastError = error?.message || 'Coverage tile failed';
+      state.coverage.lastError = error?.message || msg('Coverage tile failed');
       if (error?.keyRequired) state.keyRequired = true;
       if (error?.keyRejected) {
         // Every other tile would be refused too: stop asking.

@@ -1,7 +1,4 @@
-// The blocked-visibility toast speaks the UI language: the Space Missions
-// guard reason (English data from contextModePolicy.js) is re-composed with
-// the layer name localized, a known lifecycle sentence is looked up, and an
-// unknown provider message passes through.
+// The blocked-visibility toast reason in the UI language.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale } from '../i18n/index.js';

@@ -41,8 +41,7 @@ export function createAdsbGnssSource({
         );
         throw Object.assign(
           new Error(
-            // The status code form is matched by FEED_ERROR_PATTERNS
-            // (ui/statusText.js) and gnss/index.js.
+            // HTTP errors are matched by FEED_ERROR_PATTERNS in ui/statusText.js.
             limited
               ? msg('GNSS feed rate limited (HTTP 429)')
               : `GNSS feed unavailable (HTTP ${response.status})`,

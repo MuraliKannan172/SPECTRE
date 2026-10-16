@@ -4,6 +4,7 @@ import {
   MISSION_CLOSE_VIEW_RANGE_M,
   MISSION_GLOBE_VIEW_RANGE_M,
 } from './policy.js';
+import { UNKNOWN_LAUNCH_STATUS } from './model.js';
 
 export function createPanel({ state: layerState, services, parts, source }) {
   /**
@@ -191,7 +192,14 @@ export function createPanel({ state: layerState, services, parts, source }) {
     layerState._missionPanel.querySelector('[data-mission-title]').textContent =
       parts.overlays.shortMissionLabel(launch.name, 32).toUpperCase();
     setMissionPanelField('[data-mission-provider]', launch.provider);
-    setMissionPanelField('[data-mission-status]', launch.status);
+    // Launch Library status names are provider data, shown as sent; only the
+    // fallback for a launch without one is ours to translate.
+    setMissionPanelField(
+      '[data-mission-status]',
+      launch.status === UNKNOWN_LAUNCH_STATUS
+        ? t(UNKNOWN_LAUNCH_STATUS)
+        : launch.status,
+    );
     setMissionPanelField(
       '[data-mission-site]',
       launch.launchSite && launch.launchSite !== 'Unknown launch site'

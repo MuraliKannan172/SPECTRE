@@ -212,8 +212,7 @@ const rows = (els) => els['geo-import-list'].children;
 const action = (row, name) =>
   row.children.find((c) => c.dataset.action === name);
 
-// K-27. Before the other tests: the tools they leave behind would answer the
-// same registry.
+// Runs first: tools left by later tests would answer the same registry.
 test('imported files make the language switch ask first', async () => {
   const t = setup();
   assert.deepEqual(describeUnsavedWork(), []);

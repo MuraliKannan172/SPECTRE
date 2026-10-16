@@ -174,6 +174,7 @@ test('aborting pending setup removes its surface and ignores a late response', a
   resolveResponse({ ok: true, json: async () => ({ keys: [] }) });
   assert.equal(await pending, null);
 });
+
 test('a pasted, unsaved key makes the language switch ask first until teardown', async () => {
   const node = () => ({
     dataset: {},

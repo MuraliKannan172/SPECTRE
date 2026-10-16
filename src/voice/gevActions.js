@@ -10,8 +10,8 @@ export { readLayerLifecycleSummary } from './layerSummary.js';
 import { defaultGeospatial } from '../search/defaults.js';
 import { msg } from '../i18n/index.js';
 import * as Cesium from 'cesium';
+import { CITY_POIS } from '../cityPois.js';
 import {
-  CITY_POIS,
   findPoiByName,
   flyToGlobeView,
   flyToLandmark,
@@ -1643,7 +1643,6 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
   throw new Error(`Unknown CCTV action: ${args.action || 'missing'}`);
 }
 
-// Labels are place names returned to the voice model as tool data.
 const RADIO_COUNTRY_CENTERS = new Map([
   // i18n-ignore: place name in tool data
   ['us', { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' }],

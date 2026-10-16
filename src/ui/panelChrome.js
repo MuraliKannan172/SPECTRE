@@ -318,8 +318,7 @@ export class PanelChrome {
         btn.title = t(titleKey, { name: panelName });
         btn.setAttribute('aria-label', t(titleKey, { name: panelName }));
         if (panelEl.id === 'radio-panel') {
-          // Expand state reuses the layers.* keys seeded on the static button;
-          // the collapse state is runtime-only, so it owns cockpit.* keys.
+          // Radio keeps the wording of its static button (context.html).
           btn.title = t(
             collapsed ? msg('Expand Radio') : msg('Collapse Radio'),
           );

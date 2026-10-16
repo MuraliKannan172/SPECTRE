@@ -7,6 +7,8 @@
  * integer category (states index 17) and ADS-B emitter strings ("A1".."B1").
  */
 
+import { msg } from '../i18n/marker.js';
+
 const HELI = new Set([
   'EC20',
   'EC25',
@@ -437,10 +439,6 @@ export function classifyAircraft({ typeCode, category } = {}) {
   if (EMITTER_CATEGORY[cat]) return EMITTER_CATEGORY[cat];
   return 'airliner';
 }
-
-// Portable flight records import this module, so it has no i18n: msg() only
-// marks the labels, and the card translates them where it shows them.
-const msg = (text) => text;
 
 /** Readable name of each class, for cards and readouts (English data). */
 export const AIRCRAFT_CLASS_LABELS = Object.freeze({

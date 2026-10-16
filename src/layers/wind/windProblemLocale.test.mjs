@@ -1,4 +1,4 @@
-// K-38: wind source failures are English data (src/layers/wind/source.js) and
+// Wind source failures are English data (src/layers/wind/source.js) and
 // are shown in the UI language; the HTTP line keeps its status number.
 import test from 'node:test';
 import assert from 'node:assert/strict';

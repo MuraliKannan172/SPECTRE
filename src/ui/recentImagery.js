@@ -37,9 +37,9 @@ const LAYER_NOTICES = new Set([
   msg('Point the camera at the ground to use the view'),
   msg('That point cannot anchor a box'),
 ]);
-const TOO_LARGE = /^(Box|View) is ([\d,]+) km wide · limit ([\d,]+) km$/;
 // Refusals with a value in them (layers/recentImagery/model.js and
 // imageryBoxTool.js); fixed refusals there are msg() text for translateKnown.
+const TOO_LARGE = /^(Box|View) is ([\d,]+) km wide · limit ([\d,]+) km$/;
 const POLAR = /^Imagery stops at ±([\d.]+)° latitude$/;
 const POINTER_BUSY = /^(.+) is using the pointer — close it first$/;
 

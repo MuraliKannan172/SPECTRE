@@ -1,4 +1,4 @@
-// K-38: refusals and failures that source modules produce in English reach
+// Refusals and failures that source modules produce in English reach
 // the page translated — through a placeholder at the point of display, or
 // through a catalog entry when the text is stored as data.
 import assert from 'node:assert/strict';
@@ -30,7 +30,7 @@ function snapshot(error) {
 }
 
 for (const locale of ['es', 'ru']) {
-  test(`K-38 (${locale}): the nearest-image refusal is built in the language and kept by the panel`, () => {
+  test(`${locale}: the nearest-image refusal is built in the language and kept by the panel`, () => {
     setLocale(locale);
     try {
       // What streetLevel/index.js openNearest writes into street.error.
@@ -50,7 +50,7 @@ for (const locale of ['es', 'ru']) {
     }
   });
 
-  test(`K-38 (${locale}): the route proxy's refusals are shown translated`, () => {
+  test(`${locale}: the route proxy's refusals are shown translated`, () => {
     setLocale(locale);
     try {
       const shown = t('Routing failed: {error}', {
@@ -78,7 +78,7 @@ for (const locale of ['es', 'ru']) {
     }
   });
 
-  test(`K-38 (${locale}): a weather manifest timeout is shown translated`, async () => {
+  test(`${locale}: a weather manifest timeout is shown translated`, async () => {
     const source = createWeatherSource({
       fetchImpl: (_url, { signal }) =>
         new Promise((_resolve, reject) =>

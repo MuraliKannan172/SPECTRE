@@ -1,4 +1,4 @@
-// K-47: Flights / Military feed failure texts reach the DATA LAYERS row in the
+// Flights / Military feed failure texts reach the DATA LAYERS row in the
 // UI language; the feeds keep them in English.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +40,7 @@ const cases = [
   ['malformed rows', 'Malformed adsb.lol aircraft rows'],
 ];
 
-test('en: feed failure texts read as before', () => {
+test('en: feed failure texts stay English', () => {
   setLocale('en');
   for (const [, message] of cases)
     assert.equal(

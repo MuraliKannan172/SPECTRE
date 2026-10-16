@@ -657,7 +657,7 @@ test('a change of open card scrolls its header into view once; refreshes never m
   assert.deepEqual(intoView, [], 'ancestor scrollers are never moved');
   view.destroy();
 });
-test('history time keeps the hour whatever the length of the localized date (K-6)', () => {
+test('history time keeps the hour whatever the length of the localized date', () => {
   for (const locale of ['en', 'es', 'ru']) {
     setLocale(locale);
     try {

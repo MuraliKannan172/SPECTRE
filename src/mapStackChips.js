@@ -38,8 +38,7 @@ export function mapStackChipModel(stack, activeId) {
   const available = stack?.available !== false;
   const label = String(stack?.label ?? stack?.id ?? '');
   const requiresIon = stack?.requiresIon === true;
-  // Stack labels are provider/dataset names (keep-English); the availability
-  // sentence around them is copy and localizes here at the model boundary.
+  // Stack labels are provider names and stay English; the sentence translates.
   const fallbackReason = requiresIon
     ? t('Needs {envVars} — add it in Provider Settings', {
         envVars: keySetupRequirementEnvVars('cesium-ion'),

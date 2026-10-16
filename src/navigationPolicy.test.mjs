@@ -133,7 +133,6 @@ test('cockpit refuses without stamping or releasing anything', () => {
 });
 
 test('weather layers name their destination in the Cockpit refusal', () => {
-  // «Exit cockpit to fly to a weather» was the template with a bare noun.
   const expected = {
     weather: 'Exit cockpit to view weather coverage',
     cyclone: 'Exit cockpit to fly to a cyclone',

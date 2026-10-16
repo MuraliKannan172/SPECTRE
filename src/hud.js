@@ -16,7 +16,7 @@ import { applicationServices } from './services/application.js';
 
 import * as Cesium from 'cesium';
 import { forward as toMGRS } from 'mgrs';
-import { CITY_POIS } from './locations.js';
+import { CITY_POIS } from './cityPois.js';
 import { composeLocalityTag } from './hudLocality.js';
 import { hudQuantity, LOCALIZED_LOCALITY } from './hudLocalityFormat.js';
 import {
@@ -64,9 +64,8 @@ const HUD_COLORS = {
 };
 
 /**
- * Mode names shown for each style. Same English as STYLE_STATUS_LABELS in
- * ui/visualPresets.js, so the top-left mode and the dock's active style
- * translate alike.
+ * Mode names per style: the same English as STYLE_STATUS_LABELS
+ * (ui/visualPresets.js), so both translate alike.
  */
 const MODE_LABELS = Object.freeze({
   normal: msg('NORMAL'),
@@ -262,7 +261,7 @@ export class IntelHUD {
     this._el = document.getElementById('intel-hud');
     if (!this._el) return;
 
-    // i18n-ignore: sensor readout codes (MGRS, GSD, NIIRS, ONA, BAND…) and a classification banner; translated parts use t()
+    // i18n-ignore: sensor codes and a classification banner; the rest uses t()
     this._el.innerHTML = `
       <div class="hud-sonar" aria-hidden="true"></div>
 
@@ -433,11 +432,11 @@ export class IntelHUD {
       const formatted = this._formatMGRS(mgrsStr);
       mgrsLabel = formatted;
       const el = document.getElementById('hud-mgrs');
-      // i18n-ignore: sensor readout codes, same in every language
+      // i18n-ignore: sensor codes
       if (el) el.textContent = `MGRS: ${formatted}`;
     } catch {
       const el = document.getElementById('hud-mgrs');
-      // i18n-ignore: sensor readout codes, same in every language
+      // i18n-ignore: sensor codes
       if (el) el.textContent = 'MGRS: ---';
     }
 
@@ -446,7 +445,7 @@ export class IntelHUD {
     if (llEl) llEl.textContent = `${latDMS} ${lonDMS}`;
     const bottomEl = document.getElementById('hud-bottom-line');
     if (bottomEl) {
-      // i18n-ignore: sensor readout codes, same in every language
+      // i18n-ignore: sensor codes
       bottomEl.textContent = `MGRS: ${mgrsLabel}  LAT: ${latDMS}  LON: ${lonDMS}`;
     }
 
@@ -462,7 +461,7 @@ export class IntelHUD {
     );
     const gsdEl = document.getElementById('hud-gsd');
     if (gsdEl)
-      // i18n-ignore: sensor readout codes, same in every language
+      // i18n-ignore: sensor codes
       gsdEl.textContent = `GSD: ${gsd.toFixed(2)}m  NIIRS: ${niirs.toFixed(1)}`;
 
     // Altitude — reported as height above MEAN SEA LEVEL. `altM` is the raw
@@ -475,7 +474,7 @@ export class IntelHUD {
     const altMslM = ellipsoidalToMslDisplayM(altM, geoidN);
     const sunEl = this._estimateSunElevation(latDeg, lonDeg);
     if (altEl)
-      // i18n-ignore: sensor readout codes, same in every language
+      // i18n-ignore: sensor codes
       altEl.textContent = `ALT: ${Math.round(altMslM)}m   SUN: ${sunEl.toFixed(1)}° EL`;
 
     // Collection timestamp
@@ -485,7 +484,7 @@ export class IntelHUD {
       const h = String(now.getUTCHours()).padStart(2, '0');
       const m = String(now.getUTCMinutes()).padStart(2, '0');
       const s = String(now.getUTCSeconds()).padStart(2, '0');
-      // i18n-ignore: sensor readout codes, same in every language
+      // i18n-ignore: sensor codes
       collEl.textContent = `COLL: ${h}:${m}:${s}Z`;
     }
 
@@ -494,7 +493,7 @@ export class IntelHUD {
     const pitchDeg = Cesium.Math.toDegrees(camera.pitch);
     const ona = Math.max(0, 90 + pitchDeg);
     const onaEl = document.getElementById('hud-ona');
-    // i18n-ignore: sensor readout codes, same in every language
+    // i18n-ignore: sensor codes
     if (onaEl) onaEl.textContent = `ONA: ${ona.toFixed(1)}°`;
 
     // `altM` stays the raw ellipsoidal camera height the sensor model reads

@@ -119,10 +119,7 @@ export function formatCockpitEmergency(emergency, format = ENGLISH_EMERGENCY) {
   });
 }
 
-/**
- * The English Context scope line. The cockpit passes its own formatter so the
- * page shows it in the active language; this module stays i18n-free.
- */
+/** The English Context scope line; see formatCockpitContextScope. */
 const ENGLISH_CONTEXT_SCOPE = Object.freeze({
   window: ({ label, radiusKm }) =>
     `${label} · ${radiusKm ?? '—'} KM AIR/SEA WINDOW`,

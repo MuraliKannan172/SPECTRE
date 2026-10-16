@@ -48,9 +48,8 @@ function run(locale) {
   return details;
 }
 
-test('K-32 es: tracked ISS card', () => {
+test('es: tracked ISS card is localized', () => {
   const details = run('es');
-  console.log('es details:', JSON.stringify(details));
   assert.equal(details[0], 'ESTACIÓN · ISS');
   assert.doesNotMatch(
     details[2],
@@ -59,9 +58,8 @@ test('K-32 es: tracked ISS card', () => {
   );
 });
 
-test('K-32 ru: tracked ISS card', () => {
+test('ru: tracked ISS card is localized', () => {
   const details = run('ru');
-  console.log('ru details:', JSON.stringify(details));
   assert.equal(details[0], 'СТАНЦИЯ · ISS');
   assert.match(details[1], /км/, 'ru glossary: km → км');
   assert.doesNotMatch(

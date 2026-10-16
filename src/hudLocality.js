@@ -23,10 +23,7 @@
  */
 export const NEAR_POI_MAX_KM = 150;
 
-/**
- * The English locality line. The HUD passes its own formatter so the page
- * shows it in the active language; this default stays i18n-free.
- */
+/** The English locality line; the HUD passes hudLocalityFormat.js instead. */
 const ENGLISH_LOCALITY = Object.freeze({
   near: ({ poi, city, distKm }) =>
     `NEAR ${poi.toUpperCase()} (${city.toUpperCase()}) ${Math.round(distKm)}KM`,
@@ -54,9 +51,8 @@ function coordinateTag(value, positive, negative) {
  * @param {number} latDeg Camera latitude in decimal degrees.
  * @param {number} lonDeg Camera longitude in decimal degrees.
  * @param {{near: Function, sector: Function}} [format] Builds the line from
- *   `{ poi, city, distKm }` or `{ latDeg, lonDeg }`. The names arrive as
- *   catalogued (`Tokyo`), so a formatter can translate them first and
- *   upper-case the result in the page's language.
+ *   `{ poi, city, distKm }` or `{ latDeg, lonDeg }`; names arrive as
+ *   catalogued (`Tokyo`), not upper-cased.
  * @returns {string} `NEAR <POI> (<CITY>) <N>KM` within the bound (inclusive),
  *   otherwise `SECTOR <lat> <lon>`.
  */

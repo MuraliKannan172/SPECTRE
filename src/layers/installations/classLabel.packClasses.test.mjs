@@ -1,4 +1,4 @@
-// K-50: every class the bundled OSM names pack can put on a record has a
+// Every class the bundled OSM names pack can put on a record has a
 // catalog entry, so the selected card shows it in the UI language.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +22,7 @@ const englishLabel = Object.fromEntries(
 );
 
 for (const locale of ['es', 'ru']) {
-  test(`every names-pack class is in the ${locale} catalog (K-50)`, () => {
+  test(`every names-pack class is in the ${locale} catalog`, () => {
     const catalog = getCatalog(locale);
     const missing = pack.classes.filter(
       (c) => catalog[`installation class|${englishLabel[c]}`] === undefined,

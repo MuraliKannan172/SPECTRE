@@ -15,8 +15,8 @@
  * Only ECCC's AQHI is implemented here; `AIR_QUALITY_PROVIDERS` is the seam a
  * later provider registers against.
  */
-// A portable export (package.json): no i18n here. The labels stay English data
-// and the Layers panel shows them translated.
+// A portable export (package.json): no i18n here. The labels stay English data;
+// the Weather card (index.js) shows them translated.
 const msg = (text) => text;
 
 /** Band identifiers shared across providers, in ascending severity. */

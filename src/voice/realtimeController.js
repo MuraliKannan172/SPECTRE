@@ -58,8 +58,7 @@ import { createRealtimeBackend } from './realtimeBackend.js';
 import { t } from '../i18n/index.js';
 import { voiceStatusLabel } from './control.js';
 
-// Status enum VALUES are machine identifiers (dataset.status, CSS hooks);
-// only the LABEL rendered from them localizes, resolved at write time via t().
+// Machine states (dataset.status, CSS); voiceStatusLabel() translates labels.
 const STATUS_STATES = new Set([
   'idle',
   'connecting',

@@ -7,11 +7,7 @@ export const LOCALE_STORAGE_KEY = 'gev:locale:v1';
 /** Source language and fallback. */
 export const DEFAULT_LOCALE = 'en';
 
-/**
- * Shipped locales. The picker (src/ui/localePicker.js) lists the active one
- * first and the rest by LOCALE_NAMES. Adding one: locales/<code>.json, an
- * import in index.js, and an entry here (see docs/TRANSLATORS.md).
- */
+/** Shipped locales; order does not matter. Adding one: docs/TRANSLATORS.md. */
 export const LOCALES = Object.freeze(['en', 'es', 'ru']);
 
 /** Each locale named in its own language, for the selector. */

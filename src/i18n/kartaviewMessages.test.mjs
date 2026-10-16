@@ -1,7 +1,5 @@
-// K-194: the KartaView provider's failure and state texts are English data
-// (msg() in kartaview/{policy,source,viewer,index}.js) that the Street Level
-// panel and the chip tooltip show through translateKnown, so every one needs
-// an entry in each language's catalog.
+// KartaView texts are English data (msg() in providers/kartaview/) shown
+// through translateKnown, so each needs an entry in every catalog.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale, translateKnown } from './index.js';

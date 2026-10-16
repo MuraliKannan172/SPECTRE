@@ -1,4 +1,4 @@
-// K-7: the voice card names layers, sources and distances in the interface
+// The voice card names layers, sources and distances in the interface
 // language; what the model receives stays English.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,7 +48,7 @@ for (const locale of ['ru', 'es']) {
   });
 }
 
-test('en: layer switch, distance and plan labels read as before', () => {
+test('en: layer switch, distance and plan labels in English', () => {
   const out = attachVoiceResult(
     'set_layer_visibility',
     {

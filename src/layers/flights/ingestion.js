@@ -45,6 +45,7 @@ export function createIngestion({
         const sourceStale = snapshot.stale || snapshot.freshness === 'unknown';
         feed._backoff = sourceStale;
         feed._retryAt = 0;
+        // i18n-ignore: English data; the panel shows it through FEED_ERROR_PATTERNS (ui/statusText.js)
         feed._lastError = sourceStale
           ? sourceAgeMs == null
             ? msg('Source snapshot time unavailable')

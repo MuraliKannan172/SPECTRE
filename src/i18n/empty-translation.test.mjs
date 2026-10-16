@@ -1,4 +1,4 @@
-// K-21: an empty or blank translation must not count as done.
+// An empty or blank translation must not count as done.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

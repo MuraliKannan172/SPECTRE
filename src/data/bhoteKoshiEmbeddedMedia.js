@@ -40,10 +40,8 @@ const MEDIA_PRECONNECT_ORIGINS = Object.freeze({
   facebook: Object.freeze(['https://www.facebook.com']),
 });
 
-// Authored English in public/events/bhote-koshi-2026/event.json. The pack is
-// data and stays English; these known strings translate at display. Anything
-// else (a newer pack, a credit, a source's own title) shows as authored. A
-// string that is not known whole translates by its " · " parts.
+// Known English from public/events/bhote-koshi-2026/event.json, translated at
+// display (whole or by " · " parts). Anything else shows as authored.
 const EVENT_PACK_TEXT = new Set([
   // Field reports: our labels (credits after " · " stay) and their statuses.
   msg('Rasuwagadhi witness video'),

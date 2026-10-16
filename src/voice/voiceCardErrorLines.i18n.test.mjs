@@ -1,5 +1,5 @@
-// K-24: on a failed tool step the voice card shows the English `result.error`
-// from gevActions under a translated title and step status.
+// A failed tool step: the card shows the tool error in the UI language; the
+// result keeps gevActions' English for the model.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setLocale } from '../i18n/index.js';
@@ -10,7 +10,7 @@ import {
   voiceCardView,
 } from './voiceCardPresentation.js';
 
-// Error texts as gevActions.js builds them (lines 2442, 646–647, 2476).
+// Error texts as gevActions.js builds them (frameOverhead, select_nearest_aircraft).
 const CASES = [
   {
     name: 'frame_overhead',
@@ -76,13 +76,13 @@ for (const locale of ['es', 'ru']) {
       try {
         assert.ok(view.result.visible, 'card shows a result');
         assert.notEqual(view.result.title, '', 'card has a title');
-        // Title and step status are translated (this part passes today).
+        // Title and step status are translated.
         assert.notEqual(
           view.steps[0].statusText,
           'failed',
           'step status translated',
         );
-        // The failure line is the raw English tool error.
+        // The error line is translated, not the raw English.
         for (const line of view.result.lines) {
           assert.ok(
             !/\b(is not enabled|no airborne aircraft|of the current view)\b/.test(

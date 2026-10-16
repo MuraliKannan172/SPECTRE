@@ -1,13 +1,12 @@
-// K-34: AIS degradation chip text and the traffic "SIMULATED — <reason>" text
-// must be in the UI language (they stayed English in es before the fix);
-// English keeps its wording.
+// The AIS degradation chip and the traffic "SIMULATED — <reason>" text read in
+// the UI language; English keeps its wording.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale, translateKnown } from '../i18n/index.js';
 import { deriveAisFeedError } from '../data/aisLiveVessels.js';
 import { createModel } from './traffic/model.js';
 
-test('K-34: AIS degraded-feed reasons are localized in es', () => {
+test('AIS degraded-feed reasons are localized in es', () => {
   setLocale('es');
   try {
     const cases = [
@@ -34,7 +33,7 @@ test('K-34: AIS degraded-feed reasons are localized in es', () => {
   }
 });
 
-test('K-34: traffic "SIMULATED — <reason>" is localized in es', () => {
+test('traffic "SIMULATED — <reason>" is localized in es', () => {
   setLocale('es');
   try {
     const { trafficFeedPresentation } = createModel({
@@ -55,7 +54,7 @@ test('K-34: traffic "SIMULATED — <reason>" is localized in es', () => {
   }
 });
 
-test('K-34: English degraded-feed wording is unchanged', () => {
+test('English degraded-feed wording is unchanged', () => {
   setLocale('en');
   assert.equal(
     deriveAisFeedError({ status: 'down', reconnectAttempt: 3 }, 0),

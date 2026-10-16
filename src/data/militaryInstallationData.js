@@ -32,13 +32,6 @@ const CLASS_BY_MILITARY_TAG = {
 const LABEL_BY_CLASS = UNNAMED_INSTALLATION_LABEL_BY_CLASS;
 const UNNAMED_FALLBACK = UNNAMED_INSTALLATION_FALLBACK;
 
-/** Every name humanizeInstallationClass gives a record of a class
- * CLASS_BY_MILITARY_TAG can produce, for the display to translate. */
-export const UNNAMED_INSTALLATION_NAMES = Object.freeze([
-  ...Object.values(LABEL_BY_CLASS),
-  UNNAMED_FALLBACK,
-]);
-
 const MAX_FOOTPRINT_POINTS = 400;
 
 /**

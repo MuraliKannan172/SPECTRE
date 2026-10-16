@@ -1,14 +1,11 @@
 import { t } from '../i18n/index.js';
 
-/** Build the voice control independently of its connection backend. */
 // The assistant's name on its card. i18n-ignore: product name
 const ASSISTANT_NAME = 'GEV';
 
 /**
- * The short state label in the voice heading. The heading is a few characters
- * wide next to the cost readout, so these carry their own `voice` context and
- * languages can pick shorter words than the shared CONNECTING / OFF labels.
- * Unknown states show as they are, upper-cased.
+ * Short state label for the narrow voice heading. The `voice` context lets
+ * languages use shorter words; unknown states show upper-cased.
  * @param {string} status machine state (dataset.status)
  * @returns {string}
  */
@@ -29,6 +26,7 @@ export function voiceStatusLabel(status) {
   }
 }
 
+/** Build the voice control independently of its connection backend. */
 export function createVoiceControl({ reset = false } = {}) {
   let root = document.getElementById('gev-voice-control');
   if (root && reset) {

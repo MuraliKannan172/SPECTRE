@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createCyclonesLayer } from './index.js';
 import { setLocale, t } from '../../i18n/index.js';
 
-// The exact string the server sends (server/providers/cyclones.js:8).
+// The exact string the server sends (COVERAGE in server/providers/cyclones.js).
 const SERVER_COVERAGE =
   'Atlantic and eastern/central North Pacific; not worldwide cyclone coverage.';
 const time = '2026-09-16T03:00:00.000Z';
@@ -59,7 +59,7 @@ function harness(feed) {
 
 const translated = () => t(SERVER_COVERAGE);
 
-test('K-35a: es, server snapshot without storms -> coverage line in Spanish', async () => {
+test('es: server snapshot without storms -> coverage line in Spanish', async () => {
   setLocale('es');
   try {
     assert.notEqual(translated(), SERVER_COVERAGE, 'es.json has a translation');
@@ -77,7 +77,7 @@ test('K-35a: es, server snapshot without storms -> coverage line in Spanish', as
   }
 });
 
-test('K-35b: es, server snapshot with a storm -> coverage line in Spanish', async () => {
+test('es: server snapshot with a storm -> coverage line in Spanish', async () => {
   setLocale('es');
   try {
     const layer = harness({ getSnapshot: async () => snapshot([storm]) });
@@ -94,7 +94,7 @@ test('K-35b: es, server snapshot with a storm -> coverage line in Spanish', asyn
   }
 });
 
-test('K-35c: es, unavailable without reason -> fallback status not the English literal', async () => {
+test('es: unavailable without reason -> fallback status not the English literal', async () => {
   setLocale('es');
   try {
     const layer = harness({
@@ -115,7 +115,7 @@ test('K-35c: es, unavailable without reason -> fallback status not the English l
   }
 });
 
-test('K-35: en coverage and fallback status read as before', async () => {
+test('en: coverage and fallback status read as before', async () => {
   const layer = harness({ getSnapshot: async () => snapshot([]) });
   layer.enable();
   await layer.update();

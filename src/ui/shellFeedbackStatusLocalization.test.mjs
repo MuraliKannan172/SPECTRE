@@ -1,8 +1,5 @@
-// The global loading chip translates the closed status vocabulary of
-// loadingFeedback.js at the presentation boundary. The ALPR retry detail keeps
-// its layer-name prefix in every language (it is what tells the chip apart
-// from a mapped-sites retry), and every mapped-site failure reason label has a
-// catalog entry, not only the default one.
+// The global loading chip in the UI language: the status vocabulary, the ALPR
+// retry prefix and every mapped-site failure reason.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale, t } from '../i18n/index.js';

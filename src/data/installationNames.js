@@ -1,14 +1,10 @@
+import { msg } from '../i18n/marker.js';
+
 /**
- * The English names the data gives a military installation that has no
- * mapped name. They stay English in data — the server provider, the AI tools
- * and the voice context read the records — and the display translates them
- * (installationTitle in src/layers/installations/classLabel.js and
- * formatAwarenessLabel in src/data/militaryAwarenessEngine.js).
- *
- * The server, tools and source modules load this file, so it marks the names
- * with a local msg() instead of importing i18n.
+ * English names for installations without a mapped name. Data keeps them
+ * English (server, AI tools, voice context); classLabel.js and
+ * militaryAwarenessEngine.js translate them.
  */
-const msg = (text) => text;
 
 /** Name of an unnamed feature, by installation class. */
 export const UNNAMED_INSTALLATION_LABEL_BY_CLASS = Object.freeze({

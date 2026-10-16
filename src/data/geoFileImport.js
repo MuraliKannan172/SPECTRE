@@ -2,9 +2,7 @@
 import * as Cesium from 'cesium';
 import { createImportImageBudget } from './geoImportImages.js';
 import { createImportedPins } from './geoImportPins.js';
-
-// Marks catalog text without importing i18n; the UI translates the message.
-const msg = (text) => text;
+import { msg } from '../i18n/marker.js';
 
 /** Largest file accepted, in bytes. */
 export const MAX_IMPORT_BYTES = 50 * 1024 * 1024;

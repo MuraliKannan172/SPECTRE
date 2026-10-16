@@ -53,7 +53,8 @@
       "src/data/adsbLolFallback.js",
       "src/data/aisStreamAdapter.js",
       "src/data/aisWatchdog.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": ["ws"]
   },
@@ -79,6 +80,7 @@
       "src/localRequestGate.mjs",
       "src/data/routeSteps.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/rateLimit.js"
     ],
     "external": []
@@ -97,7 +99,8 @@
       "server/providers/space/launch-library.js",
       "server/providers/common/http.js",
       "src/data/spaceProviderRequests.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": []
   },
@@ -127,6 +130,7 @@
       "server/providers/traffic.js",
       "server/providers/common/http.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/data/tomtomTiles.js"
     ],
     "external": []
@@ -148,6 +152,7 @@
       "server/providers/firms.js",
       "server/providers/common/http.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/data/firmsCsv.js"
     ],
     "external": []
@@ -161,7 +166,8 @@
       "server/providers/common/rate-limit.js",
       "src/sources/rateLimit.js",
       "src/data/gbfsSource.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": []
   },
@@ -192,7 +198,8 @@
       "scripts/google-server-key.mjs",
       "src/data/cctvFootprint.js",
       "src/sources/cctvTypes.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": []
   },
@@ -210,7 +217,8 @@
       "server/providers/common/rate-limit.js",
       "src/sources/rateLimit.js",
       "server/providers/common/http.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": ["pbf"]
   },
@@ -226,7 +234,8 @@
       "src/data/radioCountry.js",
       "server/providers/common/http.js",
       "src/sources/radioBrowser.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": []
   },
@@ -248,6 +257,7 @@
       "src/data/placeProviderPayloads.js",
       "src/data/routeSteps.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/overpass.js",
       "src/sources/rateLimit.js"
     ],
@@ -268,6 +278,7 @@
       "server/providers/overpass/geometry.js",
       "server/providers/overpass/transport.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/rateLimit.js"
     ],
     "external": []
@@ -290,6 +301,7 @@
       "src/data/regionalModel.js",
       "src/nominatimGeocode.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/rateLimit.js",
       "src/data/local_data/natural_earth/marine.json",
       "src/data/local_data/natural_earth/regions.json",
@@ -303,6 +315,7 @@
     "runtime": "node",
     "exports": ["./server/providers/openai"],
     "modules": [
+      "src/i18n/marker.js",
       "src/hudLayoutPolicy.js",
       "server/providers/common/rate-limit.js",
       "server/providers/common/request.js",
@@ -335,6 +348,7 @@
     "runtime": "node",
     "exports": ["./server/standalone/key-setup"],
     "modules": [
+      "src/i18n/marker.js",
       "scripts/pinokio-environment.mjs",
       "server/providers/common/source-root.js",
       "server/standalone/key-setup.js",
@@ -367,6 +381,7 @@
       "src/data/local_data/natural_earth/regions.json",
       "src/data/local_data/natural_earth/marine.json",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/nominatim.js"
     ],
     "external": []
@@ -435,6 +450,7 @@
   "map-source-controls": {
     "exports": ["./ui/maps"],
     "modules": [
+      "src/i18n/marker.js",
       "src/ui/mapSource.js",
       "src/ui/mapSourceControls.js",
       "src/mapStackChips.js",
@@ -450,6 +466,7 @@
   "layer-panel": {
     "exports": ["./ui/layers", "./ui/layers/feedback"],
     "modules": [
+      "src/i18n/marker.js",
       "src/ui/layers.js",
       "src/ui/layerPanel.js",
       "src/ui/layerNames.js",
@@ -528,6 +545,7 @@
   "context-controls": {
     "exports": ["./ui/context", "./ui/context/policy"],
     "modules": [
+      "src/i18n/marker.js",
       "src/ui/context.js",
       "src/ui/contextActions.js",
       "src/ui/contextBindings.js",
@@ -598,6 +616,7 @@
   "ui-shell": {
     "exports": ["./ui/shell"],
     "modules": [
+      "src/i18n/marker.js",
       "src/ui/placeNames.js",
       "src/hudLayouts.js",
       "src/hudLayoutPolicy.js",
@@ -794,6 +813,7 @@
       "src/director/interactions/session.js",
       "src/director/sharing/bundle.js",
       "src/director/sharing/preview.js",
+      "src/i18n/marker.js",
       "src/director/sharing/lifetime.js",
       "src/director/authoring.js"
     ],
@@ -844,6 +864,7 @@
       "src/data/inputOwnership.js",
       "src/director/sharing/bundle.js",
       "src/director/sharing/preview.js",
+      "src/i18n/marker.js",
       "src/director/sharing/lifetime.js",
       "src/director/authoring.js",
       "src/scenes/sharing.js",
@@ -860,6 +881,7 @@
   "live-observations": {
     "exports": ["./sources/live"],
     "modules": [
+      "src/i18n/marker.js",
       "src/data/aircraftEmergency.js",
       "src/sources/live/aircraft.js",
       "src/sources/live/contract.js",
@@ -872,6 +894,7 @@
   "civil-flights": {
     "exports": ["./layers/flights"],
     "modules": [
+      "src/i18n/marker.js",
       "src/cyberSonar.js",
       "src/data/aircraftClass.js",
       "src/data/aircraftEmergency.js",
@@ -921,6 +944,7 @@
   "military-flights": {
     "exports": ["./layers/military"],
     "modules": [
+      "src/i18n/marker.js",
       "src/cyberSonar.js",
       "src/data/aircraftClass.js",
       "src/data/aircraftEmergency.js",
@@ -965,6 +989,7 @@
   "aircraft-mechanics": {
     "exports": ["./aircraft"],
     "modules": [
+      "src/i18n/marker.js",
       "src/data/aircraftClass.js",
       "src/data/aircraftIcons.js",
       "src/data/aircraftMeta.js",
@@ -1032,6 +1057,7 @@
   "recent-imagery": {
     "exports": ["./layers/recent-imagery"],
     "modules": [
+      "src/i18n/marker.js",
       "src/layers/recentImagery/index.js",
       "src/layers/recentImagery/source.js",
       "src/layers/recentImagery/model.js",
@@ -1159,6 +1185,7 @@
       "src/data/tomtomTiles.js",
       "src/sources/capability.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/openFreeMap.js",
       "src/sources/militaryTileGeometry.js",
       "src/sources/vectorTiles.js",
@@ -1181,6 +1208,7 @@
   "awareness-layer": {
     "exports": ["./layers/awareness"],
     "modules": [
+      "src/i18n/marker.js",
       "src/cyberSonar.js",
       "src/cockpitMath.js",
       "src/data/iconOrientation.js",
@@ -1244,6 +1272,7 @@
       "src/sources/overpassRoads.js",
       "src/sources/capability.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/openFreeMap.js",
       "src/data/installationNames.js",
       "src/sources/militaryTileGeometry.js",
@@ -1411,6 +1440,7 @@
       "src/layers/alpr/tileRecords.js",
       "src/sources/capability.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/vectorTiles.js",
       "src/sources/phaseTiming.js",
       "src/layers/alpr/floors.js",
@@ -1513,6 +1543,7 @@
       "./maps/defaults"
     ],
     "modules": [
+      "src/i18n/marker.js",
       "src/maps/availability.js",
       "src/maps/catalog.js",
       "src/maps/controller.js",
@@ -2237,6 +2268,7 @@
       "src/search/nominatim.js",
       "src/nominatimGeocode.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/nominatim.js",
       "src/app/layers/transit.js",
       "src/data/transit.js",
@@ -2863,6 +2895,7 @@
       "src/nominatimGeocode.js",
       "src/data/regionalModel.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/nominatim.js",
       "src/app/layers/transit.js",
       "src/data/transitFeeds.js",
@@ -3012,9 +3045,7 @@
       "src/layers/airQuality/model.js",
       "src/layers/airQuality/source.js",
       "src/ui/statusText.js",
-      "src/ui/layerNames.js",
-      "src/layers/wind/source.js",
-      "src/sources/windBody.js"
+      "src/ui/layerNames.js"
     ],
     "external": [
       "hls.js",
@@ -3074,6 +3105,7 @@
       "src/nominatimGeocode.js",
       "src/data/regionalModel.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/nominatim.js",
       "src/sources/featureGeometry.js",
       "src/sources/overpassFeaturesRecords.js",
@@ -3114,6 +3146,7 @@
   "ui-share-restoration": {
     "exports": ["./ui/share-restoration"],
     "modules": [
+      "src/i18n/marker.js",
       "src/data/installationFeedback.js",
       "src/data/idSwitches.js",
       "src/data/layerState.js",
@@ -3189,6 +3222,7 @@
   "civil-flight-records": {
     "exports": ["./layers/flights/records"],
     "modules": [
+      "src/i18n/marker.js",
       "src/layers/flights/records.js",
       "src/layers/flights/recordPolicy.js",
       "src/data/aircraftMeta.js",
@@ -3209,6 +3243,7 @@
   "military-flight-records": {
     "exports": ["./layers/military/records"],
     "modules": [
+      "src/i18n/marker.js",
       "src/layers/military/records.js",
       "src/layers/military/recordPolicy.js",
       "src/data/aircraftMeta.js",
@@ -3260,6 +3295,7 @@
   "directions-layer": {
     "exports": ["./layers/directions"],
     "modules": [
+      "src/i18n/marker.js",
       "src/layers/directions/index.js",
       "src/data/pointerOwnerNames.js",
       "src/layers/directions/source.js",
@@ -3335,6 +3371,7 @@
       "src/data/tomtomTiles.js",
       "src/layers/alpr/tileRecords.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/vectorTiles.js",
       "src/sources/phaseTiming.js"
     ],
@@ -3372,6 +3409,7 @@
       "src/data/tomtomTiles.js",
       "src/sources/capability.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/openFreeMap.js",
       "src/sources/militaryTileGeometry.js",
       "src/sources/vectorTiles.js",
@@ -3409,6 +3447,7 @@
       "src/layers/traffic/source.js",
       "src/sources/overpassRoads.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/openFreeMap.js",
       "src/data/installationNames.js",
       "src/sources/militaryTileGeometry.js",
@@ -3426,6 +3465,7 @@
       "src/layers/earthquakes/source.js",
       "src/layers/earthquakes/records.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/layers/perimeters/source.js",
       "src/layers/perimeters/records.js",
       "src/layers/submarineCables/bundledSource.js",
@@ -3444,13 +3484,14 @@
       "src/search/geospatial.js",
       "src/data/regionalModel.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/nominatim.js"
     ],
     "external": []
   },
   "source-http-body": {
     "exports": ["./sources/http-body"],
-    "modules": ["src/sources/httpBody.js"],
+    "modules": ["src/sources/httpBody.js", "src/i18n/marker.js"],
     "external": []
   },
   "overpass-lexer": {
@@ -3465,7 +3506,8 @@
       "src/nominatimGeocode.js",
       "src/search/geospatial.js",
       "src/data/regionalModel.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": []
   },
@@ -3481,6 +3523,7 @@
       "src/data/transitFeeds.js",
       "src/data/transitProxy.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/transitHistory.js",
       "src/sources/transitService.js",
       "src/sources/transitHistoryStore.js",
@@ -3620,6 +3663,7 @@
       "src/data/transitProxy.js",
       "src/data/gtfsRealtime.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/sources/transitHistory.js",
       "src/sources/transitService.js",
       "src/sources/transitHistoryStore.js",
@@ -3643,6 +3687,7 @@
     "modules": [
       "src/layers/perimeters/index.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/layers/perimeters/source.js",
       "src/layers/perimeters/records.js",
       "src/layers/perimeters/cards.js",
@@ -3659,6 +3704,7 @@
     "modules": [
       "src/layers/gnss/index.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/layers/gnss/source.js",
       "src/layers/gnss/records.js",
       "src/i18n/index.js",
@@ -3672,7 +3718,11 @@
   },
   "gnss-source": {
     "exports": ["./layers/gnss/source"],
-    "modules": ["src/sources/httpBody.js", "src/layers/gnss/source.js"],
+    "modules": [
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js",
+      "src/layers/gnss/source.js"
+    ],
     "external": []
   },
   "perimeters-source": {
@@ -3680,6 +3730,7 @@
     "modules": [
       "src/layers/perimeters/records.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/layers/perimeters/source.js"
     ],
     "external": []
@@ -3713,6 +3764,7 @@
       "src/layers/wind/inspection.js",
       "src/layers/wind/model.js",
       "src/layers/wind/fields.js",
+      "src/i18n/marker.js",
       "src/tools/queries/imagery.js",
       "src/tools/queries/cables.js",
       "src/tools/queries/surveillance.js",
@@ -3766,6 +3818,7 @@
       "src/layers/cctv/sourcePolicy.js",
       "src/layers/cyclones/source.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/layers/earthquakes/source.js",
       "src/layers/earthquakes/records.js",
       "src/layers/firms/source.js",
@@ -3812,6 +3865,8 @@
       "src/layers/weather/source.js",
       "src/layers/wind/source.js",
       "src/sources/windBody.js",
+      "src/layers/wind/fields.js",
+      "src/layers/wind/model.js",
       "src/layers/recentImagery/catalog.js",
       "src/layers/recentImagery/model.js",
       "src/layers/submarineCables/bundledSource.js",
@@ -3841,6 +3896,7 @@
       "src/layers/airQuality/model.js",
       "src/layers/airQuality/source.js",
       "src/sources/httpBody.js",
+      "src/i18n/marker.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
@@ -3855,7 +3911,8 @@
     "modules": [
       "src/layers/airQuality/model.js",
       "src/layers/airQuality/source.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "src/i18n/marker.js"
     ],
     "external": []
   }

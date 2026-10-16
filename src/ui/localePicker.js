@@ -2,10 +2,8 @@
  * Interface language picker: a HUD button in the bottom-right corner that
  * opens a listbox of the shipped languages.
  *
- * The ordering, search filter, keyboard model and choice rule are pure
- * functions below, testable without a DOM (localePicker.test.mjs).
- * mountLocalePicker() binds them to the #locale-picker markup; the shell only
- * mounts it and decides what choosing another language does (confirm, reload).
+ * The logic is pure and DOM-free; mountLocalePicker() only renders it. The
+ * shell decides what a choice does (confirm, reload).
  *
  * The list follows the ARIA listbox pattern: the button opens it, focus moves
  * into the list (or into the search field, which is a combobox, once there are

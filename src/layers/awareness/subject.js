@@ -11,10 +11,9 @@ import {
   AWARENESS_PAGE_SIZE,
 } from './policy.js';
 
-// installations/controls.js getStats composes coverageLabel inside the layer
-// model (machine-composed English, pinned by militaryInstallations.test.mjs).
-// This is the presentation boundary: map the closed vocabulary to the
-// catalog, passing anything unknown through verbatim (docs/TRANSLATORS.md).
+// coverageLabel is machine-composed English from installations/controls.js
+// (pinned by src/data/militaryInstallations.test.mjs); translate the known
+// forms here, pass anything else through.
 const WITHIN_KM_RE = /^WITHIN (\d+) KM$/;
 
 function localizeCoverageLabel(label) {

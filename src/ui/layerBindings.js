@@ -130,8 +130,6 @@ export class LayerBindings {
     ]) {
       const layer = this._dataManager?.layers?.get(id)?.module;
       if (typeof layer?.attachShellServices !== 'function') continue;
-      // The Cockpit refusal names the destination: a cyclone layer flies to
-      // a storm, the others to their coverage area.
       const noun = id === 'weather-cyclones' ? 'cyclone' : 'weather';
       layer.attachShellServices({
         runNavigation: (navigate) =>

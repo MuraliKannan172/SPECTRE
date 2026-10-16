@@ -3,9 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale, t } from '../../i18n/index.js';
-import { WIND_FIELDS } from './fields.js';
+import { SCALAR_UNAVAILABLE, WIND_FIELDS } from './fields.js';
 import { fieldUnavailableText } from './rendering.js';
-import { SCALAR_UNAVAILABLE } from './source.js';
 
 for (const locale of ['es', 'ru']) {
   test(`${locale}: every field's unavailable status has a translation`, () => {

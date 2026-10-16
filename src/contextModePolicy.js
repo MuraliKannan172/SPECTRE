@@ -1,3 +1,5 @@
+import { msg } from './i18n/marker.js';
+
 const CONTEXT_DEPENDENCIES = Object.freeze({
   flights: new Set([
     'military-awareness',
@@ -9,10 +11,6 @@ const CONTEXT_DEPENDENCIES = Object.freeze({
   'space-missions': new Set(['rocket-launches', 'satellites']),
 });
 const CONTEXT_COMPANIONS = new Set(['radio']);
-// This module is shared with voice actions and scene policy, so the refusal
-// reason stays English data; the Context shell translates it with t() at the
-// toast (src/ui/contextLayerChanges.js).
-const msg = (text) => text;
 /** The Space Missions refusal, with the blocked layer's name as {layer}. */
 export const SPACE_MISSIONS_LAYER_BLOCK_REASON = msg(
   'Space Missions isolates replay data. Exit the mode to enable {layer}.',
@@ -350,8 +348,8 @@ export function contextLayerEnableBlockReason({
 }
 
 /**
- * Split a Space Missions refusal back into its template and layer name so
- * the presentation can translate the sentence and localize the name.
+ * The layer name from a Space Missions refusal, so the UI can rebuild the
+ * sentence in its language.
  * @param {string} reason
  * @returns {{layer: string}|null} The blocked layer's name, or null when the
  *   reason is not a Space Missions refusal.

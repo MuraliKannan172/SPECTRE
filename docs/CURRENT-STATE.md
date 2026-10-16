@@ -3241,14 +3241,13 @@ Shipped locales: **en** (source and fallback), **es** and **ru**. The code lives
   value). English has no catalog; every other locale is
   `src/i18n/locales/<code>.json`, and a missing entry falls back to English.
 - **Locale choice.** `?lang=` → stored choice (`gev:locale:v1`) →
-  `navigator.languages` → English. `?lang=` is not stored: it applies while it
-  stays in the address, and the copied share link drops it, so a recipient keeps
-  their own language. The language picker in the bottom-right corner (a globe
-  button beside POWER UP, `src/ui/localePicker.js`) stores the choice, removes `?lang=` (keeps it only where storage is blocked) and reloads,
-  so nothing re-renders live; it asks first when the reload would lose work
-  (unsaved CCTV calibration, the open cockpit, Draw marks on the board,
-  imported map files, an active voice session — each registered through
-  `registerUnsavedWork`).
+  `navigator.languages` → English. `?lang=` is not stored, and share links drop
+  it, so a recipient keeps their own language. The globe picker in the
+  bottom-right corner (`src/ui/localePicker.js`) stores the choice, drops
+  `?lang=` (keeps it only when storage is blocked) and reloads. It asks first
+  when the reload would lose work registered with `registerUnsavedWork`:
+  unsaved keys or CCTV calibration, Draw marks, imported map files, the open
+  cockpit, a voice session.
 - **Gate.** `npm run i18n` (and `src/i18n/catalog.test.mjs` under `npm test`)
   extracts every message and fails on missing, empty, unused,
   placeholder-mismatched, still-English (plural forms included) or

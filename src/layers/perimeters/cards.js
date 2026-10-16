@@ -146,10 +146,8 @@ function formatAge(deltaMs) {
  * @returns {Object} World-overlay entry without `position`.
  */
 export function buildIncidentCard(row, nowMs, { link = null } = {}) {
-  // Feed values stay as WFIGS sends them in the row (and in what the AI tools
-  // read); the card translates the known cause, behavior and complexity values
-  // and the wording around them. State, category, county and complex names
-  // are shown as sent.
+  // The row keeps WFIGS values as sent (AI tools read them); the card translates
+  // the known cause, behavior and complexity values and the wording around them.
   const facts = [];
   if (Number.isFinite(row.acres)) {
     const acres = Math.round(row.acres);

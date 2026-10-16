@@ -1,4 +1,4 @@
-// K-49: the CCTV "ACQUIRING FRAME" caption lives in CSS `content:` and the
+// The CCTV "ACQUIRING FRAME" caption lives in CSS `content:` and the
 // i18n scanner (scripts/i18n.mjs) never reads CSS, so es/ru show it in English.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ const LOCALES = path.join(HERE, '..', 'i18n', 'locales');
 // street-level.css ' · ESC' is a key cap. Neither is UI copy.
 const DECORATIVE = new Set(['cyber.css', 'street-level.css']);
 
-test('K-49: no user-visible text in CSS content: outside decorative themes', () => {
+test('no user-visible text in CSS content: outside decorative themes', () => {
   const hits = [];
   for (const file of readdirSync(STYLES)) {
     if (!file.endsWith('.css') || DECORATIVE.has(file)) continue;
@@ -26,7 +26,7 @@ test('K-49: no user-visible text in CSS content: outside decorative themes', () 
   assert.deepEqual(hits, []);
 });
 
-test('K-49: the CCTV acquisition caption has es and ru translations', () => {
+test('the CCTV acquisition caption has es and ru translations', () => {
   for (const lang of ['es', 'ru']) {
     const dict = JSON.parse(readFileSync(path.join(LOCALES, `${lang}.json`), 'utf8'));
     assert.ok('ACQUIRING FRAME' in dict, `${lang}.json lacks "ACQUIRING FRAME"`);

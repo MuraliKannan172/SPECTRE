@@ -1,8 +1,9 @@
 /**
  * Key setup ("POWER UP") — the pure core.
  *
- * One registry and pure functions; its only import is the proxy-header check
- * shared with the other local gates (localRequestGate.mjs). The dev server's
+ * One registry and pure functions; it imports only the proxy-header check
+ * shared with the other local gates (localRequestGate.mjs) and the msg()
+ * marker (src/i18n/marker.js). The dev server's
  * /api/setup endpoints (vite.config.js) and the in-app panel (keySetup.js)
  * are both thin shells over this module, so what a key is called, what it
  * unlocks, and how a .env line is written each live in exactly one place.
@@ -12,6 +13,7 @@
  * behavior below unit-testable.
  */
 
+import { msg } from './i18n/marker.js';
 import { hasProxySignals } from './localRequestGate.mjs';
 
 /** Longest accepted key/token value. Real provider keys are all far shorter. */
@@ -32,10 +34,6 @@ export const KEY_SETUP_APPEND_HEADER =
  * bundle by design (restrict them at the provider, per SECURITY.md).
  * `hidden` keeps advanced configuration out of the panel and missing-key count.
  */
-// Marks `unlocks` copy for i18n extraction; Provider Settings translates it
-// with t(). Kept local so the server can import this module without i18n.
-const msg = (text) => text;
-
 export const KEY_SETUP_KEYS = Object.freeze([
   Object.freeze({
     id: 'google-maps',
@@ -397,13 +395,11 @@ export function knownKeySetupEnvVars() {
   return names;
 }
 
-/** Tooltip guidance for a control gated by one registry entry. */
 /**
- * Env-var requirements for a registry entry, as machine values for
- * presentation layers that localize the guidance sentence themselves
- * (this module also runs in node-side key-setup builds, which stay English).
+ * Env-var names a registry entry needs, joined with ' + ', for callers that
+ * build the guidance sentence in the UI language (src/ui/keyGuidance.js).
  * @param {string} id Registry entry id.
- * @returns {string|null} Joined env-var names, or null when nothing is required.
+ * @returns {string|null} null for an unknown or hidden entry.
  */
 export function keySetupRequirementEnvVars(id) {
   const entry = KEY_SETUP_KEYS.find((candidate) => candidate.id === id);
@@ -411,6 +407,7 @@ export function keySetupRequirementEnvVars(id) {
   return entry.envVars.join(' + ');
 }
 
+/** English tooltip guidance for a control gated by one registry entry. */
 export function keySetupRequirement(id) {
   const entry = KEY_SETUP_KEYS.find((candidate) => candidate.id === id);
   if (!entry || entry.hidden) return '';

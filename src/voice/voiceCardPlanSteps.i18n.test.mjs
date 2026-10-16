@@ -1,7 +1,6 @@
-// PDF review C3, B4, E5, E6 and proposal 1: the voice card's plan steps name
-// every tool in the interface language, the "Layer" step agrees in gender,
-// error lines and long headlines show whole, and the Contacts snapshot time
-// reads as a clock, not ISO. What the model receives stays English.
+// Voice card in the UI language: every tool's plan step, the bare "Layer"
+// step, whole error lines and long headlines, the Contacts snapshot clock.
+// What the model receives stays English.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setLocale } from '../i18n/index.js';
@@ -26,7 +25,7 @@ function inLocale(locale, run) {
   }
 }
 
-test('C3: every tool has a plan label, never its raw name', () => {
+test('every tool has a plan label, never its raw name', () => {
   for (const name of TOOLS) {
     const label = planStepLabel(name, {});
     assert.notEqual(label, name.replace(/_/g, ' '), name);
@@ -46,13 +45,13 @@ test('C3: every tool has a plan label, never its raw name', () => {
 });
 
 for (const locale of ['ru', 'es']) {
-  test(`C3: ${locale} plan labels are all translated`, () => {
+  test(`${locale} plan labels are all translated`, () => {
     const english = Object.fromEntries(
       TOOLS.map((name) => [name, planStepLabel(name, { direction: 'out' })]),
     );
     inLocale(locale, () => {
       for (const name of TOOLS) {
-        // A layer switch without a layer is checked below (B4).
+        // A layer switch without a layer is checked below.
         const label = planStepLabel(name, { direction: 'out' });
         assert.notEqual(label, english[name], `${name}: "${label}"`);
       }
@@ -60,7 +59,7 @@ for (const locale of ['ru', 'es']) {
   });
 }
 
-test('C3/E10: analyst query and an unknown tool in ru and es', () => {
+test('analyst query and an unknown tool in ru and es', () => {
   inLocale('ru', () => {
     assert.equal(planStepLabel('analyst_query', {}), 'Аналитический запрос');
     assert.equal(planStepLabel('brand_new_tool', {}), 'Действие');
@@ -71,7 +70,7 @@ test('C3/E10: analyst query and an unknown tool in ru and es', () => {
   });
 });
 
-test('B4: a layer step with no layer agrees with "Capa"', () => {
+test('a layer step with no layer agrees with "Capa"', () => {
   const step = (enabled) => planStepLabel('set_layer_visibility', { enabled });
   assert.equal(step(true), 'Layer on');
   assert.equal(step(false), 'Layer off');
@@ -118,7 +117,7 @@ const NO_PLACE = {
   feed: {},
 };
 
-test('proposal 1: an error line shows whole, in every language', () => {
+test('an error line shows whole, in every language', () => {
   for (const [locale, expected] of [
     ['en', NO_PLACE.error],
     [
@@ -137,7 +136,7 @@ test('proposal 1: an error line shows whole, in every language', () => {
   }
 });
 
-test('proposal 1: a successful line keeps its 80-character cap', () => {
+test('a successful line keeps its 80-character cap', () => {
   const long = 'x'.repeat(120);
   const view = voiceCardView({
     ...initialVoiceCardState(),
@@ -146,7 +145,7 @@ test('proposal 1: a successful line keeps its 80-character cap', () => {
   assert.equal(view.result.lines[0].length, 80);
 });
 
-test('E5: a translated analyst headline fits the card title whole', () => {
+test('a translated analyst headline fits the card title whole', () => {
   const title =
     'Al menos 12 aeronaves militares en un radio de 40 km de Los Angeles';
   const card = () =>
@@ -159,11 +158,11 @@ test('E5: a translated analyst headline fits the card title whole', () => {
   assert.equal(card().length, 64);
 });
 
-test('E6: the snapshot time reads as a UTC clock, dated when not today', () => {
+test('the snapshot time reads as a UTC clock, dated when not today', () => {
   const iso = '2026-10-15T14:32:05.000Z';
   const sameDay = Date.parse('2026-10-15T23:00:00Z');
   const nextDay = Date.parse('2026-10-16T00:10:00Z');
-  assert.equal(shownSnapshotTime(iso, sameDay), iso, 'English as before');
+  assert.equal(shownSnapshotTime(iso, sameDay), iso, 'English keeps ISO');
   inLocale('ru', () => {
     assert.equal(shownSnapshotTime(iso, sameDay), '14:32:05 UTC');
     assert.equal(shownSnapshotTime(iso, nextDay), '15.10.2026, 14:32:05 UTC');
@@ -175,7 +174,7 @@ test('E6: the snapshot time reads as a UTC clock, dated when not today', () => {
   });
 });
 
-test('E6: the Contacts note shows the clock; the model note stays ISO', () => {
+test('the Contacts note shows the clock; the model note stays ISO', () => {
   const evaluatedAt = new Date();
   evaluatedAt.setUTCHours(14, 32, 5, 0);
   const iso = evaluatedAt.toISOString();
@@ -197,9 +196,7 @@ test('E6: the Contacts note shows the clock; the model note stays ISO', () => {
   assert.equal(result.coverage.note, note, 'the result is not changed');
 });
 
-// C12: preset places show in the interface language on the card; the model's
-// error and scope stay English.
-test('C12: plan steps and errors name a preset place in the UI language', () => {
+test('plan steps and errors name a preset place in the UI language', () => {
   const failed = {
     ok: false,
     action: 'select_nearest_aircraft',
@@ -228,7 +225,7 @@ test('C12: plan steps and errors name a preset place in the UI language', () => 
   assert.match(failed.error, /Tokyo view/, 'the result stays English');
 });
 
-test('C12: the analyst scope names Los Angeles in the UI language', () => {
+test('the analyst scope names Los Angeles in the UI language', () => {
   const result = {
     ok: true,
     count: 12,

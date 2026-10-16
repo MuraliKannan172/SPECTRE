@@ -124,8 +124,6 @@ test('a missing or malformed nearest POI never crashes the summary', () => {
   assert.match(composeLocalityTag({ ...LINCOLN }, 10, 10), /^SECTOR /);
 });
 
-// The names reach a formatter as catalogued, so the HUD can translate the
-// city before upper-casing it: the place-name table knows `Tokyo`, not `TOKYO`.
 test('a formatter builds the line from the same parts', () => {
   const format = {
     near: ({ poi, city, distKm }) => `near:${poi}|${city}|${distKm}`,

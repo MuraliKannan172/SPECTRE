@@ -52,9 +52,8 @@ const TRIGGER_ORBIT_DURATION_SEC = 2.8;
 const TRIGGER_SOURCE_URL =
   'https://earthquake.usgs.gov/earthquakes/eventpage/us7000tbwb/executive';
 
-// Overview pin titles that are more than a place name translate at display,
-// through the same entries the event panel uses. The data stays English and
-// place names stay Latin; everything else shows as authored.
+// Descriptive pin titles translate at display (same entries as the event
+// panel); place names stay Latin, anything else shows as authored.
 const PLACE_TITLE_TEXT = new Map(
   [
     msg('Collapse viewpoint'),

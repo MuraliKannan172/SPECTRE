@@ -1,4 +1,15 @@
+import { msg } from '../../i18n/marker.js';
 import { normalizeLongitude, sampleWind } from './model.js';
+
+// Imported by src/tools: the catalog-free marker, not src/i18n/index.js. The
+// texts stay English data and the wind layer and layer panel show them
+// translated.
+
+/** Status of a scalar overlay the provider could not supply, by overlay. */
+export const SCALAR_UNAVAILABLE = Object.freeze({
+  temperature: msg('Temperature field unavailable'),
+  pressure: msg('Mean sea level pressure field unavailable'),
+});
 
 /** Fixed physical scales shared by imagery and the field legend. */
 export const WIND_FIELDS = Object.freeze({

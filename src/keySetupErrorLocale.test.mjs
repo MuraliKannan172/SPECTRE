@@ -1,7 +1,5 @@
-// K-25: a refused key save reads in the panel's language. The server sends a
-// `code` (and `params`) beside its English `error`; the panel builds the
-// sentence through t(), so English stays the server's own text and es/ru get
-// the catalog's.
+// A refused key save reads in the panel's language: the server sends `code`
+// and `params` beside its English `error`, the panel builds the sentence.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -94,7 +92,7 @@ test('in English the panel shows exactly the server sentence', () => {
     assert.equal(saveRefusalText(refusal, 400), refusal.error);
 });
 
-test('an unknown code or a bare error falls back as before', () => {
+test('an unknown code or a bare error falls back to the server text or the status', () => {
   setLocale('en');
   assert.equal(
     saveRefusalText({ error: 'Something new', code: 'new' }, 400),

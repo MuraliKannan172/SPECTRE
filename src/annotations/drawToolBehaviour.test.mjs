@@ -241,8 +241,7 @@ const LEFT_DOUBLE_CLICK = Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK;
 
 /* ── the tests ─────────────────────────────────────────────────────────── */
 
-// K-27. First in the file: the tools other tests leave behind would answer the
-// same registry.
+// First in the file: tools left by later tests would answer the same registry.
 test('a lasting mark or a half-drawn shape makes the language switch ask first', async () => {
   const h = harness();
   try {
@@ -288,7 +287,7 @@ test('Draw refuses to start when something else holds the pointer', async () => 
     h.element('draw-toggle').emit('click');
     assert.equal(h.tool.active, false, 'it must not half-start');
     assert.equal(pointerOwner(), 'directions', 'and must not steal the claim');
-    // Named by its tool, not by the internal owner id (E3/E12).
+    // Named by its tool, not by the internal owner id.
     assert.equal(
       h.element('draw-hint').textContent,
       'Directions is using the pointer — close it first.',

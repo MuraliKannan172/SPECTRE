@@ -1,6 +1,6 @@
-// Imported by the server: no i18n here. The text stays English data; layers
-// show it translated (translateKnown).
-const msg = (text) => text;
+// Imported by the server: the catalog-free marker, not src/i18n/index.js. The
+// text stays English data; layers show it translated (translateKnown).
+import { msg } from '../i18n/marker.js';
 
 const tooLarge = () =>
   Object.assign(new Error(msg('Upstream response too large')), {

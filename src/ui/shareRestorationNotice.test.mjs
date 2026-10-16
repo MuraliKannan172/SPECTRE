@@ -1,6 +1,5 @@
 // Share-tracking restore notices are ready-made sentences per policy: a label
-// dropped into a template cannot take the case (ru) or article (es) the
-// sentence needs. English stays exactly as it was composed before.
+// dropped into a template cannot take the case (ru) or article (es) needed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setLocale } from '../i18n/index.js';
@@ -11,7 +10,7 @@ const { flights, military, satellites } = SHARE_TRACKING_RESTORE_POLICIES;
 
 test.afterEach(() => setLocale('en'));
 
-test('en: the notices read as before for every policy and outcome', () => {
+test('en: the notices for every policy and outcome', () => {
   setLocale('en');
   const notice = (policy, classification) =>
     shareTrackingRestoreNotice({ ...policy, classification });
