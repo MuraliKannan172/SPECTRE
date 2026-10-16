@@ -61,6 +61,8 @@ export class MapSourceController {
     this._terrainMode = null;
     this._terrainFallback = null;
     this._retryTimer = null;
+    this._retrying = false;
+    this._retryRequested = false;
     this._retryDelay = FALLBACK_RETRY_MS;
     this._subscribers = new Set();
     this._destroyed = false;
@@ -329,9 +331,14 @@ export class MapSourceController {
    * screen: Esri's OSM stand-in, or flat terrain on a shown globe. Fallbacks
    * stay cached and shown meanwhile, so no switch waits on a retry; a
    * fallback out of use is left alone until an activation shows it again.
+   * One retry runs at a time; a request made meanwhile re-arms once it ends.
    */
   _scheduleRetry() {
-    if (this._retryTimer) return;
+    if (this._retryTimer || this._destroyed) return;
+    if (this._retrying) {
+      this._retryRequested = true;
+      return;
+    }
     this._retryTimer = setTimeout(() => {
       this._retryTimer = null;
       void this._retryFallbacks();
@@ -345,6 +352,8 @@ export class MapSourceController {
     let terrain = flat && this._sources.get(this._activeId)?.terrain;
     if (terrain?.id !== this._terrainMode) terrain = null;
     if (!id && !terrain) return;
+    this._retrying = true;
+    this._retryRequested = false;
     const attempt = async (create) => {
       try {
         return await create?.({ signal: this._abort.signal });
@@ -352,47 +361,70 @@ export class MapSourceController {
         return null; // Still unavailable: keep the fallback.
       }
     };
-    const [provider, real] = await Promise.all([
-      id && attempt(this._sources.get(id).imagery),
-      terrain && attempt(terrain.create),
-    ]);
-    if (this._destroyed) {
-      this._dispose(provider);
-      this._dispose(real?.provider);
-      return;
-    }
-    let failed = (id && !provider) || (terrain && (!real || real.fallback));
+    // Each recovers as soon as it loads, never waiting on the other.
+    const retryImagery = async () => {
+      const cached = this._imageryProviders.get(id);
+      const provider = await attempt(this._sources.get(id).imagery);
+      // Obsolete: destroyed, or the cache moved on while this was in flight.
+      if (this._destroyed || this._imageryProviders.get(id) !== cached) {
+        this._dispose(provider);
+        return true;
+      }
+      if (!provider) return false;
+      this._imageryProviders.set(id, Promise.resolve(resolved(provider, id)));
+      // Still showing the fallback once any switch settles: use the real one.
+      const recover = () => {
+        if (this._activeResolution === resolution)
+          void this.setStack(id, { [AUTOMATIC]: true });
+      };
+      if (!this._isSwitching) recover();
+      else {
+        const stop = this.subscribe(() => {
+          stop();
+          recover();
+        });
+      }
+      return true;
+    };
+    const retryTerrain = async () => {
+      const cached = this._terrainProviders.get(terrain.id);
+      const real = await attempt(terrain.create);
+      if (
+        this._destroyed ||
+        this._terrainProviders.get(terrain.id) !== cached ||
+        !real ||
+        real.fallback
+      ) {
+        this._dispose(real?.provider);
+        return Boolean(real && !real.fallback);
+      }
+      this._terrainProviders.set(terrain.id, Promise.resolve(real));
+      if (this._terrainFallback === flat && this.viewer.scene.globe.show) {
+        this._applyTerrain(real);
+        this._requestRender('map-stack');
+      } else this._terrainMode = null; // The next globe activation installs it.
+      return true;
+    };
+    const settled = (retry) =>
+      retry().catch((error) => {
+        console.warn('[MapSourceController] fallback recovery failed:', error);
+        return false;
+      });
+    let failed = false;
     try {
-      if (provider) {
-        this._imageryProviders.set(id, Promise.resolve(resolved(provider, id)));
-        // Still showing the fallback once any switch settles: use the real one.
-        const recover = () => {
-          if (this._activeResolution === resolution)
-            void this.setStack(id, { [AUTOMATIC]: true });
-        };
-        if (!this._isSwitching) recover();
-        else {
-          const stop = this.subscribe(() => {
-            stop();
-            recover();
-          });
-        }
-      }
-      if (terrain && real && !real.fallback) {
-        this._terrainProviders.set(terrain.id, Promise.resolve(real));
-        if (this._terrainFallback === flat && this.viewer.scene.globe.show) {
-          this._applyTerrain(real);
-          this._requestRender('map-stack');
-        } else this._terrainMode = null; // The next globe activation installs it.
-      }
-    } catch (error) {
-      console.warn('[MapSourceController] fallback recovery failed:', error);
-      failed = true;
+      const results = await Promise.all([
+        id && settled(retryImagery),
+        terrain && settled(retryTerrain),
+      ]);
+      failed = results.includes(false);
+    } finally {
+      this._retrying = false;
     }
+    if (this._destroyed) return;
     this._retryDelay = failed
       ? Math.min(this._retryDelay * 2, FALLBACK_RETRY_MAX_MS)
       : FALLBACK_RETRY_MS;
-    if (failed) this._scheduleRetry();
+    if (failed || this._retryRequested) this._scheduleRetry();
   }
 
   _cached(cache, id, create) {

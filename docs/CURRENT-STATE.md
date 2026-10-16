@@ -386,8 +386,9 @@ upstream exposes it. One console warning is logged per cooldown window. Other
 failures keep Cesium's handling and the flat `EllipsoidTerrainProvider`
 fallback; while that flat terrain is on a shown globe the map controller
 retries Re:Earth in the background (30 s, doubling to a 10-minute cap) and
-installs the real terrain without waiting for a map switch. Behind a 3D tileset
-it neither retries nor installs; the next globe activation does.
+installs the real terrain without waiting for a map switch or an imagery
+retry. Behind a 3D tileset it neither retries nor installs; the next globe
+activation does.
 `scripts/qa-terrain-429.mjs` reproduces the burst against a keyless
 dev server, counts real throttles with their headers as evidence, synthesises
 throttles with `--inject N` when the upstream is not throttling, and fails if
