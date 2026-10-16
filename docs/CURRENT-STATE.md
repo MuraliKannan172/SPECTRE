@@ -1262,6 +1262,15 @@ cancels the body unread. A rejected or timed-out body is an upstream miss and
 follows each route's existing error and cached-data paths. FIRMS map-key
 status, the OpenSky token exchange and CCTV media keep their current handling.
 
+The route also bounds request frequency: 120 requests/minute per client
+address, with a global backstop of three times that. A refused request answers
+429 with `Retry-After` and `Cache-Control: no-store` and performs no outbound
+fetch. The bikeshare layer's own demand is about 15 requests a minute with
+every catalogued system in range, so an ordinary session never meets the limit;
+the method, host and path guards run unchanged.
+
+Updated: September 21, 2026
+
 ## Remaining local service modules
 
 Overpass query validation, geometry simplification, disk caching and upstream
@@ -3302,7 +3311,7 @@ its criteria cannot be silently ignored.
 | CCTV                   | Austin + Caltrans (CA) + TfL London + Ontario 511 + Fintraffic (FI) + DriveBC (BC) + TxDOT (TX) + Estonia (Tallinn, Tarktee) + Live Traffic NSW + Open Calgary Open Data + Statens vegvesen (NO, stills + live HLS) + King County (WA) Open Data + WSDOT (WA) Open Data + NYC DOT TMC (opt-in) + City of Toronto RESCU + Catalonia (Servei Català de Trànsit) + Street View fallback | `src/data/cctv.js`                                    | `/api/cctv`                                              | 10s (active)                                                                      |
 | Radio                  | Radio Browser (public-domain station directory)                                                                                                                                                 | `src/data/radio.js`                                   | `/api/radio/stations`, `/api/radio/click/:uuid`          | 45 min directory refresh                                                          |
 | Transit 🚌             | Operator GTFS-Realtime VehiclePositions (7 keyless regions, `src/data/transitFeeds.js`)                                                                                                         | `src/layers/transit/` via `src/app/layers/transit.js` | `/api/transit`                                           | 15s (poll + delayed playback)                                                     |
-| Bikeshare 🚲           | GBFS (Lyft + BCycle + Social Bicycles + PBSC incl. Bike Share Toronto and Bike Itaú (Brazil) + Urban Sharing, Entur, JCDecaux NO)                                                                                                                                        | `src/data/bikeshare.js`                               | `/api/gbfs`                                              | 60s                                                                               |
+| Bikeshare 🚲           | GBFS (Lyft + BCycle + Social Bicycles + PBSC incl. Bike Share Toronto, Bike Itaú (Brazil) and Bicing (Barcelona) + Urban Sharing, Entur, JCDecaux NO + nextbike (AMBici))                                                                                                                                        | `src/data/bikeshare.js`                               | `/api/gbfs`                                              | 60s                                                                               |
 | Directions 🧭          | OSRM on FOSSGIS servers (OpenStreetMap)                                                                                                                                                         | `src/data/directions.js`                              | `/api/route` (`steps=1`)                                 | on placement / mode change                                                        |
 | Datacenters ▣          | OSM extract (bundled)                                                                                                                                                                           | `src/data/localLayers.js`                             | —                                                        | static                                                                            |
 | Dams ▰                 | OpenInfraMap/OSM extract (bundled)                                                                                                                                                              | `src/data/localLayers.js`                             | —                                                        | static                                                                            |
