@@ -2793,5 +2793,8 @@
     "one": "{n} secuencia a la vista · haz clic en una línea para su foto más cercana",
     "many": "{n} secuencias a la vista · haz clic en una línea para su foto más cercana",
     "other": "{n} secuencias a la vista · haz clic en una línea para su foto más cercana"
-  }
+  },
+  "FOV {value}° (DATASHEET)": "FOV {value}° (FICHA TÉCNICA)",
+  "SPEC FOV {span}° (CAPABILITY)": "FOV DE FICHA {span}° (CAPACIDAD)",
+  "{spec} · SPECS: CCTV-DATABASE.COM": "{spec} · ESPECIFICACIONES: CCTV-DATABASE.COM"
 }

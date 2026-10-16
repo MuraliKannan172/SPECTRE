@@ -2,6 +2,11 @@ import { CCTV_AMBIENT_CARD_MAX } from '../../data/cctvLod.js';
 import { t } from '../../i18n/index.js';
 import { ACTIVE_FRAME_REFRESH_MS, IDLE_FRAME_REFRESH_MS } from './policy.js';
 import { headingHudToken, isHeadingEstimated } from './headingConfidence.js';
+import {
+  specSummary,
+  specFovCapabilityToken,
+  isDatasheetFov,
+} from './modelSpecs.js';
 
 export function createPresentation({
   state: layerState,
@@ -47,9 +52,20 @@ export function createPresentation({
       // A synthetic bearing (headingConfidence 'low', no human calibration)
       // is tagged so a hashed guess never reads as a surveyed facing (#639).
       headingHudToken(active.camera),
-      t('FOV {value}°', {
-        value: Math.round(active.camera.fovDeg),
-      }),
+      // Identified hardware labels its FOV as datasheet-sourced (catalog.js)
+      // only while no manual calibration offset has moved it.
+      isDatasheetFov(active.camera)
+        ? t('FOV {value}° (DATASHEET)', {
+            value: Math.round(active.camera.fovDeg),
+          })
+        : t('FOV {value}°', {
+            value: Math.round(active.camera.fovDeg),
+          }),
+      // A PTZ/varifocal datasheet range is what the lens can do, not its
+      // current zoom, so it is shown beside the estimate, never as it.
+      specFovCapabilityToken(active.camera, (span) =>
+        t('SPEC FOV {span}° (CAPABILITY)', { span }),
+      ),
       t('COVERAGE {value}km²', { value: area.toFixed(2) }),
       overlapCount > 0
         ? t('OVERLAP {count} cams', { count: overlapCount })
@@ -67,6 +83,12 @@ export function createPresentation({
             value: String(active.camera.feedType || 'image').toUpperCase(),
           }),
       t('{value} CONTEXT', { value: viewBand.toUpperCase() }),
+      // Identified hardware: append the model's datasheet specs + attribution.
+      active.camera.spec
+        ? t('{spec} · SPECS: CCTV-DATABASE.COM', {
+            spec: specSummary(active.camera.spec).toUpperCase(),
+          })
+        : null,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -104,6 +126,15 @@ export function createPresentation({
       headingEstimated: isHeadingEstimated(camera),
       pitchDeg: camera.pitchDeg,
       fovDeg: camera.fovDeg,
+      // Identified-hardware enrichment passthrough (catalog.js / modelSpecs.js).
+      fovSource: isDatasheetFov(camera)
+        ? 'datasheet'
+        : camera.fovSource === 'datasheet'
+          ? 'calibrated'
+          : camera.fovSource || 'estimated',
+      specFovMinDeg: camera.specFovMinDeg ?? null,
+      specFovMaxDeg: camera.specFovMaxDeg ?? null,
+      spec: camera.spec || null,
       rangeM: camera.rangeM,
       elevationM: camera.absoluteHeightM,
       mountHeightM: camera.mountHeightM,
