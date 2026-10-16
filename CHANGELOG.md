@@ -1,11 +1,5 @@
 # Changelog
 
-- Fire-perimeter queries handle outlines and holes crossing the antimeridian:
-  areas enclosed near ±180° are included, areas at the opposite meridian are
-  excluded, and returned perimeter coordinates stay near the dateline. Incident
-  cards use the same circular longitude mean and compare multipart outline
-  areas along short longitude edges, keeping the card on the largest polygon.
-
 - Local FM seek finds stations after wrapping around 87.5–108 MHz, covers both
   band edges, skips the starting station and rejects spectra from an earlier
   tune (Aditya, @Rohilalala, #1174).
