@@ -676,6 +676,31 @@ test('uses Launch Library 2 pad latitude/longitude fields', () => {
   assert.equal(launches[0].lon, -120.611);
 });
 
+test('null or blank pad and landing coordinates stay unknown instead of becoming 0', () => {
+  const base = { net: '2026-07-20T10:00:00Z' };
+  for (const blank of [null, '', '  ', false]) {
+    assert.deepEqual(
+      normalizeRocketLaunches([{ ...base, id: 'blank', pad: { latitude: blank, longitude: blank } }], NOW),
+      [],
+    );
+  }
+  // Null pad fields fall through to the location's "lon,lat" pair, not 0,0.
+  const [fallback] = normalizeRocketLaunches([{ ...base, id: 'fallback',
+    pad: { latitude: null, longitude: null, location: { coordinates: '-80.6,28.6' } } }], NOW);
+  assert.equal(fallback.lat, 28.6);
+  assert.equal(fallback.lon, -80.6);
+  // An undisclosed landing keeps position, distance and flight number unknown.
+  const [launch] = normalizeRocketLaunches([{ ...base, id: 'landing', pad: { latitude: 1, longitude: 2 },
+    rocket: { launcher_stage: [{ launcher_flight_number: null,
+      landing: { attempt: true, downrange_distance: null,
+        landing_location: { latitude: null, longitude: null } } }] } }], NOW);
+  const [stage] = launch.recoveryStages;
+  assert.equal(stage.lat, null);
+  assert.equal(stage.lon, null);
+  assert.equal(stage.downrangeKm, null);
+  assert.equal(stage.flightNumber, null);
+});
+
 test('normalizes detailed payload and stage recovery records', () => {
   const launches = normalizeRocketLaunches({ results: [{
     id: 'recovery-details',

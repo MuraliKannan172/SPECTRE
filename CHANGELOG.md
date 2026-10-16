@@ -1,5 +1,9 @@
 # Changelog
 
+- Launch Library records with a null or blank pad latitude/longitude, landing
+  position, downrange distance or stage flight number now keep those values
+  unknown instead of reading them as 0, so a launch is no longer placed at
+  0°N 0°E and an undisclosed landing no longer reports a 0 km downrange.
 - Local FM seek finds stations after wrapping around 87.5–108 MHz, covers both
   band edges, skips the starting station and rejects spectra from an earlier
   tune (Aditya, @Rohilalala, #1174).
