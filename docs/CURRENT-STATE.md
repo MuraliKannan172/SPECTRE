@@ -1352,6 +1352,19 @@ Node-only package entries expose both provider factories. Routes, payloads,
 fallback behavior and existing dev/preview hook registration are preserved;
 browser rendering is unchanged.
 
+## CCTV missing numeric fields
+
+CCTV numbers are read as missing when they are absent, null, blank or boolean,
+on the server (`toFiniteNumber`, every pack and the file/env source packs) and
+in the browser (`safeNumber`). `/api/cctv/sources` sends an unknown number as
+JSON null; the browser then uses the bundled seed camera's value when one
+shares the id, else the field's default — id-hash heading, pitch −17°, FOV 74°
+(which a matched datasheet can still replace), range 700 m, mount 24 m, the
+city's ground elevation — rather than reading zero and clamping it to the
+field's floor. A camera with a missing latitude or longitude and no seed
+position is skipped by the browser catalog instead of being placed at 0,0.
+Real zeros, including `"0"`, are kept.
+
 ## Terrain, traffic, fire and bike-share provider modules
 
 Local composition now imports separate Node modules for Re:Earth heights,
@@ -3469,7 +3482,10 @@ controls (the address goes in the caption); a pose goes out at once and
 again when the panorama's month, photographer and address arrive (one
 successful lookup per panorama per session, seeded by the nearest lookup;
 a details lookup that fails or takes over ten seconds waits five seconds
-before a view event can retry, and an unmount drops lookups in flight). A key
+before a view event can retry, and an unmount drops lookups in flight). Opening
+another panorama settles the previous open before registering its wait; closing
+then releases the current wait immediately. A details lookup released while its
+service loads makes no panorama request after that service becomes available. A key
 Google refuses (`gm_authFailure`: the API not enabled, a referrer it does
 not allow, billing off) reads KEY REJECTED and fails a pending open at
 once; a lookup or open Google never answers fails after 10 or 20 s. In CI
