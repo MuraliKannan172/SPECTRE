@@ -121,6 +121,12 @@ export class GevRealtimeController extends RealtimeFacade {
         abortTools: () => this._turns.abortTools(),
         isActive: (...args) => this.isActive(...args),
         stop: (...args) => this.stop(...args),
+        readVoiceResumeSettings: () => ({
+          pushToTalk: Boolean(this.pushToTalkMode),
+        }),
+        resumeVoice: (settings) => this.start(settings),
+        notifyVoiceSuspended: ({ reason }) =>
+          this.emitSessionEvent({ type: 'voice-suspended', reason }),
         setStatus: (...args) => this.setStatus(...args),
         queueResponseCreate: (...args) => this.queueResponseCreate(...args),
         debugLog: (...args) => this.debugLog(...args),
@@ -135,6 +141,10 @@ export class GevRealtimeController extends RealtimeFacade {
         setStatus: (...args) => this.setStatus(...args),
         debugLog: (...args) => this.debugLog(...args),
         stop: (...args) => this.stop(...args),
+        readVoiceResumeSettings: () => ({
+          pushToTalk: Boolean(this.pushToTalkMode),
+        }),
+        resumeVoice: (settings) => this.start(settings),
       },
     });
     this._input = new RealtimeInput({
@@ -201,6 +211,10 @@ export class GevRealtimeController extends RealtimeFacade {
         startPendingRadioHandoff: (...args) =>
           this.startPendingRadioHandoff(...args),
         stop: (...args) => this.stop(...args),
+        readVoiceResumeSettings: () => ({
+          pushToTalk: Boolean(this.pushToTalkMode),
+        }),
+        resumeVoice: (settings) => this.start(settings),
       },
     });
     // Progress narration: spoken lines go out of band through the turns
@@ -224,9 +238,15 @@ export class GevRealtimeController extends RealtimeFacade {
       input: this._input,
       cost: this._cost,
       operations: {
+        bindTranscriptionModel: (model) =>
+          this._turns.bindTranscriptionModel(model),
         isActive: (...args) => this.isActive(...args),
         pauseRadioForVoice: (...args) => this.pauseRadioForVoice(...args),
         stop: (...args) => this.stop(...args),
+        readVoiceResumeSettings: () => ({
+          pushToTalk: Boolean(this.pushToTalkMode),
+        }),
+        resumeVoice: (settings) => this.start(settings),
         syncCostUi: (...args) => this.syncCostUi(...args),
         setStatus: (...args) => this.setStatus(...args),
         debugLog: (...args) => this.debugLog(...args),

@@ -1,15 +1,25 @@
+import {
+  createVoiceUserTurnTracker,
+  readVoiceUserTurnProvenance,
+} from './userTurnIntent.js';
+import {
+  classifyVoiceTool,
+  shouldStopVoiceAfterToolResult,
+  reconcileRadioToolResult,
+  toolResultGuidance,
+  projectVoiceToolResultForModel,
+} from './toolExecutionPolicy.js';
 import { realtimeSessionEvent } from './realtimeEvents.js';
 import { readLayerLifecycleSummary } from './layerSummary.js';
 import {
   CALL_DEDUPE_MS,
   SUPERSEDED_RESPONSE_MEMORY,
-  shouldStopVoiceAfterRadioTool,
-  responseInstructionForToolResult,
   extractFunctionCalls,
   callDedupeKeys,
   parseArguments,
 } from './realtimeProtocol.js';
 import { narrationLabel } from './speech.js';
+import { readVoiceProviderRequestText } from './providerIntent.js';
 
 /** Out-of-band progress responses carry this metadata tag. */
 export const PROGRESS_RESPONSE_TAG = 'progress';
@@ -66,6 +76,9 @@ export class RealtimeTurns {
     this.activeResponseId = null;
     this.supersededResponseIds = new Set();
     this.activeToolAbortControllers = new Set();
+    // A completed tool can still own progressive work (for example outlines).
+    // Keep it current until an actual input/session boundary aborts this.
+    this.turnResourceAbort = new AbortController();
     this.narration = null;
     this.narrationSequence = 0;
     this.assistantAudioPlaying = false;
@@ -74,6 +87,10 @@ export class RealtimeTurns {
     this.progressResponseIds = new Set();
     this.bestEffortEventIds = new Set();
     this.bestEffortSequence = 0;
+    this.userTurnIntent = createVoiceUserTurnTracker();
+    this.speechTranscriptionEnabled = true;
+    this.responseRequestSequence = 0;
+    this.outputClearReasons = [];
   }
   get actionExecutor() {
     return this.readActionExecutor();
@@ -89,6 +106,11 @@ export class RealtimeTurns {
   }
   get radioLayer() {
     return this.readRadioLayer();
+  }
+  bindTranscriptionModel(model) {
+    // This metadata comes from our token backend, never from generated tool
+    // arguments. An absent model is unknown, so retain caption gating.
+    this.speechTranscriptionEnabled = model !== 'off';
   }
   /**
    * Inject a background MAP EVENT into the conversation as a system item — e.g. a
@@ -120,7 +142,18 @@ export class RealtimeTurns {
     const cleanText = String(text || '').trim();
     if (!cleanText) return;
     this.cancelRadioHandoff({ abortTools: true });
+    const responseId = this.activeResponseId;
+    const audioPlaying = this.assistantAudioPlaying;
+    const interruptsForProviderGuidance = Boolean(
+      readVoiceProviderRequestText(cleanText),
+    );
     this.supersedeActiveResponseForUserTurn();
+    if (interruptsForProviderGuidance && this.responseActive)
+      this.cancelResponse(responseId);
+    if (interruptsForProviderGuidance && audioPlaying)
+      this.clearOutputBuffer('provider-guidance');
+    this.emitSessionEvent({ type: 'user-turn-start' });
+    this.userTurnIntent.text(cleanText);
     this.metrics?.userText();
     // New intent: stop any progress line, then start the new turn's timing.
     this.narration?.cancel();
@@ -136,7 +169,10 @@ export class RealtimeTurns {
         content: [{ type: 'input_text', text: cleanText }],
       },
     };
-    this.sendRealtimeEvent(itemEvent, 'client.user_text');
+    if (!this.sendRealtimeEvent(itemEvent, 'client.user_text')) {
+      this.userTurnIntent.invalidate();
+      return false;
+    }
     this.requestUserTextResponse();
   }
 
@@ -206,11 +242,27 @@ export class RealtimeTurns {
     if (!this.dc || this.dc.readyState !== 'open') return;
     this.pendingUserTextResponse = false;
     this.responseCreatePending = true;
+    const eventId = `gev_response_${++this.responseRequestSequence}`;
     const sent = this.sendRealtimeEvent(
-      { type: 'response.create' },
+      { type: 'response.create', event_id: eventId },
       'client.response_create.user_text',
     );
-    if (!sent) this.responseCreatePending = false;
+    if (sent) {
+      this.userTurnIntent.expectResponse(eventId);
+      this.endSessionForReservationOverflow();
+    } else this.responseCreatePending = false;
+  }
+
+  endSessionForReservationOverflow() {
+    const state = this.userTurnIntent.reservationState();
+    if (!state.overflowed) return false;
+    // Dropping FIFO slots while this transport remains live would attribute a
+    // delayed response to a newer input. A fresh explicit start is the boundary
+    // that can safely restore tracking and retire all old provider callbacks.
+    this.debugLog('voice.turn.reservation_overflow', state);
+    this.stop({ preserveStatus: true });
+    this.setStatus('error', 'Voice lost turn tracking. Start voice again.');
+    return true;
   }
 
   ownsConversation(channel) {
@@ -218,12 +270,75 @@ export class RealtimeTurns {
   }
 
   async handleRealtimeEvent(event) {
+    await this.processRealtimeEvent(event);
+  }
+
+  async processRealtimeEvent(event) {
     const eventChannel = this.dc;
     let payload = null;
     try {
       payload = JSON.parse(event.data);
     } catch {
       return;
+    }
+    const progressEvent = this.isProgressEvent(payload);
+    if (!progressEvent) {
+      if (payload.type === 'output_audio_buffer.cleared') {
+        const clearReason = this.outputClearReasons.shift();
+        this.emitSessionEvent({
+          type: 'audio-cleared',
+          responseId: payload.response_id || null,
+          ...(clearReason ? { reason: clearReason } : {}),
+        });
+      }
+    }
+    let responseBinding = null;
+    if (this.ownsConversation(eventChannel) && !this.isSessionEnding()) {
+      if (['session.created', 'session.updated'].includes(payload.type)) {
+        const session = payload.session;
+        const input = session?.audio?.input;
+        // Only an accepted, explicit setting can disable caption gating. A
+        // partial update with absent transcription metadata proves nothing.
+        if (input && Object.hasOwn(input, 'transcription'))
+          this.speechTranscriptionEnabled = input.transcription !== null;
+        else if (session && Object.hasOwn(session, 'input_audio_transcription'))
+          this.speechTranscriptionEnabled =
+            session.input_audio_transcription !== null;
+      }
+      if (payload.type === 'input_audio_buffer.speech_started') {
+        this.emitSessionEvent({ type: 'user-turn-start' });
+        this.userTurnIntent.speechStarted(payload.item_id, {
+          transcriptionEnabled: this.speechTranscriptionEnabled,
+        });
+      }
+      if (payload.type === 'conversation.item.input_audio_transcription.failed')
+        this.userTurnIntent.transcriptionUnavailable(payload.item_id, 'failed');
+      if (
+        payload.type === 'conversation.item.input_audio_transcription.completed'
+      ) {
+        if (this.userTurnIntent.transcript(payload.item_id, payload.transcript))
+          this.emitSessionEvent({
+            type: 'user-input-final',
+            inputKind: 'speech',
+            inputId: payload.item_id,
+            inputScope: 'utterance',
+            text: payload.transcript,
+          });
+      }
+      if (payload.type === 'input_audio_buffer.committed') {
+        this.userTurnIntent.commitSpeech(payload.item_id);
+        if (this.endSessionForReservationOverflow()) return;
+      }
+      if (payload.type === 'response.created' && !progressEvent) {
+        responseBinding = this.userTurnIntent.bindResponse(
+          payload.response?.id,
+        );
+        this.emitSessionEvent({
+          type: 'response-start',
+          responseId: payload.response?.id,
+          userTurn: this.userTurnIntent.forResponse(payload.response?.id),
+        });
+      }
     }
     const sessionEvent = realtimeSessionEvent(payload);
     if (sessionEvent) this.emitSessionEvent(sessionEvent);
@@ -265,6 +380,7 @@ export class RealtimeTurns {
         return;
       }
       if (payload.error?.code === 'conversation_already_has_active_response') {
+        this.userTurnIntent.rejectPendingResponse(echoedId);
         this.cancelRadioHandoff({ abortTools: true });
         this.responseActive = true;
         this.responseCreatePending = false;
@@ -296,6 +412,7 @@ export class RealtimeTurns {
         });
         return;
       }
+      this.userTurnIntent.rejectPendingResponse(echoedId);
       this.responseActive = false;
       this.responseCreatePending = false;
       this.pendingResponseInstructions = null;
@@ -335,6 +452,10 @@ export class RealtimeTurns {
       this.beginPointerTurn?.('speech_start');
     }
     this.updateResponseState(payload);
+    if (payload.type === 'response.created' && responseBinding === 'stale') {
+      this.supersedeActiveResponseForUserTurn();
+      this.cancelResponse(this.activeResponseId);
+    }
     // The spend cap may have just ended the session from inside the usage
     // accounting above. The connection is already closed, so stop here rather
     // than executing tool calls (map side effects) for a session that no longer
@@ -350,7 +471,7 @@ export class RealtimeTurns {
         return;
       }
       // The first response.done closes the tool-call response. Only then may
-      // the queued follow-up speak “Turning on the radio.” Keep the prepared
+      // the queued follow-up say that playback is being prepared. Keep the prepared
       // result pending until that distinct spoken response also completes.
       if (this.pendingResponseInstructions) {
         this.flushPendingResponse();
@@ -414,6 +535,47 @@ export class RealtimeTurns {
       return;
     }
 
+    const responseIntent =
+      await this.userTurnIntent.waitForResponse(toolResponseId);
+    if (!this.ownsConversation(eventChannel) || this.isSessionEnding()) return;
+    if (
+      responseIntent.status !== 'ready' ||
+      !readVoiceUserTurnProvenance(responseIntent.userTurn)
+    ) {
+      this.pruneProcessedCalls();
+      let lastRefusal = null;
+      for (const call of calls) {
+        const keys = callDedupeKeys(call);
+        if (keys.some((key) => this.processedCalls.has(key))) continue;
+        keys.forEach((key) => this.processedCalls.set(key, performance.now()));
+        lastRefusal =
+          responseIntent.status !== 'stale'
+            ? {
+                ok: false,
+                action: call.name,
+                changed: false,
+                voiceIntentUnverified: true,
+                error:
+                  'The final voice transcript was unavailable, so this action was not run.',
+              }
+            : {
+                ok: false,
+                action: call.name,
+                cancelled: true,
+                superseded: true,
+                error:
+                  'Superseded by a newer command from the operator — this call was not run.',
+              };
+        this.sendToolOutput(call.call_id || call.id, lastRefusal);
+      }
+      if (responseIntent.status !== 'stale' && lastRefusal)
+        this.queueResponseCreate(toolResultGuidance(lastRefusal));
+      if (!this.ownsConversation(eventChannel) || this.isSessionEnding())
+        return;
+      this.setStatus('listening', 'Ask or command');
+      return;
+    }
+
     this.setStatus('executing', 'Running command');
     this.pruneProcessedCalls();
     let sentOutput = false;
@@ -432,6 +594,7 @@ export class RealtimeTurns {
       const resultChannel = this.dc;
       let radioHandoffEpochAtStart = this.radio.radioHandoffEpoch;
       let toolController = null;
+      let toolOwnedAtSettlement = true;
       let radioOwnershipClaimed = false;
       let radioReservationToken = null;
       let isRadioFeatureCall = call.name === 'control_radio';
@@ -442,27 +605,13 @@ export class RealtimeTurns {
         this.narration?.preamble();
       try {
         const parsedArguments = parseArguments(call.arguments);
-        const isRadioControlCall = call.name === 'control_radio';
-        const isRadioVisibilityCall =
-          call.name === 'set_layer_visibility' &&
-          parsedArguments.layerId === 'radio';
+        const policy = classifyVoiceTool(call.name, parsedArguments);
+        const isRadioControlCall = policy.radioControl;
+        const isRadioVisibilityCall = policy.radioVisibility;
         isRadioFeatureCall = isRadioControlCall || isRadioVisibilityCall;
-        const radioControlAction = isRadioControlCall
-          ? String(parsedArguments.action || '').toLowerCase()
-          : null;
-        const radioAuthorityDomain =
-          isRadioVisibilityCall ||
-          ['enable', 'disable'].includes(radioControlAction)
-            ? 'visibility'
-            : radioControlAction === 'status'
-              ? 'query'
-              : isRadioControlCall
-                ? 'playback'
-                : null;
-        radioOwnershipClaimed =
-          (isRadioControlCall &&
-            ['disable', 'pause', 'stop'].includes(radioControlAction)) ||
-          (isRadioVisibilityCall && parsedArguments.enabled === false);
+        const radioControlAction = policy.radioAction;
+        const radioAuthorityDomain = policy.authorityDomain;
+        radioOwnershipClaimed = policy.stronger;
         if (radioOwnershipClaimed) {
           // Reserve authority by cancelling unsafe underlying work now, but do
           // not advance the committed handoff epoch until this action reports
@@ -498,15 +647,20 @@ export class RealtimeTurns {
             authorityDomain: radioAuthorityDomain,
           });
         }
+        const userTurn = responseIntent.userTurn;
+        const turnResource = this.turnResourceAbort.signal;
         result = await (this.actionExecutor || this.runner)(
           call.name,
           parsedArguments,
           {
-            signal: toolController.signal,
+            signal: AbortSignal.any([toolController.signal, turnResource]),
             callId: narrationId,
+            responseId: toolResponseId,
+            userTurn,
             progress: (update) => this.narration?.progress(narrationId, update),
             isCurrent: () =>
-              this.activeToolAbortControllers.has(toolController) &&
+              !toolController.signal.aborted &&
+              !turnResource.aborted &&
               !this.userTurnPending &&
               this.dc === resultChannel &&
               resultChannel?.readyState === 'open' &&
@@ -514,8 +668,12 @@ export class RealtimeTurns {
                 radioHandoffEpochAtStart === this.radio.radioHandoffEpoch),
           },
         );
-        if (!this.ownsConversation(eventChannel)) return;
-        if (result?.ok && result.radioPlaybackRequested) {
+        const ownsConversationAfterResult = this.ownsConversation(eventChannel);
+        if (
+          ownsConversationAfterResult &&
+          result?.ok &&
+          result.radioPlaybackRequested
+        ) {
           const sessionIsCurrent =
             this.activeToolAbortControllers.has(toolController) &&
             !this.userTurnPending &&
@@ -568,6 +726,7 @@ export class RealtimeTurns {
             };
           }
         } else if (
+          ownsConversationAfterResult &&
           result?.ok &&
           result.action === 'control_radio' &&
           ['disable', 'pause', 'stop'].includes(result.radioAction)
@@ -587,6 +746,9 @@ export class RealtimeTurns {
           ok: false,
           error: error?.message || 'GEV command failed',
           tool: call.name,
+          ...(call.name === 'set_layer_visibility' && isRadioFeatureCall
+            ? { layerId: 'radio' }
+            : {}),
           ...(isRadioFeatureCall
             ? readLayerLifecycleSummary(this.dataManager, 'radio', {
                 fallbackEnabled: authoritativeRadioState?.enabled,
@@ -595,14 +757,64 @@ export class RealtimeTurns {
         };
       } finally {
         if (toolController) {
-          this.activeToolAbortControllers.delete(toolController);
+          toolOwnedAtSettlement =
+            this.activeToolAbortControllers.delete(toolController);
           this.radio.releaseTool(toolController);
         }
         this.metrics?.toolEnd(toolSpan, result?.ok);
         this.narration?.toolFinished(narrationId);
       }
+      const releaseCancelledReservation = () => {
+        if (!radioReservationToken) return;
+        this.settleRadioToolHandoffReservation(radioReservationToken, {
+          commit: false,
+          responseId: toolResponseId,
+        });
+        radioReservationToken = null;
+      };
       // Rejections also arrive after cancellation; never publish into a new session.
-      if (!this.ownsConversation(eventChannel)) return;
+      if (!this.ownsConversation(eventChannel)) {
+        releaseCancelledReservation();
+        return;
+      }
+      if (toolController && !toolOwnedAtSettlement) {
+        releaseCancelledReservation();
+        // Every emitted function call needs one terminal output or the same
+        // provider session can retain a dangling call. Settle cancellation
+        // silently: never queue a follow-up response, and never let stale work
+        // re-arm Radio playback or reach the operator as a spoken failure.
+        const authoritativeRadioState = isRadioFeatureCall
+          ? this.radioLayer?.getUIState?.() || {}
+          : null;
+        const lifecycleSummary = isRadioFeatureCall
+          ? readLayerLifecycleSummary(this.dataManager, 'radio', {
+              fallbackEnabled: authoritativeRadioState.enabled,
+            })
+          : {};
+        this.sendToolOutput(call.call_id || call.id, {
+          ok: false,
+          action: call.name,
+          tool: call.name,
+          cancelled: true,
+          superseded: true,
+          ...(isRadioFeatureCall
+            ? {
+                radioPlaybackRequested: false,
+                ...(call.name === 'set_layer_visibility'
+                  ? { layerId: 'radio' }
+                  : {}),
+              }
+            : {}),
+          error: 'Superseded by a newer command from the operator',
+          ...lifecycleSummary,
+          ...(isRadioFeatureCall
+            ? {
+                audioState: authoritativeRadioState.audioState || 'stopped',
+              }
+            : {}),
+        });
+        return;
+      }
       if (radioReservationToken && result?.ok) {
         // Successful authority commits before its output is serialized. The
         // sibling abort synchronously restores manager ownership, so report
@@ -613,24 +825,15 @@ export class RealtimeTurns {
           responseId: toolResponseId,
         });
         radioReservationToken = null;
-        const authoritativeRadioState = this.radioLayer?.getUIState?.() || {};
-        const lifecycleSummary = readLayerLifecycleSummary(
-          this.dataManager,
-          'radio',
-          {
-            fallbackEnabled: authoritativeRadioState.enabled ?? result.enabled,
-          },
-        );
-        result = {
-          ...result,
-          ...lifecycleSummary,
-          audioState: authoritativeRadioState.audioState || result.audioState,
-          ...(result.radioAction === 'pause' &&
-          lifecycleSummary.enabled === false
-            ? { changed: false }
-            : {}),
-        };
+        result = reconcileRadioToolResult(result, {
+          dataManager: this.dataManager,
+          radioLayer: this.radioLayer,
+        });
       }
+      result = reconcileRadioToolResult(result, {
+        dataManager: this.dataManager,
+        radioLayer: this.radioLayer,
+      });
       this.debugLog('tool.result', {
         name: call.name,
         callId: call.call_id || call.id || null,
@@ -638,10 +841,7 @@ export class RealtimeTurns {
       });
       lastResult = result;
       stopAfterRadioTool =
-        stopAfterRadioTool ||
-        (shouldStopVoiceAfterRadioTool(result) &&
-          !result.radioPlaybackRequested &&
-          !result.radioPlaybackSuppressed);
+        stopAfterRadioTool || shouldStopVoiceAfterToolResult(result);
       sentOutput =
         this.sendToolOutput(call.call_id || call.id, result) || sentOutput;
       if (radioReservationToken) {
@@ -673,10 +873,9 @@ export class RealtimeTurns {
       // Keep the Radio handoff wording authoritative even when another tool
       // result follows Radio in the same multi-intent response.
       this.queueResponseCreate(
-        responseInstructionForToolResult(
-          this.radio.pendingRadioPlaybackResult || lastResult,
-        ),
+        toolResultGuidance(this.radio.pendingRadioPlaybackResult || lastResult),
       );
+      if (!this.ownsConversation(eventChannel)) return;
     }
     this.setStatus('listening', 'Ask or command');
   }
@@ -731,7 +930,9 @@ export class RealtimeTurns {
       this.assistantAudioPlaying = false;
       // Playback ownership ends here, not at response.done: a line keeps
       // playing after its generation completes.
-      if (progress && (progress.id === responseId || !responseId)) {
+      // This event settles the shared output buffer, which may span a
+      // progress line and its following in-band reply without another start.
+      if (progress) {
         progress.playing = false;
         if (!progress.generating) this.progressResponse = null;
       }
@@ -868,11 +1069,17 @@ export class RealtimeTurns {
     progress.stopped = true;
     if (progress.generating && progress.id) this.cancelResponse(progress.id);
     if (progress.playing) {
-      this.sendBestEffort(
-        { type: 'output_audio_buffer.clear' },
-        'client.output_audio_clear',
-      );
+      this.clearOutputBuffer();
     }
+  }
+
+  clearOutputBuffer(reason = null) {
+    const sent = this.sendBestEffort(
+      { type: 'output_audio_buffer.clear' },
+      'client.output_audio_clear',
+    );
+    if (sent) this.outputClearReasons.push(reason);
+    return sent;
   }
 
   /** Send a client event whose rejection is expected and harmless. */
@@ -916,6 +1123,8 @@ export class RealtimeTurns {
       Boolean(this.progressResponse);
     if (!speaking) return false;
     if (!this.radio.mayVoiceClaimSpeaker()) return false;
+    this.userTurnIntent.invalidate();
+    this.emitSessionEvent({ type: 'interruption', reason: 'push-to-talk' });
     const responseId = this.activeResponseId;
     const audioPlaying = this.assistantAudioPlaying;
     this.narration?.cancel();
@@ -926,10 +1135,7 @@ export class RealtimeTurns {
       this.cancelResponse(responseId);
     }
     if (audioPlaying) {
-      this.sendBestEffort(
-        { type: 'output_audio_buffer.clear' },
-        'client.output_audio_clear',
-      );
+      this.clearOutputBuffer();
     }
     this.debugLog('voice.barge_in', { responseId, audioPlaying });
     return true;
@@ -943,7 +1149,7 @@ export class RealtimeTurns {
         item: {
           type: 'function_call_output',
           call_id: callId,
-          output: JSON.stringify(result),
+          output: JSON.stringify(projectVoiceToolResultForModel(result)),
         },
       },
       'client.function_call_output',
@@ -969,6 +1175,13 @@ export class RealtimeTurns {
       return;
     }
     if (payload.type === 'response.done') {
+      this.userTurnIntent.completeResponse(
+        payload.response?.id || payload.response_id,
+        payload.response?.status === 'completed' &&
+          payload.response?.output?.some(
+            (item) => item.type === 'function_call',
+          ),
+      );
       this.responseActive = false;
       this.responseCreatePending = false;
       this.activeResponseId = null;
@@ -1041,24 +1254,33 @@ export class RealtimeTurns {
     const instructions = this.pendingResponseInstructions;
     this.pendingResponseInstructions = null;
     this.responseCreatePending = true;
+    const eventId = `gev_response_${++this.responseRequestSequence}`;
     const sent = this.sendRealtimeEvent(
       {
         type: 'response.create',
+        event_id: eventId,
         response: { instructions },
       },
       'client.response_create.tool_followup',
     );
-    if (!sent) this.responseCreatePending = false;
+    if (sent) {
+      this.userTurnIntent.expectResponse(eventId);
+      this.endSessionForReservationOverflow();
+    } else this.responseCreatePending = false;
   }
 
   abortTools() {
     for (const controller of this.activeToolAbortControllers)
       controller.abort();
     this.activeToolAbortControllers.clear();
+    this.turnResourceAbort.abort();
+    this.turnResourceAbort = new AbortController();
     this.radio.clearTools();
   }
 
   reset() {
+    this.userTurnIntent.reset();
+    this.speechTranscriptionEnabled = true;
     this.processedCalls.clear();
     this.responseActive = false;
     this.responseCreatePending = false;
@@ -1073,5 +1295,6 @@ export class RealtimeTurns {
     this.progressResponse = null;
     this.progressResponseIds.clear();
     this.bestEffortEventIds.clear();
+    this.outputClearReasons.length = 0;
   }
 }
