@@ -1055,5 +1055,6 @@
   "src/ui/flyToDataSource.js",
   "src/ui/flyToDataSource.test.mjs",
   "scripts/assemble-changelog.mjs",
-  "src/tooling/changelogFragments.test.mjs"
+  "src/tooling/changelogFragments.test.mjs",
+  "src/data/gbfsProxyRateLimit.test.mjs"
 ]
