@@ -119,7 +119,7 @@ export function createSceneSharing(director) {
           {
             scene: pack.scene,
             pack: pack.id,
-            status: pack.status,
+            status: t(pack.status),
             path: pack.path,
             attribution: pack.attribution.text,
             license: pack.attribution.license,

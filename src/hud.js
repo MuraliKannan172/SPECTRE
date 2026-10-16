@@ -18,6 +18,7 @@ import * as Cesium from 'cesium';
 import { forward as toMGRS } from 'mgrs';
 import { CITY_POIS } from './locations.js';
 import { composeLocalityTag } from './hudLocality.js';
+import { hudQuantity, LOCALIZED_LOCALITY } from './hudLocalityFormat.js';
 import {
   ellipsoidalToMslDisplayM,
   ensureGeoidReady,
@@ -35,10 +36,8 @@ import {
   DEFAULT_HUD_LAYOUT,
   normalizeHudLayout,
 } from './hudLayouts.js';
-import { formatNumber, getLocale, msg, t } from './i18n/index.js';
-import { unitLabel } from './ui/unitLabels.js';
+import { formatNumber, msg, t } from './i18n/index.js';
 import { localizeLayerName } from './ui/layerPanel.js';
-import { localizePlaceName } from './ui/placeNames.js';
 
 /** Color palettes keyed by shader mode; applied as CSS custom properties. */
 const HUD_COLORS = {
@@ -137,38 +136,6 @@ function viewBandLabel(band) {
       return t('GLOBAL', { context: 'view band' });
   }
 }
-
-/** An upper-case HUD quantity such as `13KM` / `13КМ`, in the active language. */
-function hudQuantity(value, unit, digits = 0) {
-  const number = formatNumber(value, {
-    useGrouping: false,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-  return `${number}${unitLabel(unit).toUpperCase()}`;
-}
-
-/** One hemisphere-tagged coordinate, e.g. `21.33N` / `21,33С`. */
-function hudCoordinate(value, positive, negative) {
-  return `${hudQuantity(Math.abs(value), '', 2)}${value >= 0 ? positive : negative}`;
-}
-
-/** The summary's locality line in the active language (see hudLocality.js). */
-const LOCALIZED_LOCALITY = Object.freeze({
-  // Translate the catalogued name (`Tokyo`), then upper-case it in the page's
-  // language: the place-name table knows `Tokyo`, not `TOKYO`.
-  near: ({ poi, city, distKm }) =>
-    t('NEAR {poi} ({city}) {distance}', {
-      poi: poi.toLocaleUpperCase(getLocale()),
-      city: localizePlaceName(city).toLocaleUpperCase(getLocale()),
-      distance: hudQuantity(Math.round(distKm), 'km'),
-    }),
-  sector: ({ latDeg, lonDeg }) =>
-    t('SECTOR {lat} {lon}', {
-      lat: hudCoordinate(latDeg, t('N'), t('S')),
-      lon: hudCoordinate(lonDeg, t('E'), t('W')),
-    }),
-});
 
 /** Shader modes that automatically show the HUD overlay. */
 const MILITARY_STYLES = new Set(['retro', 'surveillance', 'thermal']);

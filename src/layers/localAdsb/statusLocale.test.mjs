@@ -1,6 +1,6 @@
-// N-10: the Local ADS-B row's working texts ("3 heard · 5.8 msg/s",
-// "2 feeds live · 14 heard", "listening", "USB error", feed problems) have no
-// catalog entries and stay English in es/ru. Place: src/layers/localAdsb/statusLocale.test.mjs
+// The Local ADS-B row's working texts ("3 heard · 5.8 msg/s",
+// "2 feeds live · 14 heard", "listening", "USB error", feed problems) read in
+// the UI language.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setLocale } from '../../i18n/index.js';

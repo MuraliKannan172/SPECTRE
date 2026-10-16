@@ -278,9 +278,10 @@ export function createQueries({ state, parts }) {
           : {}),
         degraded: count > 0 && health.degraded,
         loading: health.loading && count === 0,
-        // English data; the panel shows it through LOADING_LABEL_PATTERNS
-        // (ui/layerPanel.js).
+        // English data; the panel shows it through STATUS_PIECE_PATTERNS
+        // (ui/statusText.js).
         loadingLabel:
+          // i18n-ignore: translated on display
           health.loading && count === 0
             ? `Loading ${active.map((feed) => feed.name).join(', ')}`
             : undefined,

@@ -217,8 +217,14 @@ const JS_SINKS = [
   /\bsetAttribute\(\s*['"](?:title|aria-label|aria-valuetext|placeholder|alt)['"]\s*,\s*/g,
   /\b(?:createTextNode|insertAdjacentText)\(\s*(?:['"][a-z]+['"]\s*,\s*)?/g,
   /\binsertAdjacentHTML\(\s*['"][a-z]+['"]\s*,\s*/g,
-  /\b(?:showToast|toast|setHint|announce|say)\(\s*/g,
-  /(?:^|[{,\s])(?:label|title|tooltip|placeholder|hint|ariaLabel|accessibilityLabel|caption|subtitle|kicker|emptyText|blurb|countLabel)\s*:\s*/gm,
+  // Also showToast?.(…) and this._showToast(…).
+  /\b_?(?:showToast|toast|setHint|announce|say)(?:\?\.)?\(\s*/g,
+  // `status` values are often codes ('ok', 'auth-failed'); visibleText drops
+  // those, so only readable text is reported.
+  /(?:^|[{,\s])(?:label|title|tooltip|placeholder|hint|ariaLabel|accessibilityLabel|caption|subtitle|kicker|emptyText|blurb|countLabel|status|loadingLabel|statusMessage)\s*:\s*/gm,
+  // Layer status set by assignment: this._error = …, stats.loadingLabel = ….
+  // A declared local (`const error = …`) is scratch, not a status field.
+  /(?<![\w$])(?<!\b(?:const|let|var)\s+)_?(?:error|loadingLabel|statusMessage|status)\s*(?:\?\?|\|\|)?=(?![=>])\s*/g,
 ];
 const MARKERS = /\b(?:t|tn|msg)\(/y;
 

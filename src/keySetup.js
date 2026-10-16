@@ -389,14 +389,9 @@ export async function initKeySetup({
   // A pasted key lives only in its field until Save: switching language (a
   // reload) asks first while any field holds one.
   const unregisterUnsavedWork = registerUnsavedWork(() =>
-    !disposed &&
-    Object.keys(
-      collectKeyUpdates(
-        [...(root.querySelectorAll?.('input[data-env-var]') || [])].map(
-          (input) => ({ envVar: input.dataset?.envVar, value: input.value }),
-        ),
-      ),
-    ).length
+    [...(root.querySelectorAll?.('input[data-env-var]') || [])].some((input) =>
+      String(input.value ?? '').trim(),
+    )
       ? msg('unsaved provider keys')
       : null,
   );

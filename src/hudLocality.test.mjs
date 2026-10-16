@@ -6,6 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { composeLocalityTag, NEAR_POI_MAX_KM } from './hudLocality.js';
+import { LOCALIZED_LOCALITY } from './hudLocalityFormat.js';
+import { setLocale } from './i18n/index.js';
 
 const ALCATRAZ = { poi: 'Alcatraz Island', city: 'San Francisco' };
 const LINCOLN = { poi: 'Lincoln Memorial', city: 'Washington DC' };
@@ -123,7 +125,7 @@ test('a missing or malformed nearest POI never crashes the summary', () => {
 });
 
 // The names reach a formatter as catalogued, so the HUD can translate the
-// city before upper-casing it (N-04: `TOKYO` never matched the `Tokyo` key).
+// city before upper-casing it: the place-name table knows `Tokyo`, not `TOKYO`.
 test('a formatter builds the line from the same parts', () => {
   const format = {
     near: ({ poi, city, distKm }) => `near:${poi}|${city}|${distKm}`,
@@ -137,4 +139,21 @@ test('a formatter builds the line from the same parts', () => {
     composeLocalityTag(null, 21.3, -157.8, format),
     'sector:21.3|-157.8',
   );
+});
+
+test('the HUD formatter translates the catalogued city, then upper-cases it', () => {
+  const tokyo = { poi: 'Tokyo Tower', city: 'Tokyo', distKm: 2 };
+  assert.equal(
+    composeLocalityTag(tokyo, 35.66, 139.75, LOCALIZED_LOCALITY),
+    'NEAR TOKYO TOWER (TOKYO) 2KM',
+  );
+  setLocale('ru');
+  try {
+    assert.match(
+      composeLocalityTag(tokyo, 35.66, 139.75, LOCALIZED_LOCALITY),
+      /\(ТОКИО\)/,
+    );
+  } finally {
+    setLocale('en');
+  }
 });

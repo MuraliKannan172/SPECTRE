@@ -91,6 +91,7 @@ export function createWindLayer({
       model: model === 'ifs' ? 'ECMWF' : 'GFS',
       validTime:
         formatWindValidTime(manifest?.cycle?.validIso) || 'Unavailable',
+      // i18n-ignore: English reading for AI tools; the card status uses t()
       status: loading
         ? 'Loading forecast'
         : error ||

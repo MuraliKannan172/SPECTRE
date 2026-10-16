@@ -1,8 +1,7 @@
-// Shell toasts, prompts and launcher labels that reach the page through
-// `showToast?.(`, `this._showToast(`, `window.prompt/confirm` or a constant
-// are invisible to the unmarked-text checker, so pin them here: marked in the
-// code, present in every shipped catalog, and no bare literal left at the
-// call sites.
+// Shell toasts, prompts and launcher labels: pin that they are marked in the
+// code, present in every shipped catalog, and that no bare literal is left at
+// the call sites (`window.prompt/confirm` and constants are invisible to the
+// unmarked-text checker).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -27,7 +26,6 @@ const KEYS = [
   'Exit cockpit to fly to a location',
   'Exit cockpit to fly to a photo',
   'Exit cockpit to fly to a shared view',
-  'Exit cockpit to fly to a {noun}',
   'Go to expanded Radio section',
   'Expand Radio section in Context',
   'Double-click the header to snap the panel back',
@@ -84,12 +82,10 @@ test('the Cockpit refusal keeps its English wording per noun', () => {
     cockpitActive: true,
     showToast,
   });
-  runExplicitNavigation({ cockpitActive: true, noun: 'contact', showToast });
   assert.deepEqual(log, [
     'Exit cockpit to fly to a camera',
     'Exit cockpit to fly to a location',
     'Exit cockpit to fly to a location',
-    'Exit cockpit to fly to a contact',
   ]);
 });
 

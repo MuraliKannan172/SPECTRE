@@ -7,7 +7,8 @@ import test from 'node:test';
 import { setLocale } from '../i18n/index.js';
 import { GEV_ACTION_SCHEMAS } from './actionSchemas.js';
 import { presentResult, shownSnapshotTime } from './resultDisplay.js';
-import { attachVoiceResult, planStepLabel } from './speech.js';
+import { CITY_POIS } from '../cityPois.js';
+import { attachVoiceResult, narrationLabel, planStepLabel } from './speech.js';
 import {
   initialVoiceCardState,
   reduceVoiceCard,
@@ -243,4 +244,42 @@ test('C12: the analyst scope names Los Angeles in the UI language', () => {
   );
   assert.match(title, /Los Ángeles$/, 'the headline is not cut at 64');
   assert.equal(result.scopeLabel, 'within 40 km of Los Angeles');
+});
+
+// A preset city id from the tool schema (sf, nyc, dc) reads as its city name.
+test('a preset city id names the city in plan steps and narration', () => {
+  const step = (id, action = 'fly_to_location') =>
+    planStepLabel(action, { locationId: id });
+  assert.equal(step('sf'), 'Fly to San Francisco');
+  assert.equal(
+    narrationLabel('fly_to_location', { locationId: 'dc' }),
+    'Washington DC',
+  );
+  assert.equal(
+    planStepLabel('fly_to_location', { query: 'Ulaanbaatar' }),
+    'Fly to Ulaanbaatar',
+    'other places are shown as given',
+  );
+  inLocale('es', () => {
+    assert.equal(step('tokyo'), 'Volar a Tokio');
+    assert.equal(step('nyc'), 'Volar a Nueva York');
+    for (const id of ['sf', 'nyc', 'dc'])
+      assert.doesNotMatch(step(id), /\b(Sf|Nyc|Dc)$/, id);
+  });
+  inLocale('ru', () => {
+    assert.match(step('dc', 'select_nearest_aircraft'), /Вашингтон/);
+  });
+});
+
+test('every locationId the voice tools accept is a preset city', () => {
+  const ids = new Set();
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node.locationId?.enum))
+      node.locationId.enum.forEach((id) => ids.add(id));
+    Object.values(node).forEach(visit);
+  };
+  visit(GEV_ACTION_SCHEMAS);
+  assert.ok(ids.size > 0, 'found the locationId enums');
+  for (const id of ids) assert.ok(Object.hasOwn(CITY_POIS, id), id);
 });

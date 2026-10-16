@@ -5,7 +5,13 @@
 // catalog entry, not only the default one.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setLocale } from '../i18n/index.js';
+import { setLocale, t } from '../i18n/index.js';
+import {
+  aggregateLayerLoading,
+  createLoadingFeedbackState,
+  presentLoadingFeedback,
+  reduceLoadingFeedback,
+} from '../loadingFeedback.js';
 
 const elements = {
   'global-loading-status': { hidden: true, dataset: {} },
@@ -106,5 +112,31 @@ for (const locale of ['es', 'ru']) {
     });
     assert.equal(localized.label, 'HTTP 503 FROM OVERPASS-API.DE');
     assert.notEqual(localized.detail, 'retry pending');
+  });
+
+  // An incomplete Overpass answer (alpr/source.js) on the ALPR retry chip,
+  // which shows the layer's error upper-cased.
+  test(`${locale}: the ALPR retry chip translates an incomplete Overpass answer`, () => {
+    setLocale(locale);
+    const error = 'Overpass returned an incomplete camera response';
+    assert.notEqual(t(error), error, 'the catalog has the entry');
+    const now = Date.now();
+    const layer = {
+      id: 'alpr-cameras',
+      name: 'ALPR cameras',
+      enabled: true,
+      stats: { status: 'unavailable', error, retryAt: now + 12000 },
+    };
+    const summary = aggregateLayerLoading([layer]);
+    const state = reduceLoadingFeedback(
+      createLoadingFeedbackState(),
+      summary,
+      now,
+    );
+    const shown = localizeLoadingPresentation(
+      presentLoadingFeedback(state, summary, now),
+    );
+    assert.equal(shown.state, 'retry', 'the ALPR retry chip is up');
+    assert.equal(shown.label, t(error).toLocaleUpperCase(locale));
   });
 }

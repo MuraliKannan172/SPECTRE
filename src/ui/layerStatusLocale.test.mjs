@@ -1,6 +1,5 @@
-// N-03: layer status texts produced without msg()/catalog entries (GNSS,
-// Transit, CelesTrak, AQHI) stay English in the es/ru DATA LAYERS row.
-// Place: src/ui/layerStatusLocale.test.mjs
+// The DATA LAYERS row shows the English status texts that GNSS, Transit,
+// CelesTrak and AQHI produce in the UI language.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setLocale } from '../i18n/index.js';

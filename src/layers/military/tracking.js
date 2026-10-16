@@ -125,6 +125,7 @@ export function createTracking({
         icao24,
         // Honesty cue: the contact is coasting on dead reckoning, so the
         // narrated position/velocity are last-known rather than live.
+        // i18n-ignore: voice-context data, English for the model
         status: described.stale ? 'stale (missed polls)' : 'live',
       },
     };

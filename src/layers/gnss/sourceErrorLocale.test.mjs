@@ -1,4 +1,4 @@
-// N-03: the GNSS source's own failures are English data (source.js); the
+// The GNSS source's own failures are English data (source.js); the
 // card's info line shows them in the UI language, the HTTP form included.
 import assert from 'node:assert/strict';
 import test from 'node:test';

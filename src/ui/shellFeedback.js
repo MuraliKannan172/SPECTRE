@@ -10,7 +10,8 @@ import {
 } from '../loadingFeedback.js';
 import { setSplitFlapText, disposeSplitFlap } from '../splitFlap.js';
 import { getLocale, t, msg } from '../i18n/index.js';
-import { localizeLayerName, translateFeedError } from './layerPanel.js';
+import { localizeLayerName } from './layerPanel.js';
+import { translateFeedError } from './statusText.js';
 
 // loadingFeedback.js composes the shared status copy inside the portable
 // node/browser graph (the server-side HUD summary reads the same modules), so
@@ -56,6 +57,7 @@ const CHIP_ERROR_KEYS = new Map(
     msg('Vector tile request timed out'),
     msg('Camera coverage unavailable'),
     msg('Camera source temporarily unavailable'),
+    msg('Overpass returned an incomplete camera response'),
   ].map((key) => [key.toUpperCase(), key]),
 );
 const CHIP_TILE_HTTP_RE = /^VECTOR TILES UNAVAILABLE \(HTTP (\d+)\)$/;

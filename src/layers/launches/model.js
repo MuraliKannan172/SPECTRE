@@ -192,6 +192,7 @@ export function createModel({ state: layerState, services, parts, source }) {
             launch.id || launch.slug || launch.name || `launch-${date}`,
           ),
           name: launch.name || 'Unnamed launch',
+          // i18n-ignore: Launch Library status names are provider data, shown as sent
           status: launch.status?.name || 'Unknown',
           launchTime: Number.isFinite(date)
             ? new Date(date).toISOString()

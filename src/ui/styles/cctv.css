@@ -79,8 +79,8 @@ html[lang='es'] .cctv-controls {
 }
 
 /* A translated label longer than its button wraps inside the button instead
-   of running past the panel edge. English keeps its one-line buttons (unguarded,
-   this rule broke AUTO HOP OFF onto two lines). */
+   of running past the panel edge. English is excluded so its labels (AUTO HOP
+   OFF) stay on one line. */
 html:not([lang='en']) .cctv-controls .scene-btn {
   white-space: normal;
   overflow-wrap: break-word;

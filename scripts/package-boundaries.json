@@ -469,7 +469,8 @@
       "src/i18n/locales/es.json",
       "src/i18n/locales/ru.json",
       "src/ui/unitLabels.js",
-      "src/ui/keyGuidance.js"
+      "src/ui/keyGuidance.js",
+      "src/ui/statusText.js"
     ],
     "external": []
   },
@@ -737,7 +738,8 @@
       "src/i18n/locales/ru.json",
       "src/ui/unitLabels.js",
       "src/ui/keyGuidance.js",
-      "src/ui/layerNames.js"
+      "src/ui/layerNames.js",
+      "src/ui/statusText.js"
     ],
     "external": ["cesium"]
   },
@@ -1570,6 +1572,7 @@
       "src/voice/referents.js",
       "src/voice/layerManifest.js",
       "src/voice/speech.js",
+      "src/cityPois.js",
       "src/ui/layerNames.js",
       "src/ui/unitLabels.js",
       "src/ui/placeNames.js",
@@ -1580,7 +1583,8 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/statusText.js"
     ],
     "external": []
   },
@@ -1794,6 +1798,7 @@
       "src/firstRunExperience.js",
       "src/hud.js",
       "src/hudLocality.js",
+      "src/hudLocalityFormat.js",
       "src/hudSummaryResponse.js",
       "src/keySetup.js",
       "src/keySetupCore.mjs",
@@ -2020,6 +2025,7 @@
       "src/loadingFeedback.js",
       "src/locationStatus.js",
       "src/locations.js",
+      "src/cityPois.js",
       "src/logoGaze.js",
       "src/mapStackChips.js",
       "src/mapStackController.js",
@@ -2436,7 +2442,8 @@
       "src/app/layers/airQuality.js",
       "src/layers/airQuality/index.js",
       "src/layers/airQuality/model.js",
-      "src/layers/airQuality/source.js"
+      "src/layers/airQuality/source.js",
+      "src/ui/statusText.js"
     ],
     "external": [
       "hls.js",
@@ -2792,6 +2799,7 @@
       "src/layers/vessels/testing.js",
       "src/layers/vessels/tracking.js",
       "src/locations.js",
+      "src/cityPois.js",
       "src/navigationPolicy.js",
       "src/overlays/worldOverlay.js",
       "src/overlays/worldOverlayDraw.js",
@@ -3000,7 +3008,11 @@
       "src/app/layers/airQuality.js",
       "src/layers/airQuality/index.js",
       "src/layers/airQuality/model.js",
-      "src/layers/airQuality/source.js"
+      "src/layers/airQuality/source.js",
+      "src/ui/statusText.js",
+      "src/ui/layerNames.js",
+      "src/layers/wind/source.js",
+      "src/sources/windBody.js"
     ],
     "external": [
       "hls.js",
@@ -3039,6 +3051,7 @@
       "src/keylessGeocoder.js",
       "src/layers/firms/anchors.js",
       "src/locations.js",
+      "src/cityPois.js",
       "src/cameraGroundGuard.js",
       "src/search/alpsGeocoder.js",
       "src/search/defaults.js",
@@ -3299,13 +3312,15 @@
       "src/voice/referents.js",
       "src/voice/layerManifest.js",
       "src/voice/speech.js",
+      "src/cityPois.js",
       "src/ui/layerNames.js",
       "src/ui/unitLabels.js",
       "src/voice/pointerReticle.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/statusText.js"
     ],
     "external": []
   },
@@ -3647,7 +3662,9 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/statusText.js",
+      "src/ui/layerNames.js"
     ],
     "external": ["cesium"]
   },
@@ -3825,7 +3842,9 @@
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",
-      "src/i18n/locales/ru.json"
+      "src/i18n/locales/ru.json",
+      "src/ui/statusText.js",
+      "src/ui/layerNames.js"
     ],
     "external": ["cesium"]
   },

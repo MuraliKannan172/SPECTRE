@@ -477,7 +477,7 @@ export function createIngestion({ state, services, parts, source }) {
           error?.message || error,
         );
         // English data; the panel shows it through FEED_ERROR_PATTERNS
-        // (ui/layerPanel.js).
+        // i18n-ignore: translated on display (ui/statusText.js)
         status.error = `${feed.name} feed unavailable`;
         status.retryInSec = Number.isFinite(error?.retryInSec)
           ? error.retryInSec

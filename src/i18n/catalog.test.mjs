@@ -136,3 +136,78 @@ test('unmarkedScript finds literals that reach the page without t/tn/msg', () =>
     [],
   );
 });
+
+test('unmarkedScript sees toasts behind optional calls and private helpers', () => {
+  const texts = (js) => unmarkedScript('f.js', js).map((f) => f.text);
+  assert.deepEqual(texts("showToast?.('North up');"), ['North up']);
+  assert.deepEqual(texts("this._showToast('Search failed');"), [
+    'Search failed',
+  ]);
+  assert.deepEqual(texts("this.showToast('Link copied');"), ['Link copied']);
+  assert.deepEqual(texts("this.actions.showToast?.('Tilted view');"), [
+    'Tilted view',
+  ]);
+  assert.deepEqual(texts("showToast?.(t('North up'));"), []);
+  assert.deepEqual(texts("this._showToast(t('Search failed'));"), []);
+});
+
+test('unmarkedScript sees status text assigned to layer errors and labels', () => {
+  const texts = (js) => unmarkedScript('f.js', js).map((f) => f.text);
+  assert.deepEqual(texts("layerState._error = 'live feed unavailable';"), [
+    'live feed unavailable',
+  ]);
+  assert.deepEqual(
+    texts("this._error = err?.message || 'TeleGeography load failed';"),
+    ['TeleGeography load failed'],
+  );
+  assert.deepEqual(texts("_error = 'Route request failed';"), [
+    'Route request failed',
+  ]);
+  assert.deepEqual(texts("error ??= 'Feed closed';"), ['Feed closed']);
+  assert.deepEqual(texts('stats.error = `${name} fetch error`;'), [
+    'fetch error',
+  ]);
+  assert.deepEqual(texts("loadingLabel = 'loading coverage...';"), [
+    'loading coverage...',
+  ]);
+  assert.deepEqual(texts("state._loadingLabel = 'Loading cables';"), [
+    'Loading cables',
+  ]);
+  assert.deepEqual(texts("stats.statusMessage = 'Add a key in Settings';"), [
+    'Add a key in Settings',
+  ]);
+  assert.deepEqual(texts("this.status = 'Scene not saved';"), [
+    'Scene not saved',
+  ]);
+  assert.deepEqual(
+    texts("layerState._error = msg('live feed unavailable');"),
+    [],
+  );
+  assert.deepEqual(texts("stats.error = t('GBFS fetch error');"), []);
+  // Machine values, comparisons and local scratch variables are not UI text.
+  assert.deepEqual(texts("status = 'missing-key';"), []);
+  assert.deepEqual(texts("if (error === 'Feed closed') stop();"), []);
+  assert.deepEqual(texts("const error = log() || 'Unknown shader error';"), []);
+  assert.deepEqual(texts('stats.error = new Error(`HTTP ${code}`);'), []);
+});
+
+test('unmarkedScript sees human-readable status, loadingLabel and statusMessage fields', () => {
+  const texts = (js) => unmarkedScript('f.js', js).map((f) => f.text);
+  assert.deepEqual(
+    texts("return { status: 'Scene not saved — storage unavailable' };"),
+    ['Scene not saved — storage unavailable'],
+  );
+  assert.deepEqual(
+    texts("return { status: ok ? 'Ready' : 'Source unavailable' };"),
+    ['Ready', 'Source unavailable'],
+  );
+  assert.deepEqual(texts("return { loadingLabel: 'Loading feeds' };"), [
+    'Loading feeds',
+  ]);
+  assert.deepEqual(texts("return { statusMessage: 'connect a receiver' };"), [
+    'connect a receiver',
+  ]);
+  assert.deepEqual(texts("return { status: 'streaming', code: 'ok' };"), []);
+  assert.deepEqual(texts("return { status: 'auth-failed' };"), []);
+  assert.deepEqual(texts("return { status: msg('Source unavailable') };"), []);
+});

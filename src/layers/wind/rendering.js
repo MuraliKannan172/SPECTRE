@@ -7,6 +7,7 @@ import { orderWeatherImagery } from '../weather/imageryOrder.js';
 import { NO_IMAGERY_HOST } from '../weather/imageryHost.js';
 import { msg } from '../../i18n/index.js';
 import { createWindGpuRendering } from './gpuRendering.js';
+import { SCALAR_UNAVAILABLE } from './source.js';
 import { advectParticle, sampleWind } from './model.js';
 import {
   createFieldRaster,
@@ -16,16 +17,17 @@ import {
 
 // A scalar overlay that cannot be drawn, in English for diagnostics; the
 // panel status shows it translated (index.js). The scalar texts are the ones
-// the source reports (source.js).
+// the source reports. setOptions only accepts these overlays.
 const FIELD_UNAVAILABLE = Object.freeze({
   speed: msg('Wind speed field unavailable'),
-  temperature: msg('Temperature field unavailable'),
-  pressure: msg('Mean sea level pressure field unavailable'),
+  ...SCALAR_UNAVAILABLE,
 });
 
 /** English status for a scalar overlay with no drawable field. */
 export function fieldUnavailableText(overlay) {
-  return FIELD_UNAVAILABLE[overlay] || `${overlay} field unavailable`;
+  return Object.hasOwn(FIELD_UNAVAILABLE, overlay)
+    ? FIELD_UNAVAILABLE[overlay]
+    : null;
 }
 const WIND_FIELD_FADE_HIGH_METERS = 1_200_000;
 const WIND_FIELD_FADE_LOW_METERS = 200_000;

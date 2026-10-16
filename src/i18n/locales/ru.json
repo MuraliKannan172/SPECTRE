@@ -2481,7 +2481,6 @@
   "Exit cockpit to fly to a route": "Выйдите из кабины, чтобы перелететь к маршруту",
   "Exit cockpit to fly to a file": "Выйдите из кабины, чтобы перелететь к файлу",
   "Exit cockpit to fly to a scene": "Выйдите из кабины, чтобы перелететь к сцене",
-  "Exit cockpit to fly to a {noun}": "Выйдите из кабины, чтобы перелететь: {noun}",
   "Go to expanded Radio section": "Перейти к развёрнутому разделу радио",
   "Expand Radio section in Context": "Развернуть раздел «Радио» в панели «Контекст»",
   "Double-click the header to snap the panel back": "Двойной щелчок по заголовку — вернуть панель на место",
@@ -2944,5 +2943,12 @@
   "unsaved provider keys": "несохранённые ключи провайдеров",
   "Exit cockpit to fly to an aircraft": "Выйдите из кабины, чтобы перелететь к самолёту",
   "Exit cockpit to fly to a satellite": "Выйдите из кабины, чтобы перелететь к спутнику",
-  "Exit cockpit to frame contacts": "Выйдите из кабины, чтобы показать контакты в кадре"
+  "Exit cockpit to frame contacts": "Выйдите из кабины, чтобы показать контакты в кадре",
+  "{feed} {count} ({seconds}s old)": "{feed} {count} ({seconds} с назад)",
+  "entry {n}": "№ {n}",
+  "Upstream response too large": "Слишком большой ответ источника",
+  "Included in bundle": "Входит в архив",
+  "Missing bundle file — reimport its bundle": "Файла нет в архиве — импортируйте этот архив снова",
+  "Source configured; file checked when loaded": "Источник настроен; файл будет проверен при загрузке",
+  "Source unavailable": "Источник недоступен"
 }

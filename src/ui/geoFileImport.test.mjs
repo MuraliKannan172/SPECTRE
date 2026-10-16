@@ -714,10 +714,6 @@ test('KML and KMZ rows say they keep their own styles instead of showing a color
   assert.ok(gpx.children[0].style.background);
 });
 
-// N-08: tn() replaces values.count with the raw number, so the
-// formatNumber(...) passed by the import list is lost: "12345 map objects"
-// (main: "12,345"). Append to src/ui/geoFileImport.test.mjs (uses its setup(),
-// file(), rows() helpers).
 test('the map-object count in a row title keeps digit grouping', async () => {
   const t = setup({
     load: async (f) => ({

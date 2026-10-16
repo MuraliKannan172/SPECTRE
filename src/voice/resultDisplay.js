@@ -28,6 +28,7 @@ import {
 } from '../i18n/index.js';
 import { layerNameForId, sourceLabel } from '../ui/layerNames.js';
 import { localizePlaceName } from '../ui/placeNames.js';
+import { translateStatusLine } from '../ui/statusText.js';
 import { formatQuantity } from '../ui/unitLabels.js';
 
 const LAYER_NOUNS = Object.freeze({
@@ -372,7 +373,10 @@ function shownNote(text) {
     const shown = match ? show(match) : null;
     if (shown) return shown;
   }
-  return translateKnown(text);
+  // A layer's empty note can be its status line, English pieces joined by
+  // " · " ("feeds 1090, 978 stale · 0 heard", "TTC 0 (95s old)").
+  const known = translateKnown(text);
+  return known !== text ? known : translateStatusLine(text);
 }
 
 /** Feed states as the card's chips show them; the values stay English. */

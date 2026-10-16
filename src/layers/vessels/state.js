@@ -69,7 +69,6 @@ export function createVesselState({ source, services }) {
     /** Sprites whose animated emphasis remains outside the 1.0 deadband. */
     activeFocusCount: 0,
     activeLabelCount: 0,
-    /** @type {Set<Object>} Records that have an ambient card this pass. */
     selectedRecord: null,
     /** @type {{setPositions: Function, clear: Function, destroy: Function}|null} Selected-vessel fading trail */
     trail: null,

@@ -2440,7 +2440,6 @@
   "Exit cockpit to fly to a route": "Sal de la cabina para volar a una ruta",
   "Exit cockpit to fly to a file": "Sal de la cabina para volar a un archivo",
   "Exit cockpit to fly to a scene": "Sal de la cabina para volar a una escena",
-  "Exit cockpit to fly to a {noun}": "Sal de la cabina para volar a {noun}",
   "Go to expanded Radio section": "Ir a la sección de Radio expandida",
   "Expand Radio section in Context": "Expandir la sección de Radio en Contexto",
   "Double-click the header to snap the panel back": "Haz doble clic en el encabezado para devolver el panel a su sitio",
@@ -2877,5 +2876,12 @@
   "unsaved provider keys": "las claves de proveedores sin guardar",
   "Exit cockpit to fly to an aircraft": "Sal de la cabina para volar a una aeronave",
   "Exit cockpit to fly to a satellite": "Sal de la cabina para volar a un satélite",
-  "Exit cockpit to frame contacts": "Sal de la cabina para encuadrar contactos"
+  "Exit cockpit to frame contacts": "Sal de la cabina para encuadrar contactos",
+  "{feed} {count} ({seconds}s old)": "{feed} {count} (hace {seconds} s)",
+  "entry {n}": "n.º {n}",
+  "Upstream response too large": "Respuesta del origen demasiado grande",
+  "Included in bundle": "Incluido en el paquete",
+  "Missing bundle file — reimport its bundle": "Falta el archivo en el paquete — vuelve a importar su paquete",
+  "Source configured; file checked when loaded": "Fuente configurada; el archivo se comprobará al cargarlo",
+  "Source unavailable": "Fuente no disponible"
 }

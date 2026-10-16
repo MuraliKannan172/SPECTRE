@@ -1,6 +1,5 @@
-// N-07: the analyst card shows a layer's "empty" note from getStats().coverage
-// as is; Transit's notes are English template strings with no catalog entry,
-// so the es/ru card note stays English. Place: src/voice/analystTransitNote.test.mjs
+// The analyst card shows a layer's "empty" note (Transit's English
+// getStats().coverage text) in the UI language.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setLocale } from '../i18n/index.js';

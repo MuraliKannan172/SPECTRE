@@ -1,11 +1,11 @@
-// N-02: the Air quality layer (merged from main, AQHI) is fully English in
-// es/ru: layer name, Weather card (title, coverage, status, legend, risk) and
-// its own failure text. Place: src/layers/airQuality/airQualityLocale.test.mjs
+// The Air quality layer (AQHI) reads in the UI language: layer name, Weather
+// card (title, coverage, status, legend, risk) and its own failure text.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setLocale, t } from '../../i18n/index.js';
 import { layerNameForId, localizeLayerName } from '../../ui/layerNames.js';
 import { LayerPanel } from '../../ui/layerPanel.js';
+import { translateFeedError } from '../../ui/statusText.js';
 import { createAirQualityLayer } from './index.js';
 
 function inLocale(locale, run) {
@@ -87,5 +87,22 @@ for (const locale of ['es', 'ru']) {
       }),
     );
     assert.ok(!row.includes('Air quality request failed'), row);
+  });
+}
+
+for (const locale of ['en', 'es', 'ru']) {
+  test(`${locale}: the Weather card shows an HTTP failure as the row does`, async () => {
+    const layer = harness({
+      getSnapshot: async () => {
+        throw new Error('ECCC HTTP 503');
+      },
+    });
+    await layer.update();
+    const card = inLocale(locale, () => layer.getRowControls().summary.status);
+    assert.equal(
+      card,
+      inLocale(locale, () => translateFeedError('ECCC HTTP 503')),
+    );
+    assert.equal(card, locale === 'en' ? 'ECCC HTTP 503' : 'ECCC: HTTP 503');
   });
 }

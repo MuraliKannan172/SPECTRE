@@ -1,7 +1,5 @@
-// N-06: voice frame_overhead under Cockpit passed the noun 'frame', which had
-// no entry in COCKPIT_REFUSALS, so the toast fell back to the template with
-// the English id («Sal de la cabina para volar a frame»). The second test
-// collects every noun the callers hand to the navigation policy, so the next
+// The Cockpit refusal names its destination in the UI language. The scan
+// below collects every noun the callers hand to the navigation policy, so a
 // noun without its own sentence fails here instead of reaching the page.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -59,17 +57,15 @@ function sourceFiles(dir) {
   });
 }
 
-const lineOf = (text, index) => text.slice(0, index).split('\n').length;
-
-// Calls whose first argument is the destination noun.
-const NOUN_FIRST =
-  /\b(runImmediateNavigation|_runExplicitNavigation|runOrientation|_beginDeferredNavigation|cockpitRefusal|runNavigation|navigation\??\.(?:run|begin))\s*\(\s*([^,)]*)/g;
-// runManagedVoiceNavigation(styleManager, noun, action, …) in gevActions.js.
-const VOICE_NOUN = /\brunManagedVoiceNavigation\s*\(\s*[\w.?]+\s*,\s*([^,)]*)/g;
-// Parameter defaults: `noun = 'location'`.
-const NOUN_DEFAULT = /\bnoun\s*=\s*'([^']+)'/g;
-// A local noun picked by a condition: `const noun = … ? 'cyclone' : 'weather'`.
-const NOUN_CHOICE = /\bconst noun\s*=\s*[^?;]*\?\s*'([^']+)'\s*:\s*'([^']+)'/g;
+// The destination noun: the first argument of a navigation call, or the
+// second of runManagedVoiceNavigation(styleManager, noun, …) in gevActions.js.
+// `runNavigation(fly)` layer seams take only the flight (group 1).
+const NOUN_ARGUMENT =
+  /\b(?:(runNavigation)\s*\(|(?:runImmediateNavigation|_runExplicitNavigation|runOrientation|_beginDeferredNavigation|cockpitRefusal|navigation\??\.(?:run|begin))\s*\(|runManagedVoiceNavigation\s*\(\s*[\w.?]+\s*,)\s*([^,)]*)/g;
+// Literal nouns elsewhere: a parameter default (`noun = 'location'`) or both
+// branches of `const noun = … ? 'cyclone' : 'weather'`.
+const NOUN_LITERAL =
+  /\bnoun\s*=\s*'([^']+)'|\bconst noun\s*=\s*[^?;]*\?\s*'([^']+)'\s*:\s*'([^']+)'/g;
 
 function trackableKinds() {
   const source = readFileSync(join(SRC, 'voice/gevActions.js'), 'utf8');
@@ -78,54 +74,36 @@ function trackableKinds() {
   return [...block[1].matchAll(/kind:\s*'([^']+)'/g)].map((m) => m[1]);
 }
 
-// Non-literal first arguments the test knows how to expand. Anything else is
-// a new dynamic noun: list its values here.
+// Non-literal arguments: what each one can be. A wrapper's own `noun` (or all
+// its arguments) passes on; its default is a NOUN_LITERAL. Anything else is a
+// new dynamic noun: list its values here.
 const DYNAMIC_NOUNS = new Map([
   ['family.kind', trackableKinds],
   [
     "detail?.kind || 'target'",
     () => [...Object.keys(WORLD_FOCUS_FRAMING), 'target'],
   ],
+  ['noun', () => []],
+  ['...args', () => []],
+  ['...arguments', () => []],
 ]);
-// Wrappers that pass their own `noun` parameter (or all arguments) on.
-const PASS_THROUGH = new Set(['noun', '...args', '...arguments']);
 
 function collectNouns() {
-  const nouns = new Map();
+  const nouns = new Set();
   const unknown = [];
-  const add = (noun, where) => {
-    if (!nouns.has(noun)) nouns.set(noun, where);
-  };
   for (const file of sourceFiles(SRC)) {
     const text = readFileSync(file, 'utf8');
-    const name = relative(SRC, file);
-    const take = (raw, where, { closures = false } = {}) => {
+    for (const [, seam, raw] of text.matchAll(NOUN_ARGUMENT)) {
       const arg = raw.trim();
-      const literal = arg.match(/^'([^']*)'$/);
-      if (literal) return add(literal[1], where);
-      // A wrapper's own parameter; its default is collected by NOUN_DEFAULT.
-      if (PASS_THROUGH.has(arg) || /^noun\s*=\s*'[^']+'$/.test(arg)) return;
-      if (DYNAMIC_NOUNS.has(arg)) {
-        for (const noun of DYNAMIC_NOUNS.get(arg)()) add(noun, where);
-        return;
-      }
-      // The layer-side `runNavigation(fly)` seams take only the flight; their
-      // noun is bound where the seam is built.
-      if (closures) return;
-      unknown.push(`${where}: ${arg}`);
-    };
-    for (const m of text.matchAll(NOUN_FIRST))
-      take(m[2], `${name}:${lineOf(text, m.index)}`, {
-        closures: m[1] === 'runNavigation',
-      });
-    for (const m of text.matchAll(VOICE_NOUN))
-      take(m[1], `${name}:${lineOf(text, m.index)}`);
-    for (const m of text.matchAll(NOUN_DEFAULT))
-      add(m[1], `${name}:${lineOf(text, m.index)}`);
-    for (const m of text.matchAll(NOUN_CHOICE)) {
-      add(m[1], `${name}:${lineOf(text, m.index)}`);
-      add(m[2], `${name}:${lineOf(text, m.index)}`);
+      const literal = arg.match(/^'([^']*)'$/)?.[1];
+      if (literal) nouns.add(literal);
+      else if (DYNAMIC_NOUNS.has(arg))
+        DYNAMIC_NOUNS.get(arg)().forEach((noun) => nouns.add(noun));
+      else if (!seam && !/^noun\s*=/.test(arg))
+        unknown.push(`${relative(SRC, file)}: ${arg}`);
     }
+    for (const m of text.matchAll(NOUN_LITERAL))
+      m.slice(1).forEach((noun) => noun && nouns.add(noun));
   }
   return { nouns, unknown };
 }
@@ -134,25 +112,26 @@ test('every noun the callers pass has its own Cockpit refusal', () => {
   const { nouns, unknown } = collectNouns();
   assert.deepEqual(unknown, [], 'a new dynamic noun: add it to DYNAMIC_NOUNS');
   // The scan still sees the known callers (a guard against a broken regex).
-  for (const noun of ['location', 'camera', 'photo', 'shared view', 'file'])
+  for (const noun of [
+    'location',
+    'camera',
+    'photo',
+    'shared view',
+    'file',
+    'scene',
+    'route',
+    'weather',
+    'cyclone',
+    'vessel',
+    'fire',
+    'frame',
+    'aircraft',
+    'satellite',
+    'target',
+  ])
     assert.ok(nouns.has(noun), `found ${noun}`);
-  for (const noun of ['scene', 'route', 'weather', 'cyclone', 'vessel', 'fire'])
-    assert.ok(nouns.has(noun), `found ${noun}`);
-  for (const noun of ['frame', 'aircraft', 'satellite', 'target'])
-    assert.ok(nouns.has(noun), `found ${noun}`);
-
-  const missing = [...nouns]
-    .filter(([noun]) => !COCKPIT_REFUSAL_NOUNS.includes(noun))
-    .map(([noun, where]) => `${noun} (${where})`);
+  const missing = [...nouns].filter(
+    (noun) => !COCKPIT_REFUSAL_NOUNS.includes(noun),
+  );
   assert.deepEqual(missing, [], 'add these nouns to COCKPIT_REFUSALS');
-
-  setLocale('es');
-  for (const noun of nouns.keys()) {
-    const shown = cockpitToast(noun);
-    assert.notEqual(
-      shown,
-      `Sal de la cabina para volar a ${noun}`,
-      `${noun}: the template with the English id`,
-    );
-  }
 });

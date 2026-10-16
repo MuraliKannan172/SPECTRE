@@ -14,12 +14,12 @@ import {
 } from './layerNames.js';
 export { localizeLayerName } from './layerNames.js';
 import { createWeatherPanel } from './weatherPanel.js';
+import { translateFeedError, translateLoadingLabel } from './statusText.js';
 import {
   formatNumber,
   getLocale,
   msg,
   t,
-  tn,
   translateKnown,
 } from '../i18n/index.js';
 
@@ -146,197 +146,8 @@ export function layerKeyRequirementTooltip(layer = {}) {
   );
 }
 
-// Live-source failures arrive as English data (src/sources/live/contract.js,
-// standalone.js, flights and military ingestion), some with a source name or a
-// number in them; the row shows them in the UI language. Keep these in step
-// with the producers. Anything else shows its catalog entry, or as it came.
-const FEED_ERRORS = new Set([
-  msg('OpenSky OAuth client missing/invalid'),
-  msg('OpenSky OAuth rejected credentials'),
-  msg('OpenSky username/password rejected'),
-  msg('OpenSky auth missing'),
-  msg('OpenSky auth required'),
-  msg('OpenSky auth invalid'),
-  msg('OpenSky auth failed'),
-]);
-const FEED_ERROR_PATTERNS = [
-  // Street Level coverage errors (streetLevel/providers/kartaview/source.js),
-  // ahead of the generic "<source> HTTP <status>".
-  [
-    /^KartaView answered HTTP (\d+)$/,
-    ([, status]) => t('KartaView answered HTTP {status}', { status }),
-  ],
-  [
-    /^Panoramax answered HTTP (\d+)$/,
-    ([, status]) => t('Panoramax answered HTTP {status}', { status }),
-  ],
-  [
-    /^KartaView refused the request \(code (-?\d+)\)$/,
-    ([, code]) => t('KartaView refused the request (code {code})', { code }),
-  ],
-  // Weather imagery (weather/source.js, infraredImage.js) and vector tile
-  // (sources/vectorTiles.js) failures carry their own wording; the generic
-  // pattern below would take "Weather image" for a source name.
-  [
-    /^Weather (image )?HTTP (\d+)$/,
-    ([, image, status]) =>
-      image
-        ? t('Weather image HTTP {status}', { status })
-        : t('Weather HTTP {status}', { status }),
-  ],
-  [
-    /^Vector tiles unavailable \(HTTP (\d+)\)$/,
-    ([, status]) => t('Vector tiles unavailable (HTTP {status})', { status }),
-  ],
-  // Layer statuses with a number or a feed name in them: GNSS
-  // (gnss/source.js), CelesTrak groups (satellites/ingestion.js) and transit
-  // feeds (transit/ingestion.js).
-  [
-    /^GNSS feed unavailable \(HTTP (\d{3})\)$/,
-    ([, status]) => t('GNSS feed unavailable (HTTP {status})', { status }),
-  ],
-  [
-    /^(\d+) CelesTrak groups? unavailable$/,
-    ([, groups]) =>
-      tn(
-        Number(groups),
-        '{count} CelesTrak group unavailable',
-        '{count} CelesTrak groups unavailable',
-        { count: formatNumber(Number(groups)) },
-      ),
-  ],
-  [
-    /^(.+) feed unavailable$/,
-    ([, feed]) => t('{feed} feed unavailable', { feed: translateKnown(feed) }),
-  ],
-  [
-    /^Source snapshot (\d+) min old$/,
-    ([, minutes]) => t('Source snapshot {minutes} min old', { minutes }),
-  ],
-  [
-    /^(.+) rate limited \(anonymous\)$/,
-    ([, source]) =>
-      t('{source} rate limited (anonymous)', { source: sourceLabel(source) }),
-  ],
-  [
-    /^(.+) rate limited$/,
-    ([, source]) => t('{source} rate limited', { source: sourceLabel(source) }),
-  ],
-  [
-    /^(.+) HTTP (\d{3})$/,
-    ([, source, status]) =>
-      t('{source} HTTP {status}', { source: sourceLabel(source), status }),
-  ],
-  [
-    /^(.+) network error$/,
-    ([, source]) =>
-      t('{source} network error', { source: sourceLabel(source) }),
-  ],
-  [
-    /^Malformed (.+) aircraft rows$/,
-    ([, source]) =>
-      t('Malformed {source} aircraft rows', { source: sourceLabel(source) }),
-  ],
-  [
-    /^Malformed (.+) response$/,
-    ([, source]) =>
-      t('Malformed {source} response', { source: sourceLabel(source) }),
-  ],
-];
-
-/** One error text in the UI language, or null when nothing matches. */
-function feedErrorText(text) {
-  if (FEED_ERRORS.has(text)) return t(text);
-  const known = translateKnown(text);
-  if (known !== text) return known;
-  for (const [pattern, format] of FEED_ERROR_PATTERNS) {
-    const match = pattern.exec(text);
-    if (match) return format(match);
-  }
-  return null;
-}
-
-/**
- * A layer's error text in the UI language (see FEED_ERRORS). An error made of
- * several statuses joined by " · " (Local ADS-B) translates piece by piece.
- */
-export function translateFeedError(text) {
-  if (typeof text !== 'string') return text;
-  const whole = feedErrorText(text);
-  if (whole !== null) return whole;
-  if (!text.includes(ROW_TEXT_SEPARATOR)) return text;
-  return text
-    .split(ROW_TEXT_SEPARATOR)
-    .map((piece) => feedErrorText(piece) ?? translateStatusPiece(piece))
-    .join(ROW_TEXT_SEPARATOR);
-}
-
 const ROW_TEXT_SEPARATOR = ' · ';
 
-// Feed states named in a Local ADS-B feed problem ("feeds 1090, 978 stale").
-const FEED_PROBLEM_FORMS = Object.freeze({
-  stale: (count, names) =>
-    tn(count, 'feed {names} stale', 'feeds {names} stale', { names }),
-  unreachable: (count, names) =>
-    tn(count, 'feed {names} unreachable', 'feeds {names} unreachable', {
-      names,
-    }),
-  invalid: (count, names) =>
-    tn(count, 'feed {names} invalid', 'feeds {names} invalid', { names }),
-});
-
-// Working texts with a number or a name in them arrive as English data, one
-// piece of a " · " joined line each: transit (transit/queries.js) and Local
-// ADS-B (localAdsb/status.js). Keep these in step with the producers.
-const STATUS_PIECE_PATTERNS = [
-  [/^Loading (.+)$/, ([, feeds]) => t('Loading {feeds}', { feeds })],
-  [
-    /^(\d+) heard$/,
-    ([, heard]) =>
-      tn(Number(heard), '{count} heard', '{count} heard', {
-        count: formatNumber(Number(heard)),
-      }),
-  ],
-  [
-    /^(USB )?(\d+(?:\.\d+)?) msg\/s$/,
-    ([, usb, rate]) =>
-      usb
-        ? t('USB {rate} msg/s', { rate: formatNumber(Number(rate)) })
-        : t('{rate} msg/s', { rate: formatNumber(Number(rate)) }),
-  ],
-  [
-    /^(\d+) feeds? live$/,
-    ([, live]) =>
-      tn(Number(live), '{count} feed live', '{count} feeds live', {
-        count: formatNumber(Number(live)),
-      }),
-  ],
-  [
-    /^feeds? (.+) (stale|unreachable|invalid)$/,
-    ([, names, status]) =>
-      FEED_PROBLEM_FORMS[status](names.split(', ').length, names),
-  ],
-];
-
-/** One piece of a status line in the UI language, or as it came. */
-function translateStatusPiece(piece) {
-  const known = translateKnown(piece);
-  if (known !== piece) return known;
-  for (const [pattern, format] of STATUS_PIECE_PATTERNS) {
-    const match = pattern.exec(piece);
-    if (match) return format(match);
-  }
-  return piece;
-}
-
-/** A loading label is English data, at times several joined by " · ". */
-function translateLoadingLabel(label) {
-  return label
-    .trim()
-    .split(ROW_TEXT_SEPARATOR)
-    .map(translateStatusPiece)
-    .join(ROW_TEXT_SEPARATOR);
-}
 // A short Latin code joined by hyphens. Longer runs (a URL, a token in an
 // error) keep their break opportunities so they cannot overflow the rail.
 const HYPHENATED_CODE = /[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+/g;

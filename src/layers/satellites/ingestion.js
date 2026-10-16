@@ -72,7 +72,7 @@ export function createIngestion({
         // At least one group loaded — proceed with a fresh rebuild, but keep the
         // partial outage visible at the layer control instead of presenting the
         // reduced catalog as a fully healthy refresh. English data; the panel
-        // shows it through FEED_ERROR_PATTERNS (ui/layerPanel.js).
+        // shows it through FEED_ERROR_PATTERNS (ui/statusText.js).
         layerState._lastError = failed.length
           ? `${failed.length} CelesTrak group${failed.length === 1 ? '' : 's'} unavailable`
           : null;

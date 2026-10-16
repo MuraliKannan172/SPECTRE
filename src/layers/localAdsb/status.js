@@ -3,7 +3,7 @@ import { LAYER_SOURCE } from './policy.js';
 
 // Marks English that the Layers panel translates when it shows the status.
 // Texts with a number or a feed name stay English data too; the panel shows
-// them through STATUS_PIECE_PATTERNS (ui/layerPanel.js), piece by piece.
+// them through STATUS_PIECE_PATTERNS (ui/statusText.js), piece by piece.
 const msg = (text) => text;
 
 /**
@@ -75,6 +75,7 @@ function webUsbStatus(receiver, heard, feedState) {
   const rate = Number.isFinite(receiver.messagesPerSecond)
     ? `${receiver.messagesPerSecond} msg/s`
     : msg('listening');
+  // i18n-ignore: English data, shown through STATUS_PIECE_PATTERNS
   return { status: 'streaming', loadingLabel: `${heard} heard · ${rate}` };
 }
 
@@ -117,6 +118,7 @@ export function localAdsbStatus({ receiver, feedState, heard }) {
     return {
       source,
       status: 'streaming',
+      // i18n-ignore: English data, shown through STATUS_PIECE_PATTERNS
       loadingLabel: `${live.length} ${plural(live.length, 'feed', 'feeds')} live · ${heardText}${rate}`,
     };
   }

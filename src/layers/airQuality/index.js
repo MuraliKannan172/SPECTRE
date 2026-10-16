@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
-import { msg, t, tn, translateKnown } from '../../i18n/index.js';
+import { msg, t, tn } from '../../i18n/index.js';
+import { translateFeedError } from '../../ui/statusText.js';
 import {
   AIR_QUALITY_BANDS,
   AIR_QUALITY_OVERLAY_SOURCE_ID,
@@ -216,8 +217,9 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
         0,
       );
       // Readings and errors stay English data (analyst records, stats); the
-      // card shows them in the UI language. A provider's own error text has
-      // no catalog entry and shows as it came.
+      // card shows them in the UI language, errors as the Layers panel row
+      // does. A provider's own error text has no catalog entry and shows as
+      // it came.
       return {
         readout: true,
         summary: {
@@ -226,7 +228,7 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
           validTime: newest ? new Date(newest).toISOString() : undefined,
           detail: `${provider.network} · ${provider.scale}`,
           status: _lastError
-            ? translateKnown(_lastError)
+            ? translateFeedError(_lastError)
             : _count === 0
               ? _lastUpdate === null
                 ? t('No readings available')
@@ -249,7 +251,7 @@ export function createAirQualityLayer({ source, overlayHost } = {}) {
             id: reading.id,
             ordinal: index + 1,
             lead: `${reading.scale} ${reading.label}`,
-            text: `${reading.name} · ${reading.risk ? t(reading.risk) : reading.risk}`,
+            text: `${reading.name} · ${t(reading.risk)}`,
             accent: reading.color,
           })),
         },

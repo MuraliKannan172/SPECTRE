@@ -12,8 +12,7 @@ import { t, msg } from './i18n/index.js';
 export const NAVIGATION_AUTHORITY_EVENT = 'gev:navigation-authority-taken';
 
 // The Cockpit refusal per destination noun. Nouns are English identifiers
-// from the callers ('camera', 'location', 'photo'…); a noun without its own
-// sentence falls back to the template with the noun as given.
+// from the callers ('camera', 'location', 'photo'…);
 // navigationPolicyFrame.test.mjs collects every noun the callers pass and
 // fails when one has no sentence here.
 const COCKPIT_REFUSALS = Object.freeze({
@@ -44,8 +43,7 @@ export const COCKPIT_REFUSAL_NOUNS = Object.freeze(
 );
 
 function cockpitRefusal(noun) {
-  const ready = COCKPIT_REFUSALS[noun];
-  return ready ? t(ready) : t('Exit cockpit to fly to a {noun}', { noun });
+  return t(COCKPIT_REFUSALS[noun]);
 }
 
 /**

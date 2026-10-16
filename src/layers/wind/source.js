@@ -4,6 +4,12 @@ import { readWindBody } from '../../sources/windBody.js';
 // wind layer and layer panel show them translated.
 const msg = (text) => text;
 
+/** Status of a scalar overlay the provider could not supply, by overlay. */
+export const SCALAR_UNAVAILABLE = Object.freeze({
+  temperature: msg('Temperature field unavailable'),
+  pressure: msg('Mean sea level pressure field unavailable'),
+});
+
 /** Create a bounded, cancellable source for the same-origin wind provider. */
 export function createWindSource({
   fetchImpl = (...args) => globalThis.fetch(...args),
@@ -44,10 +50,7 @@ export function createWindSource({
         const optionalUnavailable =
           overlay !== 'none' &&
           scalar === undefined &&
-          scalarError ===
-            (overlay === 'temperature'
-              ? msg('Temperature field unavailable')
-              : msg('Mean sea level pressure field unavailable'));
+          scalarError === SCALAR_UNAVAILABLE[overlay];
         const scalarValid =
           overlay === 'none'
             ? scalar === undefined && scalarError === undefined

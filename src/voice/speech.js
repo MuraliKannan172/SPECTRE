@@ -39,6 +39,7 @@ import {
   sourceLabel,
 } from '../ui/layerNames.js';
 import { localizePlaceName } from '../ui/placeNames.js';
+import { CITY_POIS } from '../cityPois.js';
 import { formatQuantity } from '../ui/unitLabels.js';
 
 const LAYER_NOUNS = Object.freeze({
@@ -344,28 +345,10 @@ function shownPair(items) {
     : items[0] || '';
 }
 
-/**
- * The preset city ids the voice tools take (the `locationId` enum in
- * actionSchemas.js) and the CITY_POIS names they stand for, so `sf` reads
- * "San Francisco", not "Sf". A copy, not an import: src/locations.js pulls in
- * Cesium. planStepPresetIds.i18n.test.mjs keeps it in step with CITY_POIS.
- */
-const PRESET_PLACE_NAMES = Object.freeze({
-  austin: 'Austin',
-  sf: 'San Francisco',
-  nyc: 'New York',
-  tokyo: 'Tokyo',
-  london: 'London',
-  paris: 'Paris',
-  dubai: 'Dubai',
-  dc: 'Washington DC',
-  tallinn: 'Tallinn',
-});
-
-/** A preset city id as its English name; any other value unchanged. */
+/** A preset city id (`sf`, `nyc`) as its English name; any other value unchanged. */
 function presetPlaceName(value) {
   const id = typeof value === 'string' ? value.trim() : '';
-  return Object.hasOwn(PRESET_PLACE_NAMES, id) ? PRESET_PLACE_NAMES[id] : value;
+  return Object.hasOwn(CITY_POIS, id) ? CITY_POIS[id].name : value;
 }
 
 // A place as the card shows it: a preset city in the interface language,
@@ -375,7 +358,6 @@ function shownPlace(value, max) {
 }
 
 /** Ids such as `austin` or `local-firms` read as names on screen. */
-
 function displayName(value, max) {
   const label = spokenLabel(value, max);
   return /^[a-z0-9-]+$/.test(label)

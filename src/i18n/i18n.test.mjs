@@ -243,6 +243,10 @@ test('tn() shows a caller-formatted count and still picks the form by number', (
   assert.equal(label(12345), '12,345 map objects');
   assert.equal(tn(12345, '{count} file', '{count} files'), '12345 files');
   setLocale('ru');
-  assert.equal(label(12345), '12 345 объектов на карте');
-  assert.equal(label(1), '1 объект на карте');
+  try {
+    assert.equal(label(12345), '12 345 объектов на карте');
+    assert.equal(label(1), '1 объект на карте');
+  } finally {
+    setLocale('en');
+  }
 });

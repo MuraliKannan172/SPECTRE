@@ -1,5 +1,9 @@
 import { BUNDLE_SOURCE } from './bundle.js';
 
+// Pack statuses stay English in the report; the import dialog shows them
+// through t() (scenes/sharing.js).
+const msg = (text) => text;
+
 /** Describe an import without fetching assets, applying state or exposing source configuration. */
 export function describeSceneShare(
   { project, assets },
@@ -16,11 +20,11 @@ export function describeSceneShare(
       status:
         pack.source.adapter === BUNDLE_SOURCE
           ? assets.has(pack.source.path)
-            ? 'Included in bundle'
-            : 'Missing bundle file — reimport its bundle'
+            ? msg('Included in bundle')
+            : msg('Missing bundle file — reimport its bundle')
           : sources.has(pack.source.adapter)
-            ? 'Source configured; file checked when loaded'
-            : 'Source unavailable',
+            ? msg('Source configured; file checked when loaded')
+            : msg('Source unavailable'),
     })),
   );
   return {

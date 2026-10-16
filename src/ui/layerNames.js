@@ -117,8 +117,6 @@ const SOURCE_LABEL_KEYS = new Map(
     msg('OSM routing'),
     msg('Mapped camera locations'),
     msg('OpenStreetMap · community mapped'),
-    msg('Decoder feeds'),
-    msg('WebUSB + decoder feeds'),
   ].map((key) => [key, key]),
 );
 

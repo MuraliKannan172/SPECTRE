@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
-import { formatNumber, msg, t, translateKnown } from '../../i18n/index.js';
+import { formatNumber, msg, t } from '../../i18n/index.js';
+import { translateFeedError } from '../../ui/statusText.js';
 import {
   GNSS_LEVEL_COLORS,
   GNSS_MIN_AIRCRAFT,
@@ -30,14 +31,6 @@ const LEVEL_LABELS = Object.freeze({
   medium: msg('Low-accuracy score 2–10%'),
   high: msg('Low-accuracy score > 10%'),
 });
-
-/** A source failure (English data, source.js) in the UI language. */
-function shownSourceError(text) {
-  const http = /^GNSS feed unavailable \(HTTP (\d{3})\)$/.exec(text);
-  return http
-    ? t('GNSS feed unavailable (HTTP {status})', { status: http[1] })
-    : translateKnown(text);
-}
 
 /** Degrees at the centre of the current view, or null before the camera settles. */
 export function defaultGnssViewAnchor(viewer) {
@@ -385,7 +378,7 @@ export function createGnssIntegrityLayer({
             'Regional sample · 250 nm radius · cells from visited views over 30 min',
           ) +
           (_lastError && _retryAt
-            ? ` · ${shownSourceError(_lastError)} · ${
+            ? ` · ${translateFeedError(_lastError)} · ${
                 _retryAt <= 8640000000000000
                   ? t('Retrying automatically at {time} UTC', {
                       time: new Date(_retryAt).toISOString().slice(11, 19),
