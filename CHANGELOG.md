@@ -3,10 +3,11 @@
 - CCTV cameras with identified hardware show the model's datasheet specs. When a
   source names a camera model found in the vendored CCTV Camera Database records
   (CC0), the HUD meta line adds its resolution, night vision and PTZ capability.
-  A fixed single-lens model's horizontal FOV replaces the estimate
-  (`FOV n° (DATASHEET)`); a PTZ or varifocal range is what the lens can do, not
-  its current zoom, so those cameras keep the estimate and show
-  `SPEC FOV min–max° (CAPABILITY)` beside it (bassem chagra, #452).
+  A fixed single-lens model's horizontal FOV fills in when the source states no
+  FOV and the pose is not curated (`FOV n° (DATASHEET)`); a PTZ or varifocal
+  range is what the lens can do, not its current zoom, so those cameras keep the
+  estimate and show `SPEC FOV min–max° (CAPABILITY)` beside it (bassem chagra,
+  #452).
 
 - Add WSDOT highway cameras (Washington State) as a keyless CCTV source pack:
   WSDOT's official Travel Center camera layer, with frames registered only on

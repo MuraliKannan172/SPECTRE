@@ -4185,7 +4185,8 @@ silently demoting every later lookup for the session.
 - **CCTV identified hardware:** a camera whose source or seed names a hardware `model` that
   resolves in `src/layers/cctv/modelSpecs.js` (vendored CC0 records from the CCTV Camera
   Database) gets the model's specs appended to the HUD meta line. Only fixed single-lens
-  hardware replaces the estimated FOV, shown as `FOV n° (DATASHEET)`. PTZ, varifocal and
+  hardware fills the FOV, and only when the source or seed states none and the pose is not
+  curated, shown as `FOV n° (DATASHEET)` until a manual calibration moves it. PTZ, varifocal and
   multi-sensor datasheets publish a capability range, not the lens's current zoom, so those
   cameras keep their estimate and show `SPEC FOV min–max° (CAPABILITY)` beside it. Public
   camera state carries `fovSource`, `specFovMinDeg`, `specFovMaxDeg` and `spec` (#452).

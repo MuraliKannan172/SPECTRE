@@ -1,7 +1,11 @@
 import { CCTV_AMBIENT_CARD_MAX } from '../../data/cctvLod.js';
 import { ACTIVE_FRAME_REFRESH_MS, IDLE_FRAME_REFRESH_MS } from './policy.js';
 import { headingHudToken, isHeadingEstimated } from './headingConfidence.js';
-import { specSummary, specFovCapabilityToken } from './modelSpecs.js';
+import {
+  specSummary,
+  specFovCapabilityToken,
+  isDatasheetFov,
+} from './modelSpecs.js';
 
 export function createPresentation({
   state: layerState,
@@ -40,8 +44,9 @@ export function createPresentation({
       // A synthetic bearing (headingConfidence 'low', no human calibration)
       // is tagged so a hashed guess never reads as a surveyed facing (#639).
       headingHudToken(active.camera),
-      // Identified hardware labels its FOV as datasheet-sourced (catalog.js).
-      `FOV ${Math.round(active.camera.fovDeg)}°${active.camera.fovSource === 'datasheet' ? ' (DATASHEET)' : ''}`,
+      // Identified hardware labels its FOV as datasheet-sourced (catalog.js)
+      // only while no manual calibration offset has moved it.
+      `FOV ${Math.round(active.camera.fovDeg)}°${isDatasheetFov(active.camera) ? ' (DATASHEET)' : ''}`,
       // A PTZ/varifocal datasheet range is what the lens can do, not its
       // current zoom, so it is shown beside the estimate, never as it.
       specFovCapabilityToken(active.camera),
@@ -96,7 +101,11 @@ export function createPresentation({
       pitchDeg: camera.pitchDeg,
       fovDeg: camera.fovDeg,
       // Identified-hardware enrichment passthrough (catalog.js / modelSpecs.js).
-      fovSource: camera.fovSource || 'estimated',
+      fovSource: isDatasheetFov(camera)
+        ? 'datasheet'
+        : camera.fovSource === 'datasheet'
+          ? 'calibrated'
+          : camera.fovSource || 'estimated',
       specFovMinDeg: camera.specFovMinDeg ?? null,
       specFovMaxDeg: camera.specFovMaxDeg ?? null,
       spec: camera.spec || null,

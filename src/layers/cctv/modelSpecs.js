@@ -14,7 +14,7 @@
  *
  * Spec records are vendored verbatim from the CCTV Camera Database
  * (https://github.com/ch-bas/cctv-camera-database, CC0-1.0) — an open dataset
- * of 28,000+ camera models transcribed from manufacturer datasheets (75% with
+ * of 28,000+ camera models transcribed from manufacturer datasheets (84% with
  * FOV, as of v2.26.0). This module vendors the records that the currently integrated public
  * catalogs publish hardware for — King County WA (Cohu, Bosch AUTODOME, Axis
  * Q6135-LE), plus the Bosch AUTODOME and Axis PTZ/multisensor models that
@@ -25,7 +25,7 @@
  * night vision) — never endpoints, stream paths, or access/config data.
  */
 
-/** Verbatim records from the dataset's model-enrichment extract (v2.19.0). */
+/** Verbatim records from the dataset's model-enrichment extract (v2.26.0). */
 const RECORDS = [
   {
     id: 'axis-q6135-le',
@@ -307,74 +307,144 @@ function normalize(value) {
     .replace(/\s+/g, ' ');
 }
 
-const BY_MODEL = new Map();
-for (const record of RECORDS) {
-  BY_MODEL.set(normalize(record.model), record);
-  for (const alias of record.aliases || [])
-    BY_MODEL.set(normalize(alias), record);
+/**
+ * Whitespace words of a name, lowercased, with surrounding punctuation trimmed
+ * so "(NDP-7512-Z30)" reads as "ndp-7512-z30". Inner hyphens and dots stay:
+ * "f4105-lre-unknown" is one word, never "f4105-lre" plus noise.
+ * @param {string} value
+ * @returns {string[]}
+ */
+function words(value) {
+  return normalize(value)
+    .split(' ')
+    .map((raw) => raw.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''))
+    .filter(Boolean);
 }
 
 /**
- * DISTINCTIVE tokens of a record — the whitespace words of its model and
- * aliases that identify hardware rather than describe it. A token qualifies
- * only when it is >= 4 chars AND contains a digit or hyphen, so generic words
- * ("dome", "network", "camera", "series", "ptz") are never distinctive and a
- * verbose registry string cannot match on them alone. Surrounding punctuation
- * is trimmed so "(NDP-7512-Z30)" indexes as "ndp-7512-z30".
- * @param {Object} record
- * @returns {string[]} Unique distinctive tokens, lowercased.
+ * Descriptor words that never identify hardware: product-type nouns, codec
+ * and resolution/zoom/frequency tokens ("h.264", "2mp", "40x", "1080p").
  */
-function distinctiveTokens(record) {
-  const out = new Set();
-  for (const name of [record.model, ...(record.aliases || [])]) {
-    for (const raw of normalize(name).split(' ')) {
-      const token = raw.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
-      if (token.length >= 4 && /[0-9-]/.test(token)) out.add(token);
-    }
+const GENERIC_WORDS = new Set([
+  'network',
+  'camera',
+  'cam',
+  'ip',
+  'ptz',
+  'dome',
+  'bullet',
+  'box',
+  'hd',
+  'ir',
+  'outdoor',
+  'indoor',
+  'series',
+]);
+
+function isGeneric(word) {
+  return (
+    GENERIC_WORDS.has(word) ||
+    /^h\.?\d+$/.test(word) ||
+    /^\d+(?:\.\d+)?(?:mp|p|k|x|mm|hz|tvl)$/.test(word)
+  );
+}
+
+/** A model code: letters AND digits, and not a generic descriptor. */
+function isModelCode(word) {
+  return /[a-z]/.test(word) && /\d/.test(word) && !isGeneric(word);
+}
+
+/** Hyphenated variant suffixes that do not change the hardware. */
+const VARIANT_SUFFIXES = new Set(['50hz', '60hz', 'ntsc', 'pal']);
+
+/** "q6155-e-60hz" → "q6155-e"; "f4105-lre-unknown" is left as is. */
+function stripVariantSuffix(word) {
+  let out = word;
+  for (;;) {
+    const cut = out.lastIndexOf('-');
+    if (cut <= 0 || !VARIANT_SUFFIXES.has(out.slice(cut + 1))) return out;
+    out = out.slice(0, cut);
   }
-  return [...out];
+}
+
+/** Manufacturer names (lowercased words) accepted for each record brand. */
+const BRAND_ALIASES = {
+  Hanwha: ['wisenet', 'samsung'],
+  Hikvision: ['hiwatch'],
+};
+
+function brandWords(record) {
+  return new Set([
+    ...words(record.brand),
+    ...(BRAND_ALIASES[record.brand] || []),
+  ]);
 }
 
 /**
- * Token index for the substring fallback: one precompiled whole-word matcher
- * per distinctive token. Word boundaries are any non-alphanumeric char (or the
- * string ends), so hyphenated/dotted tokens like "q6155-e" or "h.264" match as
- * whole words while "700" never matches inside "7000".
+ * One entry per record name (model + aliases). `required` is every
+ * non-generic word of the name — all must appear in a query, so a generation
+ * or suffix ("Mk II", "7000i" vs "7000") is never dropped. `hasCode` marks
+ * names carrying a letter+digit model code; names without one ("3950",
+ * "01959-004", "AUTODOME 800 Series") match only when the brand does.
  */
-const TOKEN_INDEX = RECORDS.flatMap((record) =>
-  distinctiveTokens(record).map((token) => ({
-    token,
-    record,
-    re: new RegExp(
-      `(?:^|[^a-z0-9])${token.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?:[^a-z0-9]|$)`,
-    ),
-  })),
-);
+const NAME_INDEX = RECORDS.flatMap((record) => {
+  const brand = brandWords(record);
+  return [record.model, ...(record.aliases || [])].map((name) => {
+    const nameWords = words(name);
+    return {
+      record,
+      brand,
+      allowed: new Set(nameWords),
+      required: nameWords.filter((word) => !isGeneric(word)),
+      hasCode: nameWords.some(isModelCode),
+    };
+  });
+});
 
 /**
  * Looks up a spec record for a hardware-model string.
  *
- * Exact match first (case-insensitive, whitespace-collapsed) on the model and
- * every alias. When that misses, a token fallback lets a VERBOSE registry
- * string resolve — e.g. "AXIS Q6155-E PTZ Dome Network Camera" finds the
- * Q6155-E via its distinctive "q6155-e" token. The most specific (longest)
- * matched token wins; if two different records tie on the longest matched
- * token the result is ambiguous and returns null (never guesses).
+ * A record name matches when every non-generic word of that name appears in
+ * the query (case-insensitive, punctuation-trimmed) and every other query word
+ * is generic or the record's brand. That lets a VERBOSE registry string
+ * resolve — "AXIS Q6155-E PTZ Dome Network Camera" finds the Q6155-E — while
+ * an unrelated code ("Q1615"), a generation suffix ("Mk II") or a longer part
+ * number ("F4105-LRE-UNKNOWN") rejects the match. Codec, resolution and
+ * product-type words never identify hardware on their own. A name with no
+ * letter+digit model code ("3950") needs the brand, from `manufacturer` or the
+ * query itself. A `manufacturer` that is not the record's brand always
+ * rejects. Matches on two different records are ambiguous → null (never
+ * guesses).
  * @param {string} model - Hardware model as named by a source pack or seed.
+ * @param {string} [manufacturer] - The source's manufacturer, when published.
  * @returns {Object|null} The verbatim spec record, or null when unknown.
  */
-export function lookupModelSpec(model) {
-  if (!model) return null;
-  const query = normalize(model);
-  if (!query) return null;
-  const exact = BY_MODEL.get(query);
-  if (exact) return exact;
-  const matches = TOKEN_INDEX.filter((entry) => entry.re.test(query));
-  if (!matches.length) return null;
-  const maxLen = Math.max(...matches.map((m) => m.token.length));
-  const top = matches.filter((m) => m.token.length === maxLen);
-  const records = new Set(top.map((m) => m.record));
-  return records.size === 1 ? top[0].record : null;
+export function lookupModelSpec(model, manufacturer) {
+  const query = words(model).map(stripVariantSuffix);
+  if (!query.length) return null;
+  const maker = words(manufacturer);
+  const found = new Set();
+  for (const entry of NAME_INDEX) {
+    const makerMatches = maker.some((word) => entry.brand.has(word));
+    if (maker.length && !makerMatches) continue;
+    if (
+      !entry.hasCode &&
+      !makerMatches &&
+      !query.some((word) => entry.brand.has(word))
+    )
+      continue;
+    if (!entry.required.length) continue;
+    if (!entry.required.every((word) => query.includes(word))) continue;
+    if (
+      !query.every(
+        (word) =>
+          entry.allowed.has(word) || entry.brand.has(word) || isGeneric(word),
+      )
+    )
+      continue;
+    found.add(entry.record);
+  }
+  return found.size === 1 ? [...found][0] : null;
 }
 
 /**
@@ -414,6 +484,16 @@ export function fixedHorizontalFovDeg(spec) {
     return null;
   const range = horizontalFovRangeDeg(spec);
   return range && range.minDeg === range.maxDeg ? range.minDeg : null;
+}
+
+/**
+ * True when the camera's CURRENT FOV is the datasheet figure: it was filled
+ * from a fixed-lens datasheet and no manual calibration offset has moved it.
+ * @param {Object} camera - Catalog camera (see applyModelEnrichment).
+ * @returns {boolean}
+ */
+export function isDatasheetFov(camera) {
+  return camera?.fovSource === 'datasheet' && !camera.calibration?.fovDeg;
 }
 
 /**

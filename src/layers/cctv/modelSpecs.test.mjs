@@ -9,6 +9,7 @@ import {
   horizontalFovRangeDeg,
   fixedHorizontalFovDeg,
   specFovCapabilityToken,
+  isDatasheetFov,
   specSummary,
 } from './modelSpecs.js';
 import { createCatalog } from './catalog.js';
@@ -21,7 +22,8 @@ test('lookupModelSpec matches case-insensitively and trims', () => {
 });
 
 test('lookupModelSpec matches aliases', () => {
-  const byAlias = lookupModelSpec('01959-004');
+  // A part number without letters needs the brand.
+  const byAlias = lookupModelSpec('01959-004', 'Axis');
   assert.ok(byAlias);
   assert.equal(byAlias.model, 'Q6135-LE');
 });
@@ -29,7 +31,8 @@ test('lookupModelSpec matches aliases', () => {
 test('vendored table covers the integrated catalogs published hardware', () => {
   // Models the live packs publish: King County (Cohu, AUTODOME IP 5000i),
   // Sarasota (Bosch AUTODOME 7000/VG4), Sioux Falls (Axis).
-  const cohu = lookupModelSpec('3950'); // King County publishes "3950"
+  // King County publishes "3950" with Manufacturer "Cohu".
+  const cohu = lookupModelSpec('3950', 'Cohu');
   assert.equal(cohu?.brand, 'Cohu');
   const autodome = lookupModelSpec('AUTODOME IP 5000i');
   assert.ok(autodome && horizontalFovRangeDeg(autodome).maxDeg > 0);
@@ -71,8 +74,8 @@ test('token fallback never matches on generic words or wrong models', () => {
 });
 
 test('exact match still wins over the token fallback', () => {
-  // "3965" is an alias of the 3960; exact alias match, not a token scan.
-  assert.equal(lookupModelSpec('3965')?.id, 'cohu-3960');
+  // "3965" is an alias of the 3960, not the 3950.
+  assert.equal(lookupModelSpec('3965', 'Cohu')?.id, 'cohu-3960');
   assert.equal(lookupModelSpec('AUTODOME IP 5000i')?.id, 'bosch-ndp-5502-30');
 });
 
@@ -167,10 +170,10 @@ function browserCatalog() {
   });
 }
 
-test('catalog keeps the estimated FOV for PTZ hardware and substitutes only fixed-lens datasheets', () => {
+test('catalog keeps the estimated FOV for PTZ hardware and fills only fixed-lens datasheets', () => {
   const [ptz, fixed, unknown] = browserCatalog().buildCatalogFromSources([
     { id: 'ptz', lat: 47.7, lon: -122, fovDeg: 44, model: 'Q6135-LE' },
-    { id: 'fixed', lat: 47.7, lon: -122, fovDeg: 44, model: 'F4105-LRE' },
+    { id: 'fixed', lat: 47.7, lon: -122, model: 'F4105-LRE' },
     { id: 'unknown', lat: 47.7, lon: -122, fovDeg: 44, model: 'NOPE-1' },
   ]);
 
@@ -189,6 +192,99 @@ test('catalog keeps the estimated FOV for PTZ hardware and substitutes only fixe
   assert.equal(unknown.fovDeg, 44);
   assert.equal(unknown.spec, undefined);
   assert.equal(unknown.specFovMaxDeg, undefined);
+});
+
+test('codec, format and product words never identify hardware', () => {
+  // "h.264" is in the VG4 AUTODOME alias; it is a codec, not a model code.
+  assert.equal(lookupModelSpec('Axis Q1615 H.264 Network Camera'), null);
+  assert.equal(lookupModelSpec('H.264 Network Camera'), null);
+  assert.equal(lookupModelSpec('H.265 IP Camera'), null);
+});
+
+test('generation and suffix distinctions are preserved', () => {
+  // A Mk II is not the vendored (Mk I) Q6135-LE.
+  assert.equal(lookupModelSpec('AXIS Q6135-LE Mk II'), null);
+  // A longer part number is a different product...
+  assert.equal(lookupModelSpec('F4105-LRE-UNKNOWN'), null);
+  // ...unless the rest is a mains-frequency variant suffix.
+  assert.equal(lookupModelSpec('Q6155-E-60Hz')?.id, 'axis-q6155-e');
+});
+
+test('manufacturer must agree with the record brand', () => {
+  // Purely numeric models need a brand match.
+  assert.equal(lookupModelSpec('3950'), null);
+  assert.equal(lookupModelSpec('Pelco 3950'), null);
+  assert.equal(lookupModelSpec('3950', 'Pelco'), null);
+  // A model code under the wrong manufacturer is not that record either.
+  assert.equal(lookupModelSpec('Q6135-LE', 'Hikvision'), null);
+  // Case-insensitive, with company suffixes and aliases.
+  assert.equal(lookupModelSpec('3950', 'COHU')?.id, 'cohu-3950-iview');
+  assert.equal(
+    lookupModelSpec('Q6135-LE', 'Axis Communications AB')?.id,
+    'axis-q6135-le',
+  );
+  assert.equal(
+    lookupModelSpec('XNP-6400RW', 'Hanwha Vision')?.id,
+    'hanwha-xnp-6400rw',
+  );
+  assert.equal(
+    lookupModelSpec('XNP-6400RW', 'Wisenet')?.id,
+    'hanwha-xnp-6400rw',
+  );
+});
+
+test('King County snapshot model strings still resolve', () => {
+  // Model/Manufacturer pairs as published in the King County feed.
+  assert.equal(lookupModelSpec('3950', 'Cohu')?.id, 'cohu-3950-iview');
+  assert.equal(lookupModelSpec('3965', 'Cohu')?.id, 'cohu-3960');
+  assert.equal(lookupModelSpec('3925 Dome', 'Cohu')?.id, 'cohu-3920-idome');
+  assert.equal(lookupModelSpec('Q6135-LE', 'Axis')?.id, 'axis-q6135-le');
+  assert.equal(
+    lookupModelSpec('AUTODOME IP 5000i', 'BOSCH')?.id,
+    'bosch-ndp-5502-30',
+  );
+});
+
+test('catalog never overwrites an explicit FOV or a curated pose', () => {
+  const [explicit, curated, cohu, pelco] =
+    browserCatalog().buildCatalogFromSources([
+      { id: 'explicit', lat: 47.7, lon: -122, fovDeg: 44, model: 'F4105-LRE' },
+      {
+        id: 'curated',
+        lat: 47.7,
+        lon: -122,
+        model: 'F4105-LRE',
+        poseSource: 'curated',
+      },
+      { id: 'cohu', lat: 47.7, lon: -122, model: '3950', manufacturer: 'Cohu' },
+      {
+        id: 'pelco',
+        lat: 47.7,
+        lon: -122,
+        model: '3950',
+        manufacturer: 'Pelco',
+      },
+    ]);
+  assert.equal(explicit.fovDeg, 44);
+  assert.equal(explicit.fovSource, undefined);
+  assert.equal(explicit.spec.model, 'F4105-LRE');
+  assert.equal(curated.fovDeg, 74);
+  assert.equal(curated.fovSource, undefined);
+  // The source's manufacturer reaches the lookup.
+  assert.equal(cohu.spec?.id, 'cohu-3950-iview');
+  assert.equal(pelco.spec, undefined);
+});
+
+test('the DATASHEET label drops once calibration moves the FOV', () => {
+  const camera = { fovSource: 'datasheet', fovDeg: 110 };
+  assert.equal(isDatasheetFov(camera), true);
+  assert.equal(isDatasheetFov({ ...camera, calibration: { fovDeg: 0 } }), true);
+  assert.equal(
+    isDatasheetFov({ ...camera, calibration: { fovDeg: 6 } }),
+    false,
+  );
+  assert.equal(isDatasheetFov({ fovDeg: 74 }), false);
+  assert.equal(isDatasheetFov(null), false);
 });
 
 test('specSummary renders the HUD line and degrades by omission', () => {

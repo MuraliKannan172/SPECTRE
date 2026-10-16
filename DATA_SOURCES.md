@@ -185,6 +185,7 @@ The [Bhote Koshi event pack](public/events/bhote-koshi-2026/README.md), under `p
 | **Natural Earth countries, states and provinces** (260 admin-0/map units + 4,587 admin-1 polygons)             | `natural_earth/`                  | **Public domain**                                                                                         | ✅ (no restrictions)                             | "Made with Natural Earth" (courtesy credit — not legally required)          |
 | **US Census Bureau counties** (3,235 county polygons)                       | `us_census_counties/`             | **Public domain**                                                                                         | ✅ (no restrictions)                             | "U.S. Census Bureau" (courtesy — not legally required)                      |
 | **CCTV ground heights** (3,445 cameras)                                     | `cctv_ground_heights/`            | Precomputed camera placement heights, aligned to work with Google Photorealistic 3D Tiles (folder README) | —                                                | —                                                                           |
+| **CCTV Camera Database** model-enrichment extract v2.26.0 (17 camera-model records) | `src/layers/cctv/modelSpecs.js` | **CC0-1.0** (public domain dedication) | ✅ (no restrictions) | "Specs: cctv-database.com" (courtesy — not legally required) |
 
 ### ⚠️ TeleGeography is bundled but NonCommercial
 
@@ -209,6 +210,17 @@ OpenMapTiles while OpenFreeMap tiles are used; Data attribution retains the full
 commercial use with attribution and applicable database share-alike/access
 obligations; it does not license the application code. Trimmed test-only tile
 fixtures retain their provenance in `src/data/fixtures/README.md`.
+
+### CCTV Camera Database (`src/layers/cctv/modelSpecs.js`)
+
+The CCTV layer's hardware-model specs are a small verbatim extract (v2.26.0) of the
+[CCTV Camera Database](https://github.com/ch-bas/cctv-camera-database), an open dataset of
+camera models transcribed from manufacturer datasheets, dedicated to the public domain under
+**CC0-1.0**. Only the records for hardware that the integrated public catalogs name (King
+County, Sarasota County and Sioux Falls) are bundled, compiled into the module. Nothing is
+fetched at runtime. The records describe camera products (optics, resolution, night vision)
+only, never endpoints, stream paths or access data. CC0 requires no attribution; the CCTV HUD
+credits it anyway as `SPECS: CCTV-DATABASE.COM` beside any spec line it renders.
 
 ### Bundled OpenStreetMap data
 

@@ -7,17 +7,22 @@ import {
 
 /**
  * Applies datasheet enrichment to a camera in place: when it names a known
- * hardware `model`, the spec record is attached for the HUD and the
- * datasheet's horizontal FOV range rides along as `specFovMinDeg`/
- * `specFovMaxDeg`. Only fixed-lens hardware replaces the pose estimate: a
- * PTZ/varifocal range says what the lens CAN do, not where it is zoomed now.
+ * hardware `model` (and, when published, a matching `manufacturer`), the spec
+ * record is attached for the HUD and the datasheet's horizontal FOV range
+ * rides along as `specFovMinDeg`/`specFovMaxDeg`. Only fixed-lens hardware
+ * fills the FOV, and only when none was given: an explicit source/seed
+ * `fovDeg` or a curated pose is never overwritten. A PTZ/varifocal range says
+ * what the lens CAN do, not where it is zoomed now.
  * Unknown models — the common case — change nothing.
  * @param {Object} camera - Camera being built (mutated).
- * @param {string} [modelName] - Hardware model from a source or seed.
+ * @param {{model?:string, manufacturer?:string, explicitFov?:boolean}} hardware
+ *   - Hardware model/manufacturer from a source or seed, and whether that
+ *   source or seed stated its own `fovDeg`.
  * @param {(v:number,min:number,max:number)=>number} clamp - Pose clamp helper.
  */
-function applyModelEnrichment(camera, modelName, clamp) {
-  const spec = modelName ? lookupModelSpec(modelName) : null;
+function applyModelEnrichment(camera, hardware, clamp) {
+  const { model, manufacturer, explicitFov } = hardware;
+  const spec = model ? lookupModelSpec(model, manufacturer) : null;
   if (!spec) return;
   const range = horizontalFovRangeDeg(spec);
   if (range) {
@@ -25,7 +30,7 @@ function applyModelEnrichment(camera, modelName, clamp) {
     camera.specFovMaxDeg = range.maxDeg;
   }
   const fixedFov = fixedHorizontalFovDeg(spec);
-  if (fixedFov) {
+  if (fixedFov && !explicitFov && camera.poseSource !== 'curated') {
     camera.fovDeg = clamp(fixedFov, 20, 125);
     camera.fovSource = 'datasheet';
   }
@@ -77,7 +82,11 @@ export function createCatalog({ state: layerState, services, parts, source }) {
           parts.model.clamp(seed.elevationM ?? 22, 8, 80),
         pitchDeg: parts.model.clamp(seed.pitchDeg ?? -17, -40, -4),
       };
-      applyModelEnrichment(camera, seed.model, parts.model.clamp);
+      applyModelEnrichment(
+        camera,
+        { model: seed.model, explicitFov: seed.fovDeg != null },
+        parts.model.clamp,
+      );
       parts.model.ensureCameraPose(camera);
       catalog.push(camera);
     }
@@ -242,7 +251,15 @@ export function createCatalog({ state: layerState, services, parts, source }) {
       };
       applyModelEnrichment(
         camera,
-        source.model || seed?.model,
+        {
+          model: source.model || seed?.model,
+          manufacturer: source.model ? source.manufacturer : '',
+          explicitFov:
+            (source.fovDeg != null && Number.isFinite(Number(source.fovDeg))) ||
+            CAMERA_SEEDS.some(
+              (entry) => entry.id === id && entry.fovDeg != null,
+            ),
+        },
         parts.model.clamp,
       );
       parts.model.ensureCameraPose(camera);
