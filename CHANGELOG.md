@@ -160,6 +160,9 @@
 
 - Director timeline seeks cross the dateline along the short longitude arc.
 
+- Keep unknown GBFS availability counts neutral instead of turning null or empty
+  values into zero bikes.
+
 - Recent Imagery continues past malformed records in full catalog pages, respects the requested record limit, and reports results as truncated when that limit drops valid records.
 
 - Regional articles retain unknown publication times when compact source dates do not identify a real calendar instant.
