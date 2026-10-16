@@ -4,6 +4,7 @@ import {
   isAllowedGbfsHost,
   isAllowedGbfsPath,
   gbfsCacheControl,
+  gbfsUpstreamHeaders,
 } from '../../src/data/gbfsSource.js';
 
 // ---------------------------------------------------------------------------
@@ -11,6 +12,9 @@ import {
 // ---------------------------------------------------------------------------
 /** Upstream fetch timeout for GBFS requests (ms). */
 const GBFS_PROXY_TIMEOUT_MS = 12000;
+
+/** Value of the Client-Identifier header sent with every upstream request. */
+export const GBFS_CLIENT_IDENTIFIER = 'gods-eye-view';
 
 export const GBFS_MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -74,6 +78,10 @@ export async function fetchGbfsUpstream(
       headers: {
         Accept: 'application/json',
         'User-Agent': 'gods-eye-view-gbfs-proxy/1.0',
+        // Urban Sharing (the Norwegian city-bike feeds) asks every client to
+        // name itself in this header; other operators ignore it.
+        'Client-Identifier': GBFS_CLIENT_IDENTIFIER,
+        ...gbfsUpstreamHeaders(new URL(url).hostname),
       },
       redirect: 'manual',
       signal: controller.signal,
@@ -213,7 +221,7 @@ export function gbfsProxy({ ratePerMinute = GBFS_RATE_PER_MIN } = {}) {
           return;
         }
 
-        if (!isAllowedGbfsPath(upstreamUrl.pathname)) {
+        if (!isAllowedGbfsPath(upstreamUrl.pathname, upstreamUrl.hostname)) {
           res.writeHead(400, {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-store',
