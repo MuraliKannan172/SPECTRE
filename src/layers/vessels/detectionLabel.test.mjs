@@ -1,6 +1,4 @@
-// C6: a vessel with an ambient card gets no detection callout under it (the
-// card already shows name, speed and course); the speed unit of a callout
-// follows the UI language.
+// The speed unit of a vessel's detection callout follows the UI language.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
@@ -60,20 +58,6 @@ function detectable(cameraZ) {
     _setVesselOverlayHostForTest();
   }
 }
-
-test('a vessel with a card on screen draws no detection label', () => {
-  const objects = detectable(2_500);
-  const hidden = Object.values(objects).filter((object) => object.hideLabel);
-  assert.equal(hidden.length, 1, 'exactly the carded vessel hides its label');
-  const shown = Object.values(objects).filter((object) => !object.hideLabel);
-  assert.equal(shown.length, 1, 'the vessel without a card keeps its label');
-  assert.equal(hidden[0].skipLabel, false, 'not treated as the tracked vessel');
-});
-
-test('past the card fade the detection label comes back', () => {
-  const objects = detectable(4_000_000);
-  assert.ok(Object.values(objects).every((object) => !object.hideLabel));
-});
 
 test('ru: the callout speed unit is translated', () => {
   setLocale('ru');

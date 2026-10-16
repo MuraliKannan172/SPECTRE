@@ -471,7 +471,7 @@ export function createQueries({
      * @param {Object} [options={}] - Options from the detection system.
      * @param {number} [options.maxCount] - Maximum objects to return (defaults to all).
      * @param {number} [options.seed] - Seed offset for stride sampling.
-     * @returns {Array<{position: Cesium.Cartesian3, id: string, type: string, skipLabel: boolean, hideLabel: boolean}>}
+     * @returns {Array<{position: Cesium.Cartesian3, id: string, type: string, skipLabel: boolean}>}
      */
     getDetectableObjects(options = {}) {
       if (
@@ -492,7 +492,6 @@ export function createQueries({
       const start = seed % stride;
 
       const selected = state.selectedRecord;
-      const carded = state.cardedRecords;
       const result = [];
       for (let idx = 0; idx < records.length; idx += 1) {
         if ((idx - start) % stride !== 0) continue;
@@ -507,9 +506,6 @@ export function createQueries({
           id: record.name || record.mmsi || 'VESSEL',
           type: 'SEA',
           skipLabel: record === selected,
-          // An open ambient card already names the vessel with its speed and
-          // course; a detection label under it would only cover them.
-          hideLabel: carded?.has(record) === true,
           klass: record.type
             ? String(record.type).toUpperCase().slice(0, 14)
             : undefined,

@@ -70,7 +70,6 @@ export function createVesselState({ source, services }) {
     activeFocusCount: 0,
     activeLabelCount: 0,
     /** @type {Set<Object>} Records that have an ambient card this pass. */
-    cardedRecords: new Set(),
     selectedRecord: null,
     /** @type {{setPositions: Function, clear: Function, destroy: Function}|null} Selected-vessel fading trail */
     trail: null,

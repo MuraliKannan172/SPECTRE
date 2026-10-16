@@ -129,7 +129,6 @@ export function createLifecycle({
     state.lastFocusUpdate = 0;
     state.activeFocusCount = 0;
     state.activeLabelCount = 0;
-    state.cardedRecords = new Set();
     state.selectedRecord = null;
     state.trail = null;
     state.trailPositions = [];

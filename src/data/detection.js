@@ -1450,9 +1450,6 @@ function _drawOverlay(frame) {
       if (bracketAlpha > 0) protectedVisibleCount++;
       continue;
     }
-    // The source shows its own card for this object (e.g. an ambient vessel
-    // card): keep the bracket, draw no callout over the card.
-    if (obj.hideLabel) continue;
 
     const primary = String(obj.id || '');
     const micro = String(obj.metric || '');
