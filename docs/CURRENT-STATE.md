@@ -1352,6 +1352,19 @@ Node-only package entries expose both provider factories. Routes, payloads,
 fallback behavior and existing dev/preview hook registration are preserved;
 browser rendering is unchanged.
 
+## CCTV missing numeric fields
+
+CCTV numbers are read as missing when they are absent, null, blank or boolean,
+on the server (`toFiniteNumber`, every pack and the file/env source packs) and
+in the browser (`safeNumber`). `/api/cctv/sources` sends an unknown number as
+JSON null; the browser then uses the bundled seed camera's value when one
+shares the id, else the field's default — id-hash heading, pitch −17°, FOV 74°
+(which a matched datasheet can still replace), range 700 m, mount 24 m, the
+city's ground elevation — rather than reading zero and clamping it to the
+field's floor. A camera with a missing latitude or longitude and no seed
+position is skipped by the browser catalog instead of being placed at 0,0.
+Real zeros, including `"0"`, are kept.
+
 ## Terrain, traffic, fire and bike-share provider modules
 
 Local composition now imports separate Node modules for Re:Earth heights,
