@@ -1,9 +1,5 @@
 # Changelog
 
-- Director shot actions land on the requested shot. A seek to a shot's start
-  could round a hair below it and select the end of the previous shot for some
-  shot counts and durations.
-
 - Local FM seek finds stations after wrapping around 87.5–108 MHz, covers both
   band edges, skips the starting station and rejects spectra from an earlier
   tune (Aditya, @Rohilalala, #1174).
