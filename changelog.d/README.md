@@ -38,6 +38,13 @@ The assembler refuses a batch rather than guessing: a filename that is not
 `<pull request>-<slug>.md`, or two fragments claiming one pull request number,
 stops the run before anything is written and names the files.
 
+If `npm run changelog` fails part-way (a full disk, a killed process), run it
+again. The batch is staged in `changelog.d/.assembling/` and only lands when the
+assembled file replaces `CHANGELOG.md` in a single rename, so the rerun either
+finishes that batch or puts its fragments back first. It never adds an entry
+twice or drops one. `npm run changelog:check` names a staged batch, if one is
+left over, instead of reporting past it.
+
 A documentation claim that needs a regression test — the way
 `src/annotations/drawTool.test.mjs` asserts against `CHANGELOG.md` — should
 assert against `docs/CURRENT-STATE.md` or `README.md` instead. A pull request
