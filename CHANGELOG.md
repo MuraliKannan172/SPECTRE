@@ -1,5 +1,13 @@
 # Changelog
 
+- Add nine Ontario transit feeds: TTC, MiWay, Hamilton HSR, Durham Region,
+  YRT/Viva, Guelph, Burlington, Barrie and Kingston, each carrying its own
+  licence quote and attribution. A feed can now name its own modes, so Toronto's
+  trams read "Streetcar" while Helsinki's stay "Tram", and a feed whose route ids
+  are internal keys can translate them to the number a rider would say. TTC
+  vehicles take their mode from the fleet number first, so replacement buses on
+  streetcar routes read as buses and out-of-service streetcars stay streetcars.
+
 - CCTV cameras with identified hardware show the model's datasheet specs. When a
   source names a camera model found in the vendored CCTV Camera Database records
   (CC0), the HUD meta line adds its resolution, night vision and PTZ capability.
