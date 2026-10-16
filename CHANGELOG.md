@@ -1,10 +1,5 @@
 # Changelog
 
-- `aircraft_in_area` and `vessels_in_area` take `group_by` and `stats`, so an
-  MCP client can ask which countries, aircraft types or ship types dominate an
-  area, or the average altitude or speed, over every match instead of
-  estimating from the returned rows. Operator and type are counted only where
-  the feed reports them.
 - Local FM seek finds stations after wrapping around 87.5–108 MHz, covers both
   band edges, skips the starting station and rejects spectra from an earlier
   tune (Aditya, @Rohilalala, #1174).
