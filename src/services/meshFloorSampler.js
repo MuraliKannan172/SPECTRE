@@ -84,8 +84,11 @@ export function createMeshFloorSampler({
    */
   function _approxKm(lat1, lon1, lat2, lon2) {
     const dLat = (lat2 - lat1) * 111.32;
+    // The short way round, so points either side of 180° stay close.
+    let dLonDeg = lon2 - lon1;
+    dLonDeg -= 360 * Math.round(dLonDeg / 360);
     const dLon =
-      (lon2 - lon1) * 111.32 * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
+      dLonDeg * 111.32 * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
     return Math.hypot(dLat, dLon);
   }
 
