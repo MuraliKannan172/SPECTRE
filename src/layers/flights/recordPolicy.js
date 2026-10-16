@@ -13,12 +13,4 @@ export const MISSING_POLL_LIMIT = 3;
 export const ERROR_BACKOFF_INTERVAL = 20000;
 
 /** Local equirectangular distance used for viewer-proximate floor sampling. */
-export function approxDistanceKm(lat1, lon1, lat2, lon2) {
-  const dLat = (lat2 - lat1) * 111.32;
-  // The short way round, so points either side of 180° stay close.
-  let dLonDeg = lon2 - lon1;
-  dLonDeg -= 360 * Math.round(dLonDeg / 360);
-  const dLon =
-    dLonDeg * 111.32 * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
-  return Math.hypot(dLat, dLon);
-}
+export { approxDistanceKm } from '../../data/approxDistance.js';

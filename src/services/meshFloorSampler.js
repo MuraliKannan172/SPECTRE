@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+import { approxDistanceKm } from '../data/approxDistance.js';
 
 /** Construct an instance-owned meshFloorSampler service with explicit dependencies. */
 export function createMeshFloorSampler({
@@ -80,19 +81,6 @@ export function createMeshFloorSampler({
   }
 
   /**
-   * Equirectangular distance (km) — same approximation the flights clamp uses.
-   */
-  function _approxKm(lat1, lon1, lat2, lon2) {
-    const dLat = (lat2 - lat1) * 111.32;
-    // The short way round, so points either side of 180° stay close.
-    let dLonDeg = lon2 - lon1;
-    dLonDeg -= 360 * Math.round(dLonDeg / 360);
-    const dLon =
-      dLonDeg * 111.32 * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
-    return Math.hypot(dLat, dLon);
-  }
-
-  /**
    * Samples the rendered mesh height for the coarse cells containing `points`,
    * one-shot per cell, budget-capped, viewer-proximity-gated. Call ONCE per
    * layer poll (never per contact, never per frame). Synchronous — Cesium's
@@ -136,7 +124,7 @@ export function createMeshFloorSampler({
       if (
         Number.isFinite(viewerLat) &&
         Number.isFinite(viewerLon) &&
-        _approxKm(viewerLat, viewerLon, cell.lat, cell.lon) > MAX_SAMPLE_DIST_KM
+        approxDistanceKm(viewerLat, viewerLon, cell.lat, cell.lon) > MAX_SAMPLE_DIST_KM
       ) {
         continue; // too far: tiles not streamed there, probe would be a guaranteed miss
       }
