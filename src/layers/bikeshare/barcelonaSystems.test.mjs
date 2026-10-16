@@ -70,6 +70,26 @@ test('a camera over each outermost station activates its system', () => {
   }
 });
 
+test('each load radius reaches its outermost stations', () => {
+  // The range check floors every radius at 100 km, so the test above passes
+  // with any loadRadiusKm; get_bike_share uses the radius as registered.
+  for (const [id, expected] of Object.entries(SYSTEMS)) {
+    const system = CITY_BY_ID.get(id);
+    for (const station of expected.stations) {
+      const distance = parts.model.haversineKm(
+        system.centerLat,
+        system.centerLon,
+        station.lat,
+        station.lon,
+      );
+      assert.ok(
+        distance <= system.loadRadiusKm,
+        `${station.name} is ${distance.toFixed(1)} km from the ${id} centre`,
+      );
+    }
+  }
+});
+
 test('a camera over central Barcelona activates both systems', () => {
   // Plaça de Catalunya.
   const active = computeInRangeCities({ lat: 41.387, lon: 2.17 });
