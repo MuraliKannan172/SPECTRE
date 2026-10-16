@@ -89,9 +89,8 @@ try {
     const url = new URL(request.url());
     if (
       url.pathname === '/api/geocode' ||
-      (url.hostname === 'photon.komoot.io' && url.pathname === '/api/') ||
-      (url.hostname === 'maps.googleapis.com' &&
-        url.pathname === '/maps/api/geocode/json')
+      url.pathname === '/api/google/geocode' ||
+      (url.hostname === 'photon.komoot.io' && url.pathname === '/api/')
     )
       geocoderRequests.push(request.url());
   };
