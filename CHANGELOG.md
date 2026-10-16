@@ -1,5 +1,12 @@
 # Changelog
 
+- Add Bogotá (Tembici, 250 stations) and Santiago de Chile (Bike Itaú, 200
+  stations) to the GBFS bikeshare registry, the layer's first stations in
+  Colombia and Chile. Both are PBSC feeds like the Brazilian Bike Itaú cities,
+  so no proxy change is needed. Both feeds also list depot stations on other
+  continents (São Paulo, Madrid) as in service; stations outside a city's load
+  radius are now dropped instead of drawn as live docks.
+
 - Add Barcelona's bike share to the GBFS registry: Bicing (543 stations, the
   city's PBSC system) and AMBici (237 e-bike stations across the metropolitan
   area, run by nextbike). Both are keyless GBFS 2.3 feeds listed in
