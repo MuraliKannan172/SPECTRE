@@ -45,7 +45,7 @@ import {
   registerUnsavedWork,
   t,
 } from '../i18n/index.js';
-import { LOCALES, LOCALE_NAMES } from '../i18n/locale.js';
+import { applyLocaleChoice, mountLocalePicker } from './localePicker.js';
 
 /**
  * Central UI orchestrator for the God's Eye View application.
@@ -715,17 +715,13 @@ export class StyleManager extends ShellFacade {
   }
 
   /**
-   * Renders the command-dock locale switch: one button per shipped locale,
-   * labelled with its code and named in its own language. A click stores the
-   * choice and reloads, so nothing re-renders live; it asks first when the
-   * reload would lose work (see _confirmLocaleReload).
+   * Mounts the interface language picker in the bottom-right corner
+   * (src/ui/localePicker.js). Choosing another language stores it and
+   * reloads, so nothing re-renders live; it asks first when the reload would
+   * lose work (see _chooseLocale).
    * @returns {void}
    */
   _initLocaleSelector() {
-    const container = document.querySelector(
-      '#control-panel .dock-locale-switch',
-    );
-    if (!container) return;
     // Work this shell can see that a reload drops. Other modules register
     // their own (registerUnsavedWork in src/i18n/index.js).
     this._unsavedWorkChecks = [
@@ -740,24 +736,27 @@ export class StyleManager extends ShellFacade {
         this.cockpitView?.active ? msg('the open cockpit') : null,
       ),
     ];
-    const active = getLocale();
-    for (const locale of LOCALES) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'dock-locale-btn';
-      button.dataset.locale = locale;
-      button.textContent = locale.toUpperCase();
-      button.setAttribute('aria-label', LOCALE_NAMES[locale]);
-      button.lang = locale;
-      const isActive = locale === active;
-      button.classList.toggle('active', isActive);
-      button.setAttribute('aria-pressed', String(isActive));
-      button.addEventListener('click', () => {
-        if (!this._confirmLocaleReload()) return;
-        persistLocaleAndReload(button.dataset.locale);
-      });
-      container.appendChild(button);
-    }
+    const root = globalThis.document?.getElementById?.('locale-picker');
+    if (!root) return;
+    this._localePicker = mountLocalePicker({
+      root,
+      current: getLocale(),
+      onSelect: (locale) => this._chooseLocale(locale),
+    });
+  }
+
+  /**
+   * Switch to `locale`: nothing for the active language, otherwise store it
+   * and reload once _confirmLocaleReload agrees.
+   * @param {string} locale
+   * @returns {'unchanged'|'declined'|'switched'}
+   */
+  _chooseLocale(locale) {
+    return applyLocaleChoice(locale, {
+      current: getLocale(),
+      confirmSwitch: () => this._confirmLocaleReload(),
+      switchLocale: (next) => persistLocaleAndReload(next),
+    });
   }
 
   /**
@@ -1759,6 +1758,8 @@ export class StyleManager extends ShellFacade {
     this._lifetime.destroy();
     for (const unregister of this._unsavedWorkChecks?.splice(0) ?? [])
       unregister();
+    this._localePicker?.destroy();
+    this._localePicker = null;
     this._recording.destroy();
     this._panelChrome.destroy();
     this._feedback.destroy();

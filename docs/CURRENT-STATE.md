@@ -3209,8 +3209,8 @@ Shipped locales: **en** (source and fallback), **es** and **ru**. The code lives
 - **Locale choice.** `?lang=` → stored choice (`gev:locale:v1`) →
   `navigator.languages` → English. `?lang=` is not stored: it applies while it
   stays in the address, and the copied share link drops it, so a recipient keeps
-  their own language. The language switch in the Visual Presets dock stores the
-  choice, removes `?lang=` (keeps it only where storage is blocked) and reloads,
+  their own language. The language picker in the bottom-right corner (a globe
+  button beside POWER UP, `src/ui/localePicker.js`) stores the choice, removes `?lang=` (keeps it only where storage is blocked) and reloads,
   so nothing re-renders live; it asks first when the reload would lose work
   (unsaved CCTV calibration, the open cockpit, Draw marks on the board,
   imported map files, an active voice session — each registered through

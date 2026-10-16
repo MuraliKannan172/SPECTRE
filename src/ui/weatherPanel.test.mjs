@@ -689,7 +689,6 @@ test('history time keeps the hour whatever the length of the localized date (K-6
   }
 });
 
-
 test('air-quality readout renders its band legend, Canada coverage and worst-first list', async () => {
   const observedMs = Date.now() - 10 * 60_000;
   const reading = (stationId, value, band, name) => ({

@@ -2,10 +2,16 @@
        both the chip and this dialog outright when /api/setup/status is not
        there to answer (prod builds, LAN visitors). Rows are rendered from
        that payload, so the key registry lives in src/keySetupCore.mjs alone. -->
-  <button id="key-setup-chip" type="button" hidden aria-haspopup="dialog" aria-controls="key-setup">
-    <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
-    <span data-key-setup-chip-label data-i18n>POWER UP</span>
-  </button>
+  <!-- Bottom-right corner, one HUD row: the POWER UP chip (while keys are
+       missing) and, in the very corner, the interface language picker that
+       src/ui/localePicker.js renders into #locale-picker. -->
+  <div id="corner-actions">
+    <button id="key-setup-chip" type="button" hidden aria-haspopup="dialog" aria-controls="key-setup">
+      <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+      <span data-key-setup-chip-label data-i18n>POWER UP</span>
+    </button>
+    <div id="locale-picker"></div>
+  </div>
   <aside id="key-setup" role="dialog" aria-labelledby="key-setup-title" aria-describedby="key-setup-description" hidden>
     <div class="key-setup-scanline" aria-hidden="true"></div>
     <header class="key-setup-header">
