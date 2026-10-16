@@ -108,6 +108,18 @@ Catalog calls check their cancellation signal immediately before executing a
 tool. Already-cancelled queries do not start; cancellation after execution starts
 continues to follow the existing tool and caller behavior.
 
+Fire-perimeter queries test polygon interiors and holes on continuous unwrapped
+longitudes, matching the short-edge convention used for boundary intersections.
+An outline crossing ±180° contains nearby boxes and radius areas without also
+containing their counterparts near Greenwich. Returned perimeter coordinates
+use a circular mean for longitude, including multipart outlines. Incident cards
+also use a circular longitude mean over the largest outer ring (excluding its
+repeated closing vertex). Their relative-area comparison follows short longitude
+edges so a small dateline-crossing part cannot outweigh a larger ordinary part.
+Regression coverage lives in `src/tools/area.test.mjs`,
+`src/tools/queries/environment.test.mjs` and
+`src/layers/perimeters/cards.test.mjs`.
+
 ## Cyber HUD — September 30, 2026
 
 Display > HUD > Layout includes Cyber, also available through the HUD voice
