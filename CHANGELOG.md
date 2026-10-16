@@ -1,5 +1,14 @@
 # Changelog
 
+- Local FM seek finds stations after wrapping around 87.5–108 MHz, covers both
+  band edges, skips the starting station and rejects spectra from an earlier
+  tune (Aditya, @Rohilalala, #1174).
+- Local RTL-SDR keeps USB reads queued in order and bounds pending decoder
+  work. A stalled or overloaded decoder stops with an explicit error; stopping
+  terminates its worker and rejects late audio. FM playback buffers short
+  scheduling gaps, caps its audio queue at 256 ms, and reduces display updates
+  and spectrum calculations while listening.
+
 - Add Bogotá (Tembici, 250 stations) and Santiago de Chile (Bike Itaú, 200
   stations) to the GBFS bikeshare registry, the layer's first stations in
   Colombia and Chile. Both are PBSC feeds like the Brazilian Bike Itaú cities,
