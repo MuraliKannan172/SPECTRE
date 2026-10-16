@@ -8,6 +8,16 @@
   Manifest paths are relative to the manifest, so a build served under a path
   prefix installs and launches inside that prefix.
 
+- Cyclone advisories no longer go dark while NHC publishes an advisory ahead
+  of its nominal time: advisory and position times up to 90 minutes ahead of
+  the server clock are accepted (previously 5 minutes), so the whole feed is
+  not rejected for about half an hour each advisory cycle.
+
+- Flights age out vanished aircraft again. OpenSky's routine position-less rows
+  no longer mark every snapshot partial, which had kept vanished and landed
+  aircraft at full opacity for up to five minutes; those rows retain only their
+  own aircraft, and a likely-landed one still leaves on the landed limit.
+
 - Add WSDOT highway cameras (Washington State) as a keyless CCTV source pack:
   WSDOT's official Travel Center camera layer, with frames registered only on
   WSDOT's own image host (partner-hosted cameras such as Oregon DOT and City of

@@ -339,7 +339,12 @@ Cyclones combine fixed NHC/CPHC status and summary GIS endpoints through a bound
 same-origin provider. The status endpoint lacks browser CORS; each installation
 fetches keyless public sources at runtime, with no centralized ingestion service.
 The five-minute snapshot covers Atlantic and eastern/central North Pacific only.
-Current positions, advisory issue time and position time stay distinct. Tracks,
+Current positions, advisory issue time and position time stay distinct. NHC may
+release an advisory before its nominal time (routinely up to about 30 minutes,
+rarely about an hour), so advisory issue and position times up to and including
+90 minutes ahead of the server clock are accepted; 90 minutes is this app's
+tolerance, not an NHC limit. Later, non-canonical, or more than 12-hour-old
+times still reject the status snapshot. Tracks,
 forecast lead-hour points and cones render only when all source parts match the
 status advisory; a newer status shows its position with geometry pending rather
 than relabeling older geometry. The cone represents forecast center uncertainty,
@@ -872,7 +877,13 @@ addition to the locally accumulated trail, never a promise of complete coverage.
 
 Snapshot coverage, completeness and freshness are separate fields. A partially
 admitted aircraft snapshot retains absent contacts for up to five minutes before
-the usual missed-poll eviction. Unknown snapshot times remain unknown in stats. An invalid nonempty
+the usual missed-poll eviction. An OpenSky row with an ICAO24 address but null
+longitude and latitude is a contact without a position, not a malformed row: it
+leaves the snapshot complete and is listed in `retainIds`, so civil flights
+retain that aircraft under the same five-minute bound, unless it is likely
+landed, while other absent aircraft fade and leave on the missed-poll limits. A
+nonempty snapshot with no positioned rows is still malformed. Military readsb
+admission is unchanged. Unknown snapshot times remain unknown in stats. An invalid nonempty
 snapshot retains the previous display. Empty vessel refreshes retain the existing
 first-connect grace and warm-data behavior. Known source failures have bounded
 messages; arbitrary HTTP response bodies are not surfaced as diagnostics.
