@@ -105,7 +105,10 @@ test('push-to-talk: the held gesture sends the target once, with the chip after 
     { pushToTalk: true },
   );
   controller.beginPointerTurn('keydown');
-  await event({ type: 'input_audio_buffer.speech_started' });
+  await event({
+    type: 'input_audio_buffer.speech_started',
+    item_id: 'ptt-held-pointer',
+  });
   assert.deepEqual(
     pointer.calls.map(([at]) => at),
     ['keydown', 'speech_start'],
@@ -145,7 +148,10 @@ test('push-to-talk: a speech start after the release keeps the gesture referent'
   });
   controller.beginPointerTurn('keydown');
   pointer.releaseHold();
-  await event({ type: 'input_audio_buffer.speech_started' });
+  await event({
+    type: 'input_audio_buffer.speech_started',
+    item_id: 'ptt-released-pointer',
+  });
   assert.equal(
     pointer.calls.length,
     1,
@@ -158,7 +164,10 @@ test('push-to-talk: a speech start after the release keeps the gesture referent'
 test('open mic: only a recent pointer counts, and the model learns only that one exists', async () => {
   const pointer = fakePointer([aircraftSnapshot]);
   const { events, event, items } = controllerFixture(pointer);
-  await event({ type: 'input_audio_buffer.speech_started' });
+  await event({
+    type: 'input_audio_buffer.speech_started',
+    item_id: 'open-mic-recent-pointer',
+  });
   assert.equal(
     pointer.calls[0][1],
     POINTER_OPEN_MIC_RECENT_MS,
@@ -179,7 +188,10 @@ test('open mic: only a recent pointer counts, and the model learns only that one
 test('open mic: the chip and reticle appear when a tool resolves the pointer, once', async () => {
   const pointer = fakePointer([aircraftSnapshot]);
   const { controller, events, event } = controllerFixture(pointer);
-  await event({ type: 'input_audio_buffer.speech_started' });
+  await event({
+    type: 'input_audio_buffer.speech_started',
+    item_id: 'open-mic-resolved-pointer',
+  });
   assert.equal(controller.announcePointer(), true);
   assert.equal(controller.announcePointer(), false);
   assert.equal(

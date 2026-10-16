@@ -32,6 +32,7 @@ export function subscribeVoiceUserTurn(token, listener) {
 export function createVoiceUserTurnTracker({
   setTimer = setTimeout,
   clearTimer = clearTimeout,
+  keyedRequests = false,
 } = {}) {
   let current = null;
   const responses = new Map();
@@ -39,6 +40,7 @@ export function createVoiceUserTurnTracker({
   const pending = [];
   const waiters = new Set();
   let overflow = false;
+  let resetGeneration = 0;
   const retireCurrent = () => {
     const previous = current;
     current = null;
@@ -70,12 +72,15 @@ export function createVoiceUserTurnTracker({
     }
   };
   const reset = () => {
+    resetGeneration++;
     settleWaiters({ status: 'stale', userTurn: undefined });
-    retireCurrent();
+    const previous = current;
+    current = null;
     responses.clear();
     inputs.clear();
     pending.length = 0;
     overflow = false;
+    notifyVoiceUserTurn(previous, { retire: true });
   };
   const begin = (
     itemId,
@@ -86,7 +91,7 @@ export function createVoiceUserTurnTracker({
     // Keep pending response reservations for older turns. Their delayed
     // response.created must consume their own slot, never the newer input.
     settleWaiters({ status: 'stale', userTurn: undefined });
-    retireCurrent();
+    const previous = current;
     responses.clear();
     const token = Object.freeze({});
     const record = {
@@ -104,6 +109,8 @@ export function createVoiceUserTurnTracker({
       inputs.set(itemId, record);
       while (inputs.size > 16) inputs.delete(inputs.keys().next().value);
     }
+    notifyVoiceUserTurn(previous, { retire: true });
+    return current === record ? token : undefined;
   };
   const reserve = (record, requestId = null) => {
     if (overflow) return;
@@ -121,8 +128,8 @@ export function createVoiceUserTurnTracker({
     },
     invalidate() {
       settleWaiters({ status: 'stale', userTurn: undefined });
-      retireCurrent();
       responses.clear();
+      retireCurrent();
     },
     rejectPendingResponse(requestId) {
       if (!requestId) return false;
@@ -130,17 +137,26 @@ export function createVoiceUserTurnTracker({
       if (index < 0) return false;
       const [{ record }] = pending.splice(index, 1);
       if (record === current) {
-        retireCurrent();
         responses.clear();
+        retireCurrent();
       }
       return true;
     },
     text(text) {
-      begin(null, typeof text === 'string' ? text.trim() : '', 'typed');
+      return begin(null, typeof text === 'string' ? text.trim() : '', 'typed');
     },
-    speechStarted(itemId, { transcriptionEnabled = true } = {}) {
+    // Provider adapters own duplicate/input admission before this transition.
+    speechStarted(
+      itemId,
+      { transcriptionEnabled = true, isCurrent = () => true } = {},
+    ) {
+      const generation = resetGeneration;
       settleWaiters({ status: 'stale', userTurn: undefined });
       retireCurrent();
+      // A synchronous token observer may Stop/replace the session. That reset
+      // owns the new lifetime. An observer can also submit newer typed input;
+      // this old onset must not overwrite either successor after notification.
+      if (resetGeneration !== generation || !isCurrent()) return;
       responses.clear();
       if (typeof itemId === 'string' && itemId)
         begin(
@@ -195,6 +211,14 @@ export function createVoiceUserTurnTracker({
       notifyVoiceUserTurn(current);
       return true;
     },
+    rememberSupersededSpeech(itemId) {
+      // An admitted onset can lose to newer local input during notification,
+      // before it becomes current. Its later real commit still needs a stale
+      // identity, but remembering it grants no token or response reservation.
+      if (typeof itemId !== 'string' || !itemId || inputs.has(itemId)) return;
+      inputs.set(itemId, { itemId, committed: false });
+      while (inputs.size > 16) inputs.delete(inputs.keys().next().value);
+    },
     commitSpeech(itemId) {
       // A provider input-buffer commit causes one automatic VAD response.
       const record = inputs.get(itemId);
@@ -202,14 +226,42 @@ export function createVoiceUserTurnTracker({
       if (record) record.committed = true;
       reserve(record || null);
     },
+    captureRequest(responseId = undefined) {
+      const record =
+        responseId === undefined ? current : responses.get(responseId) || null;
+      const generation = resetGeneration;
+      let reserved = false;
+      return Object.freeze({
+        isCurrent: () => generation === resetGeneration && record === current,
+        reserve(requestId) {
+          if (reserved || generation !== resetGeneration) return false;
+          reserved = true;
+          // Capture before transport callbacks, reserve only after send. A
+          // newer input makes this original record stale, never its successor.
+          reserve(record, requestId);
+          return true;
+        },
+      });
+    },
     expectResponse(requestId = null) {
       // Called only when the application sends a typed/tool-follow-up response
       // request; generated out-of-band progress responses do not reserve one.
       reserve(current, requestId);
     },
-    bindResponse(id) {
+    bindResponse(id, requestId = null) {
       if (!id || overflow) return null;
-      const record = pending.shift()?.record;
+      if (keyedRequests && responses.has(id))
+        return responses.get(id) === current ? 'current' : 'stale';
+      let index = 0;
+      if (keyedRequests) {
+        // Only server-returned client metadata can select a client request.
+        // Untagged automatic responses cannot borrow typed/follow-up slots.
+        if (requestId !== null && (typeof requestId !== 'string' || !requestId))
+          return 'stale';
+        index = pending.findIndex((slot) => slot.requestId === requestId);
+        if (index < 0) return requestId === null ? 'untracked' : 'stale';
+      }
+      const record = pending.splice(index, 1)[0]?.record;
       if (!record) return 'untracked';
       if (record !== current) return 'stale';
       responses.set(id, record);
@@ -254,8 +306,8 @@ export function createVoiceUserTurnTracker({
       // A function-call response can continue after its tool result. A final
       // answer retires the request, so later automatic turns cannot reuse it.
       if (record && record === current && !hasToolCalls) {
-        retireCurrent();
         responses.clear();
+        retireCurrent();
       }
     },
     reset,

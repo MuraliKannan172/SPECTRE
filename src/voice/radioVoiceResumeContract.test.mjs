@@ -424,7 +424,14 @@ function fixture(t, initialProvider) {
       } else {
         await receiveOpenAI({
           type: 'response.created',
-          response: { id: 'radio-request' },
+          response: {
+            id: 'radio-request',
+            metadata: peers
+              .at(-1)
+              .channel.sent.findLast(
+                (event) => event.type === 'response.create',
+              ).response.metadata,
+          },
         });
         await receiveOpenAI({
           type: 'response.function_call_arguments.done',
@@ -435,11 +442,22 @@ function fixture(t, initialProvider) {
         });
         await receiveOpenAI({
           type: 'response.done',
-          response: { id: 'radio-request', status: 'completed' },
+          response: {
+            id: 'radio-request',
+            status: 'completed',
+            output: [{ type: 'function_call' }],
+          },
         });
         await receiveOpenAI({
           type: 'response.created',
-          response: { id: 'radio-confirmation' },
+          response: {
+            id: 'radio-confirmation',
+            metadata: peers
+              .at(-1)
+              .channel.sent.findLast(
+                (event) => event.type === 'response.create',
+              ).response.metadata,
+          },
         });
         await receiveOpenAI({
           type: 'response.done',

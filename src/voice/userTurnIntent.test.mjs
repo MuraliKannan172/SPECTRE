@@ -459,3 +459,39 @@ test('reset invalidates tokens even when a later session reuses provider respons
   assert.equal(readVoiceUserTurnText(old), undefined);
   assert.equal(readVoiceUserTurnText(fresh), 'switch to OpenAI');
 });
+
+for (const transition of [
+  'text',
+  'invalidate',
+  'complete',
+  'reject',
+  'reset',
+]) {
+  test(`retirement ${transition} cannot erase a response bound by its observer`, () => {
+    const t = createVoiceUserTurnTracker({ keyedRequests: true });
+    t.text('old');
+    t.expectResponse('old-key');
+    t.bindResponse('old-response', 'old-key');
+    const old = t.forResponse('old-response');
+    if (transition === 'reject') t.expectResponse('reject-key');
+    let next;
+    subscribeVoiceUserTurn(old, () => {
+      if (readVoiceUserTurnText(old) !== undefined) return;
+      t.text('newer observer');
+      t.expectResponse('new-key');
+      t.bindResponse('new-response', 'new-key');
+      next = t.forResponse('new-response');
+    });
+    if (transition === 'text') t.text('older outer');
+    if (transition === 'invalidate') t.invalidate();
+    if (transition === 'complete') t.completeResponse('old-response');
+    if (transition === 'reject') t.rejectPendingResponse('reject-key');
+    if (transition === 'reset') t.reset();
+    assert.equal(readVoiceUserTurnText(old), undefined);
+    assert.equal(
+      readVoiceUserTurnText(t.forResponse('new-response')),
+      'newer observer',
+    );
+    assert.equal(t.forResponse('new-response'), next);
+  });
+}

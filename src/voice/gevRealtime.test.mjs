@@ -1334,21 +1334,34 @@ async function beginTestToolResponse(controller, responseId) {
 }
 
 async function continueTestToolResponse(controller, previousId, responseId) {
-  await controller.handleRealtimeEvent({
-    data: JSON.stringify({
-      type: 'response.done',
-      response: {
-        id: previousId,
-        status: 'completed',
-        output: [{ type: 'function_call' }],
-      },
-    }),
-  });
-  controller.queueResponseCreate('Continue the current user request.');
+  let metadata;
+  const channel = controller.dc;
+  const send = channel.send;
+  channel.send = function (body) {
+    const payload = JSON.parse(body);
+    if (payload.type === 'response.create')
+      metadata = payload.response?.metadata;
+    return send.call(this, body);
+  };
+  try {
+    await controller.handleRealtimeEvent({
+      data: JSON.stringify({
+        type: 'response.done',
+        response: {
+          id: previousId,
+          status: 'completed',
+          output: [{ type: 'function_call' }],
+        },
+      }),
+    });
+    controller.queueResponseCreate('Continue the current user request.');
+  } finally {
+    channel.send = send;
+  }
   await controller.handleRealtimeEvent({
     data: JSON.stringify({
       type: 'response.created',
-      response: { id: responseId },
+      response: { id: responseId, metadata },
     }),
   });
 }
@@ -1437,7 +1450,11 @@ test('Radio handoff waits for response.done so later multi-intent tools execute 
   await controller.handleRealtimeEvent(
     event({
       type: 'response.done',
-      response: { id: 'response-1', status: 'completed' },
+      response: {
+        id: 'response-1',
+        status: 'completed',
+        output: [{ type: 'function_call' }],
+      },
     }),
   );
   assert.deepEqual(order, [
@@ -1610,7 +1627,10 @@ test('detected speech cancels a prepared Radio handoff before a cancelled respon
   );
 
   await controller.handleRealtimeEvent(
-    event({ type: 'input_audio_buffer.speech_started' }),
+    event({
+      type: 'input_audio_buffer.speech_started',
+      item_id: 'speech-radio-confirmation',
+    }),
   );
   assert.equal(controller.pendingRadioPlaybackResult, null);
   await controller.handleRealtimeEvent(
@@ -1681,7 +1701,10 @@ test('a Radio tool result that resolves after speech interruption cannot re-arm 
   await Promise.resolve();
   assert.equal(receivedSignal?.aborted, false);
   await controller.handleRealtimeEvent(
-    event({ type: 'input_audio_buffer.speech_started' }),
+    event({
+      type: 'input_audio_buffer.speech_started',
+      item_id: 'speech-radio-in-flight',
+    }),
   );
   assert.equal(
     receivedSignal.aborted,

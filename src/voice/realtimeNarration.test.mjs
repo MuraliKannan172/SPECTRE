@@ -75,6 +75,18 @@ function controllerFixture({
 }
 
 const types = (sent) => sent.map((message) => message.type);
+const clientCreated = (f, id) =>
+  f.event({
+    type: 'response.created',
+    response: {
+      id,
+      metadata: f.sent.findLast(
+        (e) =>
+          e.type === 'response.create' &&
+          e.response?.metadata?.gev !== 'progress',
+      )?.response?.metadata,
+    },
+  });
 
 function speechFallbackFixture() {
   const calls = [];
@@ -401,7 +413,10 @@ test('user speech stops an audible progress line: cancel and clear its audio', a
   await progressLine('resp_p');
   await event({ type: 'output_audio_buffer.started', response_id: 'resp_p' });
   sent.length = 0;
-  await event({ type: 'input_audio_buffer.speech_started' });
+  await event({
+    type: 'input_audio_buffer.speech_started',
+    item_id: 'speech-during-progress',
+  });
   assert.deepEqual(types(sent), [
     'response.cancel',
     'output_audio_buffer.clear',
@@ -529,7 +544,7 @@ test('caption transcription is metered with the served transcription model', asy
 
 test('tools report start, progress and finish to narration; Radio stays silent', async () => {
   const calls = [];
-  const { controller, event } = controllerFixture({
+  const { controller, event, sent } = controllerFixture({
     runner: async (name, args, options) => {
       options.progress?.({ step: 'resolve', label: 'Zilker Park' });
       return { ok: true, action: name };
@@ -549,7 +564,14 @@ test('tools report start, progress and finish to narration; Radio stays silent',
   controller.sendTextCommand(
     'Mark Zilker Park and set Radio volume to 20 percent',
   );
-  await event({ type: 'response.created', response: { id: 'resp_t' } });
+  await event({
+    type: 'response.created',
+    response: {
+      id: 'resp_t',
+      metadata: sent.findLast((e) => e.type === 'response.create')?.response
+        ?.metadata,
+    },
+  });
   await event({
     type: 'response.output_audio_transcript.delta',
     response_id: 'resp_t',
@@ -599,7 +621,7 @@ test('OpenAI dispatch binds first-party input across a tool follow-up and retire
     },
   });
   f.controller.sendTextCommand('What am I looking at?');
-  await f.event({ type: 'response.created', response: { id: 'tools' } });
+  await clientCreated(f, 'tools');
   await f.event({
     type: 'response.function_call_arguments.done',
     response_id: 'tools',
@@ -618,7 +640,7 @@ test('OpenAI dispatch binds first-party input across a tool follow-up and retire
   assert.equal(calls[0].text, 'What am I looking at?');
   assert.equal(calls[0].options.responseId, 'tools');
   const token = calls[0].options.userTurn;
-  await f.event({ type: 'response.created', response: { id: 'ack' } });
+  await clientCreated(f, 'ack');
   assert.equal(
     observed.find(
       (event) => event.type === 'response-start' && event.responseId === 'ack',
@@ -797,7 +819,7 @@ test('OpenAI cancels a stale response reservation and keeps its successor curren
   });
   f.controller.sendTextCommand('old turn');
   f.controller.sendTextCommand('fresh turn');
-  await f.event({ type: 'response.created', response: { id: 'stale' } });
+  await clientCreated(f, 'stale');
   assert.equal(
     f.sent.findLast((message) => message.type === 'response.cancel')
       ?.response_id,
@@ -815,7 +837,7 @@ test('OpenAI cancels a stale response reservation and keeps its successor curren
     type: 'response.done',
     response: { id: 'stale', status: 'cancelled' },
   });
-  await f.event({ type: 'response.created', response: { id: 'fresh' } });
+  await clientCreated(f, 'fresh');
   await f.event({
     type: 'response.function_call_arguments.done',
     response_id: 'fresh',
@@ -838,7 +860,7 @@ test('OpenAI cancellation never publishes a stale resolved tool payload', async 
     },
   });
   f.controller.sendTextCommand('What is in the current view?');
-  await f.event({ type: 'response.created', response: { id: 'old' } });
+  await clientCreated(f, 'old');
   const pending = f.event({
     type: 'response.function_call_arguments.done',
     response_id: 'old',
@@ -900,7 +922,7 @@ for (const [label, cancel] of [
       },
     });
     f.controller.sendTextCommand('What is in the current view?');
-    await f.event({ type: 'response.created', response: { id: 'old' } });
+    await clientCreated(f, 'old');
     const pending = f.event({
       type: 'response.function_call_arguments.done',
       response_id: 'old',
@@ -1157,6 +1179,9 @@ test('an untracked tool refusal cannot erase restart-required state when its fol
     f.controller._turns.userTurnIntent.reservationState().pending,
     16,
   );
+  // No current input: an untracked refusal may speak neutral guidance, but
+  // must not borrow a different live typed request just to fill the queue.
+  f.controller._turns.userTurnIntent.invalidate();
   await f.event({
     type: 'response.function_call_arguments.done',
     call_id: 'untracked-overflow',

@@ -365,23 +365,23 @@ export class RealtimeRadio {
       epoch: this.radioHandoffEpoch,
       responseId: responseId || null,
     };
+    // Release only the old handoff before abort listeners can create a new one.
+    const shouldStopPlayback = this.radioHandoffInFlight;
+    const attemptId = this.radioHandoffAttemptId;
+    const radioLayer = this.radioLayer;
+    this.pendingRadioPlaybackResult = null;
+    this.radioHandoffInFlightResult = null;
+    this.radioToolHandoffReservations.clear();
+    this.radioHandoffDeferredByReservation = false;
+    this.radioHandoffInFlight = false;
+    this.radioHandoffAttemptId = null;
     if (abortTools) {
       this.abortTools();
     } else if (abortRadioSiblings) {
       this.abortRadioSiblingTools();
     }
-    this.pendingRadioPlaybackResult = null;
-    this.radioHandoffInFlightResult = null;
-    this.radioToolHandoffReservations.clear();
-    this.radioHandoffDeferredByReservation = false;
-    const shouldStopPlayback = this.radioHandoffInFlight;
-    const attemptId = this.radioHandoffAttemptId;
-    // Release ownership before Stop synchronously notifies playback observers;
-    // the resulting callback is then idempotent instead of re-entering Stop.
-    this.radioHandoffInFlight = false;
-    this.radioHandoffAttemptId = null;
     if (shouldStopPlayback) {
-      this.radioLayer?.stopPlayback?.({ origin: 'voice-cleanup', attemptId });
+      radioLayer?.stopPlayback?.({ origin: 'voice-cleanup', attemptId });
     }
   }
 

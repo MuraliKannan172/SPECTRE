@@ -1,5 +1,32 @@
 # Changelog
 
+- Add Bogotá (Tembici, 250 stations) and Santiago de Chile (Bike Itaú, 200
+  stations) to the GBFS bikeshare registry, the layer's first stations in
+  Colombia and Chile. Both are PBSC feeds like the Brazilian Bike Itaú cities,
+  so no proxy change is needed. Both feeds also list depot stations on other
+  continents (São Paulo, Madrid) as in service; stations outside a city's load
+  radius are now dropped instead of drawn as live docks.
+
+- Preserve newer typed input submitted during rejected-response cleanup, and
+  reject repeated OpenAI response creation IDs before they can consume a newer
+  speech turn or alter response state. Release exact ID history on Stop/reset.
+
+- Correlate OpenAI typed and tool-follow-up responses with client-authored
+  request metadata instead of automatic speech-response arrival order. Keep
+  deferred responses tied to their original input through send callbacks.
+
+- Ignore duplicate or previously admitted OpenAI speech-start events before
+  retiring input, cancelling tools or dropping queued typed responses. Retain
+  input IDs until session Stop/reset, and prevent observer-triggered Stop or
+  newer input from being overwritten by the interrupted admission callback.
+  An onset superseded inside a notification retains only a retired identity
+  for its later commit, keeping its response separate from newer typed input.
+
+- Preserve typed command ownership when an unobserved Gemini automatic activity
+  receives its interruption boundary; a separate new speech onset still revokes
+  that typed request during the wait. A newer OpenAI speech turn drops an unsent
+  typed response instead of binding that response to the speech transcript.
+
 - Add Barcelona's bike share to the GBFS registry: Bicing (543 stations, the
   city's PBSC system) and AMBici (237 e-bike stations across the metropolitan
   area, run by nextbike). Both are keyless GBFS 2.3 feeds listed in

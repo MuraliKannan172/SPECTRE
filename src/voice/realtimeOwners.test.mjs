@@ -674,7 +674,12 @@ test('late action or viewport completion cannot resume a stopped or replacement 
       await controller.handleRealtimeEvent({
         data: JSON.stringify({
           type: 'response.created',
-          response: { id: 'owned-response' },
+          response: {
+            id: 'owned-response',
+            metadata: controller.dc.sent.findLast(
+              (e) => e.type === 'response.create',
+            )?.response?.metadata,
+          },
         }),
       });
       const pending = controller.handleRealtimeEvent({

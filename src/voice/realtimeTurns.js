@@ -72,7 +72,9 @@ export class RealtimeTurns {
     this.responseCreatePending = false;
     this.userTurnPending = false;
     this.pendingResponseInstructions = null;
+    this.pendingResponseRequest = null;
     this.pendingUserTextResponse = false;
+    this.pendingUserTextRequest = null;
     this.activeResponseId = null;
     this.supersededResponseIds = new Set();
     this.activeToolAbortControllers = new Set();
@@ -87,7 +89,15 @@ export class RealtimeTurns {
     this.progressResponseIds = new Set();
     this.bestEffortEventIds = new Set();
     this.bestEffortSequence = 0;
-    this.userTurnIntent = createVoiceUserTurnTracker();
+    this.userTurnIntent = createVoiceUserTurnTracker({ keyedRequests: true });
+    // Retain exact provider IDs for this connection lifetime: evicting older
+    // IDs would let delayed starts revoke a newer input again. Stop/reset
+    // releases the ledger; it is not a rolling-window or presentation cache.
+    this.admittedSpeechItemIds = new Set();
+    // Semantic response admission survives completed binding-map eviction.
+    // Exact IDs are released at the actual owned connection lifetime end.
+    this.admittedResponseIds = new Set();
+    this.inputGeneration = 0;
     this.speechTranscriptionEnabled = true;
     this.responseRequestSequence = 0;
     this.outputClearReasons = [];
@@ -120,7 +130,7 @@ export class RealtimeTurns {
    * payload is serialized JSON, so place names stay structured DATA (the same
    * injection hygiene as failedLabels), never instruction-bearing prose.
    */
-  notifyMapEvent(payload) {
+  notifyMapEvent(payload, options) {
     if (!this.dc || this.dc.readyState !== 'open') return false;
     return this.sendRealtimeEvent(
       {
@@ -132,6 +142,7 @@ export class RealtimeTurns {
         },
       },
       'client.map_event',
+      options,
     );
   }
 
@@ -141,26 +152,41 @@ export class RealtimeTurns {
     }
     const cleanText = String(text || '').trim();
     if (!cleanText) return;
+    const generation = ++this.inputGeneration;
+    const channel = this.dc;
+    const owned = () =>
+      this.inputGeneration === generation &&
+      this.ownsConversation(channel) &&
+      !this.isSessionEnding();
     this.cancelRadioHandoff({ abortTools: true });
+    if (!owned()) return false;
     const responseId = this.activeResponseId;
     const audioPlaying = this.assistantAudioPlaying;
     const interruptsForProviderGuidance = Boolean(
       readVoiceProviderRequestText(cleanText),
     );
     this.supersedeActiveResponseForUserTurn();
-    if (interruptsForProviderGuidance && this.responseActive)
-      this.cancelResponse(responseId);
-    if (interruptsForProviderGuidance && audioPlaying)
-      this.clearOutputBuffer('provider-guidance');
+    if (interruptsForProviderGuidance && this.responseActive) {
+      this.cancelResponse(responseId, { isCurrent: owned });
+      if (!owned()) return false;
+    }
+    if (interruptsForProviderGuidance && audioPlaying) {
+      this.clearOutputBuffer('provider-guidance', { isCurrent: owned });
+      if (!owned()) return false;
+    }
     this.emitSessionEvent({ type: 'user-turn-start' });
+    if (!owned()) return false;
     this.userTurnIntent.text(cleanText);
-    this.metrics?.userText();
-    // New intent: stop any progress line, then start the new turn's timing.
+    if (!owned()) return false;
+    const request = this.userTurnIntent.captureRequest();
+    this.metrics?.userText(owned);
+    if (!owned()) return false;
     this.narration?.cancel();
+    if (!owned()) return false;
     this.narration?.userTurnEnded();
-    // A typed turn gets the same pointer context as a spoken one; it lands
-    // before the text so the model reads "this" with its referent.
-    this.beginPointerTurn?.('text');
+    if (!owned()) return false;
+    this.beginPointerTurn?.('text', { isCurrent: owned });
+    if (!owned()) return false;
     const itemEvent = {
       type: 'conversation.item.create',
       item: {
@@ -169,11 +195,16 @@ export class RealtimeTurns {
         content: [{ type: 'input_text', text: cleanText }],
       },
     };
-    if (!this.sendRealtimeEvent(itemEvent, 'client.user_text')) {
-      this.userTurnIntent.invalidate();
+    if (
+      !this.sendRealtimeEvent(itemEvent, 'client.user_text', {
+        isCurrent: owned,
+      })
+    ) {
+      if (owned() && request.isCurrent()) this.userTurnIntent.invalidate();
       return false;
     }
-    this.requestUserTextResponse();
+    if (!owned() || !request.isCurrent()) return false;
+    this.requestUserTextResponse(request);
   }
 
   /**
@@ -202,6 +233,7 @@ export class RealtimeTurns {
       }
     }
     this.pendingResponseInstructions = null;
+    this.pendingResponseRequest = null;
   }
 
   /**
@@ -226,13 +258,22 @@ export class RealtimeTurns {
    * active response finishes.
    * @returns {void}
    */
-  requestUserTextResponse() {
+  requestUserTextResponse(
+    request = this.pendingUserTextRequest ||
+      this.userTurnIntent.captureRequest(),
+  ) {
+    if (!request.isCurrent()) {
+      this.pendingUserTextResponse = false;
+      this.pendingUserTextRequest = null;
+      return;
+    }
     if (
       this.responseActive ||
       this.responseCreatePending ||
       this.progressGenerating()
     ) {
       this.pendingUserTextResponse = true;
+      this.pendingUserTextRequest = request;
       this.debugLog('response.create.deferred_user_text', {
         responseActive: this.responseActive,
         responseCreatePending: this.responseCreatePending,
@@ -241,14 +282,20 @@ export class RealtimeTurns {
     }
     if (!this.dc || this.dc.readyState !== 'open') return;
     this.pendingUserTextResponse = false;
+    this.pendingUserTextRequest = null;
     this.responseCreatePending = true;
     const eventId = `gev_response_${++this.responseRequestSequence}`;
+    const channel = this.dc;
     const sent = this.sendRealtimeEvent(
-      { type: 'response.create', event_id: eventId },
+      {
+        type: 'response.create',
+        event_id: eventId,
+        response: { metadata: { gev_request_id: eventId } },
+      },
       'client.response_create.user_text',
     );
-    if (sent) {
-      this.userTurnIntent.expectResponse(eventId);
+    if (sent && this.ownsConversation(channel) && !this.isSessionEnding()) {
+      request.reserve(eventId);
       this.endSessionForReservationOverflow();
     } else this.responseCreatePending = false;
   }
@@ -269,6 +316,42 @@ export class RealtimeTurns {
     return this.dc === channel && channel?.readyState === 'open';
   }
 
+  rejectSpeechStart(event, payload, channel) {
+    const source = event.currentTarget ?? event.target;
+    if (source != null && source !== channel) return 'channel';
+    if (!this.ownsConversation(channel) || this.isSessionEnding())
+      return 'session';
+    if (this.isProgressEvent(payload)) return 'progress';
+    const id = payload.item_id;
+    if (typeof id !== 'string' || !id) return 'item-id';
+    if (this.admittedSpeechItemIds.has(id)) return 'duplicate';
+    this.admittedSpeechItemIds.add(id);
+    return null;
+  }
+
+  rejectResponseCreated(event, payload, channel) {
+    const source = event.currentTarget ?? event.target;
+    if (source && source !== channel) return 'transport';
+    if (!this.ownsConversation(channel) || this.isSessionEnding())
+      return 'closed';
+    const id = payload.response?.id;
+    if (typeof id !== 'string' || !id) return 'invalid-response-id';
+    if (this.admittedResponseIds.has(id)) return 'duplicate';
+    this.admittedResponseIds.add(id);
+    return null;
+  }
+
+  rememberSupersededSpeechStart(payload, channel) {
+    // Never carry a retired onset across Stop/reset or connection replacement.
+    // This only remembers an input already admitted in the owned lifetime.
+    if (
+      this.ownsConversation(channel) &&
+      !this.isSessionEnding() &&
+      this.admittedSpeechItemIds.has(payload.item_id)
+    )
+      this.userTurnIntent.rememberSupersededSpeech(payload.item_id);
+  }
+
   async handleRealtimeEvent(event) {
     await this.processRealtimeEvent(event);
   }
@@ -280,6 +363,37 @@ export class RealtimeTurns {
       payload = JSON.parse(event.data);
     } catch {
       return;
+    }
+    const speechStart = payload?.type === 'input_audio_buffer.speech_started';
+    const responseCreated = payload?.type === 'response.created';
+    const responseAdmission = this.admittedResponseIds;
+    const ownsResponseCreated = () =>
+      this.admittedResponseIds === responseAdmission &&
+      this.ownsConversation(eventChannel) &&
+      !this.isSessionEnding();
+    if (responseCreated) {
+      const rejection = this.rejectResponseCreated(
+        event,
+        payload,
+        eventChannel,
+      );
+      if (rejection) {
+        this.debugLog('voice.response_created.rejected', { reason: rejection });
+        return;
+      }
+    }
+    let inputGeneration = this.inputGeneration;
+    const ownsSpeechStart = () =>
+      this.inputGeneration === inputGeneration &&
+      this.ownsConversation(eventChannel) &&
+      !this.isSessionEnding();
+    if (speechStart) {
+      const rejection = this.rejectSpeechStart(event, payload, eventChannel);
+      if (rejection) {
+        this.debugLog('voice.speech_start.rejected', { reason: rejection });
+        return;
+      }
+      inputGeneration = ++this.inputGeneration;
     }
     const progressEvent = this.isProgressEvent(payload);
     if (!progressEvent) {
@@ -306,10 +420,24 @@ export class RealtimeTurns {
             session.input_audio_transcription !== null;
       }
       if (payload.type === 'input_audio_buffer.speech_started') {
+        // A newer microphone turn supersedes a typed response that has not
+        // been sent yet. Flushing it later would reserve this speech record
+        // instead of the typed input it originally answered.
+        this.pendingUserTextResponse = false;
+        this.pendingUserTextRequest = null;
         this.emitSessionEvent({ type: 'user-turn-start' });
+        if (!ownsSpeechStart()) {
+          this.rememberSupersededSpeechStart(payload, eventChannel);
+          return;
+        }
         this.userTurnIntent.speechStarted(payload.item_id, {
           transcriptionEnabled: this.speechTranscriptionEnabled,
+          isCurrent: ownsSpeechStart,
         });
+        if (!ownsSpeechStart()) {
+          this.rememberSupersededSpeechStart(payload, eventChannel);
+          return;
+        }
       }
       if (payload.type === 'conversation.item.input_audio_transcription.failed')
         this.userTurnIntent.transcriptionUnavailable(payload.item_id, 'failed');
@@ -330,9 +458,17 @@ export class RealtimeTurns {
         if (this.endSessionForReservationOverflow()) return;
       }
       if (payload.type === 'response.created' && !progressEvent) {
-        responseBinding = this.userTurnIntent.bindResponse(
-          payload.response?.id,
-        );
+        const metadata = payload.response?.metadata;
+        const requestId =
+          metadata && Object.hasOwn(metadata, 'gev_request_id')
+            ? typeof metadata.gev_request_id === 'string'
+              ? metadata.gev_request_id
+              : false
+            : null;
+        responseBinding =
+          payload.response?.conversation_id === null
+            ? 'untracked'
+            : this.userTurnIntent.bindResponse(payload.response?.id, requestId);
         this.emitSessionEvent({
           type: 'response-start',
           responseId: payload.response?.id,
@@ -340,10 +476,18 @@ export class RealtimeTurns {
         });
       }
     }
+    if (speechStart && !ownsSpeechStart()) return;
+    if (responseCreated && !ownsResponseCreated()) return;
     const sessionEvent = realtimeSessionEvent(payload);
     if (sessionEvent) this.emitSessionEvent(sessionEvent);
+    if (speechStart && !ownsSpeechStart()) return;
+    if (responseCreated && !ownsResponseCreated()) return;
     this.metrics?.serverEvent(payload);
+    if (speechStart && !ownsSpeechStart()) return;
+    if (responseCreated && !ownsResponseCreated()) return;
     this.observeSpeech(payload);
+    if (speechStart && !ownsSpeechStart()) return;
+    if (responseCreated && !ownsResponseCreated()) return;
     // Streaming deltas are skipped: their `.done` events carry the full text,
     // and logging every token spent the debug sink's per-minute write budget,
     // dropping later turns' records.
@@ -380,14 +524,20 @@ export class RealtimeTurns {
         return;
       }
       if (payload.error?.code === 'conversation_already_has_active_response') {
-        this.userTurnIntent.rejectPendingResponse(echoedId);
-        this.cancelRadioHandoff({ abortTools: true });
         this.responseActive = true;
         this.responseCreatePending = false;
         this.pendingResponseInstructions = null;
+        this.pendingResponseRequest = null;
         // Never replay: the rejected turn is dropped, not retried. Re-arming
         // here is how one collision becomes the same sentence twice.
         this.pendingUserTextResponse = false;
+        this.pendingUserTextRequest = null;
+        // Cancellation and token retirement may synchronously submit new input.
+        // Finish old-request cleanup first so those successors are preserved.
+        this.cancelRadioHandoff({ abortTools: true });
+        this.userTurnIntent.rejectPendingResponse(echoedId);
+        if (!this.ownsConversation(eventChannel) || this.isSessionEnding())
+          return;
         console.warn('[GEV Realtime] Skipped overlapping response.create');
         this.debugLog('response.create.skipped_active', {
           eventId: payload.event_id,
@@ -412,12 +562,16 @@ export class RealtimeTurns {
         });
         return;
       }
-      this.userTurnIntent.rejectPendingResponse(echoedId);
       this.responseActive = false;
       this.responseCreatePending = false;
       this.pendingResponseInstructions = null;
+      this.pendingResponseRequest = null;
       this.pendingUserTextResponse = false;
+      this.pendingUserTextRequest = null;
       this.cancelRadioHandoff({ abortTools: true });
+      this.userTurnIntent.rejectPendingResponse(echoedId);
+      if (!this.ownsConversation(eventChannel) || this.isSessionEnding())
+        return;
       this.reportError('Realtime API', payload.error, {
         eventId: payload.event_id,
         type: payload.error?.type,
@@ -442,16 +596,22 @@ export class RealtimeTurns {
       return;
     }
 
-    if (payload.type === 'input_audio_buffer.speech_started') {
+    if (speechStart) {
+      if (!ownsSpeechStart()) return;
       this.userTurnPending = true;
       this.pendingResponseInstructions = null;
+      this.pendingResponseRequest = null;
       this.cancelRadioHandoff({ abortTools: true });
+      if (!ownsSpeechStart()) return;
       this.setVoiceSpeaker('user');
+      if (!ownsSpeechStart()) return;
       // Point-and-ask: read the pointer as speech starts (open mic), or reuse
       // the push-to-talk keydown snapshot, before the user audio commits.
       this.beginPointerTurn?.('speech_start');
+      if (!ownsSpeechStart()) return;
     }
     this.updateResponseState(payload);
+    if (responseCreated && !ownsResponseCreated()) return;
     if (payload.type === 'response.created' && responseBinding === 'stale') {
       this.supersedeActiveResponseForUserTurn();
       this.cancelResponse(this.activeResponseId);
@@ -535,6 +695,7 @@ export class RealtimeTurns {
       return;
     }
 
+    const responseRequest = this.userTurnIntent.captureRequest(toolResponseId);
     const responseIntent =
       await this.userTurnIntent.waitForResponse(toolResponseId);
     if (!this.ownsConversation(eventChannel) || this.isSessionEnding()) return;
@@ -569,7 +730,10 @@ export class RealtimeTurns {
         this.sendToolOutput(call.call_id || call.id, lastRefusal);
       }
       if (responseIntent.status !== 'stale' && lastRefusal)
-        this.queueResponseCreate(toolResultGuidance(lastRefusal));
+        this.queueResponseCreate(
+          toolResultGuidance(lastRefusal),
+          responseRequest,
+        );
       if (!this.ownsConversation(eventChannel) || this.isSessionEnding())
         return;
       this.setStatus('listening', 'Ask or command');
@@ -874,6 +1038,7 @@ export class RealtimeTurns {
       // result follows Radio in the same multi-intent response.
       this.queueResponseCreate(
         toolResultGuidance(this.radio.pendingRadioPlaybackResult || lastResult),
+        responseRequest,
       );
       if (!this.ownsConversation(eventChannel)) return;
     }
@@ -1073,17 +1238,18 @@ export class RealtimeTurns {
     }
   }
 
-  clearOutputBuffer(reason = null) {
+  clearOutputBuffer(reason = null, options) {
     const sent = this.sendBestEffort(
       { type: 'output_audio_buffer.clear' },
       'client.output_audio_clear',
+      options,
     );
     if (sent) this.outputClearReasons.push(reason);
     return sent;
   }
 
   /** Send a client event whose rejection is expected and harmless. */
-  sendBestEffort(message, logEventName) {
+  sendBestEffort(message, logEventName, options) {
     const eventId = `gev_be_${++this.bestEffortSequence}`;
     this.bestEffortEventIds.add(eventId);
     while (this.bestEffortEventIds.size > 16)
@@ -1093,16 +1259,18 @@ export class RealtimeTurns {
     return this.sendRealtimeEvent(
       { ...message, event_id: eventId },
       logEventName,
+      options,
     );
   }
 
-  cancelResponse(responseId) {
+  cancelResponse(responseId, options) {
     return this.sendBestEffort(
       {
         type: 'response.cancel',
         ...(responseId ? { response_id: responseId } : {}),
       },
       'client.response_cancel',
+      options,
     );
   }
 
@@ -1123,22 +1291,35 @@ export class RealtimeTurns {
       Boolean(this.progressResponse);
     if (!speaking) return false;
     if (!this.radio.mayVoiceClaimSpeaker()) return false;
+    const generation = ++this.inputGeneration;
+    const channel = this.dc;
+    const owned = () =>
+      this.inputGeneration === generation &&
+      this.ownsConversation(channel) &&
+      !this.isSessionEnding();
     this.userTurnIntent.invalidate();
+    if (!owned()) return false;
     this.emitSessionEvent({ type: 'interruption', reason: 'push-to-talk' });
+    if (!owned()) return false;
     const responseId = this.activeResponseId;
     const audioPlaying = this.assistantAudioPlaying;
     this.narration?.cancel();
+    if (!owned()) return false;
     this.metrics?.bargeIn();
+    if (!owned()) return false;
     this.pendingResponseInstructions = null;
+    this.pendingResponseRequest = null;
     if (this.responseActive) {
       this.supersedeActiveResponseForUserTurn();
-      this.cancelResponse(responseId);
+      this.cancelResponse(responseId, { isCurrent: owned });
+      if (!owned()) return false;
     }
     if (audioPlaying) {
-      this.clearOutputBuffer();
+      this.clearOutputBuffer(null, { isCurrent: owned });
+      if (!owned()) return false;
     }
     this.debugLog('voice.barge_in', { responseId, audioPlaying });
-    return true;
+    return owned();
   }
 
   sendToolOutput(callId, result) {
@@ -1227,7 +1408,11 @@ export class RealtimeTurns {
     }
   }
 
-  queueResponseCreate(instructions) {
+  queueResponseCreate(
+    instructions,
+    request = this.userTurnIntent.captureRequest(),
+  ) {
+    if (!request.isCurrent()) return;
     if (this.userTurnPending) {
       this.debugLog('response.create.skipped_user_turn', {
         instructions: instructions || null,
@@ -1236,6 +1421,7 @@ export class RealtimeTurns {
     }
     this.pendingResponseInstructions =
       instructions || 'Briefly respond once. Do not repeat yourself.';
+    this.pendingResponseRequest = request;
     if (!this.responseActive && !this.responseCreatePending)
       this.flushPendingResponse();
   }
@@ -1251,34 +1437,43 @@ export class RealtimeTurns {
       this.dc.readyState !== 'open'
     )
       return;
+    const request = this.pendingResponseRequest;
     const instructions = this.pendingResponseInstructions;
     this.pendingResponseInstructions = null;
+    this.pendingResponseRequest = null;
+    if (!request?.isCurrent()) return;
     this.responseCreatePending = true;
     const eventId = `gev_response_${++this.responseRequestSequence}`;
+    const channel = this.dc;
     const sent = this.sendRealtimeEvent(
       {
         type: 'response.create',
         event_id: eventId,
-        response: { instructions },
+        response: { instructions, metadata: { gev_request_id: eventId } },
       },
       'client.response_create.tool_followup',
     );
-    if (sent) {
-      this.userTurnIntent.expectResponse(eventId);
+    if (sent && this.ownsConversation(channel) && !this.isSessionEnding()) {
+      request.reserve(eventId);
       this.endSessionForReservationOverflow();
     } else this.responseCreatePending = false;
   }
 
   abortTools() {
-    for (const controller of this.activeToolAbortControllers)
-      controller.abort();
+    const controllers = [...this.activeToolAbortControllers];
+    const resources = this.turnResourceAbort;
     this.activeToolAbortControllers.clear();
-    this.turnResourceAbort.abort();
     this.turnResourceAbort = new AbortController();
     this.radio.clearTools();
+    for (const controller of controllers) controller.abort();
+    resources.abort();
   }
 
   reset() {
+    this.inputGeneration++;
+    this.admittedSpeechItemIds.clear();
+    this.admittedResponseIds.clear();
+    this.admittedResponseIds = new Set();
     this.userTurnIntent.reset();
     this.speechTranscriptionEnabled = true;
     this.processedCalls.clear();
@@ -1286,7 +1481,9 @@ export class RealtimeTurns {
     this.responseCreatePending = false;
     this.userTurnPending = false;
     this.pendingResponseInstructions = null;
+    this.pendingResponseRequest = null;
     this.pendingUserTextResponse = false;
+    this.pendingUserTextRequest = null;
     this.activeResponseId = null;
     this.supersededResponseIds.clear();
     this.narration?.cancel();

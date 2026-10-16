@@ -153,6 +153,7 @@ export class GeminiSessionController {
     this.model = null;
     this.epoch = 0;
     this.turn = 0;
+    this.inputGeneration = 0;
     this.turnAbort = new AbortController();
     this.disposed = false;
     this.socket = null;
@@ -460,12 +461,14 @@ export class GeminiSessionController {
 
   writeControl(entry) {
     this.socket.send(entry.body);
+    if (!this.controlCurrent(entry)) return;
     const input = entry.message.realtimeInput;
     // Only markers actually written to the socket own its physical activity.
     if (input?.activityStart) {
       this.forwardedActivityOpen = true;
       this.forwardedCaptureId = entry.captureId;
       this.beginSpeechIntent(entry.captureId);
+      if (!this.controlCurrent(entry)) return;
     }
     if (input?.activityEnd) {
       this.forwardedActivityOpen = false;
@@ -598,10 +601,24 @@ export class GeminiSessionController {
             return;
           if (!pushToTalk || activityCaptureId === metadata.captureId) return;
           this.captureOwner.admitted = true;
-          this.interrupt('push-to-talk', {
-            keepPlayback: !this.pttPlaybackSuppressed,
-          });
-          this.beginPointerTurn('speech_start', this.captureOwner.snapshot);
+          if (
+            !this.interrupt('push-to-talk', {
+              keepPlayback: !this.pttPlaybackSuppressed,
+            })
+          )
+            return;
+          if (!this.owns(epoch) || !this.acceptsCapture(metadata)) return;
+          const activityGeneration = this.inputGeneration;
+          const activityCurrent = () =>
+            this.owns(epoch) &&
+            this.inputGeneration === activityGeneration &&
+            this.acceptsCapture(metadata);
+          this.beginPointerTurn(
+            'speech_start',
+            this.captureOwner.snapshot,
+            activityCurrent,
+          );
+          if (!activityCurrent()) return;
           const context = this.pendingPointerContext;
           this.captureOwner.context = context;
           if (!this.sendPointerContext(context, metadata)) {
@@ -613,10 +630,12 @@ export class GeminiSessionController {
               );
             return;
           }
+          if (!activityCurrent()) return;
           const accepted = this.sendUserInput(
             { realtimeInput: { activityStart: {} } },
             metadata,
           );
+          if (!activityCurrent()) return;
           // Quiet context and an empty hold have no response to retire later.
           if (accepted) activityCaptureId = metadata.captureId;
           else if (this.owns(epoch))
@@ -864,23 +883,21 @@ export class GeminiSessionController {
   }
 
   abortTools() {
-    this.narration?.cancel();
-    // A completed tool can still own progressive work (for example outlines).
-    // Retain its turn signal until an actual input/session boundary revokes it.
-    this.turnAbort.abort();
+    const resources = this.turnAbort;
+    const tools = [...this.tools.values()];
     this.turnAbort = new AbortController();
     this.turn++;
     this.typedIntent = null;
     this.providerQuarantine = null;
     this.radioStrongerCommit = null;
     this.pruneControls();
-    for (const entry of this.tools.values()) {
-      entry.abort();
-    }
     this.tools.clear();
     this.radio?.clearTools();
     this.pendingTools = 0;
     this.toolQueue = Promise.resolve();
+    this.narration?.cancel();
+    resources.abort();
+    for (const entry of tools) entry.abort();
   }
 
   noteUserActivity() {
@@ -912,8 +929,7 @@ export class GeminiSessionController {
       !this.radio.mayVoiceClaimSpeaker()
     )
       return false;
-    this.interrupt('push-to-talk');
-    return true;
+    return this.interrupt('push-to-talk');
   }
 
   interrupt(
@@ -924,7 +940,14 @@ export class GeminiSessionController {
       serverInterrupted = false,
     } = {},
   ) {
-    if (this.goAway && !serverInterrupted) return;
+    if (this.goAway && !serverInterrupted) return false;
+    const epoch = this.epoch;
+    const generation = ++this.inputGeneration;
+    const channel = this.channel;
+    const owned = () =>
+      this.owns(epoch) &&
+      this.inputGeneration === generation &&
+      this.channel === channel;
     this.pttPlaybackSuppressed = false;
     if (['push-to-talk', 'user-text'].includes(reason))
       this.manualInputKind = reason;
@@ -946,11 +969,14 @@ export class GeminiSessionController {
     }
     this.clearDeferredInput();
     this.abortTools();
+    if (!owned()) return false;
     this.userTurns.invalidate();
+    if (!owned()) return false;
     this.intentItemId = null;
     this.intentResponseId = null;
     this.intentCaptureId = null;
     this.emit({ type: 'user-turn-start' });
+    if (!owned()) return false;
     if (deferInput) {
       // Only one successor may reach Live before the previous boundary. A
       // newer local turn replaces unsent input and waits to interrupt that
@@ -984,7 +1010,9 @@ export class GeminiSessionController {
       owner.timer.unref?.();
     } else this.boundRetiredReply();
     this.noteUserActivity();
+    if (!owned()) return false;
     if (!keepPlayback) this.audio?.clearPlayback();
+    if (!owned()) return false;
     this.modelComplete = false;
     this.pendingCompletionStatus = null;
     this.postToolOutput = false;
@@ -995,13 +1023,16 @@ export class GeminiSessionController {
       reason,
       ...(preserveAdvisoryCaption ? { preserveAdvisoryCaption: true } : {}),
     });
+    if (!owned()) return false;
     this.input.setVoiceSpeaker(this.goAway ? 'idle' : 'user');
+    if (!owned()) return false;
     this.setStatus(
       'listening',
       this.goAway
         ? 'Gemini session expiring; finishing the current reply'
         : 'Ask or command',
     );
+    return owned();
   }
 
   handleMessage(message, epoch = this.epoch) {
@@ -1050,11 +1081,34 @@ export class GeminiSessionController {
     // A server acknowledgment of a local interruption belongs to the retired
     // reply; it must not revoke the successor's pointer, timing or turn token.
     if (content?.interrupted) {
-      if (!this.retiredReplyPending)
-        this.interrupt('user-speech', {
-          preserveAdvisoryCaption: true,
-          serverInterrupted: true,
-        });
+      const newAutomaticActivity =
+        !this.input.pushToTalkMode &&
+        !this.goAway &&
+        message.voiceActivity?.type === 'ACTIVITY_START' &&
+        !this.userActivityOpen;
+      const predecessor = this.typedIntent?.automaticPredecessor;
+      if (
+        !this.retiredReplyPending &&
+        !newAutomaticActivity &&
+        predecessor?.epoch === epoch &&
+        this.readTypedTurnInput()
+      ) {
+        // Automatic VAD may not have produced output before text superseded
+        // it. This specific local predecessor owns one interruption boundary;
+        // the acknowledgment is not another user input. Do not infer this
+        // from output silence alone, or wait for a boundary until it arrives.
+        this.retiredAutomaticActivityOwner = predecessor;
+        this.typedIntent.retiredAutomaticPredecessor = predecessor;
+        this.typedIntent.automaticPredecessor = null;
+      } else if (!this.retiredReplyPending) {
+        if (
+          !this.interrupt('user-speech', {
+            preserveAdvisoryCaption: true,
+            serverInterrupted: true,
+          })
+        )
+          return;
+      }
       this.retiredReplyPending = true;
       this.boundRetiredReply();
     }
@@ -1066,7 +1120,19 @@ export class GeminiSessionController {
         !this.userActivityOpen
       ) {
         this.userActivityOpen = true;
-        if (!this.retiredReplyPending) this.interrupt();
+        const typedPredecessor = this.typedIntent?.retiredAutomaticPredecessor;
+        if (
+          this.retiredReplyPending &&
+          typedPredecessor &&
+          typedPredecessor === this.retiredAutomaticActivityOwner &&
+          this.readTypedTurnInput()
+        ) {
+          // This precise wait still belongs to the automatic predecessor, not
+          // the submitted text. New speech revokes that text without inventing
+          // a second retirement/deferred input or renewing the existing bound.
+          this.replyPending = false;
+          if (!this.interrupt()) return;
+        } else if (!this.retiredReplyPending && !this.interrupt()) return;
         // Local activity ownership is only for expiry liveness, not tools.
         // Assign after retiring observed output so its boundary cannot clear
         // a newer detected activity that has not received a reply yet.
@@ -1075,12 +1141,20 @@ export class GeminiSessionController {
           sequence: ++this.automaticActivitySequence,
         };
         this.automaticTurnOpen = true;
+        const activityGeneration = this.inputGeneration;
+        const activityCurrent = () =>
+          this.owns(epoch) && this.inputGeneration === activityGeneration;
         this.beginSpeechIntent(null);
-        this.beginPointerTurn('speech_start');
+        if (!activityCurrent()) return;
+        this.beginPointerTurn('speech_start', undefined, activityCurrent);
+        if (!activityCurrent()) return;
         const context = this.pendingPointerContext;
         if (
           context &&
-          this.send({ realtimeInput: { text: JSON.stringify(context.item) } })
+          this.send({
+            realtimeInput: { text: JSON.stringify(context.item) },
+          }) &&
+          activityCurrent()
         )
           this.consumePointerContext(context);
       } else if (
@@ -1129,6 +1203,11 @@ export class GeminiSessionController {
       if (content?.turnComplete) {
         this.clearRetiredBoundaryWait();
         this.retiredReplyPending = false;
+        if (
+          this.typedIntent?.retiredAutomaticPredecessor ===
+          this.retiredAutomaticActivityOwner
+        )
+          this.typedIntent.retiredAutomaticPredecessor = null;
         // A true replyPending now belongs to a successor submitted while
         // this older reply was retired. Its boundary cannot revoke that input.
         if (
@@ -1158,8 +1237,15 @@ export class GeminiSessionController {
       content?.outputTranscription ||
       content?.generationComplete ||
       message.toolCall
-    )
+    ) {
+      // Once successor output is observed, an unattributed later interruption
+      // cannot still claim the unobserved automatic predecessor's boundary.
+      if (this.typedIntent) {
+        this.typedIntent.automaticPredecessor = null;
+        this.typedIntent.retiredAutomaticPredecessor = null;
+      }
       this.replyPending = true;
+    }
     if (content?.outputTranscription?.text) {
       this.userTurnPending = false;
       this.postToolOutput = true;
@@ -1184,6 +1270,10 @@ export class GeminiSessionController {
     if (message.toolCall?.functionCalls?.length)
       this.enqueueTools(message.toolCall.functionCalls, epoch);
     if (content?.turnComplete) {
+      if (this.typedIntent) {
+        this.typedIntent.automaticPredecessor = null;
+        this.typedIntent.retiredAutomaticPredecessor = null;
+      }
       this.pttPlaybackSuppressed = false;
       // A native terminal boundary also completes a silent user turn. Output,
       // pending tools and queued controls still gate presentation completion.
@@ -1552,7 +1642,21 @@ export class GeminiSessionController {
       throw new Error('Gemini voice is not connected');
     if (this.input.pushToTalkMode && this.captureOwner)
       this.captureOwner.retired = true;
-    this.interrupt('user-text');
+    const automaticPredecessor =
+      this.automaticTurnOpen &&
+      !this.replyPending &&
+      !this.retiredReplyPending &&
+      !this.deferredInput
+        ? this.automaticActivityOwner
+        : null;
+    if (!this.interrupt('user-text')) return false;
+    const epoch = this.epoch;
+    const turn = this.turn;
+    const generation = this.inputGeneration;
+    const owned = () =>
+      this.owns(epoch) &&
+      this.turn === turn &&
+      this.inputGeneration === generation;
     // Typed intent supersedes the held speech even if its worklet end is late.
     // Close the forwarded manual activity before submitting the new text.
     if (this.input.pushToTalkMode && this.forwardedActivityOpen)
@@ -1560,18 +1664,23 @@ export class GeminiSessionController {
         { realtimeInput: { activityEnd: {} } },
         { captureId: this.forwardedCaptureId },
       );
+    if (!owned()) return false;
     this.userTurns.text(clean);
+    if (!owned()) return false;
     const typedIntent = {
       epoch: this.epoch,
       turn: this.turn,
       responseId: `gemini-response-${this.epoch}-${++this.intentSequence}`,
+      automaticPredecessor,
+      retiredAutomaticPredecessor: null,
     };
     // Bind the accepted text now, rather than whatever input happens to be
     // current when reliable transport or a retired reply eventually drains.
     this.userTurns.expectResponse();
     this.userTurns.bindResponse(typedIntent.responseId);
     this.typedIntent = typedIntent;
-    this.beginPointerTurn('text');
+    this.beginPointerTurn('text', undefined, owned);
+    if (!owned()) return false;
     const context = this.pendingPointerContext;
     const mapSnapshot = [...this.pendingMapEvents];
     const parts = context ? [{ text: JSON.stringify(context.item) }] : [];
@@ -1590,18 +1699,19 @@ export class GeminiSessionController {
       undefined,
       {
         onSent: () => {
-          if (this.typedIntent !== typedIntent) return;
+          if (!owned() || this.typedIntent !== typedIntent) return;
           this.replyPending = true;
           this.bindTextIntent(typedIntent);
+          if (!owned() || this.typedIntent !== typedIntent) return;
           this.consumePointerContext(context);
           this.consumeMapEvents(mapSnapshot);
         },
       },
     );
-    if (sent) {
+    if (sent && owned()) {
       this.narration.userTurnEnded();
     }
-    return sent;
+    return sent && owned();
   }
 
   consumeMapEvents(snapshot) {
@@ -1801,8 +1911,8 @@ export class GeminiSessionController {
   }
 
   /** Use the common pointer owner; held speech context precedes audio quietly. */
-  beginPointerTurn(at, capturedSnapshot = undefined) {
-    if (!this.pointer) return null;
+  beginPointerTurn(at, capturedSnapshot = undefined, isCurrent = () => true) {
+    if (!this.pointer || !isCurrent()) return null;
     // The delayed manual speech notification still refers to the released hold.
     if (
       capturedSnapshot === undefined &&
@@ -1826,6 +1936,7 @@ export class GeminiSessionController {
     } catch {
       snapshot = null;
     }
+    if (!isCurrent()) return null;
     const chip = pointerChip(snapshot);
     this.pointerAnnounced = gesture && chip ? snapshot : null;
     this.emit({
@@ -1833,6 +1944,7 @@ export class GeminiSessionController {
       pointer:
         gesture && chip ? { ...chip, screenPx: snapshot.screenPx } : null,
     });
+    if (!isCurrent()) return null;
     const item = !chip
       ? this.pointerSentKey && this.pointerSentKey !== 'none'
         ? { type: 'pointer_context', at, target: 'none' }
@@ -1931,7 +2043,16 @@ export class GeminiSessionController {
     this.intentCaptureId = captureId;
     // A physical speech onset clears display-only recent captions, including
     // when retirement already fenced the reply and no second interrupt runs.
+    const epoch = this.epoch;
+    const turn = this.turn;
+    const generation = this.inputGeneration;
     this.emit({ type: 'user-caption-reset' });
+    if (
+      !this.owns(epoch) ||
+      this.turn !== turn ||
+      this.inputGeneration !== generation
+    )
+      return;
     this.emit({ type: 'user-turn-start' });
   }
 
@@ -2104,6 +2225,7 @@ export class GeminiSessionController {
   } = {}) {
     if (this.disposed) return;
     this.epoch++;
+    this.inputGeneration++;
     this.userTurns.reset();
     this.clearSettledSpeechIntent();
     this.clearControls();

@@ -109,7 +109,11 @@ for (const malicious of [false, true]) {
     controller.sendTextCommand('Zoom in');
     await event({
       type: 'response.created',
-      response: { id: 'zoom-response' },
+      response: {
+        id: 'zoom-response',
+        metadata: sent.findLast((event) => event.type === 'response.create')
+          .response.metadata,
+      },
     });
     await event({
       type: 'response.function_call_arguments.done',
