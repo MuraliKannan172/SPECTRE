@@ -17,7 +17,7 @@ import {
   selectAuthorizedSdrDevice,
 } from './usbDevices.js';
 import { summarizeLocalAdsb } from '../sources/adsbRecords.js';
-import { formatNumber, t } from '../i18n/index.js';
+import { formatNumber, msg, t, translateKnown } from '../i18n/index.js';
 
 export { createRememberingWebUsb } from './usbDevices.js';
 
@@ -298,7 +298,7 @@ function describeConnectionError(error) {
       'RTL-SDR access failed; close other SDR apps and check USB permissions',
     );
   }
-  return message || t('RTL-SDR connection failed');
+  return message ? translateKnown(message) : t('RTL-SDR connection failed');
 }
 
 function streamingMessage(mode) {
@@ -487,11 +487,11 @@ export class SdrController {
     gate.waiting += 1;
     const run = async () => {
       if (epoch !== this._usbEpoch)
-        throw new Error('USB work abandoned after a stalled transfer');
+        throw new Error(msg('USB work abandoned after a stalled transfer'));
       await Promise.allSettled(gate.reads);
       // A stalled read may have ended this session while it drained.
       if (epoch !== this._usbEpoch)
-        throw new Error('USB work abandoned after a stalled transfer');
+        throw new Error(msg('USB work abandoned after a stalled transfer'));
       return operation();
     };
     const queued = this._usbTail.then(run, run);
@@ -785,10 +785,10 @@ export class SdrController {
       decoderOverloadSnapshot: snapshot,
       message:
         reason === 'startup'
-          ? 'SDR decoder did not start; receiver stopped'
+          ? t('SDR decoder did not start; receiver stopped')
           : reason === 'stalled'
-            ? 'SDR decoder stopped responding; receiver stopped'
-            : 'SDR decoder fell behind; receiver stopped',
+            ? t('SDR decoder stopped responding; receiver stopped')
+            : t('SDR decoder fell behind; receiver stopped'),
     });
     void this.stop({ preserveMessage: true });
   }
@@ -1726,7 +1726,7 @@ export class SdrController {
         // tuneFm reports the failure; no spectrum is valid for this frame.
         if (!(await this.tuneFm(center, { quiet: true }))) {
           if (token === this._seekToken)
-            this._setState({ seeking: false, seekMessage: 'Seek stopped' });
+            this._setState({ seeking: false, seekMessage: t('Seek stopped') });
           return null;
         }
         const sequence = this._spectrumSequence;

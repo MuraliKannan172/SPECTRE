@@ -56,3 +56,25 @@ test('FM seek messages keep their English wording and decimal point', async () =
   assert.ok(texts.includes('Scanning 98.5 MHz…'));
   assert.match(texts.at(-1), /^Found 98\.8 MHz · \d+\.\d dB$/);
 });
+
+for (const locale of ['es', 'ru']) {
+  test(`a failed seek tune and a decoder overload are localized in ${locale}`, async () => {
+    setLocale(locale);
+    try {
+      const { c } = makeController();
+      c.tuneFm = async () => false;
+      assert.equal(await c.seekFm(1), null);
+      assert.ok(c.state.seekMessage);
+      assert.notEqual(c.state.seekMessage, 'Seek stopped');
+
+      c.stop = async () => {};
+      for (const reason of ['startup', 'stalled', 'backlog']) {
+        c._device = {};
+        c._overload(reason);
+        assert.doesNotMatch(c.state.message, /SDR decoder|receiver stopped/);
+      }
+    } finally {
+      setLocale('en');
+    }
+  });
+}
