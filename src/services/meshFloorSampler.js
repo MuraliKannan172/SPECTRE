@@ -124,7 +124,8 @@ export function createMeshFloorSampler({
       if (
         Number.isFinite(viewerLat) &&
         Number.isFinite(viewerLon) &&
-        approxDistanceKm(viewerLat, viewerLon, cell.lat, cell.lon) > MAX_SAMPLE_DIST_KM
+        approxDistanceKm(viewerLat, viewerLon, cell.lat, cell.lon) >
+          MAX_SAMPLE_DIST_KM
       ) {
         continue; // too far: tiles not streamed there, probe would be a guaranteed miss
       }
