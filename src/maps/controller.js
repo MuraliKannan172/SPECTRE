@@ -66,6 +66,10 @@ export class MapSourceController {
     this._retrying = false;
     this._retryRequested = false;
     this._retryDelay = FALLBACK_RETRY_MS;
+    /** Expire callbacks of retry attempts in flight; destroy() runs them. */
+    this._retryDeadlines = new Set();
+    /** A fallback terrain a retry replaced while it stayed installed. */
+    this._replacedTerrain = null;
     this._subscribers = new Set();
     this._destroyed = false;
   }
@@ -326,6 +330,10 @@ export class MapSourceController {
     if (result.terrain) this.viewer.scene.setTerrain(result.terrain);
     else this.viewer.terrainProvider = result.provider;
     this._terrainFallback = result.fallback ? result : null;
+    if (this._replacedTerrain && this._replacedTerrain !== result) {
+      this._dispose(this._replacedTerrain.provider);
+      this._replacedTerrain = null;
+    }
   }
 
   /**
@@ -361,15 +369,20 @@ export class MapSourceController {
     // requests have no timeout, so a late result is released, never used.
     const attempt = async (create, release) => {
       const expiry = new AbortController();
-      let timer;
+      let expire;
+      const deadline = new Promise((resolve) => {
+        expire = () => {
+          clearTimeout(timer);
+          resolve(expiry);
+        };
+      });
+      const timer = setTimeout(expire, FALLBACK_ATTEMPT_MS);
+      this._retryDeadlines.add(expire);
       const pending = Promise.resolve().then(() =>
         create?.({
           signal: AbortSignal.any([this._abort.signal, expiry.signal]),
         }),
       );
-      const deadline = new Promise((resolve) => {
-        timer = setTimeout(resolve, FALLBACK_ATTEMPT_MS, expiry);
-      });
       try {
         const result = await Promise.race([pending, deadline]);
         if (result !== expiry) return result;
@@ -380,6 +393,7 @@ export class MapSourceController {
         return null; // Still unavailable: keep the fallback.
       } finally {
         clearTimeout(timer);
+        this._retryDeadlines.delete(expire);
       }
     };
     // Each recovers as soon as it loads, never waiting on the other.
@@ -426,8 +440,14 @@ export class MapSourceController {
       this._terrainProviders.set(terrain.id, Promise.resolve(real));
       if (this._terrainFallback === flat && this.viewer.scene.globe.show) {
         this._applyTerrain(real);
+        this._dispose(flat.provider);
         this._requestRender('map-stack');
-      } else this._terrainMode = null; // The next globe activation installs it.
+      } else {
+        this._terrainMode = null; // The next globe activation installs it.
+        // Release the replaced fallback once nothing shows it.
+        if (this._terrainFallback === flat) this._replacedTerrain = flat;
+        else this._dispose(flat.provider);
+      }
       return true;
     };
     const settled = (retry) =>
@@ -559,6 +579,11 @@ export class MapSourceController {
     this._switchGen++;
     this._abort.abort();
     clearTimeout(this._retryTimer);
+    for (const expire of this._retryDeadlines) expire();
+    this._retryDeadlines.clear();
+    this._retrying = false;
+    this._dispose(this._replacedTerrain?.provider);
+    this._replacedTerrain = null;
     this._isSwitching = false;
     this._removeImageryLayer();
     this._credits.destroy();
