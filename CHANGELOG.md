@@ -1,5 +1,11 @@
 # Changelog
 
+- The tracked-aircraft descriptor now publishes `verticalRateMps`, on both the
+  civil and military layers, so a consumer reading `getTrackedInfo()` no longer
+  has to reach past it into the raw poll record for climb/descent. Reported,
+  never derived: an aircraft that has not transmitted a rate reads as `null`
+  rather than a level-flight `0`.
+
 - Cyclone advisories no longer go dark while NHC publishes an advisory ahead
   of its nominal time: advisory and position times up to 90 minutes ahead of
   the server clock are accepted (previously 5 minutes), so the whole feed is
@@ -719,11 +725,6 @@
   Native point, billboard and label highlighting uses GPU draw commands; there
   is no scene-dimming effect selector. Unsupported shaders retain native contact
   rendering, and leaving Cyber restores the standard shell and contact treatment.
-- The tracked-aircraft descriptor now publishes `verticalRateMps`, on both the
-  civil and military layers, so a consumer reading `getTrackedInfo()` no longer
-  has to reach past it into the raw poll record for climb/descent. Reported,
-  never derived: an aircraft that has not transmitted a rate reads as `null`
-  rather than a level-flight `0`.
 
 - Add a **Recent Imagery** data layer (NASA GIBS · HLS + VIIRS, keyless).
   Select a box (drag, the current view, or around a pin; up to 1,000 km a
