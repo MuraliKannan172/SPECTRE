@@ -803,7 +803,7 @@ test('normalizes recovery stage coordinates, downrange distance, and flight numb
   assert.equal(expendable.success, null);
 });
 
-test('normalizes payload edge cases for missing, blank, or invalid mass and non-numeric amounts', () => {
+test('normalizes payload amounts and fractional string masses', () => {
   const launches = normalizeRocketLaunches(
     {
       results: [
@@ -817,33 +817,17 @@ test('normalizes payload edge cases for missing, blank, or invalid mass and non-
               {
                 id: 601,
                 amount: 'not-a-number',
-                payload: {
-                  id: 11,
-                  name: 'Empty Mass Payload',
-                  mass: '',
-                },
+                payload: { id: 11, name: 'Unknown Amount Payload' },
               },
               {
                 id: 602,
                 amount: 3,
-                payload: {
-                  id: 12,
-                  name: 'Negative Mass Payload',
-                  mass: -50,
-                },
+                payload: { id: 12, name: 'Triple Payload' },
               },
               {
                 id: 603,
                 payload: {
                   id: 13,
-                  name: 'Non-Numeric Mass Payload',
-                  mass: 'unknown',
-                },
-              },
-              {
-                id: 604,
-                payload: {
-                  id: 14,
                   name: 'Valid Fractional Mass Payload',
                   mass: '12.75',
                 },
@@ -856,14 +840,13 @@ test('normalizes payload edge cases for missing, blank, or invalid mass and non-
     NOW,
   );
 
+  // Blank, negative and non-numeric masses are pinned by "missing payload
+  // details stay unknown without inventing mass or classification".
   const payloads = launches[0].payloads;
-  assert.equal(payloads.length, 4);
+  assert.equal(payloads.length, 3);
   assert.equal(payloads[0].amount, 1);
-  assert.equal(payloads[0].massKg, null);
   assert.equal(payloads[1].amount, 3);
-  assert.equal(payloads[1].massKg, null);
-  assert.equal(payloads[2].massKg, null);
-  assert.equal(payloads[3].massKg, 12.75);
+  assert.equal(payloads[2].massKg, 12.75);
 });
 
 test('keeps payload and recovery collections empty when LL2 does not disclose them', () => {
