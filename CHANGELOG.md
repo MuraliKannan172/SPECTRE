@@ -82,6 +82,11 @@
   have wound down — CoGo's feed reports no stations and last moved a bike in
   March 2025. The three repointed feeds were verified live.
 
+- Add seven Brazilian Bike Itaú (Tembici) cities to the GBFS bikeshare registry:
+  São Paulo, Rio de Janeiro, Salvador, Recife, Porto Alegre, Brasília and
+  Curitiba (about 1,000 stations in total). These are the layer's first stations
+  in South America.
+
 - Add Bike Share Toronto (1,069 stations) to the bikeshare registry. The system
   publishes the same PBSC GBFS v2 feeds as the Austin, Honolulu and Chattanooga
   entries, so it needs no new plumbing; a registry test now holds every city's
