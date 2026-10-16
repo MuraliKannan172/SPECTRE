@@ -12,6 +12,8 @@ const AUTOMATIC = Symbol('automatic switch');
 /** Background retries of a fallback in use back off from 30 s to 10 min. */
 const FALLBACK_RETRY_MS = 30_000;
 const FALLBACK_RETRY_MAX_MS = 600_000;
+/** A retry attempt still unsettled after a minute counts as failed. */
+const FALLBACK_ATTEMPT_MS = 60_000;
 
 const resolved = (provider, effectiveStackId) => ({
   provider,
@@ -354,17 +356,38 @@ export class MapSourceController {
     if (!id && !terrain) return;
     this._retrying = true;
     this._retryRequested = false;
-    const attempt = async (create) => {
+    // An attempt that outlives its deadline counts as a failure. Its signal is
+    // aborted, but the Esri and keyless factories ignore it and Cesium's
+    // requests have no timeout, so a late result is released, never used.
+    const attempt = async (create, release) => {
+      const expiry = new AbortController();
+      let timer;
+      const pending = Promise.resolve().then(() =>
+        create?.({
+          signal: AbortSignal.any([this._abort.signal, expiry.signal]),
+        }),
+      );
+      const deadline = new Promise((resolve) => {
+        timer = setTimeout(resolve, FALLBACK_ATTEMPT_MS, expiry);
+      });
       try {
-        return await create?.({ signal: this._abort.signal });
+        const result = await Promise.race([pending, deadline]);
+        if (result !== expiry) return result;
+        expiry.abort();
+        pending.then(release, () => {});
+        return null;
       } catch {
         return null; // Still unavailable: keep the fallback.
+      } finally {
+        clearTimeout(timer);
       }
     };
     // Each recovers as soon as it loads, never waiting on the other.
     const retryImagery = async () => {
       const cached = this._imageryProviders.get(id);
-      const provider = await attempt(this._sources.get(id).imagery);
+      const provider = await attempt(this._sources.get(id).imagery, (late) =>
+        this._dispose(late),
+      );
       // Obsolete: destroyed, or the cache moved on while this was in flight.
       if (this._destroyed || this._imageryProviders.get(id) !== cached) {
         this._dispose(provider);
@@ -388,7 +411,9 @@ export class MapSourceController {
     };
     const retryTerrain = async () => {
       const cached = this._terrainProviders.get(terrain.id);
-      const real = await attempt(terrain.create);
+      const real = await attempt(terrain.create, (late) =>
+        this._dispose(late?.provider),
+      );
       if (
         this._destroyed ||
         this._terrainProviders.get(terrain.id) !== cached ||
