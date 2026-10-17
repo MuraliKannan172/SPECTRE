@@ -60,4 +60,3 @@ export function tleCatalogNumber(line) {
   const number = Number.parseInt(field, 10);
   return Number.isInteger(number) ? number : null;
 }
-

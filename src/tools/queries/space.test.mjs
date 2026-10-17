@@ -85,7 +85,6 @@ SAT ALPHA5
   assert.equal(tleCatalogNumber(entries[0].line2), 100000);
 });
 
-
 test('the next pass defaults to the ISS and reports times, peak and direction', async () => {
   const catalog = composeCatalog({
     tools: coreTools,
