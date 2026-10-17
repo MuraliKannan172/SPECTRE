@@ -9,7 +9,7 @@ import {
   validTerrainResult,
 } from '../../src/data/terrainHeightsProxy.js';
 import { makeRateLimiter, clientKey } from './common/rate-limit.js';
-import { admitSameSite } from './common/same-site.js';
+import { admitSameSiteKeyless } from './common/same-site.js';
 
 /**
  * Re:Earth terrain point-height proxy: batched lon/lat → ellipsoidal height
@@ -29,6 +29,8 @@ import { admitSameSite } from './common/same-site.js';
  * the route carries an always-on per-client limiter. The route also refuses
  * cross-site browser requests, so another web page cannot use the visitor's
  * browser to fill the cache or spend the visitor's own rate-limit quota.
+ * Reverse-proxied same-origin requests are admitted: terrain is keyless and
+ * needed for rendering, and a 403 would send every chunk to the geoid fallback.
  */
 export function terrainHeightsProxy(options = {}) {
   // Destructured in the body, not the signature: `proxyErrorResponses.test.mjs`
@@ -236,8 +238,9 @@ export function terrainHeightsProxy(options = {}) {
     server.middlewares.use('/api/terrain/heights', async (req, res) => {
       // Refuse cross-site browser requests (an <img> or fetch from another
       // site) before the limiter, cache or upstream see them. Same-origin app
-      // requests and non-browser loopback callers (MCP panel_request) pass.
-      if (admitSameSite(req, res)) return;
+      // requests, non-browser loopback callers (MCP panel_request) and the app
+      // served behind a reverse proxy pass.
+      if (admitSameSiteKeyless(req, res)) return;
       const send = (status, bodyObj) => {
         if (res.headersSent) return;
         res.writeHead(status, { 'Content-Type': 'application/json' });

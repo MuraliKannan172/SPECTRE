@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseTerrainPoints } from './data/terrainHeightsProxy.js';
 import { terrainHeightsProxy } from '../server/providers/terrain.js';
+import { admitSameSite } from '../server/providers/common/same-site.js';
 
 function install(plugin) {
   const routes = new Map();
@@ -224,7 +225,8 @@ test('a cross-site page cannot fill the cache or spend the visitor quota', async
     { host, 'sec-fetch-site': 'same-site' },
     { host, origin: 'https://evil.example' }, // fetch from another page
     { host, origin: 'null' }, // sandboxed frame
-    { host, 'x-forwarded-for': '203.0.113.9' }, // through a proxy
+    // Behind a reverse proxy the browser's own Sec-Fetch-Site still decides.
+    { host, 'x-forwarded-for': '203.0.113.9', 'sec-fetch-site': 'cross-site' },
   ];
   // More refused requests than the 90/min quota, each a distinct new key.
   for (let i = 0; i < 100; i += 1) {
@@ -247,6 +249,98 @@ test('a cross-site page cannot fill the cache or spend the visitor quota', async
   const tool = await request(route, { url: '/?points=-97.75,30.26' });
   assert.equal(tool.statusCode, 200);
   assert.equal(asked.length, 2);
+});
+
+test('the app served behind a reverse proxy still gets terrain', async (t) => {
+  const asked = stubTerrainUpstream(t);
+  const route = install(terrainHeightsProxy()).get('/api/terrain/heights');
+  const host = 'globe.example.lan';
+  // What nginx/Caddy/Cloudflare add in front of a same-origin app fetch. The
+  // cost-bearing routes refuse these; terrain is keyless and needed to render,
+  // so a 403 here would drop every chunk to the geoid fallback.
+  const proxied = [
+    {
+      host,
+      'sec-fetch-site': 'same-origin',
+      'x-forwarded-for': '203.0.113.9',
+    },
+    {
+      host,
+      'sec-fetch-site': 'same-origin',
+      'cf-connecting-ip': '203.0.113.9',
+    },
+    {
+      host,
+      'sec-fetch-site': 'same-origin',
+      forwarded: 'for=203.0.113.9;proto=https',
+      via: '1.1 caddy',
+    },
+    // TLS terminated at the proxy: the page origin is https, the hop is http.
+    {
+      host,
+      origin: `https://${host}`,
+      'sec-fetch-site': 'same-origin',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-for': '203.0.113.9',
+    },
+  ];
+  for (const [i, reqHeaders] of proxied.entries()) {
+    const answer = await request(route, {
+      url: `/?points=${(-97.8 - i / 1000).toFixed(5)},30.26`,
+      reqHeaders,
+    });
+    assert.equal(answer.statusCode, 200, JSON.stringify(reqHeaders));
+  }
+  assert.equal(asked.length, proxied.length);
+
+  // Proxied or not, a cross-site page is still refused before any work.
+  for (const reqHeaders of [
+    { host, 'x-forwarded-for': '203.0.113.9', 'sec-fetch-site': 'cross-site' },
+    {
+      host,
+      'x-forwarded-proto': 'https',
+      origin: 'https://evil.example',
+    },
+    // A forwarded scheme does not make an http Origin match an https page.
+    { host, 'x-forwarded-proto': 'https', origin: `http://${host}` },
+  ]) {
+    const answer = await request(route, {
+      url: '/?points=-97.9,30.26',
+      reqHeaders,
+    });
+    assert.equal(answer.statusCode, 403, JSON.stringify(reqHeaders));
+  }
+  assert.equal(asked.length, proxied.length, 'refusals cost no upstream call');
+});
+
+test('cost-bearing routes still refuse proxied requests', () => {
+  // The keyless exemption is scoped to terrain; the shared gate is unchanged.
+  const res = {
+    statusCode: 200,
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    },
+    end(body) {
+      this.body = body;
+    },
+  };
+  const refused = admitSameSite(
+    {
+      headers: {
+        host: 'globe.example.lan',
+        'sec-fetch-site': 'same-origin',
+        'x-forwarded-for': '203.0.113.9',
+      },
+      socket: {},
+    },
+    res,
+  );
+  assert.equal(refused, true);
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), {
+    error: 'Proxied requests are not accepted',
+  });
 });
 
 test('a second client keeps its own quota', async (t) => {

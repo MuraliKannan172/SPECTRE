@@ -29,7 +29,7 @@ function fixture(name, overrides = {}, preview = false) {
     makeRateLimiter, clientKey,
     // terrain.js gates cross-site requests first; fixture requests carry no
     // browser headers, so admit them like a loopback tool.
-    admitSameSite: () => false,
+    admitSameSiteKeyless: () => false,
     path, process: { cwd: () => '/fixture', env: {} },
     fsp: {
       readFile: async () => { throw new Error('cache absent'); },
