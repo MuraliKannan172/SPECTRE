@@ -1075,6 +1075,22 @@ The images are periodically updated road-condition photographs, not continuous
 video; camera poses use the existing low-confidence heading prior.
 `CCTV_LITHUANIA_MAX_SOURCES` sets its cap (default 400, bounded to 1–1000).
 
+## Taiwan CCTV source pack
+
+The CCTV catalog includes Taiwan national freeway cameras from the Freeway
+Bureau, MOTC. One keyless request reads the daily MOTC 2.0 `CCTV.xml` table
+(~1,800 cameras); the request refuses redirects, has a 15-second deadline and a
+6 MiB response cap, and uses the shared 15-minute cache and fair catalog
+allocation. An unavailable source contributes an empty pack. The table
+publishes MJPEG stream URLs; each is mapped to the same camera server's
+single-JPEG path for the same camera number, and only those exact HTTPS pairs
+on the four `freeway.gov.tw` camera servers are registered with the frame
+proxy. Camera keys come from the server and camera number, because published
+CCTV IDs contain Chinese place names and a few repeat across cameras. Poses use
+the low-confidence heading prior. `CCTV_TAIWAN_ENABLED=0` disables the pack;
+`CCTV_TAIWAN_MAX_SOURCES` sets its cap (default 600, bounded to 1–2000).
+Gate: `src/data/cctvTaiwan.test.mjs`.
+
 ## DriveBC CCTV source pack
 
 The CCTV catalog adds DriveBC highway cameras for British Columbia alongside the
