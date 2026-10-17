@@ -601,8 +601,12 @@ const PROJECT_FIXTURE = {
   }],
 };
 
-/** Stub the browser globals the director touches, headlessly. */
-function installSceneRuntime(project = PROJECT_FIXTURE) {
+/**
+ * Stub the browser globals the director touches, headlessly. `storage` replaces
+ * the seeded entries (key -> raw string); setting `localStorage.full` makes
+ * every write throw a quota error.
+ */
+function installSceneRuntime(project = PROJECT_FIXTURE, { storage } = {}) {
   const originalDocument = globalThis.document;
   const originalLocalStorage = globalThis.localStorage;
   const noopClassList = { add() {}, remove() {}, toggle() {}, contains: () => false };
@@ -614,10 +618,17 @@ function installSceneRuntime(project = PROJECT_FIXTURE) {
     removeEventListener() {},
     body: { classList: noopClassList, appendChild() {} },
   };
-  const stored = new Map([['godsEyeView.sceneProject.v2', JSON.stringify(project)]]);
+  const stored = new Map(storage
+    ? Object.entries(storage)
+    : [['godsEyeView.sceneProject.v2', JSON.stringify(project)]]);
   globalThis.localStorage = {
+    stored,
+    full: false,
     getItem: (key) => stored.get(key) ?? null,
-    setItem: (key, value) => stored.set(key, value),
+    setItem(key, value) {
+      if (this.full) throw new DOMException('quota exceeded', 'QuotaExceededError');
+      stored.set(key, value);
+    },
     removeItem: (key) => stored.delete(key),
   };
 
@@ -718,7 +729,8 @@ async function settle(turns = 8) {
 
 /** Build a director over doubles, with the fixture project loaded. */
 function makeDirector(options = {}) {
-  const restore = installSceneRuntime(options.project);
+  const restore = installSceneRuntime(options.project, { storage: options.storage });
+  const storage = globalThis.localStorage;
   const viewer = fakeViewer();
   const styleManager = fakeStyleManager(options.style);
   const dataManager = fakeDataManager(options.data);
@@ -728,8 +740,75 @@ function makeDirector(options = {}) {
   // Telemetry is only accumulated during a run; observable-failure assertions
   // need the accumulator without driving a whole run.
   director._activeRun = { events: [] };
-  return { director, viewer, styleManager, dataManager, restore };
+  return { director, viewer, styleManager, dataManager, storage, restore };
 }
+
+test('only Play Shot or a scene run grants transient media authority; LOAD, Stop and replacement revoke it', async () => {
+  const { director, dataManager, restore } = makeDirector();
+  let owner = null;
+  const owners = [];
+  dataManager.layers = new Map([['flights', { module: {
+    setSceneMediaPlayback(value = null) { owner = value; if (value) owners.push(value.shotId); },
+  } }]]);
+  try {
+    await director.loadShot('scene-1', 'shot-a', { flyDuration: 0 });
+    assert.equal(owner, null, 'passive LOAD is not playback');
+    await director.replayShot('scene-1', 'shot-a');
+    assert.equal(owner?.shotId, 'shot-a');
+    assert.equal(owner.token.cancelled, false);
+    await director.loadShot('missing-scene', 'missing-shot');
+    assert.equal(owner?.shotId, 'shot-a', 'rejected navigation does not revoke another action');
+    director._running = true;
+    await director.loadShot('scene-1', 'shot-b');
+    assert.equal(owner?.shotId, 'shot-a', 'LOAD refused during a run cannot stop its media');
+    director._running = false;
+    await director.loadShot('scene-1', 'shot-b', { flyDuration: 0 });
+    assert.equal(owner, null, 'replacement LOAD revokes the prior replay');
+    await director.replayShot('scene-1', 'shot-a');
+    director.stopScene();
+    assert.equal(owner, null);
+    director._sleep = async () => {};
+    owners.length = 0;
+    await director.startScene('scene-1', { single: true, preview: false });
+    assert.deepEqual(owners, ['shot-a'], 'only enabled opt-in layers receive playback authority');
+    assert.equal(owner, null, 'run completion releases the last shot owner');
+  } finally { await director.destroy(); restore(); }
+});
+
+test('cross-scene replay grants media ownership only after the previous scene releases its layers', async () => {
+  const { director, dataManager, restore } = makeDirector();
+  let owner = null;
+  const events = [];
+  const media = { setSceneMediaPlayback(value = null) { owner = value; } };
+  dataManager.layers = new Map([['flights', { module: media }]]);
+  const setEnabled = dataManager.setEnabled.bind(dataManager);
+  dataManager.setEnabled = async (id, enabled, options) => {
+    if (id === 'flights') {
+      events.push({ enabled, owner: owner?.shotId ?? null });
+      if (!enabled) media.setSceneMediaPlayback();
+    }
+    return setEnabled(id, enabled, options);
+  };
+  try {
+    const previous = director._project.scenes[0];
+    previous.releaseLayerIds = ['flights'];
+    const target = structuredClone(previous);
+    target.id = 'other-media-scene';
+    director._project.scenes.push(target);
+    await director.loadShot(previous.id, 'shot-a', { flyDuration: 0 });
+    events.length = 0;
+    const result = await director.replayShot(target.id, 'shot-a');
+    assert.equal(result.started, true);
+    assert.deepEqual(events.slice(0, 2), [
+      { enabled: false, owner: null },
+      { enabled: true, owner: 'shot-a' },
+    ], 'old-scene disable must finish before granting the new owner');
+    assert.equal(owner?.sceneId, target.id);
+    assert.equal(owner?.token.cancelled, false);
+    director.stopScene();
+    assert.equal(owner, null);
+  } finally { await director.destroy(); restore(); }
+});
 
 test('scene camera waits for provider completion and fade rather than the saved media hold', async () => {
   const { director, viewer, dataManager, restore } = makeDirector();
@@ -1516,4 +1595,66 @@ test('camera refusal starts no authored frame or playback clock', async () => {
     assert.equal(director.getPlaybackTimingState().activeTimers, 0);
     assert.deepEqual(viewer.flights, []);
   } finally { restore(); }
+});
+
+test('an unreadable saved project does not overwrite its recovery checkpoint (#971)', async () => {
+  const unreadable = '{"version":99,"scenes":[]}';
+  const warn = console.warn;
+  console.warn = () => {};
+  const { director, storage, restore } = makeDirector({ storage: {
+    'godsEyeView.sceneProject.v2': unreadable,
+    'godsEyeView.sceneProject.checkpoint.v1': 'EARLIER-CHECKPOINT',
+  } });
+  try {
+    assert.equal(storage.stored.get('godsEyeView.sceneProject.v2'), unreadable);
+    assert.equal(storage.stored.get('godsEyeView.sceneProject.checkpoint.v1'), 'EARLIER-CHECKPOINT');
+  } finally { console.warn = warn; await director.destroy(); restore(); }
+});
+
+test('a capture, update or import that cannot be saved keeps the "Scene not saved" status (#971)', async () => {
+  const warn = console.warn;
+  console.warn = () => {};
+  const { director, storage, restore } = makeDirector();
+  let status = '';
+  director.subscribe(({ state }) => { status = state.status; });
+  try {
+    storage.full = true;
+    director._selectedSceneId = 'scene-1';
+    director._selectedShotId = 'shot-a';
+    director.captureShot();
+    assert.match(status, /^Scene not saved/, 'failed capture keeps the save failure');
+    director.updateSelectedShot();
+    assert.match(status, /^Scene not saved/, 'failed update keeps the save failure');
+    assert.equal(await director.importProjectFile(
+      { name: 'fixture.json' },
+      { prepared: { project: structuredClone(PROJECT_FIXTURE), assets: [] } },
+    ), true);
+    assert.match(status, /^Scene not saved/, 'failed import keeps the save failure');
+  } finally { console.warn = warn; await director.destroy(); restore(); }
+});
+
+test('startScene resolves its result, resumes after a shot without a scene id, and counts distinct scenes (#971)', async () => {
+  const { director, restore } = makeDirector();
+  try {
+    const options = { single: true, preview: false };
+    assert.deepEqual(await director.startScene('scene-1', options), { started: true, shots: 2 });
+    assert.equal(director._lastRun.scenesRun, 1, 'one scene with two shots is one scene run');
+    assert.deepEqual(
+      await director.startScene(undefined, { ...options, afterShotId: 'shot-a' }),
+      { started: true, shots: 1 },
+    );
+  } finally { await director.destroy(); restore(); }
+});
+
+test('a caught run failure resolves as run-failed, not success (#971)', async () => {
+  const { director, styleManager, restore } = makeDirector();
+  const warn = console.warn;
+  console.warn = () => {};
+  styleManager.applyVisualState = async () => { throw new Error('visual failed'); };
+  try {
+    assert.deepEqual(
+      await director.startScene('scene-1', { single: true, preview: false }),
+      { started: false, reason: 'run-failed' },
+    );
+  } finally { console.warn = warn; await director.destroy(); restore(); }
 });
