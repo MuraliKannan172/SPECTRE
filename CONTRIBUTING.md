@@ -64,12 +64,13 @@ runtime reference either way. `scripts/qa-l9-matrix.mjs` aggregates the broader
 release-candidate checks and selected harnesses; it does not replace the focused
 gate for the feature you changed.
 
-> **CI does not cover this for you.** The workflow runs the setup policy
+> **CI covers only two of these for you.** The workflow runs the setup policy
 > checks, the formatting and package-boundary checks, the unit suite and the
-> production build, plus a Windows onboarding job. It runs neither
-> `npm run test:track` nor any `qa-*.mjs` gate — both need a live dev server
-> and a browser. Include the applicable local run in your PR's validation
-> evidence.
+> production build, plus a Windows onboarding job, and against the built preview
+> it runs `qa:street-level:fixtures` and `qa:panel-resize`. It does not run
+> `npm run test:track` or any other `qa-*.mjs` gate — those need a live dev
+> server and a browser. Include the applicable local run in your PR's
+> validation evidence.
 
 ## Share-link layer tokens
 
