@@ -1370,6 +1370,14 @@ outside its promise, so an unusual mirror status cannot crash the server.
 Node-only package entries expose both provider factories. Routes, payloads,
 fallback behavior and existing dev/preview hook registration are preserved;
 browser rendering is unchanged.
+The portable frame source retains the proxy's known `X-CCTV-Source` kind. Camera
+snapshot tools label Street View fallback imagery as historical and credit Google,
+while upstream frames retain their current-view label and catalog attribution.
+Synthetic placeholders are unavailable as snapshots. Injected frame sources may
+supply `sourceKind`; missing or unknown provenance keeps `current_view` null and
+does not claim the image is current. The `current_view` field distinguishes camera-feed
+provenance from historical fallback imagery; it does not measure capture time or
+image freshness.
 
 ## CCTV missing numeric fields
 
@@ -1392,7 +1400,10 @@ plugin order, server-key selection, validation, disk caches, budgets, retries
 and stale/error responses remain unchanged. Each has a Node-only package entry
 under `gods-eye-view/server/providers/`. Portable terrain mechanics, traffic tile
 math and GBFS source rules are available under `gods-eye-view/sources/`.
-The browser layers and their rendering remain in their existing modules.
+The TomTom `/api/tomtom/*` routes run the shared same-site admission gate before
+status, cache or upstream work, refusing cross-site browser requests while
+preserving same-origin app requests and non-browser local callers. The browser
+layers and their rendering remain in their existing modules.
 GBFS null or empty availability counts retain an unknown value through station
 parsing and rendering; they use the neutral station color rather than reporting
 an empty dock. Explicit zero and caller-supplied numeric fallbacks remain valid.
