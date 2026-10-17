@@ -4,5 +4,6 @@
   of estimating from the returned rows. Airlines come from the ICAO designator
   in each callsign (SWA1234 counts as SWA), so the breakdown works on feeds
   that report no operator; operator and type are counted only where the feed
-  reports them; AIS ship type 0 ("not available") counts as unknown
+  reports them. Ship types count by family, so AIS codes 70 to 79 are all
+  cargo, and type 0 ("not available") counts as unknown
   (quanticsoul4772, #1056).
