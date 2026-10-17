@@ -131,3 +131,70 @@ test('adaptive rail restore hides compact Radio before revealing Context', (t) =
     'layout',
   ]);
 });
+
+test('real PanelChrome constructor wires rail restore to compact Radio owner', (t) => {
+  const priorDocument = globalThis.document;
+  const priorRaf = globalThis.requestAnimationFrame;
+  let nextFrame;
+  const contextPanel = {
+    id: 'global-context-panel',
+    classList: classList(['collapsed', 'layout-auto-collapsed']),
+  };
+  const rightRail = {
+    querySelectorAll(selector) {
+      return selector === '.layout-auto-collapsed' ? [contextPanel] : [];
+    },
+  };
+  globalThis.document = {
+    getElementById(id) {
+      return id === 'right-context-rail' ? rightRail : null;
+    },
+  };
+  globalThis.requestAnimationFrame = (callback) => {
+    nextFrame = callback;
+    return 1;
+  };
+  t.after(() => {
+    globalThis.document = priorDocument;
+    globalThis.requestAnimationFrame = priorRaf;
+  });
+
+  const dock = { classList: classList(['disclosure-open']) };
+  const calls = [];
+  const chrome = new PanelChrome({
+    elements: { _contextRadioDock: dock },
+    operations: {
+      _setRadioDisclosure(open) {
+        calls.push(`disclosure:${open}`);
+        dock.classList.toggle('disclosure-open', open);
+      },
+      _syncPanelCollapseButton(panel) {
+        calls.push(`button:${panel.id}`);
+      },
+    },
+    readHud: () => ({ visible: true, getVariant: () => 'tactical' }),
+    readCockpit: () => null,
+    readShareLinks: () => null,
+    readInitialShare: () => null,
+    readScrollRestoreOwner: () => null,
+    readDisplayScrollTop: () => 0,
+  });
+  chrome._panelLayout._syncRightPanelAdaptiveLayout = () => {
+    calls.push('layout');
+  };
+
+  chrome._panelLayout._scheduleRightPanelLayout({
+    reconsiderAutoCollapse: true,
+  });
+  assert.equal(typeof nextFrame, 'function');
+  assert.equal(dock.classList.contains('disclosure-open'), true);
+  nextFrame();
+
+  assert.equal(contextPanel.classList.contains('collapsed'), false);
+  assert.equal(dock.classList.contains('disclosure-open'), false);
+  assert.deepEqual(calls, [
+    'disclosure:false',
+    'button:global-context-panel',
+    'layout',
+  ]);
+});
