@@ -243,7 +243,7 @@ export const ENRICH_DISPATCH_GAP_MS = 200;
 //     of drip, so the backlog can't outgrow a poll and re-sorts fresh), and
 //   - a ROLLING token-bucket budget (below) bounding the sustained ambient
 //     request rate (repeat sessions resolve instantly from the proxy's
-//     permanent disk cache).
+//     24-hour disk cache).
 // Fail-silent by contract: the sweep never throws into the poll loop, never
 // blocks rendering, and never touches tracking state. When a type answer
 // lands, _requestTypeEnrichment's callback swaps the billboard glyph + scale
@@ -257,7 +257,7 @@ export const ENRICH_DISPATCH_GAP_MS = 200;
 // ENRICH_AMBIENT_REFILL_TOKENS every ENRICH_AMBIENT_REFILL_WINDOW_MS, clamped
 // at the ceiling (no banking beyond one bucket). Numbers: 150 / 5 min sustains
 // 0.5 req/s worst case — an order of magnitude under the 5/s drip that (with
-// the 4-concurrent limit + the proxy's permanent disk cache) is the REAL
+// the 4-concurrent limit + the proxy's 24-hour disk cache) is the REAL
 // politeness bound on adsbdb; the 300 ceiling preserves the old first-look
 // burst so a fresh region still classifies quickly.
 /** Bucket ceiling: max ambient tokens held at once (= the initial burst). */
