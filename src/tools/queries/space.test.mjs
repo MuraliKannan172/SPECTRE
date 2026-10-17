@@ -90,6 +90,21 @@ SAT ALPHA5
   assert.equal(tleCatalogNumber(entries[0].line2), 100000);
 });
 
+test('TLE parsing rejects a pair whose catalog fields are malformed and resumes', () => {
+  // Read as digits up to the first non-digit, both fields would be 2554.
+  const text = `SAT MALFORMED
+1 2554AU 98067A   24001.50000000  .00016717  00000-0  30270-3 0  9994
+2 2554B  51.6416 247.4627 0006703 130.5360 325.0288 15.50377579432414
+SAT HALF MALFORMED
+1 2554AU 98067A   24001.50000000  .00016717  00000-0  30270-3 0  9994
+2 02554  51.6416 247.4627 0006703 130.5360 325.0288 15.50377579432414
+${TLE}`;
+  assert.deepEqual(
+    parseTleText(text).map((entry) => entry.name),
+    ['ISS (ZARYA)', 'CSS (TIANHE)'],
+  );
+});
+
 test('Alpha-5 catalog numbers decode, skipping I and O', () => {
   for (const [field, id] of [
     ['A0000', 100000],
