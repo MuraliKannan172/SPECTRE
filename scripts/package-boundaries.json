@@ -3934,7 +3934,8 @@
       "src/data/feedState.js",
       "src/contextModePolicy.js",
       "src/loadingFeedback.js",
-      "src/data/installationFeedback.js"
+      "src/data/installationFeedback.js",
+      "src/i18n/marker.js"
     ],
     "external": ["cesium"]
   }
