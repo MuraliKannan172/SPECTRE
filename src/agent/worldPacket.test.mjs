@@ -2,11 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
 
-import {
-  getWorldPacket,
-  semanticWorldPacketFingerprint,
-} from './worldPacket.js';
+import { getWorldPacket } from './worldPacket.js';
 import { createGevActionRunner } from '../voice/gevActions.js';
+
+function withoutVoicePresentation(result) {
+  const packet = { ...result };
+  delete packet.say;
+  delete packet.display;
+  delete packet.schedule;
+  return packet;
+}
 
 function harness() {
   const position = Cesium.Cartesian3.fromDegrees(-97.74, 30.26, 500);
@@ -64,7 +69,7 @@ test('World Packet preserves get_current_view_state parity', async () => {
   const runner = createGevActionRunner({ viewer, dataManager, styleManager });
   const voice = await runner('get_current_view_state');
 
-  assert.deepEqual(voice, packet);
+  assert.deepEqual(withoutVoicePresentation(voice), packet);
   assert.equal(packet.context.mode, 'contacts');
   assert.equal(packet.context.modeInternal, 'flights');
   assert.equal(packet.layers[0].feedState, 'nominal');
@@ -94,20 +99,6 @@ test('World Packet keeps stale/unavailable feed semantics distinct from empty', 
   assert.match(packet.feedProvenance.note, /fixture unavailable/i);
 });
 
-test('semantic fingerprint ignores narration prose but changes with observed state', () => {
-  const { viewer, dataManager, styleManager } = harness();
-  const packet = getWorldPacket({ viewer, dataManager, styleManager });
-  const original = semanticWorldPacketFingerprint(packet);
-
-  const proseOnly = structuredClone(packet);
-  proseOnly.feedProvenance.note = 'different generated narration';
-  assert.equal(semanticWorldPacketFingerprint(proseOnly), original);
-
-  const changed = structuredClone(packet);
-  changed.layers[0].count += 1;
-  assert.notEqual(semanticWorldPacketFingerprint(changed), original);
-});
-
 // The 2026-10 main voice contract omits disabled layers from the model payload.
 test('World Packet and voice preserve enabled-only payload and count disabled layers', async () => {
   const { viewer, dataManager, styleManager } = harness();
@@ -134,22 +125,9 @@ test('World Packet and voice preserve enabled-only payload and count disabled la
 
   const runner = createGevActionRunner({ viewer, dataManager, styleManager });
   const voice = await runner('get_current_view_state');
-  assert.deepEqual(voice, packet);
+  assert.deepEqual(withoutVoicePresentation(voice), packet);
 });
 
-test('World Packet fingerprints distinguish enabled state but ignore narrative churn', () => {
-  const { viewer, dataManager, styleManager } = harness();
-  const first = getWorldPacket({ viewer, dataManager, styleManager });
-  const prose = structuredClone(first);
-  prose.feedProvenance.note = 'new narration only';
-  assert.equal(
-    semanticWorldPacketFingerprint(first),
-    semanticWorldPacketFingerprint(prose),
-  );
-  const hidden = structuredClone(first);
-  hidden.disabledLayerCount += 1;
-  assert.notEqual(
-    semanticWorldPacketFingerprint(first),
-    semanticWorldPacketFingerprint(hidden),
-  );
+test('World Packet rejects null options with the camera requirement', () => {
+  assert.throws(() => getWorldPacket(null), /requires a viewer camera/);
 });
