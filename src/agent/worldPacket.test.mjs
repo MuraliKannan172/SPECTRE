@@ -71,82 +71,94 @@ test('World Packet preserves get_current_view_state parity', async () => {
   assert.equal(packet.feedProvenance.overall, 'nominal');
 });
 
-test('World Packet keeps stale/unavailable feed semantics distinct from empty', () => {
-  const { viewer, dataManager, styleManager } = harness();
-  dataManager.getAll = () => [
-    {
-      id: 'traffic',
-      name: 'Traffic',
-      enabled: true,
-      stats: {
-        count: 0,
-        source: 'fixture',
-        error: 'fixture unavailable',
-        lastUpdate: null,
+test(
+  'World Packet keeps stale/unavailable feed semantics distinct from empty',
+  () => {
+    const { viewer, dataManager, styleManager } = harness();
+    dataManager.getAll = () => [
+      {
+        id: 'traffic',
+        name: 'Traffic',
+        enabled: true,
+        stats: {
+          count: 0,
+          source: 'fixture',
+          error: 'fixture unavailable',
+          lastUpdate: null,
+        },
       },
-    },
-  ];
+    ];
 
-  const packet = getWorldPacket({ viewer, dataManager, styleManager });
-  assert.equal(packet.layers[0].count, 0);
-  assert.notEqual(packet.layers[0].feedState, 'nominal');
-  assert.notEqual(packet.feedProvenance.overall, 'nominal');
-  assert.match(packet.feedProvenance.note, /fixture unavailable/i);
-});
+    const packet = getWorldPacket({ viewer, dataManager, styleManager });
+    assert.equal(packet.layers[0].count, 0);
+    assert.notEqual(packet.layers[0].feedState, 'nominal');
+    assert.notEqual(packet.feedProvenance.overall, 'nominal');
+    assert.match(packet.feedProvenance.note, /fixture unavailable/i);
+  },
+);
 
-test('semantic fingerprint ignores narration prose but changes with observed state', () => {
-  const { viewer, dataManager, styleManager } = harness();
-  const packet = getWorldPacket({ viewer, dataManager, styleManager });
-  const original = semanticWorldPacketFingerprint(packet);
+test(
+  'semantic fingerprint ignores narration prose but changes with observed state',
+  () => {
+    const { viewer, dataManager, styleManager } = harness();
+    const packet = getWorldPacket({ viewer, dataManager, styleManager });
+    const original = semanticWorldPacketFingerprint(packet);
 
-  const proseOnly = structuredClone(packet);
-  proseOnly.feedProvenance.note = 'different generated narration';
-  assert.equal(semanticWorldPacketFingerprint(proseOnly), original);
+    const proseOnly = structuredClone(packet);
+    proseOnly.feedProvenance.note = 'different generated narration';
+    assert.equal(semanticWorldPacketFingerprint(proseOnly), original);
 
-  const changed = structuredClone(packet);
-  changed.layers[0].count += 1;
-  assert.notEqual(semanticWorldPacketFingerprint(changed), original);
-});
+    const changed = structuredClone(packet);
+    changed.layers[0].count += 1;
+    assert.notEqual(semanticWorldPacketFingerprint(changed), original);
+  },
+);
 
 // The 2026-10 main voice contract omits disabled layers from the model payload.
-test('World Packet and voice preserve enabled-only payload and count disabled layers', async () => {
-  const { viewer, dataManager, styleManager } = harness();
-  const rows = dataManager.getAll();
-  rows.push({
-    id: 'earthquakes',
-    name: 'Earthquakes',
-    enabled: false,
-    stats: { count: 99, source: 'fixture', error: 'stale' },
-  });
-  let reads = 0;
-  dataManager.getAll = () => {
-    reads += 1;
-    return rows;
-  };
-  const packet = getWorldPacket({ viewer, dataManager, styleManager });
-  assert.equal(reads, 1, 'collect the roster once rather than repeatedly');
-  assert.equal(packet.disabledLayerCount, 1);
-  assert.deepEqual(packet.layers.map((layer) => layer.id), ['traffic']);
-  assert.equal(packet.feedProvenance.overall, 'nominal');
+test(
+  'World Packet and voice preserve enabled-only payload and count disabled layers',
+  async () => {
+    const { viewer, dataManager, styleManager } = harness();
+    const rows = dataManager.getAll();
+    rows.push({
+      id: 'earthquakes',
+      name: 'Earthquakes',
+      enabled: false,
+      stats: { count: 99, source: 'fixture', error: 'stale' },
+    });
+    let reads = 0;
+    dataManager.getAll = () => {
+      reads += 1;
+      return rows;
+    };
+    const packet = getWorldPacket({ viewer, dataManager, styleManager });
+    assert.equal(reads, 1, 'collect the roster once rather than repeatedly');
+    assert.equal(packet.disabledLayerCount, 1);
+    assert.deepEqual(packet.layers.map((layer) => layer.id), ['traffic']);
+    assert.equal(packet.feedProvenance.overall, 'nominal');
 
-  const runner = createGevActionRunner({ viewer, dataManager, styleManager });
-  const voice = await runner('get_current_view_state');
-  assert.deepEqual(voice, packet);
-});
+    const runner = createGevActionRunner({ viewer, dataManager, styleManager });
+    const voice = await runner('get_current_view_state');
+    assert.deepEqual(voice, packet);
+  },
+);
 
-test('World Packet fingerprints distinguish enabled state but ignore narrative churn', () => {
-  const { viewer, dataManager, styleManager } = harness();
-  const first = getWorldPacket({ viewer, dataManager, styleManager });
-  const prose = structuredClone(first);
-  prose.feedProvenance.note = 'new narration only';
-  assert.equal(
-    semanticWorldPacketFingerprint(first),
-    semanticWorldPacketFingerprint(prose),
-  );
-  const hidden = structuredClone(first);
-  hidden.disabledLayerCount += 1;
-  assert.notEqual(
-    semanticWorldPacketFingerprint(first),
-    semanticWorldPacketFingerprint(hidden),
-  );
-});
+test(
+  'World Packet fingerprints distinguish enabled state but ignore narrative churn',
+  () => {
+    const { viewer, dataManager, styleManager } = harness();
+    const first = getWorldPacket({ viewer, dataManager, styleManager });
+    const prose = structuredClone(first);
+    prose.feedProvenance.note = 'new narration only';
+    assert.equal(
+      semanticWorldPacketFingerprint(first),
+      semanticWorldPacketFingerprint(prose),
+    );
+    const hidden = structuredClone(first);
+    hidden.disabledLayerCount += 1;
+    assert.notEqual(
+      semanticWorldPacketFingerprint(first),
+      semanticWorldPacketFingerprint(hidden),
+    );
+  },
+);
