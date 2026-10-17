@@ -28,35 +28,47 @@ export function parseTleText(text) {
   return result;
 }
 
+// Alpha-5: a letter A–Z, skipping I and O, then exactly four digits.
+const ALPHA5 = /^[A-HJ-NP-Z]\d{4}$/;
+const DIGITS = /^\d+$/;
+
 /**
- * The catalog number an Alpha-5 field stands for, or null for any other field.
+ * The catalog number a catalog field stands for, or null for any other field.
  *
- * Since the catalog passed 99999 (July 2026) a TLE writes the numbers above it
- * in Alpha-5: a letter A–Z, skipping I and O, stands for 10–33 in the
- * ten-thousands place, so 100000 is "A0000" and 339999 is "Z9999".
+ * A field is either plain digits or Alpha-5, the TLE spelling of numbers above
+ * 99999: the letter stands for 10–33 in the ten-thousands place, skipping I
+ * and O, so 100000 is "A0000" and 339999 is "Z9999". Anything else (a sign, a
+ * decimal point, hex, an embedded space, a lowercase or trailing letter) is
+ * not a catalog number.
+ * @param {string} field the field with any leading spaces already removed
+ * @returns {number | null}
  */
-function alpha5CatalogNumber(field) {
+function decodeCatalogField(field) {
+  if (DIGITS.test(field)) return Number(field);
+  if (!ALPHA5.test(field)) return null;
   const letter = field[0];
-  if (
-    letter >= 'A' &&
-    letter <= 'Z' &&
-    letter !== 'I' &&
-    letter !== 'O' &&
-    /^\d{4}$/.test(field.slice(1))
-  ) {
-    let tens = letter.charCodeAt(0) - 65 + 10;
-    if (letter > 'I') tens -= 1;
-    if (letter > 'O') tens -= 1;
-    return tens * 10000 + Number(field.slice(1));
-  }
-  return null;
+  let tens = letter.charCodeAt(0) - 65 + 10;
+  if (letter > 'I') tens -= 1;
+  if (letter > 'O') tens -= 1;
+  return tens * 10000 + Number(field.slice(1));
 }
 
-/** The NORAD catalog number from a TLE line, or null. */
+/**
+ * NORAD catalog number of a satrec as a number, or NaN.
+ *
+ * satellite.js keeps the TLE's five-character field verbatim in
+ * `satrec.satnum`, and `Number("A0000")` is NaN, so every Alpha-5 satellite
+ * would share one NaN key. Digits of any length (an OMM satrec carries the
+ * number unpadded) and Alpha-5 decode; anything else, blank included, is NaN.
+ * @param {string} satnum
+ * @returns {number}
+ */
+export function noradIdFromSatnum(satnum) {
+  return decodeCatalogField(String(satnum ?? '').trim()) ?? Number.NaN;
+}
+
+/** The NORAD catalog number from TLE line 1 or 2 (columns 3–7), or null. */
 export function tleCatalogNumber(line) {
   const field = String(line).slice(2, 7);
-  const alpha5 = alpha5CatalogNumber(field);
-  if (alpha5 !== null) return alpha5;
-  const number = Number.parseInt(field, 10);
-  return Number.isInteger(number) ? number : null;
+  return decodeCatalogField(field.replace(/^ +/, ''));
 }
