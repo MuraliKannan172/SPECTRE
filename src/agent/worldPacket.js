@@ -1,8 +1,8 @@
 import * as Cesium from 'cesium';
 import {
   feedProvenanceEnvelope,
+  layerSnapshot,
   layerSnapshots,
-  viewStateLayerRow,
 } from '../data/layerSnapshot.js';
 import { contextModeWord } from '../contextModePolicy.js';
 
@@ -139,7 +139,10 @@ export function getWorldPacket({
   const cartographic = Cesium.Cartographic.fromCartesian(
     viewer.camera.positionWC,
   );
+  // Read the roster once. Voice must not rewalk disabled layers: preserving the
+  // current enabled-only view keeps the model's context budget bounded.
   const rows = dataManager.getAll();
+  const enabledRows = rows.filter((layer) => layer.enabled);
   const contactsWindow = activeContactsWindow(dataManager);
   const contextState =
     typeof styleManager?.getContextModeState === 'function'
@@ -171,7 +174,21 @@ export function getWorldPacket({
         : null,
     scenePlayback: sceneDirector?.getPlaybackStatus?.() || null,
     tracked: collectTrackedEntities(dataManager),
-    layers: rows.map((layer) => viewStateLayerRow(layer, { now })),
+    disabledLayerCount: rows.length - enabledRows.length,
+    // Preserve get_current_view_state's existing compact enabled-only shape.
+    layers: enabledRows.map((layer) => {
+      const snapshot = layerSnapshot(layer, { now });
+      return {
+        id: layer.id,
+        name: layer.name,
+        enabled: layer.enabled,
+        count: layer.stats?.count || 0,
+        error: layer.stats?.error || null,
+        feedState: snapshot.feedState,
+        source: snapshot.source,
+        lastUpdate: snapshot.lastUpdate,
+      };
+    }),
     feedProvenance: feedProvenanceEnvelope(
       layerSnapshots(rows, { now }).filter((layer) => layer.enabled),
       { now },
