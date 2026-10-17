@@ -141,20 +141,6 @@ if (import.meta.url === invoked) {
     if (mode === '--check' && result.changed.length) {
       for (const name of result.changed)
         console.error(`Needs formatting: ${name}`);
-      // Temporary formatter output probe for the existing #880 test only.
-      if (result.changed.includes('src/agent/worldPacket.test.mjs')) {
-        const file = path.join(
-          fileURLToPath(new URL('../', import.meta.url)),
-          'src/agent/worldPacket.test.mjs',
-        );
-        const formatted = await prettier.format(await readFile(file, 'utf8'), {
-          ...(await prettier.resolveConfig(file)),
-          filepath: file,
-        });
-        const encoded = Buffer.from(formatted).toString('base64');
-        for (let offset = 0; offset < encoded.length; offset += 1000)
-          console.error(`PRETTIER-DATA|src/agent/worldPacket.test.mjs|${offset}|${encoded.slice(offset, offset + 1000)}`);
-      }
       process.exitCode = 1;
     } else {
       console.log(
