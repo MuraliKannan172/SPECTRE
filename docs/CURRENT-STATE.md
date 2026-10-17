@@ -1,12 +1,19 @@
 # God's Eye View Current State
 
-Shared distance checks use `geoDistance.js` with `{ lat, lon }` points and the
-IUGG mean spherical Earth radius. `greatCircleKm` is canonical;
-`greatCircleMeters` is its exact metre conversion. Missing, non-finite, and
-out-of-range points return `Infinity`, so threshold and nearest-item consumers
-exclude invalid positions. Older exported `haversineKm` entry points remain as
-compatibility wrappers only. Intentional local angular, projection, ellipsoidal
-prefilter, and small-viewport approximations remain separate.
+Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
+the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
+canonical; `greatCircleMeters` is its exact metre conversion. Missing,
+non-finite, and out-of-range points (latitude outside ±90, longitude outside
+±180) return `Infinity`, so threshold and nearest-item consumers exclude invalid
+positions. Older exported `haversineKm` entry points remain as compatibility
+wrappers only. `src/data/approxDistance.js`, the equirectangular
+viewer-proximity approximation, is deliberately separate, as are intentional
+local angular, projection, ellipsoidal prefilter, and small-viewport
+approximations. Four great-circle copies remain for a follow-up:
+`src/data/adminBoundaries.js` and `src/tools/area.js` pass unwrapped longitudes
+across the antimeridian, so they cannot use the strict ±180 check as-is, and
+`src/sources/adsbRecords.js` and `server/providers/common/geo.js` keep their own
+implementations.
 
 Vessel sources can report healthy empty coverage using a current, complete
 snapshot with zero raw rows, a healthy transport and a positive last-message
