@@ -4339,6 +4339,7 @@ silently demoting every later lookup for the session.
 - **The DENSE chip reports the dense LOAD, not the catalog param.** The param flips synchronously while the Starlink shell takes seconds to arrive over a chunked load, and CelesTrak 502s that feed regularly. So the chip reads `DENSE ···` (busy, disabled) while loading, ACTIVE only once dense points are actually on screen, and `DENSE ✕` with the reason on hover when the load fails — a failure also reverts `catalog` to `core`, drops any partial chunk, and leaves the chip clickable to retry. A load is judged by points added, not by HTTP status: a 200 carrying an empty body, a passed-through HTML error page, or only TLEs the core catalog already owns fails with the same revert semantics as a 502. Any explicit request for `core` clears a latched error even when the mode does not change, so a Space Missions restore of an already-core snapshot never leaves the user with a failure they did not cause. Because the load settles asynchronously, the layer pushes a re-render through the optional `setRowControlsListener()` hook; nothing else would repaint that row before the 5-minute catalog refresh, so the count and legend would otherwise sit stale.
 - **A dependency owner takes the row with it.** Space Missions borrows this layer for TLE lookup with `showPoints:false`; while points are hidden the layer returns empty row controls, so the legend never describes an empty sky and the chip cannot accept a write that the owner's restore would silently revert.
 - The detection-overlay record cache (`_detectionObjects`) is cleared with the catalog on every rebuild: it stamps id/class at creation only, and a rebuild can re-tag a satellite when a partial CelesTrak outage changes which group wins dedupe.
+- **Catalog numbers above 99999** can be written in a TLE as Alpha-5: a letter A–Z, skipping I and O, for the first two digits, so `A0000` is 100000 and `Z9999` is 339999. CelesTrak's TLE feed carries no satellite above 99999 (that needs the OMM feed, #1191), so this is compatibility with Alpha-5 TLEs. `src/sources/tle.js` decodes the field through one shared helper: `noradIdFromSatnum()` for the satellites layer, which keys and deduplicates its catalog by that number, and `tleCatalogNumber()` for the satellite tools. Plain digits read as before (`noradIdFromSatnum()` accepts any length, as an OMM satrec carries the number unpadded); a malformed field — a sign, decimal point, hex, exponent, embedded space, stray or lowercase letter, or blank — is rejected rather than partly read, as `NaN` in the layer and `null` in the tools.
 - **CCTV estimated bearings:** a camera whose pack marks `headingConfidence: 'low'` (the id-hash
   `fallbackHeadingFromId` bearing) shows `HDG n° (ESTIMATED)` in the HUD and draws its coverage
   wireframe dashed; colours, widths and active/idle emphasis are unchanged. A manual calibration
@@ -5474,9 +5475,9 @@ When runtime behavior or architecture changes, update this file in the same chan
 
 ## Dependency security baseline
 
-The lockfile uses DOMPurify 3.4.15, protobufjs 8.8.0, PostCSS 8.5.28, and
-nanoid 3.3.19. Cesium remains on 1.138.0. Browser QA uses Puppeteer 25.10.0;
-image-processing tools use Sharp 0.35.4. QA scripts await Puppeteer's asynchronous
+The lockfile uses DOMPurify 3.4.17, protobufjs 8.8.0, PostCSS 8.5.28,
+source-map-js 1.2.2 and nanoid 3.3.19. Cesium remains on 1.138.0. Browser QA
+uses Puppeteer 25.10.0; image-processing tools use Sharp 0.35.5. QA scripts await Puppeteer's asynchronous
 executable-path lookup before testing or passing the path to Chrome. Supported Node versions remain
 24.14.x and 26.x. Use `npm ci` to reproduce the checked-in dependency tree.
 
