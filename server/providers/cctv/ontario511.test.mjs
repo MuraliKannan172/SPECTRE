@@ -60,6 +60,6 @@ test('a rejected key is reported by status, never by the key itself', async (t) 
     { ONTARIO_511_API_KEY: 'secret-key-value' },
   );
   assert.deepEqual(cameras, []);
-  assert.match(warnings.join('\n'), /400/);
+  assert.match(warnings.join('\n'), /400 \(check ONTARIO_511_API_KEY\)/);
   assert.doesNotMatch(warnings.join('\n'), /secret-key-value/);
 });

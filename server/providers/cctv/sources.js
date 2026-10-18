@@ -539,7 +539,14 @@ export async function loadOntarioSourcesFromOpenData(
       signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     if (!resp.ok) {
-      console.warn('[CCTV] Ontario 511 camera download failed:', resp.status);
+      // The API answers 400 "Invalid Key" to a wrong or revoked key.
+      console.warn(
+        '[CCTV] Ontario 511 camera download failed:',
+        resp.status,
+        resp.status === 400 || resp.status === 401 || resp.status === 403
+          ? '(check ONTARIO_511_API_KEY)'
+          : '',
+      );
       return [];
     }
     const rows = await resp.json();
