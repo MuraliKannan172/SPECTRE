@@ -10,6 +10,7 @@ import alprCamerasLayer, {
 import { createAlprTileSource } from '../layers/alpr/source.js';
 import { DATA_CREDITS } from './dataCredits.js';
 import { setLocale } from '../i18n/index.js';
+import { shownEntityLabel } from '../voice/speech.js';
 import {
   clearSelectedEntityContextForLayer,
   getContextStore,
@@ -477,8 +478,8 @@ test('all manufacturers share one ALPR title and color; only supplied metadata a
 // The voice model reads the label as data; the voice card translates it.
 test('the camera label stays English data in a translated interface', async () => {
   const h = cameraHarness();
-  setLocale('ru');
   try {
+    setLocale('ru');
     h.setFetch(async () =>
       cameraResponse([
         cameraNode(42, { tags: { 'surveillance:type': 'ALPR' } }),
@@ -487,6 +488,10 @@ test('the camera label stays English data in a translated interface', async () =
     await alprCamerasLayer.update();
     h.click(h.source.entities.values[0].id);
     assert.equal(getSelectedEntityContext().label, 'ALPR camera');
+    assert.equal(
+      shownEntityLabel(getSelectedEntityContext().label),
+      'Камера ALPR',
+    );
   } finally {
     setLocale('en');
     h.restore();
