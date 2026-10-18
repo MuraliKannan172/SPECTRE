@@ -1153,6 +1153,18 @@ export function createGevActionRunner({
     }
 
     if (name === 'control_cctv') {
+      const action = String(args.action || '').toLowerCase();
+      if (
+        (action === 'enable' || action === 'disable') &&
+        dataManager.layers.get('cctv')?.module
+      ) {
+        const result = await runGevAction(
+          'set_layer_visibility',
+          { layerId: 'cctv', enabled: action === 'enable' },
+          runOptions,
+        );
+        return { ...result, action: 'control_cctv' };
+      }
       return controlCctv(dataManager, args, styleManager);
     }
 
