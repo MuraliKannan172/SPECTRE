@@ -139,38 +139,53 @@ function record(name, ok, detail) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Every page.waitForFunction / page.evaluate is a single CDP call that
-// puppeteer aborts after `protocolTimeout` (default 180s). The headful drain
-// budget is uncapped and reaches ~50 minutes on the full ~3,700-camera
-// catalog, so long waits are polled in slices of at most WAIT_SLICE_MS and
-// protocolTimeout is set with headroom above the largest slice.
-const WAIT_SLICE_MS = 120000;
-const PROTOCOL_TIMEOUT_MS = 2 * WAIT_SLICE_MS;
+// Each page.evaluate is bounded by puppeteer's `protocolTimeout` (default
+// 180s). Waits never come close: they poll from Node (below). The headroom is
+// for the few long evaluates, such as enabling the full ~3,700-camera catalog
+// on a real GPU, and matches the other qa-*.mjs harnesses.
+const PROTOCOL_TIMEOUT_MS = 300_000;
 
 /**
- * page.waitForFunction with an overall budget that may exceed
- * protocolTimeout: waits in WAIT_SLICE_MS slices until the predicate holds or
- * the budget runs out.
+ * Polls an in-page predicate from Node, one short page.evaluate per tick,
+ * until it holds or the budget runs out. Used instead of page.waitForFunction
+ * for two reasons: its default rAF polling stops in a minimised or hidden
+ * headful window (timers keep running, rAF does not), and its result is one
+ * CDP call that protocolTimeout cuts off, while the headful drain budget
+ * reaches ~50 minutes. A predicate that throws fails the run instead of
+ * silently spending the budget.
  * @param {import('puppeteer').Page} page
  * @param {Function} predicate - In-page predicate.
- * @param {number} budgetMs - Overall budget.
+ * @param {object} opts
+ * @param {number} opts.timeoutMs - Overall budget.
+ * @param {number} [opts.intervalMs=250] - Delay between checks.
+ * @param {unknown[]} [opts.args=[]] - Arguments passed to the predicate.
+ *   The predicate must return a boolean: its result crosses CDP by value.
  * @returns {Promise<boolean>} True if the predicate held within the budget.
  */
-async function waitForFunctionSliced(page, predicate, budgetMs) {
-  const deadline = Date.now() + budgetMs;
+async function waitForPredicate(
+  page,
+  predicate,
+  { timeoutMs, intervalMs = 250, args = [] },
+) {
+  // performance.now() is monotonic and doesn't advance while the machine
+  // sleeps, so neither a clock change nor a laptop sleep eats the budget.
+  const deadline = performance.now() + timeoutMs;
   for (;;) {
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) return false;
-    const ok = await page
-      .waitForFunction(predicate, {
-        timeout: Math.min(remaining, WAIT_SLICE_MS),
-      })
-      .then(() => true)
-      .catch((err) => {
-        if (err?.name === 'TimeoutError') return false;
+    try {
+      if (await page.evaluate(predicate, ...args)) return true;
+    } catch (err) {
+      // A navigation or Vite reload replaces the execution context: poll again.
+      if (
+        !/Execution context was destroyed|Cannot find context/.test(
+          err?.message ?? '',
+        )
+      ) {
         throw err;
-      });
-    if (ok) return true;
+      }
+    }
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) return false;
+    await sleep(Math.min(intervalMs, remaining));
   }
 }
 
@@ -190,29 +205,58 @@ async function positionPointerForGizmoDrag(page, point, frameCount = 3) {
     gev.dataManager.layers
       .get('cctv')
       .module.setParams({ calibrationMode: true });
-    const scene = gev.viewer.scene;
-    let rendered = 0;
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (complete) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        remove();
-        resolve(complete);
-      };
-      const remove = scene.postRender.addEventListener(() => {
-        rendered += 1;
-        if (rendered >= count) {
-          finish(true);
-          return;
-        }
+    return (await window.__qaRenderFrames(count, 5000)) >= count;
+  }, frameCount);
+}
+
+/**
+ * Saves a screenshot for human review. These are never a gate, so a capture
+ * that fails (for example when the renderer stalls in a hidden headful window)
+ * is logged instead of ending the run.
+ * @param {import('puppeteer').Page} page
+ * @param {string} file
+ * @param {string} label
+ */
+async function saveReviewShot(page, file, label) {
+  try {
+    await page.screenshot({ path: file });
+    console.log(`  screenshot (${label}) → ${path.relative(REPO_ROOT, file)}`);
+  } catch (err) {
+    console.warn(
+      `  screenshot skipped (${label}): ${path.relative(REPO_ROOT, file)}: ${err?.message ?? err}`,
+    );
+  }
+}
+
+/**
+ * Installs window.__qaRenderFrames(count, capMs) in the page: requests renders
+ * until `count` frames have passed scene.postRender or capMs runs out, and
+ * resolves with the number of frames rendered. The cap keeps a stalled
+ * renderer (headful window asleep or hidden) from hanging the CDP call.
+ * @param {import('puppeteer').Page} page
+ */
+function installRenderFramesHelper(page) {
+  return page.evaluate(() => {
+    window.__qaRenderFrames = (count, capMs) =>
+      new Promise((resolve) => {
+        const scene = window.__godsEyeView.viewer.scene;
+        let frames = 0;
+        const finish = () => {
+          clearTimeout(timer);
+          remove();
+          resolve(frames);
+        };
+        const remove = scene.postRender.addEventListener(() => {
+          if (++frames >= count) {
+            finish();
+            return;
+          }
+          scene.requestRender();
+        });
+        const timer = setTimeout(finish, capMs);
         scene.requestRender();
       });
-      const timer = setTimeout(() => finish(false), 5000);
-      scene.requestRender();
-    });
-  }, frameCount);
+  });
 }
 
 // In-page helper (stringified and re-defined inside each evaluate that needs
@@ -315,23 +359,21 @@ const BEARING_SHIFT_SRC = `
  * @returns {Promise<boolean>} True if tilesLoaded was observed within the timeout.
  */
 function waitForTilesLoaded(page, timeoutMs = 15000) {
-  return page
-    .waitForFunction(
-      () => {
-        const scene = window.__godsEyeView.viewer.scene;
-        const prims = scene.primitives;
-        for (let i = 0; i < prims.length; i++) {
-          const p = prims.get(i);
-          if (p && p.constructor && p.constructor.name === 'Cesium3DTileset') {
-            return p.tilesLoaded === true;
-          }
+  return waitForPredicate(
+    page,
+    () => {
+      const scene = window.__godsEyeView.viewer.scene;
+      const prims = scene.primitives;
+      for (let i = 0; i < prims.length; i++) {
+        const p = prims.get(i);
+        if (p && p.constructor && p.constructor.name === 'Cesium3DTileset') {
+          return p.tilesLoaded === true;
         }
-        return true; // no tileset in the scene — nothing to wait for
-      },
-      { timeout: timeoutMs },
-    )
-    .then(() => true)
-    .catch(() => false);
+      }
+      return true; // no tileset in the scene — nothing to wait for
+    },
+    { timeoutMs },
+  );
 }
 
 /**
@@ -400,6 +442,9 @@ async function main() {
   const browser = await puppeteer.launch({
     headless: HEADFUL ? false : 'new',
     protocolTimeout: PROTOCOL_TIMEOUT_MS,
+    // Talk CDP over a pipe, so no debugging port stays open on localhost for
+    // the length of a headful run.
+    pipe: true,
     ...(chromeExecutable ? { executablePath: chromeExecutable } : {}),
     args: [
       '--no-sandbox',
@@ -409,9 +454,6 @@ async function main() {
       '--disable-web-security',
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
-      // Puppeteer's defaults already include this; listed so the headful
-      // run keeps rendering when covered even if those defaults change.
-      '--disable-backgrounding-occluded-windows',
       '--window-size=1280,800',
     ],
   });
@@ -436,13 +478,18 @@ async function main() {
     });
     console.log('Loading app...');
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForFunction(
+    const appReady = await waitForPredicate(
+      page,
       () =>
-        window.__godsEyeView &&
-        window.__godsEyeView.viewer &&
-        window.__godsEyeView.dataManager,
-      { timeout: 60000 },
+        Boolean(
+          window.__godsEyeView &&
+          window.__godsEyeView.viewer &&
+          window.__godsEyeView.dataManager,
+        ),
+      { timeoutMs: 60000 },
     );
+    if (!appReady) throw new Error('app did not initialise within 60s');
+    await installRenderFramesHelper(page);
     // Let the initial fly-to Austin and first tiles settle.
     await sleep(4000);
 
@@ -514,14 +561,14 @@ async function main() {
     console.log(
       `Waiting for geometry-load queue to drain (N=${camCount}, budget ${Math.round(drainBudgetMs / 1000)}s)...`,
     );
-    const drained = await waitForFunctionSliced(
+    const drained = await waitForPredicate(
       page,
       () => {
         const mod = window.__godsEyeView.dataManager.layers.get('cctv').module;
         const ui = mod.getUIState();
-        return ui.loading && ui.loading.active === false;
+        return Boolean(ui.loading) && ui.loading.active === false;
       },
-      drainBudgetMs,
+      { timeoutMs: drainBudgetMs, intervalMs: 1000 },
     );
     record(
       `geometry-load queue drains within ${Math.round(drainBudgetMs / 1000)}s (N=${camCount})`,
@@ -615,14 +662,11 @@ async function main() {
     const tilesSeenLoaded = await waitForTilesLoaded(page, 45000);
     let sampleFloorOk = false;
     if (tilesSeenLoaded) {
-      sampleFloorOk = await page
-        .waitForFunction(
-          (base) => window.__qaCounters.sampleHeight - base >= 1,
-          { timeout: 30000 },
-          c0.sampleHeight,
-        )
-        .then(() => true)
-        .catch(() => false);
+      sampleFloorOk = await waitForPredicate(
+        page,
+        (base) => window.__qaCounters.sampleHeight - base >= 1,
+        { timeoutMs: 30000, args: [c0.sampleHeight] },
+      );
     }
     const cFloor = await readCounters();
     record(
@@ -1394,25 +1438,7 @@ async function main() {
         },
       });
       window.__qaCctvSiblingOwner = owner;
-      // Bounded: if the browser stops producing frames (headful window
-      // asleep or hidden), report it instead of hanging the CDP call.
-      const framesRendered = await new Promise((resolve) => {
-        let frames = 0;
-        const finish = () => {
-          clearTimeout(timer);
-          remove();
-          resolve(frames);
-        };
-        const remove = scene.postRender.addEventListener(() => {
-          if (++frames < 3) {
-            scene.requestRender();
-            return;
-          }
-          finish();
-        });
-        const timer = setTimeout(finish, 10000);
-        scene.requestRender();
-      });
+      const framesRendered = await window.__qaRenderFrames(3, 10000);
       const rect = scene.canvas.getBoundingClientRect();
       const picked = scene.pick(canvasPoint);
       const pickedId = picked?.id?.id ?? picked?.id ?? null;
@@ -1435,22 +1461,20 @@ async function main() {
     const siblingOwnsPick =
       siblingTarget?.pickedId === 'qa-cctv-sibling-owner' &&
       siblingTarget.ownsExactObject;
-    // A missed pick after fewer than 3 frames means the renderer stalled, not
-    // that picking regressed: fail it on the real-GPU sign-off path, leave it
-    // inconclusive under headless GL.
+    // No frame at all within the 10s cap points at a stalled renderer rather
+    // than at picking, though the harness can't rule out both. Fail it on the
+    // real-GPU sign-off path; leave it inconclusive under headless GL. A slow
+    // SwiftShader frame (1-2 of 3) still counts as a real miss.
     const siblingRendererStalled =
-      siblingTarget && !siblingOwnsPick && siblingTarget.framesRendered < 3;
+      siblingTarget && !siblingOwnsPick && siblingTarget.framesRendered === 0;
     record(
       'sibling test object owns its canvas pick',
       !siblingTarget
         ? null
-        : siblingRendererStalled
-          ? HEADFUL
-            ? false
-            : null
-          : siblingOwnsPick,
+        : siblingOwnsPick ||
+            (siblingRendererStalled && !HEADFUL ? null : false),
       siblingTarget
-        ? `${siblingRendererStalled ? `renderer stalled: ${siblingTarget.framesRendered}/3 frames in 10s; ` : ''}picked=${siblingTarget.pickedId} exactOwner=${siblingTarget.ownsExactObject} projectionΔ=${siblingTarget.projectionDelta} frames=${siblingTarget.framesRendered}/3`
+        ? `${siblingRendererStalled ? 'renderer stalled: ' : ''}frames=${siblingTarget.framesRendered}/3 picked=${siblingTarget.pickedId} exactOwner=${siblingTarget.ownsExactObject} projectionΔ=${siblingTarget.projectionDelta}`
         : 'no previously verified empty canvas ray was available',
     );
     if (siblingOwnsPick) {
@@ -1677,10 +1701,7 @@ async function main() {
     );
 
     const viewshedShot = path.join(SHOTS_DIR, 'cctv-v3-viewshed.png');
-    await page.screenshot({ path: viewshedShot });
-    console.log(
-      `  screenshot (visual review only) → ${path.relative(REPO_ROOT, viewshedShot)}`,
-    );
+    await saveReviewShot(page, viewshedShot, 'visual review only');
 
     // =========================================================================
     // Group 7: calibration gizmo (v3 design §3c — ADJUST mode + drag)
@@ -2014,10 +2035,7 @@ async function main() {
     // -----------------------------------------------------------------------
     await sleep(1000);
     const shot = path.join(SHOTS_DIR, 'cctv-v2-active.png');
-    await page.screenshot({ path: shot });
-    console.log(
-      `  screenshot (visual review only, not a gate) → ${path.relative(REPO_ROOT, shot)}`,
-    );
+    await saveReviewShot(page, shot, 'visual review only, not a gate');
 
     // No console errors during the whole exercise.
     record(
