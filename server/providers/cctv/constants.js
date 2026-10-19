@@ -188,6 +188,11 @@ export const TARKTEE_IMAGES_URL =
   'https://tarktee.transpordiamet.ee/api/v1/datex/roadCameraImages';
 export const TARKTEE_IMAGE_ORIGIN = 'https://tarktee.transpordiamet.ee/images/';
 export const DEFAULT_TARKTEE_MAX_SOURCES = 179;
+/** Hard ceiling per Tarktee DATEX XML document (~120–165 KB live). */
+export const TARKTEE_MAX_CATALOG_BYTES = 4 * 1024 * 1024;
+/** Two DATEX XML documents download concurrently from the same origin (~5.3 s
+ * baseline) alongside the other packs, so the 8 s default can abort mid-stream. */
+export const TARKTEE_FETCH_TIMEOUT_MS = 15_000;
 export const TARKTEE_ANCHORS = [
   { lat: 59.437, lon: 24.753 }, // Tallinn
   { lat: 58.378, lon: 26.729 }, // Tartu
