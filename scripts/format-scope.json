@@ -1062,5 +1062,10 @@
   "src/ui/flyToDataSource.test.mjs",
   "scripts/assemble-changelog.mjs",
   "src/tooling/changelogFragments.test.mjs",
-  "src/data/gbfsProxyRateLimit.test.mjs"
+  "src/data/gbfsProxyRateLimit.test.mjs",
+  "scripts/build-bright-stars.mjs",
+  "scripts/build-milky-way.mjs",
+  "src/sky/stars.test.mjs",
+  "src/sky/starrySky.test.mjs",
+  "src/tooling/skyAssets.test.mjs"
 ]

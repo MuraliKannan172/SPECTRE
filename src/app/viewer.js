@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { applyModelAtmosphereWorkaround } from './atmosphereCompat.js';
+import { StarrySky } from '../sky/starrySky.js';
 
 const PINCH_ZOOM_MULTIPLIER = 8;
 const MAX_PINCH_PIXEL_DELTA = 120;
@@ -119,6 +120,9 @@ export function createApplicationViewer({ container, creditContainer }) {
     selectionIndicator: false,
     infoBox: false,
     baseLayer: false,
+    // Replaced below: the default Tycho-2 cube map is too coarse for the
+    // whole-globe view and its JPEG blocks show around the Earth.
+    skyBox: false,
     creditContainer,
     msaaSamples: 4,
     contextOptions: { webgl: { preserveDrawingBuffer: true } },
@@ -130,6 +134,7 @@ export function createApplicationViewer({ container, creditContainer }) {
     // render loop. See app/atmosphereCompat.js.
     applyModelAtmosphereWorkaround(viewer.scene);
     viewer.scene.globe.show = false;
+    viewer.scene.skyBox = new StarrySky();
     viewer.scene.skyAtmosphere.show = true;
     viewer.scene.skyAtmosphere.atmosphereLightIntensity = 18;
     viewer.scene.skyAtmosphere.saturationShift = -0.12;
