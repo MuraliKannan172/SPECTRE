@@ -35,6 +35,9 @@ export const PROJECTION_CANVAS_WIDTH = 1920;
 
 export const PROJECTION_CANVAS_HEIGHT = 1080;
 
+/** Matte behind fitted stills; the placeholder gradient's dark end. */
+export const PROJECTION_MATTE_COLOR = '#01070c';
+
 // Downsample grid for the unchanged-frame signature (drawProjectionFrame).
 // 64x36 keeps the 16:9 aspect and reads ~9 KB per check versus the 8.3 MB a
 // full-resolution compare would touch.
