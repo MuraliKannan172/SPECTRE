@@ -223,3 +223,26 @@ test('Tarktee loader cancels the sibling body when one feed fails or overflows t
     'sibling stream is cancelled when the other feed exceeds the byte cap',
   );
 });
+
+test('Tarktee DATEX requests wait 30 s, past the slow answers measured live', async (t) => {
+  const timeouts = [];
+  const timeout = AbortSignal.timeout;
+  t.mock.method(AbortSignal, 'timeout', (ms) => {
+    timeouts.push(ms);
+    return timeout.call(AbortSignal, ms);
+  });
+  t.mock.method(console, 'log', () => {});
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (url) =>
+      new Response(
+        String(url).includes('roadCameraLocations')
+          ? SAMPLE_LOCATIONS_XML
+          : SAMPLE_IMAGES_XML,
+      ),
+  );
+  const cameras = await loadTarkteeSourcesFromDatex();
+  assert.deepEqual(timeouts, [30_000, 30_000]);
+  assert.equal(cameras.length, 1);
+});

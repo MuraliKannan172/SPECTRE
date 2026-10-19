@@ -113,6 +113,27 @@ export const CALTRANS_ANCHORS = [
   { lat: 32.7157, lon: -117.1611 }, // San Diego
   { lat: 38.5816, lon: -121.4944 }, // Sacramento
 ];
+export const FLORIDA_CCTV_URL =
+  'https://services.arcgis.com/3wFbqsFPLeKqOlIK/arcgis/rest/services/FL511_Traffic_Cameras/FeatureServer/0/query';
+export const FLORIDA_IMAGE_HOSTS = [
+  'images-dis.divas.cloud',
+  'snapshots.divas.cloud',
+];
+export const DEFAULT_FLORIDA_MAX_SOURCES = 500;
+/** Byte cap per catalog page (2,000 rows, about 650 KiB measured). */
+export const FLORIDA_MAX_CATALOG_BYTES = 2 * 1024 * 1024;
+/** Catalog page ceiling: 40 pages covers 4,000+ cameras even at 100 rows a page. */
+export const FLORIDA_MAX_CATALOG_PAGES = 40;
+export const FLORIDA_ANCHORS = [
+  { lat: 25.7617, lon: -80.1918 }, // Miami
+  { lat: 28.5384, lon: -81.3789 }, // Orlando
+  { lat: 27.9506, lon: -82.4572 }, // Tampa
+  { lat: 30.3322, lon: -81.6557 }, // Jacksonville
+  { lat: 30.4383, lon: -84.2807 }, // Tallahassee
+  { lat: 26.1224, lon: -80.1373 }, // Fort Lauderdale
+  { lat: 26.7153, lon: -80.0534 }, // West Palm Beach
+  { lat: 30.4213, lon: -87.2169 }, // Pensacola (panhandle)
+];
 /** TfL JamCams: one keyless list endpoint; frames live on a public S3 bucket. */
 export const TFL_JAMCAM_URL = 'https://api.tfl.gov.uk/Place/Type/JamCam';
 export const TFL_IMAGE_ORIGIN =
@@ -190,9 +211,6 @@ export const TARKTEE_IMAGE_ORIGIN = 'https://tarktee.transpordiamet.ee/images/';
 export const DEFAULT_TARKTEE_MAX_SOURCES = 179;
 /** Hard ceiling per Tarktee DATEX XML document (~120–165 KB live). */
 export const TARKTEE_MAX_CATALOG_BYTES = 4 * 1024 * 1024;
-/** Two DATEX XML documents download concurrently from the same origin (~5.3 s
- * baseline) alongside the other packs, so the 8 s default can abort mid-stream. */
-export const TARKTEE_FETCH_TIMEOUT_MS = 15_000;
 export const TARKTEE_ANCHORS = [
   { lat: 59.437, lon: 24.753 }, // Tallinn
   { lat: 58.378, lon: 26.729 }, // Tartu
@@ -444,6 +462,10 @@ export const CCTV_SOURCE_CACHE_MS = 15 * 60 * 1000;
  * pending forever — a hung fetch aborts, the loader returns [], and
  * serve-stale/other packs take over. */
 export const CCTV_SOURCE_FETCH_TIMEOUT_MS = 15 * 1000;
+/** Tarktee's two DATEX feeds (120 and 160 KB) answered in 2 to 16.6 s across
+ * ten requests on 2026-10-18, so the shared 15 s timeout dropped the Estonian
+ * pack on about a third of loads. Both must arrive for any camera to load. */
+export const TARKTEE_FETCH_TIMEOUT_MS = 30 * 1000;
 /** Individual CCTV image fetches must settle before the active 10-second
  * client refresh cadence. A bounded miss can fall through to Street View or
  * the synthetic frame instead of leaving the browser preview pending. */
