@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+Global OpenSky and adsb.lol military snapshot refreshes are single-flight through
+body reading and cache publication. Each caller retains its own response and
+viewport-specific regional fallback. OpenSky 5xx responses cancel their bodies,
+start a 15-second cooldown and serve dated last-good data with the upstream status
+in the stale reason. Cold failures use the existing regional fallback or a JSON
+upstream error; no error HTML is relayed as JSON.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,
