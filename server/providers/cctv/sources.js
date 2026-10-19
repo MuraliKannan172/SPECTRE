@@ -60,6 +60,7 @@ import {
   DEFAULT_FLORIDA_MAX_SOURCES,
   FLORIDA_ANCHORS,
   FLORIDA_MAX_CATALOG_BYTES,
+  FLORIDA_MAX_CATALOG_PAGES,
   CATALONIA_CAMERAS_URL,
   CATALONIA_MAX_CATALOG_BYTES,
   CATALONIA_IMAGE_HOSTS,
@@ -2883,14 +2884,18 @@ export function floridaCameraToSource(feature) {
     url: imageUrl,
     snapshotUrl: imageUrl,
     sourceKind: 'fl511-open-data',
-    license: 'FL511 (FDOT), individual non-commercial use only',
+    license:
+      'FL511 (FDOT), individual personal use only; other use needs FDOT written consent',
   };
 }
 
 /**
  * Fetch FL511 (Florida DOT) cameras, keyless: an ArcGIS FeatureServer paged
- * 2,000 rows at a time. Frames are stills on the Divas Cloud hosts. A redirect
- * on any page drops the pack; any other failed page keeps the rows already read.
+ * up to 2,000 rows at a time, ordered by the layer's object id so offsets are
+ * stable. Paging follows `exceededTransferLimit` and advances by the rows each
+ * page returned, so a lower server-side max record count still reads the whole
+ * layer. Frames are stills on the Divas Cloud hosts. A redirect on any page
+ * drops the pack; any other failed page keeps the rows already read.
  *
  * @returns {Promise<Array<object>>} Normalized camera source objects.
  */
@@ -2899,9 +2904,17 @@ export async function loadFloridaSourcesFromOpenData() {
     const cameras = [];
     const seen = new Set();
     const pageSize = 2000;
+    let offset = 0;
     // Page ceiling, in case the service ignores resultOffset.
-    for (let offset = 0, page = 0; page < 10; offset += pageSize, page += 1) {
-      const url = `${FLORIDA_CCTV_URL}?where=1%3D1&outFields=*&f=json&resultRecordCount=${pageSize}&resultOffset=${offset}`;
+    for (let page = 0; ; page += 1) {
+      if (page >= FLORIDA_MAX_CATALOG_PAGES) {
+        console.warn(
+          `[CCTV] Florida catalog stopped at the ${FLORIDA_MAX_CATALOG_PAGES}-page ceiling; the catalog may be incomplete`,
+        );
+        break;
+      }
+      // OBJECTID_1 is this layer's object id field (a plain OBJECTID is a 400).
+      const url = `${FLORIDA_CCTV_URL}?where=1%3D1&outFields=*&orderByFields=OBJECTID_1&f=json&resultRecordCount=${pageSize}&resultOffset=${offset}`;
       let resp;
       try {
         resp = await fetch(url, {
@@ -2953,9 +2966,10 @@ export async function loadFloridaSourcesFromOpenData() {
         seen.add(camera.id);
         cameras.push(camera);
       }
-      // ArcGIS sets exceededTransferLimit while more rows remain.
-      if (feats.length < pageSize || body?.exceededTransferLimit !== true)
-        break;
+      // ArcGIS sets exceededTransferLimit while more rows remain. A page may
+      // be shorter than pageSize when the layer's max record count is lower.
+      if (body?.exceededTransferLimit !== true || feats.length === 0) break;
+      offset += feats.length;
     }
 
     const maxRaw = Number(

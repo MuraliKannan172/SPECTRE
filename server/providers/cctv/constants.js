@@ -122,6 +122,8 @@ export const FLORIDA_IMAGE_HOSTS = [
 export const DEFAULT_FLORIDA_MAX_SOURCES = 500;
 /** Byte cap per catalog page (2,000 rows, about 650 KiB measured). */
 export const FLORIDA_MAX_CATALOG_BYTES = 2 * 1024 * 1024;
+/** Catalog page ceiling: 40 pages covers 4,000+ cameras even at 100 rows a page. */
+export const FLORIDA_MAX_CATALOG_PAGES = 40;
 export const FLORIDA_ANCHORS = [
   { lat: 25.7617, lon: -80.1918 }, // Miami
   { lat: 28.5384, lon: -81.3789 }, // Orlando

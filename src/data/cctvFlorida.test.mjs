@@ -9,6 +9,7 @@ import {
 import {
   FLORIDA_CCTV_URL,
   FLORIDA_MAX_CATALOG_BYTES,
+  FLORIDA_MAX_CATALOG_PAGES,
 } from '../../server/providers/cctv/constants.js';
 import {
   fallbackHeadingFromId,
@@ -88,7 +89,8 @@ test('an FL511 feature maps to a source on a pinned HTTPS frame host', () => {
   assert.equal(source.url, `${IMAGE_HOST}chan-9431_h.jpg`);
   assert.equal(source.url, source.snapshotUrl);
   assert.equal(source.sourceKind, 'fl511-open-data');
-  assert.match(source.license, /non-commercial/);
+  assert.match(source.license, /personal use only/);
+  assert.match(source.license, /written consent/);
 });
 
 test('NOT DIRECTIONAL takes the id-hash fallback at low confidence', () => {
@@ -161,7 +163,7 @@ test('isLikelyFloridaCoordinate spans the state and rejects the rest', () => {
     assert.equal(isLikelyFloridaCoordinate(lat, lon), false);
 });
 
-test('the loader pages until a short page and collapses repeated rows', async (t) => {
+test('the loader pages until exceededTransferLimit clears and collapses repeated rows', async (t) => {
   t.mock.method(console, 'log', () => {});
   uncapped(t);
   const calls = [];
@@ -170,7 +172,7 @@ test('the loader pages until a short page and collapses repeated rows', async (t
     calls.push([offsetOf(url), init.redirect]);
     if (offsetOf(url) === 0)
       return Response.json(page(0, 2000, { exceededTransferLimit: true }));
-    // Short last page: two new cameras and a repeat of one already read.
+    // Last page (no exceededTransferLimit): two new cameras and a repeat.
     return Response.json(page(1999, 3));
   });
   const cameras = await loadFloridaSourcesFromOpenData();
@@ -180,6 +182,44 @@ test('the loader pages until a short page and collapses repeated rows', async (t
   ]);
   assert.equal(cameras.length, 2002);
   assert.equal(new Set(cameras.map((camera) => camera.id)).size, 2002);
+});
+
+test('pages shorter than requested keep paging while the server says more remain', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  uncapped(t);
+  const offsets = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const params = new URL(String(url)).searchParams;
+    // Offset paging is only stable over a fixed order on the object id.
+    assert.equal(params.get('orderByFields'), 'OBJECTID_1');
+    const offset = offsetOf(url);
+    offsets.push(offset);
+    // A layer whose max record count was lowered to 1,000.
+    return Response.json(
+      page(offset, offset < 2000 ? 1000 : 500, {
+        exceededTransferLimit: offset < 2000,
+      }),
+    );
+  });
+  const cameras = await loadFloridaSourcesFromOpenData();
+  assert.deepEqual(offsets, [0, 1000, 2000]);
+  assert.equal(cameras.length, 2500);
+});
+
+test('a service that ignores resultOffset stops at the page ceiling with a warning', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const warnings = [];
+  t.mock.method(console, 'warn', (...args) => warnings.push(args.join(' ')));
+  uncapped(t);
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls += 1;
+    return Response.json(page(0, 2000, { exceededTransferLimit: true }));
+  });
+  const cameras = await loadFloridaSourcesFromOpenData();
+  assert.equal(calls, FLORIDA_MAX_CATALOG_PAGES);
+  assert.equal(cameras.length, 2000);
+  assert.ok(warnings.some((line) => /page ceiling/.test(line)));
 });
 
 test('a redirect on any page drops the whole pack and releases it', async (t) => {

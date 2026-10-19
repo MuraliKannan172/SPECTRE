@@ -146,8 +146,9 @@ const LIVE_PACKS = [
     load: loadLithuaniaSources,
   },
   {
-    // FL511's terms limit its content to individual, non-commercial use, so
-    // the pack is off unless the operator opts in (see DATA_SOURCES.md).
+    // FL511's terms limit its content to individual, personal use (other use
+    // needs FDOT's written consent), so the pack is off unless the operator
+    // opts in (see DATA_SOURCES.md).
     name: 'florida',
     enabled: () => envOptIn('CCTV_FLORIDA_ENABLED'),
     load: loadFloridaSourcesFromOpenData,
