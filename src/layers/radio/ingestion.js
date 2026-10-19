@@ -70,11 +70,6 @@ export function createIngestion({
         );
         if (!acceptedRows.length)
           throw new Error('Radio directory returned no usable stations');
-        if (acceptedRows.length !== rows.length) {
-          throw new Error(
-            'Radio directory response contained malformed stations',
-          );
-        }
         const acceptedGeneration = body.acceptedGeneration;
         if (
           acceptedGeneration !== null &&
@@ -147,7 +142,12 @@ export function createIngestion({
           }
           if (!repeatingAcceptedGeneration) layerState._updatedAt = updatedAt;
         }
-        layerState._degraded = body.degraded;
+        layerState._rejectedStationCount = Math.min(
+          1000000,
+          rows.length - acceptedRows.length,
+        );
+        layerState._degraded =
+          body.degraded || layerState._rejectedStationCount > 0;
         layerState._stale = body.stale;
         layerState._error = preservingWarmCatalog
           ? ERROR_REFRESH_DEGRADED

@@ -533,3 +533,11 @@ test('a mirror answering an invalid reason phrase rejects instead of crashing', 
   const crashed = mockMirrorStatus(t, 200, 'OK\x7f');
   await assert.rejects(Promise.race([fetchMirror(), crashed]), TypeError);
 });
+
+
+test('case expansion is capped after tag normalization in the portable and server station path', () => {
+  const row = normalizeRadioBrowserStation(station({tags: 'İ'.repeat(80) + ', NEWS__RADIO ,news-radio'}));
+  assert.equal(row.tags[0].length, 80);
+  assert.equal(row.tags[0], 'i\u0307'.repeat(40));
+  assert.deepEqual(row.tags.slice(1), ['news radio']);
+});

@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+Radio tags are lowercased and whitespace-normalized before the final 80-character
+cap, including requested-tag coverage matching. Malformed station rows are skipped
+individually; valid rows retain their accepted catalog generation. The UI snapshot
+reports a bounded `rejectedStationCount` and degraded coverage when rows were
+skipped. Malformed envelope/freshness/generation metadata and all-invalid responses
+still preserve the previous usable catalog.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,

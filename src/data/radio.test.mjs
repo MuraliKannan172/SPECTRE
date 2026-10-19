@@ -712,6 +712,24 @@ test('unusable directory responses preserve warm client state atomically', async
       assert.equal(getRadioUIState().stale, true);
       assert.equal(getRadioUIState().degraded, true);
     }
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      stations: [replacement, { id: 'malformed' }], stale: false, degraded: false,
+      acceptedGeneration: 2, catalogInstance: 'qa-instance-a', updatedAt: now,
+    }));
+    await radioLayer.update();
+    assert.equal(getRadioUIState().stationCount, 1);
+    assert.equal(getRadioUIState().rejectedStationCount, 1);
+    assert.equal(getRadioUIState().degraded, true);
+    assert.equal(getRadioUIState().stale, false);
+    assert.equal(getRadioAcceptedCatalogSnapshot().generation, 2);
+    assert.equal(getRadioAcceptedCatalogSnapshot().stations[0].id, replacement.id);
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      stations: [{ id: 'malformed' }], stale: false, degraded: false,
+      acceptedGeneration: 3, catalogInstance: 'qa-instance-a', updatedAt: now,
+    }));
+    await radioLayer.update();
+    assert.equal(getRadioAcceptedCatalogSnapshot().generation, 2);
+    assert.equal(getRadioUIState().stale, true);
   } finally {
     globalThis.fetch = originalFetch;
     radioLayer.destroy();

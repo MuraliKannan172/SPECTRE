@@ -5,7 +5,7 @@ import { readResponseTextCapped } from '../common/http.js';
 import {
   normalizeRadioBrowserStation,
   publicRadioStation,
-  cleanRadioText,
+  normalizeRadioTag,
 } from './stations.js';
 import {
   radioMirrorOrigin,
@@ -177,8 +177,8 @@ export function createRadioProxyMiddleware({
           const rows = await fetchPath(`/json/stations/search?${params}`);
           if (!Array.isArray(rows))
             throw new Error('Radio Browser catalog payload was not an array');
-          if (
-            !rows.every(
+          const stations = rows
+            .filter(
               (row) =>
                 row &&
                 typeof row === 'object' &&
@@ -188,18 +188,9 @@ export function createRadioProxyMiddleware({
                 (typeof row.url_resolved === 'string' ||
                   typeof row.url === 'string'),
             )
-          )
-            throw new Error(
-              'Radio Browser catalog contained a malformed station row',
-            );
-          const stations = rows
             .map(normalizeRadioBrowserStation)
             .filter(Boolean);
-          const requestedTag = cleanRadioText(tag, 80)
-            .toLocaleLowerCase()
-            .replace(/[_-]+/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
+          const requestedTag = normalizeRadioTag(tag);
           const requestedTagCovered =
             !requestedTag ||
             stations.some((station) =>
