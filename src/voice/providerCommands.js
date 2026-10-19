@@ -61,7 +61,16 @@ export function createProviderCommands(options, { bind, factories, storage }) {
     const pushToTalk = Boolean(
       current.session.adapter.getStartOptions?.().pushToTalk,
     );
+    const generation = ++mountGeneration;
+    voiceEnabled = false;
     current.session.destroy();
+    // Disposal suppresses the retired adapter's idle event. Clear the shared
+    // conversation explicitly before the new mount can use these owners.
+    if (disposed || generation !== mountGeneration) return false;
+    options.pointer?.clear();
+    options.referents?.clear();
+    options.runner.resetConversation?.();
+    if (disposed || generation !== mountGeneration) return false;
     provider = next;
     try {
       stored()?.setItem(STORAGE_KEY, provider);
@@ -69,7 +78,8 @@ export function createProviderCommands(options, { bind, factories, storage }) {
       /* Storage is optional. */
     }
     mount();
-    if (resume && !disposed) void current.session.start({ pushToTalk });
+    if (resume && !disposed && provider === next)
+      void current.session.start({ pushToTalk });
     globalThis.document?.getElementById('gev-voice-provider')?.focus();
     return true;
   };
@@ -77,10 +87,7 @@ export function createProviderCommands(options, { bind, factories, storage }) {
   const handleSessionEvent = (event) => {
     if (event?.type === 'state' && event.state === 'connecting')
       voiceEnabled = true;
-    if (
-      event?.type === 'stop' ||
-      (event?.type === 'state' && ['idle', 'error'].includes(event.state))
-    ) {
+    if (event?.type === 'state' && ['idle', 'error'].includes(event.state)) {
       voiceEnabled = false;
     }
     // The host still observes the mounted provider's neutral session events.

@@ -1,6 +1,7 @@
 import { isUnavailableCapability } from '../sources/capability.js';
 import { defaultGeospatial } from '../search/defaults.js';
 import * as Cesium from 'cesium';
+import { greatCircleMeters } from '../geoDistance.js';
 import {
   holdContinuousRender,
   releaseContinuousRender,
@@ -72,20 +73,16 @@ export async function resolveOutlineWithRetry(
     delaysMs = OUTLINE_RETRY_DELAYS_MS,
     isStale = () => false,
     waitFn = wait,
-    signal,
   } = {},
 ) {
   let retriedRateLimit = false;
   for (let attempt = 0; ; attempt += 1) {
-    if (signal?.aborted || isStale()) return undefined;
     let fp;
     try {
-      fp = await abortable(resolveOutline(), signal);
-    } catch (error) {
-      if (signal?.aborted || error?.name === 'AbortError') return undefined;
+      fp = await resolveOutline();
+    } catch {
       fp = null; // hard failure — definitive, keep the honest point
     }
-    if (signal?.aborted || isStale()) return undefined;
     if (isUnavailableCapability(fp)) return fp;
     if (isRateLimitedOutcome(fp)) {
       // A throttle gets one deliberately spaced retry. If that retry is throttled
@@ -94,27 +91,14 @@ export async function resolveOutlineWithRetry(
       const retryAfterMs = Number.isFinite(fp.retryAfterMs)
         ? fp.retryAfterMs
         : 0;
-      try {
-        await abortable(
-          waitFn(Math.max(retryAfterMs, delaysMs[attempt]), signal),
-          signal,
-        );
-      } catch (error) {
-        if (signal?.aborted) return undefined;
-        throw error;
-      }
+      await waitFn(Math.max(retryAfterMs, delaysMs[attempt]));
       if (isStale()) return undefined;
       retriedRateLimit = true;
       continue;
     }
     if (fp !== undefined) return fp;
     if (attempt >= delaysMs.length) return undefined; // transient budget exhausted
-    try {
-      await abortable(waitFn(delaysMs[attempt], signal), signal);
-    } catch (error) {
-      if (signal?.aborted) return undefined;
-      throw error;
-    }
+    await waitFn(delaysMs[attempt]);
     if (isStale()) return undefined; // board cleared/superseded mid-backoff
   }
 }
@@ -182,30 +166,12 @@ export function createAnnotationEngine({
     activeControllers.clear();
   }
 
-  function dropQueuedOutlineUpgrades(controller = null) {
-    for (let i = outlineQueue.length - 1; i >= 0; i -= 1) {
-      const task = outlineQueue[i];
-      if (controller && task.controller !== controller) continue;
-      outlineQueue.splice(i, 1);
-      finishOutlineTask(task);
+  function dropQueuedOutlineUpgrades() {
+    while (outlineQueue.length) {
+      const task = outlineQueue.shift();
+      if (task.anno._outlineTask === task) task.anno._outlineTask = null;
       releaseController(task.controller);
     }
-  }
-
-  function finishOutlineTask(task) {
-    if (task.anno._outlineTask !== task) return;
-    task.anno._outlineTask = null;
-    task.anno.pendingOutline = false;
-  }
-
-  function controllerIsStale(controller) {
-    if (
-      !controller.signal.aborted &&
-      typeof controller._isCurrent === 'function' &&
-      !controller._isCurrent()
-    )
-      controller.abort();
-    return controller.signal.aborted;
   }
 
   // A controller stays abortable (in activeControllers) while its annotate() call OR any
@@ -217,10 +183,7 @@ export function createAnnotationEngine({
   }
   function releaseController(c) {
     c._retain = (c._retain || 0) - 1;
-    if (c._retain <= 0) {
-      activeControllers.delete(c);
-      c._cleanup?.();
-    }
+    if (c._retain <= 0) activeControllers.delete(c);
   }
 
   // World annotations carry persistent per-frame scene animation (pulsing
@@ -296,8 +259,6 @@ export function createAnnotationEngine({
    * @param {boolean} [opts.clearPrevious]
    * @param {boolean} [opts.persist]  Keep until cleared (default true).
    * @param {boolean} [opts.flyTo]    Frame the first resolved annotation.
-   * @param {AbortSignal} [opts.signal] Cancel only this call's pending work.
-   * @param {Function} [opts.isCurrent] Guard commits and deferred upgrades.
    * @returns {Promise<{ok, drawn, failed, ids, results}>}
    */
   async function annotate(requests, opts = {}) {
@@ -310,41 +271,15 @@ export function createAnnotationEngine({
         results: [],
         error: 'destroyed',
       };
-    const cancelledResult = (results = [], ids = []) => ({
-      ok: false,
-      drawn: results.filter((r) => r.ok).length,
-      failed: results.filter((r) => !r.ok).length,
-      ids,
-      results,
-      aborted: true,
-      cancelled: true,
-    });
-    // Check authority BEFORE clearPrevious: an already-cancelled owner cannot
-    // erase a manual mark or invalidate a different owner's pending operation.
-    if (
-      opts.signal?.aborted ||
-      (typeof opts.isCurrent === 'function' && !opts.isCurrent())
-    )
-      return cancelledResult();
     const list = Array.isArray(requests) ? requests : [requests];
     if (opts.clearPrevious) clear(); // bumps generation + aborts older pending work
 
     const persist = opts.persist !== false;
-    // The call owns this controller through its final deferred outline task.
+    // Per-call cancellation: bumped/aborted by any later clear() or destroy().
     const controller = new AbortController();
-    controller._isCurrent = opts.isCurrent;
-    const cancel = () => {
-      controller.abort(opts.signal.reason);
-      dropQueuedOutlineUpgrades(controller);
-    };
-    controller._cleanup = () =>
-      opts.signal?.removeEventListener('abort', cancel);
-    opts.signal?.addEventListener('abort', cancel, { once: true });
     retainController(controller);
-    if (opts.signal?.aborted) cancel();
     const myGen = generation;
-    const superseded = () =>
-      myGen !== generation || controllerIsStale(controller);
+    const superseded = () => myGen !== generation || controller.signal.aborted;
 
     const results = [];
     const ids = [];
@@ -358,13 +293,7 @@ export function createAnnotationEngine({
     // order are all preserved exactly as the old serial loop had them.
     const settled = await Promise.allSettled(
       list.map((spec) =>
-        abortable(
-          resolveSpec(spec, controller.signal, opts.flyTo === true, superseded),
-          controller.signal,
-        ).catch((error) => {
-          if (error?.name === 'AbortError') controller.abort(error);
-          throw error;
-        }),
+        resolveSpec(spec, controller.signal, opts.flyTo === true),
       ),
     );
 
@@ -374,13 +303,7 @@ export function createAnnotationEngine({
         const outcome = settled[i];
         if (superseded()) break;
         try {
-          if (outcome.status === 'rejected') {
-            if (outcome.reason?.name === 'AbortError') {
-              controller.abort(outcome.reason);
-              break;
-            }
-            throw outcome.reason;
-          }
+          if (outcome.status === 'rejected') throw outcome.reason; // resolution threw → same path as before
           const resolved = outcome.value;
           if (!resolved) {
             results.push(failResult(spec, 'could not resolve location'));
@@ -527,14 +450,23 @@ export function createAnnotationEngine({
       releaseController(controller);
     }
 
-    // Pending work is cancelled without removing any mark already committed.
-    if (superseded()) return cancelledResult(results, ids);
+    // A clear/new-topic landed mid-flight: drop everything this call produced and
+    // do not touch the renderer or camera — the board now belongs to a newer call.
+    if (superseded()) {
+      return {
+        ok: false,
+        drawn: 0,
+        failed: results.length,
+        ids: [],
+        results,
+        aborted: true,
+      };
+    }
 
     if (ids.length) {
       renderer.sync(annotations);
       ensureTicking();
     }
-    if (superseded()) return cancelledResult(results, ids);
     if (opts.flyTo && firstAnchor) frameAnnotation(firstAnchor);
     else if (ids.length) ensureMarksVisible(ids);
 
@@ -549,17 +481,7 @@ export function createAnnotationEngine({
     };
   }
 
-  async function resolveSpec(
-    spec,
-    signal,
-    allowDistant = false,
-    isStale = () => false,
-  ) {
-    const checkCurrent = () => {
-      isStale(); // invalid currentness aborts this call's controller
-      signal.throwIfAborted();
-    };
-    checkCurrent();
+  async function resolveSpec(spec, signal, allowDistant = false) {
     const type = normalizeType(spec?.type);
     // MANUAL geometry (drawTool.js): the person clicked the vertices, so there is
     // nothing to resolve. Same record shapes as a resolved spec, source 'manual'.
@@ -584,7 +506,6 @@ export function createAnnotationEngine({
           allowDistant,
           signal,
         });
-        checkCurrent();
         if (r) resolvedPts.push(r);
         else failed.push(name || 'a waypoint');
       }
@@ -606,7 +527,6 @@ export function createAnnotationEngine({
         signal,
         placeSearch,
       );
-      checkCurrent();
       if (routed) {
         return {
           path: routed.geometry.map(([lon, lat]) => ({ lon, lat, height: 0 })),
@@ -644,7 +564,6 @@ export function createAnnotationEngine({
         allowDistant,
         signal,
       });
-      checkCurrent();
       const to = await resolveTarget({
         placeSearch,
         viewer,
@@ -657,7 +576,6 @@ export function createAnnotationEngine({
         allowDistant,
         signal,
       });
-      checkCurrent();
       if (!from || !to) {
         // Name the endpoint(s) that actually failed so the partial voice path can't
         // blame the wrong place (a valid origin → unresolved destination must report
@@ -730,10 +648,10 @@ export function createAnnotationEngine({
       const task = outlineQueue.shift();
       const stale =
         task.myGen !== generation ||
-        controllerIsStale(task.controller) ||
+        task.controller.signal.aborted ||
         !annotations.has(task.anno.id);
       if (stale) {
-        finishOutlineTask(task);
+        if (task.anno._outlineTask === task) task.anno._outlineTask = null;
         releaseController(task.controller);
         continue;
       }
@@ -753,11 +671,10 @@ export function createAnnotationEngine({
         delaysMs: outlineRetryDelaysMs,
         isStale: () =>
           myGen !== generation ||
-          controllerIsStale(controller) ||
+          controller.signal.aborted ||
           !annotations.has(anno.id),
-        signal: controller.signal,
       });
-      if (myGen !== generation || controllerIsStale(controller)) return; // board superseded
+      if (myGen !== generation || controller.signal.aborted) return; // board superseded
       if (!annotations.has(anno.id)) return; // mark replaced/removed while resolving
       anno.pendingOutline = false;
       anno.outlineUnavailable = isUnavailableCapability(fp);
@@ -826,7 +743,7 @@ export function createAnnotationEngine({
         ...(fp && anno.synthesized ? { approximate: true } : {}),
       });
     } finally {
-      finishOutlineTask(task);
+      if (anno._outlineTask === task) anno._outlineTask = null;
       releaseController(controller);
       activeOutlineUpgrades -= 1;
       drainOutlineQueue();
@@ -1221,12 +1138,14 @@ export function createAnnotationEngine({
           {
             type: 'highlight',
             target: 'Palace of Fine Arts, San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'Palace of Fine Arts',
             color: 'amber',
           },
           {
             type: 'area',
             target: 'Presidio of San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'The Presidio (former Army base)',
             color: 'green',
             footprint: true,
@@ -1234,6 +1153,7 @@ export function createAnnotationEngine({
           {
             type: 'pin',
             target: 'Letterman Digital Arts Center, San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'ILM / Lucasfilm',
             color: 'cyan',
           },
@@ -1241,6 +1161,7 @@ export function createAnnotationEngine({
             type: 'arrow',
             target: 'Palace of Fine Arts, San Francisco',
             toTarget: 'Marina District, San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'next to the Marina',
           },
         ],
@@ -1270,6 +1191,7 @@ export function createAnnotationEngine({
           {
             type: 'highlight',
             target: 'Palace of Fine Arts, San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'Palace of Fine Arts',
             color: 'amber',
           },
@@ -1284,6 +1206,7 @@ export function createAnnotationEngine({
             type: 'arrow',
             target: 'Palace of Fine Arts, San Francisco',
             toTarget: 'Marina Green, San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'next to the Marina',
             color: 'cyan',
           },
@@ -1307,6 +1230,7 @@ export function createAnnotationEngine({
           {
             type: 'area',
             target: 'Presidio of San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'The Presidio — a former Army base',
             color: 'green',
             footprint: true,
@@ -1321,6 +1245,7 @@ export function createAnnotationEngine({
           {
             type: 'pin',
             target: 'Letterman Digital Arts Center, San Francisco',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'ILM / Lucasfilm',
             color: 'red',
           },
@@ -1334,6 +1259,7 @@ export function createAnnotationEngine({
           {
             type: 'route',
             color: 'amber',
+            // i18n-ignore: dev demo of voice-agent labels (not translated)
             label: 'Crissy Field shoreline',
             points: [
               { target: 'Palace of Fine Arts, San Francisco' },
@@ -1375,46 +1301,8 @@ export function createAnnotationEngine({
   return engine;
 }
 
-// Race non-cooperative adapters too: cancellation must settle owned queues even
-// when an upstream promise never acknowledges AbortSignal. Late rejection is
-// consumed, and listeners are removed on either outcome.
-function abortable(promise, signal) {
-  if (!signal) return Promise.resolve(promise);
-  return new Promise((resolve, reject) => {
-    const cleanup = () => signal.removeEventListener('abort', cancel);
-    const cancel = () => {
-      cleanup();
-      reject(signal.reason);
-    };
-    if (signal.aborted) cancel();
-    else signal.addEventListener('abort', cancel, { once: true });
-    Promise.resolve(promise).then(
-      (value) => {
-        cleanup();
-        resolve(value);
-      },
-      (error) => {
-        cleanup();
-        reject(error);
-      },
-    );
-  });
-}
-
-function wait(ms, signal) {
-  return new Promise((resolve) => {
-    const cancel = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', cancel);
-      resolve();
-    };
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', cancel);
-      resolve();
-    }, ms);
-    signal?.addEventListener('abort', cancel, { once: true });
-    if (signal?.aborted) cancel();
-  });
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Exact per-vertex ring equality ([[lon,lat],…], ~1m epsilon) — the geometry-identity test. */
@@ -1680,16 +1568,7 @@ async function fetchRoute(coordPairs, mode, signal, service) {
 }
 
 function greatCircleM(a, b) {
-  const R = 6371000;
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLon = toRad(b.lon - a.lon);
-  const la1 = toRad(a.lat);
-  const la2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  return greatCircleMeters(a, b);
 }
 
 function formatDistance(m) {

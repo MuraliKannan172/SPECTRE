@@ -1,3 +1,4 @@
+import { readRequestBody } from '../common/request.js';
 import { admitSameSiteRequest } from '../../../src/localRequestGate.mjs';
 import {
   isAllowedHost,
@@ -60,38 +61,13 @@ export async function readGeminiTokenRequest(req, signal, maxBytes = 1024) {
   const declared = Number(req.headers?.['content-length']);
   const fail = (code) =>
     Object.assign(new Error('Invalid token request'), { code });
-  if (Number.isFinite(declared) && declared > maxBytes)
-    throw fail('BODY_TOO_LARGE');
-  const body = await new Promise((resolve, reject) => {
-    let total = 0;
-    const chunks = [];
-    const cleanup = () => {
-      req.off('data', data);
-      req.off('end', end);
-      req.off('error', error);
-      signal.removeEventListener('abort', abort);
-    };
-    const error = (reason) => {
-      cleanup();
-      req.pause();
-      reject(reason);
-    };
-    const abort = () => error(signal.reason);
-    const data = (chunk) => {
-      total += chunk.length;
-      if (total > maxBytes) return error(fail('BODY_TOO_LARGE'));
-      chunks.push(chunk);
-    };
-    const end = () => {
-      cleanup();
-      resolve(Buffer.concat(chunks).toString('utf8'));
-    };
-    req.on('data', data);
-    req.once('end', end);
-    req.once('error', error);
-    signal.addEventListener('abort', abort, { once: true });
-    if (signal.aborted) abort();
-  });
+  const body = await readRequestBody(
+    req,
+    maxBytes,
+    Number.isFinite(declared) && declared > maxBytes
+      ? AbortSignal.abort(fail('BODY_TOO_LARGE'))
+      : signal,
+  );
   if (!body.trim()) return 'open-mic';
   if (
     !/^application\/json(?:\s*;|$)/i.test(req.headers?.['content-type'] || '')

@@ -16,7 +16,6 @@ export const CREDENTIALS = Object.freeze([
   { name: 'GOOGLE_MAPS_SERVER_API_KEY', label: 'Google Places / Street View server', keychain: [] },
   { name: 'CESIUM_ION_TOKEN', label: 'Cesium ion', keychain: [['cesium-ion', 'token']] },
   { name: 'OPENAI_API_KEY', label: 'OpenAI voice', keychain: [['openai-api', 'api-key']] },
-  { name: 'GEMINI_API_KEY', label: 'Gemini voice', keychain: [] },
   { name: 'AISSTREAM_API_KEY', label: 'AISStream vessels', keychain: [['aisstream-api', 'api-key']] },
   { name: 'FIRMS_MAP_KEY', label: 'NASA FIRMS fires', keychain: [['firms-map', 'map-key']] },
   { name: 'TOMTOM_API_KEY', label: 'TomTom traffic', keychain: [['tomtom-api', 'api-key']] },
@@ -77,10 +76,15 @@ export function hasRequiredDependencies(rootDir = ROOT) {
   }
 }
 
-/** Return the npm command and spawn mode required by the target platform. */
-export function npmProcessSpec(platform = process.platform) {
-  const windows = platform === 'win32';
-  return { command: windows ? 'npm.cmd' : 'npm', shell: windows };
+/**
+ * Return the npm command, arguments and spawn mode for the target platform.
+ * Windows must run npm.cmd through a shell, and Node 24 deprecates passing an
+ * argument array with `shell: true` (DEP0190), so there the arguments, which
+ * are fixed npm subcommands, join the command string.
+ */
+export function npmProcessSpec(args, platform = process.platform) {
+  if (platform !== 'win32') return { command: 'npm', args, shell: false };
+  return { command: ['npm.cmd', ...args].join(' '), args: [], shell: true };
 }
 
 /** Read one key from Vite's dotenv file ladder without depending on Vite. */
@@ -177,9 +181,9 @@ export function buildCapabilitySummary(
         ? 'Google Photorealistic 3D Tiles through Cesium ion; Bing and world-terrain stacks available'
         : 'Esri World Imagery (keyless satellite basemap) with keyless terrain',
     flights,
-    voice: configured('OPENAI_API_KEY') || configured('GEMINI_API_KEY')
+    voice: configured('OPENAI_API_KEY')
       ? 'available'
-      : 'off until an OpenAI or Gemini key is added, or a configured OpenAI provider is selected in Provider Settings',
+      : 'off until an OpenAI key is added, or a Codex ChatGPT sign-in is selected in Provider Settings (experimental)',
     vessels: configured('AISSTREAM_API_KEY') ? 'live AISStream feed' : 'off until an AISStream key is added',
     fires: configured('FIRMS_MAP_KEY') ? 'live NASA FIRMS feed' : 'off until a FIRMS key is added',
     traffic: configured('TOMTOM_API_KEY') ? 'live TomTom flow' : 'built-in traffic simulation',
@@ -191,8 +195,8 @@ export function buildCapabilitySummary(
 
 export function inspectSetup({ includeKeychain = true, authoritativeEnvironment = false, rootDir = ROOT } = {}) {
   const node = classifyNodeVersion();
-  const npm = npmProcessSpec();
-  const npmResult = spawnSync(npm.command, ['--version'], {
+  const npm = npmProcessSpec(['--version']);
+  const npmResult = spawnSync(npm.command, npm.args, {
     encoding: 'utf8',
     shell: npm.shell,
   });

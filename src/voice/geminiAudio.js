@@ -1,3 +1,4 @@
+import { msg } from '../i18n/marker.js';
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 const MAX_QUEUED_SECONDS = 60;
 const MAX_QUEUED_SOURCES = 256;
@@ -50,17 +51,18 @@ export function decodeGeminiPcm(data, mimeType = 'audio/pcm;rate=24000') {
     typeof data !== 'string' ||
     data.length > 4 * Math.ceil(MAX_AUDIO_BYTES / 3)
   )
-    throw new Error('Gemini returned an oversized audio chunk');
+    throw new Error(msg('Gemini returned an oversized audio chunk'));
   const match = /^audio\/pcm(?:;rate=(\d+))?$/.exec(mimeType);
-  if (!match) throw new Error('Gemini returned an unsupported audio format');
+  if (!match)
+    throw new Error(msg('Gemini returned an unsupported audio format'));
   const sampleRate = Number(match[1] || 24000);
   if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000)
-    throw new Error('Gemini returned an invalid audio sample rate');
+    throw new Error(msg('Gemini returned an invalid audio sample rate'));
   const binary = atob(data);
   if (binary.length > MAX_AUDIO_BYTES)
-    throw new Error('Gemini returned an oversized audio chunk');
+    throw new Error(msg('Gemini returned an oversized audio chunk'));
   if (!binary.length || binary.length % 2)
-    throw new Error('Gemini returned incomplete PCM audio');
+    throw new Error(msg('Gemini returned incomplete PCM audio'));
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index++)
     bytes[index] = binary.charCodeAt(index);
@@ -84,7 +86,9 @@ export function createGeminiAudio({
   AudioWorkletNodeClass = globalThis.AudioWorkletNode,
 } = {}) {
   if (!AudioContextClass || !AudioWorkletNodeClass)
-    throw new Error('This browser does not support Gemini microphone audio');
+    throw new Error(
+      msg('This browser does not support Gemini microphone audio'),
+    );
   let captureContext;
   let playbackContext;
   let output;
@@ -265,7 +269,8 @@ export function createGeminiAudio({
         }
       };
       capture.onprocessorerror = () => {
-        if (!closed) onError?.(new Error('Microphone audio processing failed'));
+        if (!closed)
+          onError?.(new Error(msg('Microphone audio processing failed')));
       };
       microphone = captureContext.createMediaStreamSource(stream);
       mute = captureContext.createGain();
@@ -290,7 +295,7 @@ export function createGeminiAudio({
       // Tiny chunks can exhaust source nodes long before the duration limit.
       if (sources.size >= MAX_QUEUED_SOURCES)
         throw new Error(
-          'Gemini audio playback fell behind. Reconnect to continue.',
+          msg('Gemini audio playback fell behind. Reconnect to continue.'),
         );
       const { samples, sampleRate } = decodeGeminiPcm(data, mimeType);
       const start = Math.max(playbackContext.currentTime + 0.02, nextTime);
@@ -299,7 +304,7 @@ export function createGeminiAudio({
         MAX_QUEUED_SECONDS
       )
         throw new Error(
-          'Gemini audio playback fell behind. Reconnect to continue.',
+          msg('Gemini audio playback fell behind. Reconnect to continue.'),
         );
       const buffer = playbackContext.createBuffer(
         1,

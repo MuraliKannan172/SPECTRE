@@ -2,7 +2,11 @@
 // Real Gemini controller, action runner, DataLayerManager and RealtimeRadio consumers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { harness, tick, deferred } from './geminiNativeHarness.mjs';
+import {
+  harness,
+  tick,
+  deferred,
+} from '../testSupport/geminiNativeHarness.mjs';
 import { createGevActionRunner } from './gevActions.js';
 import { createVoiceSession } from './session.js';
 import { DataLayerManager } from '../data/manager.js';
@@ -182,12 +186,7 @@ for (const action of ['select', 'play']) {
   }
 }
 
-for (const guard of [
-  'malformed',
-  'replay',
-  'invalid-arguments',
-  'provider-veto',
-]) {
+for (const guard of ['malformed', 'replay', 'invalid-arguments']) {
   test(`native stronger Radio ${guard} cannot revoke a same-turn lookup`, async () => {
     const f = radioSiblingFixture();
     const { h, trace } = f;
@@ -211,10 +210,6 @@ for (const guard of [
       await f.lookupEntered.promise;
       const stops = trace.stops;
       const handoffEpoch = h.c.radio.radioHandoffEpoch;
-      if (guard === 'provider-veto')
-        request(ws, 'provider-setter', 'set_voice_provider', {
-          provider: 'openai',
-        });
       request(
         ws,
         guard === 'malformed' ? '\n' : 'stronger-radio',
@@ -231,13 +226,6 @@ for (const guard of [
       assert.equal(trace.stops, stops);
       assert.equal(h.c.radio.radioHandoffEpoch, handoffEpoch);
       assert.equal(h.c.radio.radioToolHandoffReservations.size, 0);
-      if (guard === 'provider-veto') {
-        assert.equal(
-          responseFor(ws, 'stronger-radio').providerRequestBlocked,
-          true,
-        );
-        assert.equal(trace.options.has('stronger-radio'), false);
-      }
       if (guard === 'invalid-arguments') {
         assert.equal(responseFor(ws, 'stronger-radio').ok, false);
         assert.match(responseFor(ws, 'stronger-radio').error, /coordinates/);
@@ -460,214 +448,73 @@ for (const phase of ['prepared', 'preflight']) {
   });
 }
 
-let historicalId = 35;
-for (const providerDropdown of [false, true]) {
-  for (const segments of [
-    ['use', 'Foo', 'as', 'my', 'voi', 'ce provider'],
-    ['use Claude'],
-    ['switch to Gemini'],
-  ]) {
-    for (const tool of [
-      { name: 'control_radio', args: { action: 'stop' } },
-      { name: 'control_radio', args: { action: 'disable' } },
-      {
-        name: 'set_layer_visibility',
-        args: { layerId: 'radio', enabled: false },
-      },
-    ]) {
-      const id = `H${historicalId++}`;
-      test(`${id} native setter quarantine: chooser=${providerDropdown} ${JSON.stringify(segments)} ${tool.name}/${tool.args.action || 'off'} leaves unrelated Radio preflight intact`, async () => {
-        const mutations = [];
-        const runner = createGevActionRunner({
-          viewer: viewerFixture(),
-          styleManager: {
-            setStyle: (...args) => mutations.push(['style', ...args]),
-          },
-          dataManager: {
-            isEnabled: () => true,
-            setEnabled: (...args) => mutations.push(['visibility', ...args]),
-          },
-          radioLayer: {
-            stopPlayback: (...args) => mutations.push(['stop', ...args]),
-          },
-        });
-        let runnerCalls = 0;
-        const h = harness({
-          providerDropdown: () => providerDropdown,
-          runAction: (...args) => {
-            runnerCalls++;
-            return runner(...args);
-          },
-        });
-        const trace = {
-          reservations: 0,
-          registered: 0,
-          toolStarted: 0,
-          pauses: 0,
-        };
-        const playbackReady = deferred();
-        let preflight;
-        try {
-          const pause = h.c.radio.pauseRadioForVoice.bind(h.c.radio);
-          h.c.radio.pauseRadioForVoice = (...args) => {
-            trace.pauses++;
-            return pause(...args);
-          };
-          await h.c.start();
-          const ws = h.sockets[0];
-          speechTurn(ws);
-          for (const text of segments)
-            ws.message({ serverContent: { inputTranscription: { text } } });
-          assert.equal(trace.pauses, 1);
-          h.c.radio.radioLayer.playForVoice = () => playbackReady.promise;
-          const prepared = {
-            ok: true,
-            action: 'control_radio',
-            radioAction: 'play',
-            radioPlaybackRequested: true,
-          };
-          h.c.radio.setPendingPlayback(prepared);
-          preflight = h.c.radio.startPendingRadioHandoff();
-          const handoffEpoch = h.c.radio.radioHandoffEpoch;
-          const attemptId = h.c.radio.radioHandoffAttemptId;
-          assert.equal(h.c.radio.radioHandoffInFlight, true);
-          for (const [method, counter] of [
-            ['reserveRadioToolHandoff', 'reservations'],
-            ['registerTool', 'registered'],
-          ]) {
-            const original = h.c.radio[method].bind(h.c.radio);
-            h.c.radio[method] = (...args) => {
-              trace[counter]++;
-              return original(...args);
-            };
-          }
-          const started = h.c.narration.toolStarted.bind(h.c.narration);
-          h.c.narration.toolStarted = (...args) => {
-            trace.toolStarted++;
-            return started(...args);
-          };
-          // The ordinary sibling is first: batch inspection must quarantine it
-          // before any runner, reservation or Radio registration can begin.
-          ws.message({
-            toolCall: {
-              functionCalls: [
-                { id: 'refused-radio', ...tool },
-                {
-                  id: 'native-setter',
-                  name: 'set_voice_provider',
-                  args: { provider: 'openai' },
-                },
-              ],
-            },
-          });
-          await h.c.toolQueue;
-          for (const callId of ['refused-radio', 'native-setter']) {
-            const result = responseFor(ws, callId);
-            assert.equal(result.providerRequestBlocked, true);
-            assert.equal(result.providerDropdown, providerDropdown);
-            assert.match(
-              result.say,
-              providerDropdown ? /dropdown/ : /switch voice providers directly/,
-            );
-          }
-          request(ws, 'later-radio', tool.name, tool.args);
-          await h.c.toolQueue;
-          assert.equal(
-            responseFor(ws, 'later-radio').providerRequestBlocked,
-            true,
-          );
-          assert.deepEqual(trace, {
-            reservations: 0,
-            registered: 0,
-            toolStarted: 0,
-            pauses: 1,
-          });
-          assert.equal(h.c.radio.radioToolHandoffReservations.size, 0);
-          assert.equal(h.c.radio.activeRadioToolControllers.size, 0);
-          assert.equal(h.c.pendingTools, 0);
-          assert.equal(h.c.tools.size, 0);
-          assert.equal(runnerCalls, 0);
-          assert.deepEqual(mutations, []);
-          assert.equal(h.c.radio.pendingRadioPlaybackResult, null);
-          assert.equal(h.c.radio.radioHandoffInFlight, true);
-          assert.equal(h.c.radio.radioHandoffInFlightResult, prepared);
-          assert.equal(h.c.radio.radioHandoffEpoch, handoffEpoch);
-          assert.equal(h.c.radio.radioHandoffAttemptId, attemptId);
-          assert.equal(h.state.stopped, 0);
-          assert.equal(h.c.stopAfterReply, false);
-          h.c.sendTextCommand('Set visual style to night vision');
-          ws.message({
-            serverContent: { interrupted: true, turnComplete: true },
-          });
-          request(ws, 'fresh-style', 'set_visual_style', {
-            style: 'night vision',
-          });
-          await h.c.toolQueue;
-          assert.equal(runnerCalls, 1);
-          assert.equal(mutations.length, 1);
-          assert.equal(h.c.pendingTools, 0);
-        } finally {
-          h.c.stop();
-          playbackReady.resolve(false);
-          await preflight;
-          runner.dispose();
-        }
-        assert.equal(h.timers.size, 0);
-      });
-    }
-  }
-}
-
-for (const [index, phase] of ['initializing', 'committed'].entries()) {
-  test(`H${53 + index} native late setter: ${phase} manager work retains commit truth and quarantines later sibling`, async () => {
+for (const phase of ['prepared', 'preflight', 'settling']) {
+  test(`native Radio cancellation: ${phase} preserves selection truth and prevents stale speaker transfer`, async () => {
     const viewer = viewerFixture();
     const manager = new DataLayerManager(viewer);
-    const initEntered = deferred();
-    const initReleased = deferred();
-    const committed = deferred();
-    const settlement = deferred();
-    const calls = [];
-    const events = [];
-    manager.register({
-      id: 'rocket-launches',
-      name: 'Missions',
-      updateInterval: -1,
-      async init() {
-        calls.push('init');
-        initEntered.resolve();
-        if (phase === 'initializing') await initReleased.promise;
-      },
-      async enable() {
-        calls.push('enable');
-      },
-      async disable() {
-        calls.push('disable');
-      },
-      async update() {},
-      getStats: () => ({ count: 0 }),
-    });
-    const unsubscribe = manager.subscribe((event) => {
-      events.push(event);
-      if (event.type === 'visibility' && event.enabled) committed.resolve();
-    });
-    const runner = createGevActionRunner({
-      viewer,
-      dataManager: manager,
-      styleManager: {
-        _waitForContextLayerSettlement: () => settlement.promise,
-      },
-    });
-    let h;
+    const prepared = deferred();
+    const settleResult = deferred();
+    const playbackReady = deferred();
+    let playCalls = 0;
+    let stopCalls = 0;
+    let selections = 0;
     let activeOptions;
-    let runnerCalls = 0;
+    const state = {
+      stationCount: 2,
+      selected: null,
+      audioState: 'stopped',
+      voiceDucked: false,
+    };
+    const radio = {
+      async init() {},
+      async enable() {},
+      async disable() {},
+      async update() {},
+      getStats: () => ({ count: 2 }),
+      getUIState: () => ({ ...state }),
+      setVoiceDucked(value) {
+        state.voiceDucked = value;
+      },
+      pause() {
+        state.audioState = 'paused';
+      },
+      subscribePlaybackControls() {
+        return () => {};
+      },
+      selectRequestedStation(_criteria, options) {
+        assert.equal(options.autoplay, false);
+        selections++;
+        state.selected = { id: 'station-1', name: 'Station One' };
+        return state.selected;
+      },
+      playForVoice() {
+        playCalls++;
+        return playbackReady.promise;
+      },
+      stopPlayback() {
+        stopCalls++;
+        state.audioState = 'stopped';
+      },
+    };
+    manager.register({
+      id: 'radio',
+      name: 'Radio',
+      updateInterval: -1,
+      ...radio,
+    });
+    const runner = createGevActionRunner({ viewer, dataManager: manager });
+    let h;
+    let preflight;
     const session = createVoiceSession({
-      runner: (name, args, options) => {
-        runnerCalls++;
+      runner: async (name, args, options) => {
         activeOptions = options;
-        return runner(name, args, options);
+        const result = await runner(name, args, options);
+        prepared.resolve(result);
+        if (phase === 'settling') await settleResult.promise;
+        return result;
       },
       createAdapter: (shared) => {
-        h = harness({ ...shared, dataManager: manager });
+        h = harness({ ...shared, dataManager: manager, radioLayer: radio });
         return {
           start: (settings) => h.c.start(settings),
           stop: (settings) => h.c.stop(settings),
@@ -679,247 +526,85 @@ for (const [index, phase] of ['initializing', 'committed'].entries()) {
     try {
       await session.start();
       const ws = h.sockets[0];
-      speechTurn(ws);
-      ws.message({
-        serverContent: { inputTranscription: { text: 'use foo as my voi' } },
+      assert.equal(session.sendText('Select Station One on Radio'), true);
+      request(ws, 'prepared-radio', 'control_radio', {
+        action: 'select',
+        stationQuery: 'Station One',
       });
-      request(ws, 'inflight-layer', 'set_layer_visibility', {
-        layerId: 'rocket-launches',
-        enabled: true,
-      });
-      await initEntered.promise;
-      if (phase === 'committed') await committed.promise;
-      assert.equal(activeOptions.signal.aborted, false);
-      assert.equal(
-        activeOptions.userTurn,
-        undefined,
-        'captions never become runner authority',
-      );
-      ws.message({
-        serverContent: { inputTranscription: { text: 'ce provider' } },
-      });
-      request(ws, 'native-setter', 'set_voice_provider', {
-        provider: 'openai',
-      });
-      request(ws, 'denied-sibling', 'set_layer_visibility', {
-        layerId: 'rocket-launches',
-        enabled: false,
-      });
-      assert.equal(
-        activeOptions.signal.aborted,
-        false,
-        'late setter cannot retroactively revoke already-started work',
-      );
-      initReleased.resolve();
-      settlement.resolve();
+      const actual = await prepared.promise;
+      assert.equal(actual.ok, true);
+      assert.equal(actual.radioPlaybackRequested, true);
+      assert.equal(actual.stationId, 'station-1');
+      assert.equal(manager.isEnabled('radio'), true);
+      if (phase !== 'settling') {
+        await h.c.toolQueue;
+        assert.ok(h.c.radio.pendingRadioPlaybackResult);
+      }
+      if (phase === 'preflight') {
+        preflight = h.c.radio.startPendingRadioHandoff();
+        assert.equal(h.c.radio.radioHandoffInFlight, true);
+        assert.equal(playCalls, 1);
+      }
+      // Native call ownership revokes only this deferred playback. No caption
+      // parsing or caption-driven provider policy participates in cancellation.
+      ws.message({ toolCallCancellation: { ids: ['prepared-radio'] } });
+      if (phase === 'settling')
+        assert.equal(activeOptions.signal.aborted, true);
+      settleResult.resolve();
       await h.c.toolQueue;
-      const result = responseFor(ws, 'inflight-layer');
-      assert.equal(result.ok, true);
-      assert.equal(result.providerRequestBlocked, undefined);
-      assert.equal(result.enabled, true);
-      assert.equal(manager.isEnabled('rocket-launches'), true);
-      assert.equal(calls.includes('enable'), true);
+      assert.equal(h.c.radio.pendingRadioPlaybackResult, null);
+      assert.equal(h.c.radio.radioHandoffInFlight, false);
+      assert.equal(manager.isEnabled('radio'), true);
+      assert.equal(state.selected.id, 'station-1');
+      assert.equal(selections, 1);
+      const modelResult = responseFor(ws, 'prepared-radio');
+      if (phase === 'settling')
+        assert.equal(
+          modelResult,
+          undefined,
+          'cancelled active call never sends a late result',
+        );
+      else {
+        assert.equal(modelResult.ok, true);
+        assert.equal(modelResult.stationId, 'station-1');
+      }
+      const stopsAfterCancellation = stopCalls;
+      assert.equal(stopsAfterCancellation, phase === 'preflight' ? 1 : 0);
+      drainRadioReply(h);
+      playbackReady.resolve(true);
+      await preflight;
+      await tick();
       assert.equal(
-        events.some((event) => event.type === 'visibility' && event.enabled),
-        true,
+        playCalls,
+        phase === 'preflight' ? 1 : 0,
+        'drain cannot revive cancelled playback',
       );
-      assert.equal(
-        responseFor(ws, 'native-setter').providerRequestBlocked,
-        true,
-      );
-      assert.equal(
-        responseFor(ws, 'denied-sibling').providerRequestBlocked,
-        true,
-      );
-      assert.equal(runnerCalls, 1);
-      session.sendText('Hide missions');
-      ws.message({ serverContent: { interrupted: true, turnComplete: true } });
-      request(ws, 'fresh-missions', 'set_layer_visibility', {
-        layerId: 'rocket-launches',
-        enabled: false,
-      });
-      await h.c.toolQueue;
-      assert.equal(responseFor(ws, 'fresh-missions').ok, true);
-      assert.equal(manager.isEnabled('rocket-launches'), false);
-      assert.equal(runnerCalls, 2);
-      assert.equal(h.c.tools.size, 0);
+      assert.equal(h.c.isActive(), true, 'late readiness cannot stop voice');
+      assert.equal(h.c.radio.radioHandoffInFlight, false);
       assert.equal(h.c.pendingTools, 0);
+      assert.equal(h.c.tools.size, 0);
+      assert.equal(session.sendText('Play radio'), true);
+      request(ws, 'fresh-radio', 'control_radio', { action: 'play' });
+      await h.c.toolQueue;
+      assert.ok(h.c.radio.pendingRadioPlaybackResult);
+      drainRadioReply(h);
+      await tick();
+      assert.equal(playCalls, phase === 'preflight' ? 2 : 1);
+      assert.equal(
+        h.c.isActive(),
+        false,
+        'fresh typed Radio handoff alone ends voice',
+      );
     } finally {
-      initReleased.resolve();
-      settlement.resolve();
+      settleResult.resolve();
+      playbackReady.resolve(false);
       session.destroy();
+      await preflight;
       runner.dispose();
-      unsubscribe();
-      await manager.setEnabled('rocket-launches', false);
+      await manager.setEnabled('radio', false);
     }
     assert.equal(h.timers.size, 0);
   });
-}
-
-for (const [chooserIndex, providerDropdown] of [false, true].entries()) {
-  for (const [phaseIndex, phase] of [
-    'prepared',
-    'preflight',
-    'settling',
-  ].entries()) {
-    test(`H${55 + chooserIndex * 3 + phaseIndex} native Radio cancellation: ${phase} chooser=${providerDropdown} preserves selection truth and prevents stale speaker transfer`, async () => {
-      const viewer = viewerFixture();
-      const manager = new DataLayerManager(viewer);
-      const prepared = deferred();
-      const settleResult = deferred();
-      const playbackReady = deferred();
-      let playCalls = 0;
-      let stopCalls = 0;
-      let selections = 0;
-      let activeOptions;
-      const state = {
-        stationCount: 2,
-        selected: null,
-        audioState: 'stopped',
-        voiceDucked: false,
-      };
-      const radio = {
-        async init() {},
-        async enable() {},
-        async disable() {},
-        async update() {},
-        getStats: () => ({ count: 2 }),
-        getUIState: () => ({ ...state }),
-        setVoiceDucked(value) {
-          state.voiceDucked = value;
-        },
-        pause() {
-          state.audioState = 'paused';
-        },
-        subscribePlaybackControls() {
-          return () => {};
-        },
-        selectRequestedStation(_criteria, options) {
-          assert.equal(options.autoplay, false);
-          selections++;
-          state.selected = { id: 'station-1', name: 'Station One' };
-          return state.selected;
-        },
-        playForVoice() {
-          playCalls++;
-          return playbackReady.promise;
-        },
-        stopPlayback() {
-          stopCalls++;
-          state.audioState = 'stopped';
-        },
-      };
-      manager.register({
-        id: 'radio',
-        name: 'Radio',
-        updateInterval: -1,
-        ...radio,
-      });
-      const runner = createGevActionRunner({ viewer, dataManager: manager });
-      let h;
-      let preflight;
-      const session = createVoiceSession({
-        providerDropdown: () => providerDropdown,
-        runner: async (name, args, options) => {
-          activeOptions = options;
-          const result = await runner(name, args, options);
-          prepared.resolve(result);
-          if (phase === 'settling') await settleResult.promise;
-          return result;
-        },
-        createAdapter: (shared) => {
-          h = harness({ ...shared, dataManager: manager, radioLayer: radio });
-          return {
-            start: (settings) => h.c.start(settings),
-            stop: (settings) => h.c.stop(settings),
-            sendText: (text) => h.c.sendTextCommand(text),
-            sendMapEvent: (event) => h.c.notifyMapEvent(event),
-          };
-        },
-      });
-      try {
-        await session.start();
-        const ws = h.sockets[0];
-        assert.equal(session.sendText('Select Station One on Radio'), true);
-        request(ws, 'prepared-radio', 'control_radio', {
-          action: 'select',
-          stationQuery: 'Station One',
-        });
-        const actual = await prepared.promise;
-        assert.equal(actual.ok, true);
-        assert.equal(actual.radioPlaybackRequested, true);
-        assert.equal(actual.stationId, 'station-1');
-        assert.equal(manager.isEnabled('radio'), true);
-        if (phase !== 'settling') {
-          await h.c.toolQueue;
-          assert.ok(h.c.radio.pendingRadioPlaybackResult);
-        }
-        if (phase === 'preflight') {
-          preflight = h.c.radio.startPendingRadioHandoff();
-          assert.equal(h.c.radio.radioHandoffInFlight, true);
-          assert.equal(playCalls, 1);
-        }
-        // Native call ownership revokes only this deferred playback. No caption
-        // parsing or caption-driven provider policy participates in cancellation.
-        ws.message({ toolCallCancellation: { ids: ['prepared-radio'] } });
-        if (phase === 'settling')
-          assert.equal(activeOptions.signal.aborted, true);
-        settleResult.resolve();
-        await h.c.toolQueue;
-        assert.equal(h.c.radio.pendingRadioPlaybackResult, null);
-        assert.equal(h.c.radio.radioHandoffInFlight, false);
-        assert.equal(manager.isEnabled('radio'), true);
-        assert.equal(state.selected.id, 'station-1');
-        assert.equal(selections, 1);
-        const modelResult = responseFor(ws, 'prepared-radio');
-        if (phase === 'settling')
-          assert.equal(
-            modelResult,
-            undefined,
-            'cancelled active call never sends a late result',
-          );
-        else {
-          assert.equal(modelResult.ok, true);
-          assert.equal(modelResult.stationId, 'station-1');
-        }
-        const stopsAfterCancellation = stopCalls;
-        assert.equal(stopsAfterCancellation, phase === 'preflight' ? 1 : 0);
-        drainRadioReply(h);
-        playbackReady.resolve(true);
-        await preflight;
-        await tick();
-        assert.equal(
-          playCalls,
-          phase === 'preflight' ? 1 : 0,
-          'drain cannot revive cancelled playback',
-        );
-        assert.equal(h.c.isActive(), true, 'late readiness cannot stop voice');
-        assert.equal(h.c.radio.radioHandoffInFlight, false);
-        assert.equal(h.c.pendingTools, 0);
-        assert.equal(h.c.tools.size, 0);
-        assert.equal(session.sendText('Play radio'), true);
-        request(ws, 'fresh-radio', 'control_radio', { action: 'play' });
-        await h.c.toolQueue;
-        assert.ok(h.c.radio.pendingRadioPlaybackResult);
-        drainRadioReply(h);
-        await tick();
-        assert.equal(playCalls, phase === 'preflight' ? 2 : 1);
-        assert.equal(
-          h.c.isActive(),
-          false,
-          'fresh typed Radio handoff alone ends voice',
-        );
-      } finally {
-        settleResult.resolve();
-        playbackReady.resolve(false);
-        session.destroy();
-        await preflight;
-        runner.dispose();
-        await manager.setEnabled('radio', false);
-      }
-      assert.equal(h.timers.size, 0);
-    });
-  }
 }
 
 // A stronger Radio control skips the ordered queue. An older Radio call still

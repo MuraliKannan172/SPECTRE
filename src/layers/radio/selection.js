@@ -104,8 +104,6 @@ export function createSelection({
     )
       parts.tuning.endRadioTuning();
     layerState._cancelledTuningPresentationStation = null;
-    if (origin === 'user')
-      parts.presentation.emitPlaybackControl('select', origin);
     layerState._selectedId = station.id;
     const generation = ++layerState._selectionGeneration;
     const sessionGeneration = layerState._sessionGeneration;

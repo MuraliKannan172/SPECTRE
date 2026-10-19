@@ -1,3 +1,4 @@
+import { waitForSignal } from '../../../src/sources/requestDeadline.js';
 import { clientKey, makeCostRateLimiter } from '../common/rate-limit.js';
 import { readResponseJsonCapped } from '../../../src/sources/httpBody.js';
 import {
@@ -17,7 +18,6 @@ const MINT_FAILURE = 'Gemini voice could not connect. Try again.';
 
 export function createGeminiTokenHandler({
   annotationGuidance,
-  providerDropdown = false,
   tools,
   fetchImpl = (...args) => fetch(...args),
   resolveApiKey = () => process.env.GEMINI_API_KEY,
@@ -31,6 +31,7 @@ export function createGeminiTokenHandler({
 } = {}) {
   let limiter;
   return async (req, res) => {
+    if (req.aborted || res.destroyed || res.writableEnded) return;
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -50,23 +51,32 @@ export function createGeminiTokenHandler({
       res.setHeader('Allow', 'POST');
       return reply(405, 'Method not allowed');
     }
-    if (
-      !isGeminiRequestOriginAllowed(req, resolveHost(), resolveAllowedHosts())
-    )
-      return reply(403, 'Gemini voice requires a same-origin app request');
-    const apiKey = String(resolveApiKey() || '').trim();
-    if (!apiKey) return reply(503, 'Add a Gemini API key in Provider Settings');
-    const model = normalizeGeminiModel(resolveModel());
-    if (!model)
-      return reply(503, 'The Gemini Live model configuration is invalid');
-    if (limiter === undefined)
-      limiter = makeCostRateLimiter(resolveRateLimit(), 30);
-    if (limiter && !limiter(clientKey(req))) {
-      res.setHeader('Retry-After', '60');
-      return reply(
-        429,
-        'Gemini voice is starting too often. Try again shortly.',
-      );
+    let apiKey;
+    let model;
+    try {
+      if (
+        !isGeminiRequestOriginAllowed(req, resolveHost(), resolveAllowedHosts())
+      )
+        return reply(403, 'Gemini voice requires a same-origin app request');
+      apiKey = String(resolveApiKey() || '').trim();
+      if (!apiKey)
+        return reply(503, 'Add a Gemini API key in Provider Settings');
+      model = normalizeGeminiModel(resolveModel());
+      if (!model)
+        return reply(503, 'The Gemini Live model configuration is invalid');
+      if (limiter === undefined)
+        limiter = makeCostRateLimiter(resolveRateLimit(), 30);
+      if (limiter && !limiter(clientKey(req))) {
+        res.setHeader('Retry-After', '60');
+        return reply(
+          429,
+          'Gemini voice is starting too often. Try again shortly.',
+        );
+      }
+    } catch {
+      // Connect does not observe the handler's returned promise. A synchronous
+      // configuration resolver must fail with a bounded, fixed response.
+      return reply(503, MINT_FAILURE);
     }
 
     const lifetime = new AbortController();
@@ -86,6 +96,7 @@ export function createGeminiTokenHandler({
       );
     }, timeoutMs);
     deadline.unref?.();
+    let acquiredResponse;
     try {
       const inputMode = await readGeminiTokenRequest(req, lifetime.signal);
       lifetime.signal.throwIfAborted();
@@ -93,7 +104,6 @@ export function createGeminiTokenHandler({
         annotationGuidance,
         inputMode,
         tools,
-        { providerDropdown },
       );
       const issuedAt = now();
       // REST uses bidiGenerateContentSetup. liveConnectConstraints is the SDK
@@ -105,22 +115,36 @@ export function createGeminiTokenHandler({
         newSessionExpireTime: new Date(issuedAt + 60_000).toISOString(),
         bidiGenerateContentSetup: { model: `models/${model}`, ...config },
       };
-      const response = await fetchImpl(GEMINI_TOKEN_ENDPOINT, {
-        method: 'POST',
-        redirect: 'error',
-        signal: lifetime.signal,
-        headers: {
-          'x-goog-api-key': apiKey,
-          'Content-Type': 'application/json',
+      const acquisition = Promise.resolve(
+        fetchImpl(GEMINI_TOKEN_ENDPOINT, {
+          method: 'POST',
+          redirect: 'error',
+          signal: lifetime.signal,
+          headers: {
+            'x-goog-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        }),
+      );
+      // A fetch implementation can ignore abort. Bound this caller's wait and
+      // discard a response that arrives after timeout/disconnection.
+      void acquisition.then(
+        (late) => {
+          acquiredResponse = late;
+          if (lifetime.signal.aborted) void late.body?.cancel().catch(() => {});
         },
-        body: JSON.stringify(request),
-      });
+        () => {},
+      );
+      const response = await waitForSignal(acquisition, lifetime.signal);
       lifetime.signal.throwIfAborted();
       if (
         response.redirected ||
         (response.url && response.url !== GEMINI_TOKEN_ENDPOINT)
-      )
+      ) {
+        void response.body?.cancel().catch(() => {});
         throw new Error('Unexpected token response destination');
+      }
       if (!response.ok) {
         // Never forward upstream bodies, headers or exception messages.
         void response.body?.cancel().catch(() => {});
@@ -172,6 +196,10 @@ export function createGeminiTokenHandler({
         return reply(400, 'Use an empty JSON token request');
       reply(lifetime.signal.aborted ? 504 : 502, MINT_FAILURE);
     } finally {
+      // Abort can happen after acquisition resolves but before this handler
+      // resumes and passes ownership to the body reader.
+      if (lifetime.signal.aborted)
+        void acquiredResponse?.body?.cancel().catch(() => {});
       clearTimeout(deadline);
       req.off('aborted', disconnect);
       res.off('close', responseClosed);

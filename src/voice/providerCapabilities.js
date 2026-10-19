@@ -1,18 +1,6 @@
-export const VOICE_PROVIDER_GUIDANCE =
-  'I can’t switch voice providers directly. Hover over the Voice panel and use the provider dropdown.';
-export const HOST_VOICE_PROVIDER_GUIDANCE =
-  'I can’t switch voice providers directly. Provider selection is managed by this app.';
-
-/** Host construction decides which controls exist; tool text cannot add one. */
-export function voiceProviderGuidance({ providerDropdown = false } = {}) {
-  return providerDropdown === true
-    ? VOICE_PROVIDER_GUIDANCE
-    : HOST_VOICE_PROVIDER_GUIDANCE;
-}
-
 export const VOICE_PROVIDERS = Object.freeze({
-  openai: Object.freeze({ label: 'OpenAI' }),
-  gemini: Object.freeze({ label: 'Gemini' }),
+  openai: Object.freeze({ label: 'OpenAI' }), // i18n-ignore: provider product name
+  gemini: Object.freeze({ label: 'Gemini' }), // i18n-ignore: provider product name
 });
 
 /** Optional providers require an explicit host opt-in and an available factory. */

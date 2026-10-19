@@ -41,9 +41,8 @@ export class TurnMetrics {
   }
 
   /** Begin a turn for typed input; the command is its end of speech. */
-  userText(isCurrent = () => true) {
+  userText() {
     this.close('next_turn');
-    if (!isCurrent()) return;
     this.open('text');
     this.turn.eouAt = this.now();
   }

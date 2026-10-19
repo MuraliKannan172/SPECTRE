@@ -151,6 +151,51 @@ test('destroy removes listeners and ignores later moves', () => {
   assert.equal(h.tracker.capture('keydown').fresh, false);
 });
 
+test('delayed speech uses its released capture without replacing a newer physical hold', () => {
+  const h = harness();
+  h.move(700, 250);
+  const capturedA = h.tracker.hold();
+  h.tracker.releaseHold();
+  h.move(200, 100);
+  h.tracker.beginTurn('speech_start', { capturedSnapshot: capturedA });
+  assert.equal(h.tracker.activeSnapshot(), capturedA);
+  const heldB = h.tracker.hold();
+  h.tracker.beginTurn('speech_start', { capturedSnapshot: capturedA });
+  assert.equal(h.tracker.activeSnapshot(), capturedA);
+  assert.equal(h.tracker.isHeld(), true);
+  assert.equal(h.tracker.beginTurn('speech_start'), heldB);
+  h.tracker.destroy();
+});
+
+test('explicit stale captures clear the referent while a silent hold leaves it alone', () => {
+  const h = harness();
+  h.move(700, 250);
+  const current = h.tracker.beginTurn('text');
+  h.move(200, 100);
+  h.tracker.hold();
+  h.tracker.releaseHold();
+  assert.equal(h.tracker.activeSnapshot(), current);
+  for (const capturedSnapshot of [null, { fresh: false, at: 'keydown' }]) {
+    h.tracker.beginTurn('text');
+    h.tracker.beginTurn('speech_start', { capturedSnapshot });
+    assert.equal(h.tracker.activeSnapshot(), null);
+  }
+  h.tracker.destroy();
+});
+
+test('a capture arriving after destruction cannot restore an active referent', () => {
+  const h = harness();
+  h.move(700, 250);
+  const capturedSnapshot = h.tracker.hold();
+  assert.equal(capturedSnapshot.fresh, true);
+  h.tracker.destroy();
+  const result = h.tracker.beginTurn('speech_start', { capturedSnapshot });
+  assert.equal(result.fresh, false);
+  assert.equal(h.tracker.activeSnapshot(), null);
+  assert.equal(h.tracker.isHeld(), false);
+  assert.equal(h.tracker.beginTurn('speech_start').fresh, false);
+});
+
 test('format: the model item is compact inert JSON; labels are bounded data', () => {
   const snapshot = buildPointerSnapshot({
     at: 'speech_start',
@@ -181,10 +226,4 @@ test('chip: "this" names an entity, "here" gives the ground coordinate', () => {
   const ground = buildPointerSnapshot({ at: 'keydown', x: 1, y: 1, width: 2, height: 2, pick: { ground: { lat: 30.2672, lon: -97.7431 } } });
   assert.deepEqual(pointerChip(ground), { kind: 'here', label: '30.27, -97.74' });
   assert.equal(pointerChip(null), null);
-});
-
-test('a captured hold does not replace an active referent until explicit admission, including after release',()=>{
- const h=harness();h.tracker.moveTo(300,200);const old=h.tracker.beginTurn('text');h.tracker.moveTo(600,250);const captured=h.tracker.hold('keydown');
- assert.equal(h.tracker.activeSnapshot(),old);h.tracker.releaseHold();assert.equal(h.tracker.activeSnapshot(),old);
- assert.equal(h.tracker.beginTurn('speech_start',{capturedSnapshot:captured}),captured);assert.equal(h.tracker.activeSnapshot(),captured);assert.notDeepEqual(captured.screenPx,old.screenPx);
 });

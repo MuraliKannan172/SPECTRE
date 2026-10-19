@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 const DISCONNECT_GRACE_MS = 6000;
 
 function releaseStartResources({ localStream = null, localPc = null } = {}) {
@@ -59,7 +61,7 @@ export class RealtimeConnection {
     this.input.pushToTalkKeyHeld = pushToTalkKeyHeld;
     this.input.spaceKeyHeld = spaceKeyHeld;
     if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) {
-      this.setStatus('error', 'WebRTC microphone support unavailable');
+      this.setStatus('error', t('WebRTC microphone support unavailable'));
       return;
     }
 
@@ -78,7 +80,7 @@ export class RealtimeConnection {
     // — this is what "applies next session" means.
     this.cost.prepareSession();
     this.syncCostUi();
-    this.setStatus('connecting', 'Requesting microphone');
+    this.setStatus('connecting', t('Requesting microphone'));
     this.debugLog('session.starting', {
       epoch,
       tier: this.cost.voiceTier,
@@ -101,7 +103,6 @@ export class RealtimeConnection {
       // cap be overrun. Unrecognised ids bill at worst-case rates.
       const costState = this.cost.bindServedModel(minted.model);
       this.cost.bindTranscriptionModel?.(minted.transcribeModel);
-      this.bindTranscriptionModel?.(minted.transcribeModel);
       if (!costState.ratesRecognized) {
         console.warn(
           `[GEV voice] unrecognised Realtime model "${costState.modelId}" — ` +
@@ -180,9 +181,9 @@ export class RealtimeConnection {
         if (!ownsChannel()) return;
         const detail = this.input.pushToTalkMode
           ? this.input.pushToTalkKeyHeld
-            ? 'Release Space to send'
-            : 'Hold Space to talk'
-          : 'Ask or command';
+            ? t('Release Space to send')
+            : t('Hold Space to talk')
+          : t('Ask or command');
         this.setStatus('listening', detail);
         this.debugLog('data_channel.open', {
           connection: this.connectionDiagnostics(dataChannel),
@@ -319,26 +320,19 @@ export class RealtimeConnection {
     }
   }
 
-  sendRealtimeEvent(
-    message,
-    logEventName = 'client.event',
-    { isCurrent = () => true } = {},
-  ) {
-    const channel = this.dc;
-    if (!channel || channel.readyState !== 'open' || !isCurrent()) return false;
+  sendRealtimeEvent(message, logEventName = 'client.event') {
+    if (!this.dc || this.dc.readyState !== 'open') return false;
     this.debugLog(logEventName, {
       type: message?.type || null,
       message,
     });
-    if (this.dc !== channel || channel.readyState !== 'open' || !isCurrent())
-      return false;
     // A dc.send() that exceeds the SCTP send-buffer / max message size throws.
     // If that throw escaped it would abort handleRealtimeEvent BEFORE
     // queueResponseCreate + setStatus('listening'), stranding the turn at
     // EXECUTING. Swallow it and signal failure so callers can fall through
     // without the offending payload (M13).
     try {
-      channel.send(JSON.stringify(message));
+      this.dc.send(JSON.stringify(message));
       return true;
     } catch (error) {
       this.debugLog('client.send.failed', {

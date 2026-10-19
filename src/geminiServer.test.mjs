@@ -1,12 +1,14 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import http from 'node:http';
-import { once } from 'node:events';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer, preview } from 'vite';
 import { hostCheckPlugin, resolveAllowedHosts } from '../build/allowedHosts.js';
+import { standaloneVoiceTools } from '../server/standalone/voiceTools.js';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { EventEmitter, once } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { geminiLiveProxy } from '../server/providers/gemini.js';
 import { createGeminiTokenHandler } from '../server/providers/gemini/realtime.js';
 import {
@@ -15,7 +17,6 @@ import {
   createGeminiLiveConfig,
 } from '../server/providers/gemini/config.js';
 import { GEV_REALTIME_TOOLS } from '../server/providers/openai/tools.js';
-import { standaloneVoiceTools } from '../server/standalone/voiceTools.js';
 import { PROXY_SIGNALS } from './localRequestGate.mjs';
 
 const API_KEY = 'private-gemini-test-key-never-return';
@@ -108,6 +109,82 @@ test('dev and preview install the same bounded Gemini token endpoint', () => {
   }
 });
 
+test('mounted token handler completes synchronous resolver failures without exposing details', async (t) => {
+  for (const resolver of [
+    'resolveHost',
+    'resolveAllowedHosts',
+    'resolveApiKey',
+    'resolveModel',
+    'resolveRateLimit',
+    null,
+  ]) {
+    await t.test(resolver || 'healthy control', async () => {
+      const req = Object.assign(new PassThrough(), {
+        method: 'POST',
+        headers: {
+          host: '127.0.0.1',
+          origin: 'http://127.0.0.1',
+          'content-type': 'application/json',
+        },
+        socket: { remoteAddress: '127.0.0.1' },
+      });
+      const writes = [];
+      const headers = new Map();
+      const res = Object.assign(new EventEmitter(), {
+        setHeader: (name, value) => headers.set(name.toLowerCase(), value),
+        end(body) {
+          this.writableEnded = true;
+          writes.push(JSON.parse(body));
+        },
+      });
+      let calls = 0;
+      let handler;
+      geminiLiveProxy({
+        realtime: {
+          resolveHost: () => '',
+          resolveAllowedHosts: () => '',
+          resolveApiKey: () => API_KEY,
+          resolveModel: () => 'gemini-3.8-live',
+          resolveRateLimit: () => '0',
+          fetchImpl: async () => {
+            calls++;
+            return Response.json({ name: TOKEN });
+          },
+          ...(resolver && {
+            [resolver]: () => {
+              throw new Error(`Synthetic resolver failure: ${API_KEY}`);
+            },
+          }),
+        },
+      }).configureServer({
+        middlewares: {
+          use(_path, installed) {
+            handler = installed;
+          },
+        },
+      });
+      const pending = handler(req, res);
+      req.end('{}');
+      await assert.doesNotReject(pending);
+      assert.equal(writes.length, 1);
+      assert.equal(res.statusCode, resolver ? 503 : 200);
+      assert.equal(calls, resolver ? 0 : 1);
+      assert.equal(headers.get('cache-control'), 'no-store');
+      if (resolver) {
+        assert.deepEqual(writes[0], {
+          error: 'Gemini voice could not connect. Try again.',
+        });
+        assert.equal(headers.get('connection'), 'close');
+      } else assert.equal(writes[0].token, TOKEN);
+      assert.equal(req.listenerCount('aborted'), 0);
+      assert.equal(req.listenerCount('data'), 0);
+      assert.equal(req.listenerCount('end'), 0);
+      assert.equal(res.listenerCount('close'), 0);
+      req.destroy();
+    });
+  }
+});
+
 test('mint locks canonical action schemas and server instructions with no permanent credential in browser data', async (t) => {
   const f = await fixture(t, {
     annotationGuidance: 'Keep existing annotations.',
@@ -170,67 +247,7 @@ test('mint locks canonical action schemas and server instructions with no perman
   });
 });
 
-test('standalone mints lock the full voice query catalog in both credential and browser setup', async (t) => {
-  const tools = standaloneVoiceTools();
-  const declarations = tools.map(({ name, description, parameters }) => ({
-    name,
-    description,
-    parametersJsonSchema: parameters,
-    behavior: 'BLOCKING',
-  }));
-  for (const name of ['search_places', 'get_weather', 'get_wind', 'plan_route'])
-    assert.ok(
-      tools.some((tool) => tool.name === name),
-      name,
-    );
-  assert.ok(tools.length > GEV_REALTIME_TOOLS.length);
-  for (const inputMode of ['open-mic', 'push-to-talk']) {
-    const f = await fixture(t, { tools });
-    const response = await f.send({
-      body: JSON.stringify(inputMode === 'open-mic' ? {} : { inputMode }),
-    });
-    assert.equal(response.status, 200);
-    const data = await response.json();
-    assert.deepEqual(data.config.tools, [
-      { functionDeclarations: declarations },
-    ]);
-    const request = JSON.parse(f.calls[0][1].body);
-    assert.deepEqual(request.bidiGenerateContentSetup, {
-      model: 'models/gemini-3.8-live',
-      ...data.config,
-    });
-    assert.equal(request.fieldMask, undefined);
-    assert.equal(JSON.stringify(data).includes(API_KEY), false);
-  }
-});
-
-test('Gemini endpoint instructions advertise only the server-owned provider chooser', async (t) => {
-  for (const options of [
-    {},
-    { providerDropdown: false },
-    { providerDropdown: true },
-  ]) {
-    const f = await fixture(t, options);
-    const response = await f.send();
-    assert.equal(response.status, 200);
-    const data = await response.json();
-    const instructions = data.config.systemInstruction.parts[0].text;
-    assert.match(instructions, /I can’t switch voice providers directly/);
-    if (options.providerDropdown === true)
-      assert.match(
-        instructions,
-        /Hover over the Voice panel and use the provider dropdown/,
-      );
-    else assert.doesNotMatch(instructions, /hover|provider dropdown/i);
-    const upstream = JSON.parse(f.calls[0][1].body);
-    assert.equal(
-      upstream.bidiGenerateContentSetup.systemInstruction.parts[0].text,
-      instructions,
-    );
-  }
-});
-
-test('browser token requests cannot enable provider chooser guidance', async (t) => {
+test('browser token requests cannot override server capabilities', async (t) => {
   for (const body of [
     { providerDropdown: true },
     { inputMode: 'push-to-talk', providerDropdown: true },
@@ -455,119 +472,6 @@ test('a positive fraction applies a real cap and only explicit zero disables it'
   assert.equal(unlimited.calls.length, 31);
 });
 
-test('real Vite dev and preview reject hostile hosts before the Gemini middleware', async (t) => {
-  for (const mode of ['dev', 'preview']) {
-    await t.test(mode, async (t) => {
-      const root = await mkdtemp(path.join(tmpdir(), 'gev-gemini-vite-test-'));
-      await mkdir(path.join(root, 'dist'));
-      await writeFile(path.join(root, 'index.html'), '<p>isolated fixture</p>');
-      await writeFile(
-        path.join(root, 'dist/index.html'),
-        '<p>isolated fixture</p>',
-      );
-      let credentialReads = 0;
-      let upstreamCalls = 0;
-      const allowedHosts = resolveAllowedHosts('gev.local');
-      const config = {
-        configFile: false,
-        envFile: false,
-        root,
-        logLevel: 'silent',
-        publicDir: false,
-        optimizeDeps: { noDiscovery: true, include: [] },
-        // Deliberately put the provider first: enforce: pre must order the gate.
-        plugins: [
-          geminiLiveProxy({
-            realtime: {
-              resolveApiKey: () => {
-                credentialReads++;
-                return '';
-              },
-              resolveHost: () => '127.0.0.1',
-              resolveAllowedHosts: () => 'gev.local',
-              fetchImpl: async () => {
-                upstreamCalls++;
-                throw new Error('No upstream calls are permitted');
-              },
-            },
-          }),
-          hostCheckPlugin(),
-        ],
-        server: {
-          host: '127.0.0.1',
-          port: 0,
-          allowedHosts,
-          hmr: false,
-          watch: null,
-        },
-        preview: { host: '127.0.0.1', port: 0, allowedHosts },
-      };
-      let server;
-      try {
-        server =
-          mode === 'dev' ? await createServer(config) : await preview(config);
-        if (mode === 'dev') await server.listen();
-        const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
-        const request = (host, extraHeaders = {}) =>
-          new Promise((resolve, reject) => {
-            const req = http.request(
-              `${origin}/api/gemini/token`,
-              {
-                method: 'POST',
-                headers: {
-                  Host: host,
-                  Origin: `http://${host}`,
-                  ...extraHeaders,
-                },
-              },
-              (res) => {
-                const chunks = [];
-                res.on('data', (chunk) => chunks.push(chunk));
-                res.on('end', () =>
-                  resolve({
-                    status: res.statusCode,
-                    body: Buffer.concat(chunks).toString(),
-                  }),
-                );
-                res.on('error', reject);
-              },
-            );
-            req.on('error', reject);
-            req.end();
-          });
-        for (const host of ['attacker.example:4173', 'arbitrary.local:4173']) {
-          const response = await request(host);
-          assert.equal(response.status, 403);
-          assert.match(response.body, /This host is not allowed/);
-        }
-        assert.equal(credentialReads, 0);
-        const sameSite = await request('gev.local:4173', {
-          'Sec-Fetch-Site': 'same-site',
-        });
-        assert.equal(sameSite.status, 403);
-        assert.equal(credentialReads, 0);
-        for (const host of [
-          'gev.local:4173',
-          '192.168.1.20:4173',
-          'demo.localhost:4173',
-        ]) {
-          const response = await request(host);
-          assert.equal(response.status, 503);
-          assert.match(response.body, /Add a Gemini API key/);
-        }
-        assert.equal(credentialReads, 3);
-        assert.equal(upstreamCalls, 0);
-      } finally {
-        try {
-          if (server) await server.close();
-        } finally {
-          await rm(root, { recursive: true, force: true });
-        }
-      }
-    });
-  }
-});
-
 test('client bodies cannot override model or locked settings and stay byte bounded', async (t) => {
   const f = await fixture(t);
   for (const body of [
@@ -740,6 +644,86 @@ test('request disconnect cancels its pending mint and cannot publish a late toke
   await new Promise((resolve) => setImmediate(resolve));
 });
 
+test('disconnect at mint resolution settles without publishing and discards the response body', async () => {
+  for (const timing of ['before-resolution', 'after-resolution', 'connected']) {
+    const req = Object.assign(new PassThrough(), {
+      method: 'POST',
+      headers: {
+        host: '127.0.0.1',
+        origin: 'http://127.0.0.1',
+        'content-type': 'application/json',
+      },
+      socket: { remoteAddress: '127.0.0.1' },
+    });
+    const writes = [];
+    const res = Object.assign(new EventEmitter(), {
+      setHeader() {},
+      end(body) {
+        this.writableEnded = true;
+        writes.push(body);
+      },
+    });
+    let started;
+    let release;
+    let cancelled = 0;
+    const ready = new Promise((resolve) => {
+      started = resolve;
+    });
+    const handler = createGeminiTokenHandler({
+      resolveApiKey: () => API_KEY,
+      resolveModel: () => 'gemini-3.8-live',
+      resolveHost: () => '',
+      resolveAllowedHosts: () => '',
+      resolveRateLimit: () => '0',
+      fetchImpl: () =>
+        new Promise((resolve) => {
+          release = resolve;
+          started();
+        }),
+    });
+    const pending = handler(req, res);
+    req.end('{}');
+    await ready;
+    const disconnect = () => {
+      req.aborted = true;
+      req.emit('aborted');
+    };
+    if (timing === 'before-resolution') {
+      disconnect();
+      await pending;
+    }
+    release(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(JSON.stringify({ name: TOKEN })),
+            );
+            if (timing === 'connected') controller.close();
+          },
+          cancel() {
+            cancelled++;
+          },
+        }),
+      ),
+    );
+    if (timing === 'after-resolution') queueMicrotask(disconnect);
+    await pending;
+    await new Promise((resolve) => setImmediate(resolve));
+    if (timing === 'connected') {
+      assert.equal(res.statusCode, 200);
+      assert.equal(writes.length, 1);
+      assert.equal(JSON.parse(writes[0]).token, TOKEN);
+      assert.equal(cancelled, 0);
+    } else {
+      assert.equal(writes.length, 0, timing);
+      assert.equal(cancelled, 1, timing);
+    }
+    assert.equal(req.listenerCount('aborted'), 0, timing);
+    assert.equal(res.listenerCount('close'), 0, timing);
+  }
+});
+
 test('timeout also bounds a stalled upstream response body', async (t) => {
   let cancelled = false;
   const f = await fixture(t, {
@@ -787,7 +771,261 @@ test('a partial token request cannot hold the handler beyond its deadline', asyn
     req.write('{');
   });
   assert.equal(response.statusCode, 504);
-  response.resume();
+  const chunks = [];
+  response.on('data', (chunk) => chunks.push(chunk));
   await once(response, 'end');
+  assert.deepEqual(JSON.parse(Buffer.concat(chunks)), {
+    error: 'Gemini voice could not connect. Try again.',
+  });
   assert.equal(f.calls.length, 0);
+});
+
+test(
+  'deadline responds before an abort-ignoring mint settles and cancels its late body',
+  { timeout: 2000 },
+  async (t) => {
+    let release;
+    let signal;
+    let cancelled = false;
+    const f = await fixture(t, {
+      timeoutMs: 30,
+      fetchImpl: (_url, options) => {
+        signal = options.signal;
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      },
+    });
+    const response = await f.send();
+    assert.equal(response.status, 504);
+    assert.equal(signal.aborted, true);
+    assert.deepEqual(await response.json(), {
+      error: 'Gemini voice could not connect. Try again.',
+    });
+    release(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(JSON.stringify({ name: TOKEN })),
+            );
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+      ),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(cancelled, true);
+  },
+);
+
+test('wrong-destination and redirected successful responses discard their bodies', async (t) => {
+  for (const property of ['url', 'redirected']) {
+    let cancelled = false;
+    const f = await fixture(t, {
+      fetchImpl: async () => {
+        const response = new Response(
+          new ReadableStream({
+            cancel() {
+              cancelled = true;
+            },
+          }),
+        );
+        Object.defineProperty(response, property, {
+          value: property === 'url' ? 'https://attacker.example/token' : true,
+        });
+        return response;
+      },
+    });
+    const response = await f.send();
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), {
+      error: 'Gemini voice could not connect. Try again.',
+    });
+    assert.equal(cancelled, true);
+  }
+});
+
+test(
+  'a chunked overflow delivers fixed 413 while its upload is still open',
+  { timeout: 2000 },
+  async (t) => {
+    const f = await fixture(t);
+    const response = await new Promise((resolve, reject) => {
+      const req = http.request(
+        f.origin,
+        {
+          method: 'POST',
+          headers: {
+            Origin: f.origin,
+            'Content-Type': 'application/json',
+            'Transfer-Encoding': 'chunked',
+          },
+        },
+        resolve,
+      );
+      req.on('error', reject);
+      t.after(() => req.destroy());
+      req.write(' '.repeat(1024));
+      req.write(' ');
+    });
+    assert.equal(response.statusCode, 413);
+    const chunks = [];
+    response.on('data', (chunk) => chunks.push(chunk));
+    await once(response, 'end');
+    assert.deepEqual(JSON.parse(Buffer.concat(chunks)), {
+      error: 'Token request is too large',
+    });
+    assert.equal(f.calls.length, 0);
+    assert.equal((await f.send({ body: ' '.repeat(1024) })).status, 200);
+  },
+);
+
+test('standalone mints lock the full voice query catalog in both credential and browser setup', async (t) => {
+  const tools = standaloneVoiceTools();
+  const declarations = tools.map(({ name, description, parameters }) => ({
+    name,
+    description,
+    parametersJsonSchema: parameters,
+    behavior: 'BLOCKING',
+  }));
+  for (const name of ['search_places', 'get_weather', 'get_wind', 'plan_route'])
+    assert.ok(
+      tools.some((tool) => tool.name === name),
+      name,
+    );
+  assert.ok(tools.length > GEV_REALTIME_TOOLS.length);
+  for (const inputMode of ['open-mic', 'push-to-talk']) {
+    const f = await fixture(t, { tools });
+    const response = await f.send({
+      body: JSON.stringify(inputMode === 'open-mic' ? {} : { inputMode }),
+    });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.deepEqual(data.config.tools, [
+      { functionDeclarations: declarations },
+    ]);
+    const request = JSON.parse(f.calls[0][1].body);
+    assert.deepEqual(request.bidiGenerateContentSetup, {
+      model: 'models/gemini-3.8-live',
+      ...data.config,
+    });
+    assert.equal(request.fieldMask, undefined);
+    assert.equal(JSON.stringify(data).includes(API_KEY), false);
+  }
+});
+
+test('real Vite dev and preview reject hostile hosts before the Gemini middleware', async (t) => {
+  for (const mode of ['dev', 'preview']) {
+    await t.test(mode, async (t) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'gev-gemini-vite-test-'));
+      await mkdir(path.join(root, 'dist'));
+      await writeFile(path.join(root, 'index.html'), '<p>isolated fixture</p>');
+      await writeFile(
+        path.join(root, 'dist/index.html'),
+        '<p>isolated fixture</p>',
+      );
+      let credentialReads = 0;
+      let upstreamCalls = 0;
+      const allowedHosts = resolveAllowedHosts('gev.local');
+      const config = {
+        configFile: false,
+        envFile: false,
+        root,
+        logLevel: 'silent',
+        publicDir: false,
+        optimizeDeps: { noDiscovery: true, include: [] },
+        // Deliberately put the provider first: enforce: pre must order the gate.
+        plugins: [
+          geminiLiveProxy({
+            realtime: {
+              resolveApiKey: () => {
+                credentialReads++;
+                return '';
+              },
+              resolveHost: () => '127.0.0.1',
+              resolveAllowedHosts: () => 'gev.local',
+              fetchImpl: async () => {
+                upstreamCalls++;
+                throw new Error('No upstream calls are permitted');
+              },
+            },
+          }),
+          hostCheckPlugin(),
+        ],
+        server: {
+          host: '127.0.0.1',
+          port: 0,
+          allowedHosts,
+          hmr: false,
+          watch: null,
+        },
+        preview: { host: '127.0.0.1', port: 0, allowedHosts },
+      };
+      let server;
+      try {
+        server =
+          mode === 'dev' ? await createServer(config) : await preview(config);
+        if (mode === 'dev') await server.listen();
+        const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
+        const request = (host, extraHeaders = {}) =>
+          new Promise((resolve, reject) => {
+            const req = http.request(
+              `${origin}/api/gemini/token`,
+              {
+                method: 'POST',
+                headers: {
+                  Host: host,
+                  Origin: `http://${host}`,
+                  ...extraHeaders,
+                },
+              },
+              (res) => {
+                const chunks = [];
+                res.on('data', (chunk) => chunks.push(chunk));
+                res.on('end', () =>
+                  resolve({
+                    status: res.statusCode,
+                    body: Buffer.concat(chunks).toString(),
+                  }),
+                );
+                res.on('error', reject);
+              },
+            );
+            req.on('error', reject);
+            req.end();
+          });
+        for (const host of ['attacker.example:4173', 'arbitrary.local:4173']) {
+          const response = await request(host);
+          assert.equal(response.status, 403);
+          assert.match(response.body, /This host is not allowed/);
+        }
+        assert.equal(credentialReads, 0);
+        const sameSite = await request('gev.local:4173', {
+          'Sec-Fetch-Site': 'same-site',
+        });
+        assert.equal(sameSite.status, 403);
+        assert.equal(credentialReads, 0);
+        for (const host of [
+          'gev.local:4173',
+          '192.168.1.20:4173',
+          'demo.localhost:4173',
+        ]) {
+          const response = await request(host);
+          assert.equal(response.status, 503);
+          assert.match(response.body, /Add a Gemini API key/);
+        }
+        assert.equal(credentialReads, 3);
+        assert.equal(upstreamCalls, 0);
+      } finally {
+        try {
+          if (server) await server.close();
+        } finally {
+          await rm(root, { recursive: true, force: true });
+        }
+      }
+    });
+  }
 });

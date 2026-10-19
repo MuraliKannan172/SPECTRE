@@ -836,7 +836,7 @@ test('markup, startup ordering and accessibility remain pinned', () => {
   // passing edit — changing it needs the owner, not a nicer-sounding rewrite.
   assert.ok(
     html.includes(
-      '<p id="first-run-description">It feels like a forbidden cockpit' +
+      '<p id="first-run-description" data-i18n-runtime>It feels like a forbidden cockpit' +
         '—then you realize the sources are public and the data is real.</p>',
     ),
     'the owner-authored first-run line must ship exactly as written',
@@ -995,11 +995,10 @@ test('the voice TOOL SCHEMA matches the pinned contract — the mission mapping 
   // list descriptions; the missions still ride existing tools.
   // Street Level and GNSS extend the manifest; broadcast caveats describe tracked and analyst aircraft.
   // Air quality (ECCC AQHI) extends the manifest.
-  // control_radio separates "turn on" (enable) from explicit playback.
-  assert.equal(block.length, 30773, 'serialized tool schema length drifted');
+  assert.equal(block.length, 30655, 'serialized tool schema length drifted');
   assert.equal(
     crypto.createHash('sha256').update(block).digest('hex'),
-    'c91af86fbfd53a40b1e5d5838e959c97ef8f475591959768775693f371971c8d',
+    '3b1d5e77c10a92f6543a4f9d1ff1870101a0306b65e5b8a6113111c81eda371e',
     'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
   );
   const instructions = fs.readFileSync(

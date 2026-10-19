@@ -1,3 +1,5 @@
+import { t, translateKnown } from '../i18n/index.js';
+import { msg } from '../i18n/marker.js';
 import { createGeminiAudio } from './geminiAudio.js';
 import { RealtimeInput } from './realtimeInput.js';
 import { RealtimeRadio } from './realtimeRadio.js';
@@ -5,21 +7,9 @@ import { captureViewportImage } from './realtimeViewport.js';
 import { createNarrationScheduler } from './narration.js';
 import { createEarcon } from './earcon.js';
 import { narrationLabel } from './speech.js';
-import {
-  createVoiceUserTurnTracker,
-  readVoiceUserTurnInputKind,
-} from './userTurnIntent.js';
-import {
-  readVoiceRequestRestriction,
-  voiceRequestRestrictionResult,
-} from './providerIntent.js';
-import {
-  classifyVoiceTool,
-  projectVoiceToolResultForModel,
-  shouldStopVoiceAfterToolResult,
-  reconcileRadioToolResult,
-  toolResultGuidance,
-} from './toolExecutionPolicy.js';
+import { waitForSignal } from '../sources/requestDeadline.js';
+import { readResponseJsonCapped } from '../sources/httpBody.js';
+import { readLayerLifecycleSummary } from './layerSummary.js';
 import {
   POINTER_OPEN_MIC_RECENT_MS,
   pointerChip,
@@ -28,6 +18,8 @@ import {
 import {
   hasStructuredViewIdentity,
   shouldSendViewportImage,
+  shouldStopVoiceAfterRadioTool,
+  responseInstructionForToolResult,
 } from './realtimeProtocol.js';
 
 const SOCKET_PATH =
@@ -53,13 +45,13 @@ export function geminiSocketUrl({ token, websocketUrl }) {
     token.length > 8192
   )
     throw new Error(
-      'Gemini token response did not include an ephemeral credential',
+      msg('Gemini token response did not include an ephemeral credential'),
     );
   let url;
   try {
     url = new URL(websocketUrl);
   } catch {
-    throw new Error('Invalid Gemini connection endpoint');
+    throw new Error(msg('Invalid Gemini connection endpoint'));
   }
   if (
     url.protocol !== 'wss:' ||
@@ -71,9 +63,29 @@ export function geminiSocketUrl({ token, websocketUrl }) {
     url.hash ||
     !SOCKET_PATH.test(url.pathname)
   )
-    throw new Error('Invalid Gemini connection endpoint');
+    throw new Error(msg('Invalid Gemini connection endpoint'));
   url.searchParams.set('access_token', token);
   return url.href;
+}
+
+// Known local-server failures are translated; unexpected diagnostics stay intact.
+function tokenErrorMessage(error) {
+  switch (error) {
+    case msg('Gemini voice could not connect. Try again.'):
+    case msg('Gemini voice requires a same-origin app request'):
+    case msg('Add a Gemini API key in Provider Settings'):
+    case msg('The Gemini Live model configuration is invalid'):
+    case msg('Gemini voice is starting too often. Try again shortly.'):
+    case msg('Gemini quota is unavailable. Try again later.'):
+    case msg('Gemini access was refused. Check the API key and model access.'):
+    case msg('Gemini Live is unavailable for the configured model.'):
+    case msg('Token request is too large'):
+    case msg('Use an empty JSON token request'):
+    case msg('Method not allowed'):
+      return t(error);
+    default:
+      return error;
+  }
 }
 
 function validCallId(id) {
@@ -90,15 +102,33 @@ function cancelled() {
   return new DOMException('Voice operation cancelled', 'AbortError');
 }
 
-function awaitWithSignal(promise, signal) {
-  return new Promise((resolve, reject) => {
-    const abort = () => reject(signal.reason || cancelled());
-    signal.addEventListener('abort', abort, { once: true });
-    if (signal.aborted) abort();
-    Promise.resolve(promise)
-      .then(resolve, reject)
-      .finally(() => signal.removeEventListener('abort', abort));
-  });
+// Match the existing OpenAI/Radio classification; transport ownership stays local.
+function classifyGeminiTool(name, args = {}) {
+  const radioControl = name === 'control_radio';
+  const radioVisibility =
+    name === 'set_layer_visibility' && args.layerId === 'radio';
+  const radioAction = radioControl
+    ? String(args.action || '').toLowerCase()
+    : null;
+  const authorityDomain =
+    radioVisibility || ['enable', 'disable'].includes(radioAction)
+      ? 'visibility'
+      : radioAction === 'status'
+        ? 'query'
+        : radioControl
+          ? 'playback'
+          : null;
+  const stronger =
+    (radioControl && ['disable', 'pause', 'stop'].includes(radioAction)) ||
+    (radioVisibility && args.enabled === false);
+  return {
+    radioControl,
+    radioVisibility,
+    authorityDomain,
+    stronger,
+    abortScope:
+      radioAction === 'disable' || radioVisibility ? 'all' : 'playback',
+  };
 }
 
 /** Gemini owns its socket/media; the common session owns action authorization. */
@@ -110,7 +140,6 @@ export class GeminiSessionController {
     ui,
     radioLayer = null,
     dataManager = null,
-    providerDropdown = () => false,
     pointer = null,
     tokenEndpoint = '/api/gemini/token',
     startupTimeoutMs = 30_000,
@@ -143,7 +172,6 @@ export class GeminiSessionController {
       pointer,
       radioLayer,
       dataManager,
-      providerDropdown,
       now,
       // Browser timer functions reject the controller as their receiver.
       setTimer: (...args) => setTimer(...args),
@@ -187,7 +215,6 @@ export class GeminiSessionController {
     this.retiredBoundaryWait = null;
     this.forwardedActivityOpen = false;
     this.forwardedCaptureId = null;
-    this.manualInputKind = null;
     this.captureGeneration = 0;
     this.captureEnabled = false;
     this.pttPlaybackSuppressed = false;
@@ -197,9 +224,7 @@ export class GeminiSessionController {
     this.pointerSentKey = null;
     this.pointerAnnounced = null;
     this.pendingPointerContext = null;
-    this.userTurns = createVoiceUserTurnTracker({ setTimer, clearTimer });
     this.typedIntent = null;
-    this.providerQuarantine = null;
     this.toolSequence = 0;
     this.radioStrongerCommit = null;
     this.intentSequence = 0;
@@ -280,12 +305,6 @@ export class GeminiSessionController {
         abortTools: () => this.abortTools(),
         isActive: () => this.isActive(),
         stop: (settings) => this.stop(settings),
-        readVoiceResumeSettings: () => ({
-          pushToTalk: Boolean(this.input.pushToTalkMode),
-        }),
-        resumeVoice: (settings) => this.start(settings),
-        notifyVoiceSuspended: ({ reason }) =>
-          this.emit({ type: 'voice-suspended', reason }),
         setStatus: (...args) => this.setStatus(...args),
         // The shared Radio owner already surfaces a failed start in the UI.
         queueResponseCreate: () => {},
@@ -334,10 +353,14 @@ export class GeminiSessionController {
     this.status = status;
     if (status === 'listening' && this.input.pushToTalkMode)
       detail = this.input.pushToTalkKeyHeld
-        ? 'Release Space to send'
-        : 'Hold Space to talk';
-    const event = { type: 'state', state: status, detail };
-    if (recovery) event.recovery = recovery;
+        ? msg('Release Space to send')
+        : msg('Hold Space to talk');
+    const event = {
+      type: 'state',
+      state: status,
+      detail: translateKnown(detail),
+    };
+    if (recovery) event.recovery = translateKnown(recovery);
     this.emit(event);
     this.input.updateVoiceButtonLabel();
     if (['idle', 'connecting', 'error'].includes(status))
@@ -361,7 +384,7 @@ export class GeminiSessionController {
     const body = JSON.stringify(message);
     const bytes = new TextEncoder().encode(body).byteLength;
     if (bytes > MAX_MESSAGE_LENGTH)
-      throw new Error('Voice command context is too large');
+      throw new Error(msg('Voice command context is too large'));
     const optional = Boolean(
       message.realtimeInput?.audio || message.realtimeInput?.video,
     );
@@ -402,7 +425,9 @@ export class GeminiSessionController {
       this.controlQueue.length >= MAX_CONTROL_MESSAGES
     )
       throw new Error(
-        'Gemini reliable transport exceeded its queue limit. Start voice again.',
+        msg(
+          'Gemini reliable transport exceeded its queue limit. Start voice again.',
+        ),
       );
     this.controlQueue.push(entry);
     this.controlBytes += bytes;
@@ -483,8 +508,8 @@ export class GeminiSessionController {
     const epoch = this.epoch;
     this.controlTimer = this.setTimer(
       () => {
-        this.controlTimer = null;
         if (!this.owns(epoch)) return;
+        this.controlTimer = null;
         try {
           this.flushControls();
         } catch (error) {
@@ -505,7 +530,7 @@ export class GeminiSessionController {
       const entry = this.controlQueue[0];
       if (this.now() >= entry.deadline)
         throw new Error(
-          'Gemini reliable transport did not drain. Start voice again.',
+          msg('Gemini reliable transport did not drain. Start voice again.'),
         );
       if (!this.canSendControl(entry)) break;
       this.controlQueue.shift();
@@ -524,39 +549,66 @@ export class GeminiSessionController {
   }
 
   async requestToken(signal, pushToTalk = false) {
-    const response = await this.fetchImpl(this.tokenEndpoint, {
-      method: 'POST',
-      cache: 'no-store',
-      redirect: 'error',
-      signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: pushToTalk ? '{"inputMode":"push-to-talk"}' : '{}',
-    });
-    const data = await response.json().catch(() => null);
     signal.throwIfAborted();
-    if (!response.ok)
-      throw new Error(
-        typeof data?.error === 'string'
-          ? data.error
-          : `Gemini token request failed (HTTP ${response.status})`,
-      );
-    if (
-      typeof data?.model !== 'string' ||
-      !/^gemini-[a-z0-9.-]+$/.test(data.model)
-    )
-      throw new Error('Gemini token response did not include a valid model');
-    if (
-      !data.config ||
-      typeof data.config !== 'object' ||
-      Array.isArray(data.config)
-    )
-      throw new Error('Gemini token response did not include session settings');
-    const manual =
-      data.config.realtimeInputConfig?.automaticActivityDetection?.disabled;
-    if (pushToTalk ? manual !== true : manual !== undefined && manual !== false)
-      throw new Error('Gemini session settings do not match the input mode');
-    const url = geminiSocketUrl(data);
-    return { ...data, url };
+    let acquiredResponse;
+    const acquisition = Promise.resolve(
+      this.fetchImpl(this.tokenEndpoint, {
+        method: 'POST',
+        cache: 'no-store',
+        redirect: 'error',
+        signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: pushToTalk ? '{"inputMode":"push-to-talk"}' : '{}',
+      }),
+    );
+    void acquisition.then(
+      (response) => {
+        acquiredResponse = response;
+        if (signal.aborted) void response.body?.cancel().catch(() => {});
+      },
+      () => {},
+    );
+    try {
+      const response = await waitForSignal(acquisition, signal);
+      signal.throwIfAborted();
+      const data = await readResponseJsonCapped(response, 256 * 1024, signal);
+      signal.throwIfAborted();
+      if (!response.ok)
+        throw new Error(
+          typeof data?.error === 'string'
+            ? tokenErrorMessage(data.error)
+            : t('Gemini token request failed (HTTP {status})', {
+                status: response.status,
+              }),
+        );
+      if (
+        typeof data?.model !== 'string' ||
+        !/^gemini-[a-z0-9.-]+$/.test(data.model)
+      )
+        throw new Error(
+          msg('Gemini token response did not include a valid model'),
+        );
+      if (
+        !data.config ||
+        typeof data.config !== 'object' ||
+        Array.isArray(data.config)
+      )
+        throw new Error(
+          msg('Gemini token response did not include session settings'),
+        );
+      const manual =
+        data.config.realtimeInputConfig?.automaticActivityDetection?.disabled;
+      if (
+        pushToTalk ? manual !== true : manual !== undefined && manual !== false
+      )
+        throw new Error(
+          msg('Gemini session settings do not match the input mode'),
+        );
+      const url = geminiSocketUrl(data);
+      return { ...data, url };
+    } finally {
+      if (signal.aborted) void acquiredResponse?.body?.cancel().catch(() => {});
+    }
   }
 
   async start({ pushToTalk = false } = {}) {
@@ -577,8 +629,6 @@ export class GeminiSessionController {
     this.lastError = null;
     this.lastAudio = null;
     this.completedTurns = 0;
-    this.setStatus('connecting', 'Requesting microphone');
-    this.radio.pauseRadioForVoice();
     let acquiredStream = null;
     let releasedStream = null;
     const releaseStream = (stream) => {
@@ -587,6 +637,11 @@ export class GeminiSessionController {
       stream.getTracks().forEach((track) => track.stop());
     };
     try {
+      this.setStatus('connecting', msg('Requesting microphone'));
+      if (!this.owns(epoch)) return;
+      signal.throwIfAborted();
+      this.radio.pauseRadioForVoice();
+      if (!this.owns(epoch)) return;
       // The worklet serializes start, PCM and flushed end notifications. A
       // keydown must not send a new start ahead of the previous queued end.
       let activityCaptureId = null;
@@ -625,7 +680,7 @@ export class GeminiSessionController {
             if (this.owns(epoch))
               this.fail(
                 new Error(
-                  'Gemini could not submit this input. Start voice again.',
+                  msg('Gemini could not submit this input. Start voice again.'),
                 ),
               );
             return;
@@ -641,7 +696,7 @@ export class GeminiSessionController {
           else if (this.owns(epoch))
             this.fail(
               new Error(
-                'Gemini could not submit this input. Start voice again.',
+                msg('Gemini could not submit this input. Start voice again.'),
               ),
             );
         },
@@ -713,11 +768,17 @@ export class GeminiSessionController {
           if (this.owns(epoch)) this.fail(error);
         },
       });
+      if (!this.owns(epoch) || signal.aborted) {
+        void Promise.resolve(audio.close()).catch(() => {});
+        return;
+      }
       this.audio = audio;
       // Invoke resume in the initiating gesture, but do not mint the short-lived
       // admission credential while an uncancellable permission prompt is open.
       const initialized = Promise.resolve(audio.initialize(permissionSignal));
       void initialized.catch(() => {});
+      if (!this.owns(epoch)) return;
+      signal.throwIfAborted();
       const mediaRequest = Promise.resolve(
         this.getUserMedia({
           audio: {
@@ -736,7 +797,7 @@ export class GeminiSessionController {
         },
         () => {},
       );
-      acquiredStream = await awaitWithSignal(mediaRequest, signal);
+      acquiredStream = await waitForSignal(mediaRequest, signal);
       if (!this.owns(epoch)) {
         releaseStream(acquiredStream);
         return;
@@ -750,11 +811,15 @@ export class GeminiSessionController {
         permissionSignal,
         AbortSignal.timeout(this.startupTimeoutMs),
       ]);
-      this.setStatus('connecting', 'Connecting to Gemini');
-      const [, credential] = await awaitWithSignal(
-        Promise.all([initialized, this.requestToken(signal, pushToTalk)]),
-        signal,
-      );
+      this.setStatus('connecting', msg('Connecting to Gemini'));
+      if (!this.owns(epoch)) return;
+      signal.throwIfAborted();
+      const startup = Promise.all([
+        initialized,
+        this.requestToken(signal, pushToTalk),
+      ]);
+      void startup.catch(() => {});
+      const [, credential] = await waitForSignal(startup, signal);
       if (!this.owns(epoch)) return;
       this.model = credential.model;
       await this.connect(credential, epoch, signal);
@@ -770,7 +835,7 @@ export class GeminiSessionController {
       );
       this.input.startVoiceVisualizer(acquiredStream);
       this.input.startAssistantVoiceVisualizer(audio.outputStream);
-      this.setStatus('listening', 'Ask or command');
+      this.setStatus('listening', msg('Ask or command'));
     } catch (error) {
       if (acquiredStream && acquiredStream !== this.stream)
         releaseStream(acquiredStream);
@@ -780,6 +845,8 @@ export class GeminiSessionController {
 
   connect(credential, epoch, signal) {
     return new Promise((resolve, reject) => {
+      signal.throwIfAborted();
+      if (!this.owns(epoch)) return reject(cancelled());
       const socket = new this.WebSocketClass(credential.url);
       socket.binaryType = 'arraybuffer';
       this.socket = socket;
@@ -789,7 +856,7 @@ export class GeminiSessionController {
       const current = () => this.owns(epoch) && this.socket === socket;
       const abort = () => {
         signal.removeEventListener('abort', abort);
-        reject(cancelled());
+        reject(signal.reason || cancelled());
       };
       signal.addEventListener('abort', abort, { once: true });
       socket.onopen = () => {
@@ -814,7 +881,7 @@ export class GeminiSessionController {
           const text =
             typeof data === 'string' ? data : new TextDecoder().decode(data);
           if (text.length > MAX_MESSAGE_LENGTH)
-            throw new Error('Gemini returned an oversized message');
+            throw new Error(msg('Gemini returned an oversized message'));
           const message = JSON.parse(text);
           if (message.setupComplete) {
             if (connected) return;
@@ -826,12 +893,14 @@ export class GeminiSessionController {
           this.handleMessage(message, epoch);
         } catch (error) {
           if (!connected) reject(error);
-          else this.fail(error);
+          else if (current()) this.fail(error);
         }
       };
       socket.onerror = () => {
         const error = new Error(
-          'Gemini Live connection failed. Check network access, then start voice again.',
+          msg(
+            'Gemini Live connection failed. Check network access, then start voice again.',
+          ),
         );
         if (!current()) return;
         if (!connected) reject(error);
@@ -858,12 +927,16 @@ export class GeminiSessionController {
         };
         const error = new Error(
           connected
-            ? 'Gemini Live connection ended. Start voice again for a new conversation.'
-            : 'Gemini Live could not start. Start voice again to request a fresh session.',
+            ? msg(
+                'Gemini Live connection ended. Start voice again for a new conversation.',
+              )
+            : msg(
+                'Gemini Live could not start. Start voice again to request a fresh session.',
+              ),
         );
         error.recovery = connected
-          ? 'Start voice again for a fresh token and a new conversation.'
-          : 'Start voice again to request a fresh session credential.';
+          ? msg('Start voice again for a fresh token and a new conversation.')
+          : msg('Start voice again to request a fresh session credential.');
         if (!connected) reject(error);
         else this.fail(error);
       };
@@ -873,10 +946,12 @@ export class GeminiSessionController {
   fail(error, recovery = error?.recovery) {
     const detail =
       error?.name === 'NotAllowedError'
-        ? 'Microphone permission was denied. Allow microphone access and try again.'
+        ? msg(
+            'Microphone permission was denied. Allow microphone access and try again.',
+          )
         : error?.name === 'TimeoutError'
-          ? 'Gemini connection timed out. Try again.'
-          : error?.message || 'Gemini voice could not start';
+          ? msg('Gemini connection timed out. Try again.')
+          : error?.message || msg('Gemini voice could not start');
     this.lastError = detail;
     this.stop({ preserveStatus: true });
     this.setStatus('error', detail, recovery);
@@ -888,7 +963,6 @@ export class GeminiSessionController {
     this.turnAbort = new AbortController();
     this.turn++;
     this.typedIntent = null;
-    this.providerQuarantine = null;
     this.radioStrongerCommit = null;
     this.pruneControls();
     this.tools.clear();
@@ -949,8 +1023,6 @@ export class GeminiSessionController {
       this.inputGeneration === generation &&
       this.channel === channel;
     this.pttPlaybackSuppressed = false;
-    if (['push-to-talk', 'user-text'].includes(reason))
-      this.manualInputKind = reason;
     // Arm only for an outstanding reply: an idle hold/first text command has
     // no old boundary to wait for. This also covers generation before the
     // first output packet, because input submission marks replyPending.
@@ -970,13 +1042,9 @@ export class GeminiSessionController {
     this.clearDeferredInput();
     this.abortTools();
     if (!owned()) return false;
-    this.userTurns.invalidate();
-    if (!owned()) return false;
     this.intentItemId = null;
     this.intentResponseId = null;
     this.intentCaptureId = null;
-    this.emit({ type: 'user-turn-start' });
-    if (!owned()) return false;
     if (deferInput) {
       // Only one successor may reach Live before the previous boundary. A
       // newer local turn replaces unsent input and waits to interrupt that
@@ -1001,7 +1069,9 @@ export class GeminiSessionController {
           if (this.deferredInput === owner && this.owns(owner.epoch))
             this.fail(
               new Error(
-                'Gemini did not finish the interrupted reply. Start voice again.',
+                msg(
+                  'Gemini did not finish the interrupted reply. Start voice again.',
+                ),
               ),
             );
         },
@@ -1029,14 +1099,75 @@ export class GeminiSessionController {
     this.setStatus(
       'listening',
       this.goAway
-        ? 'Gemini session expiring; finishing the current reply'
-        : 'Ask or command',
+        ? msg('Gemini session expiring; finishing the current reply')
+        : msg('Ask or command'),
     );
     return owned();
   }
 
+  discardRetiredReply(message, epoch) {
+    if (!this.owns(epoch) || !this.retiredReplyPending) return false;
+    const content = message.serverContent;
+    // Retired output proves the old reply is still running; only silence
+    // after it counts toward the first retirement's recovery bound.
+    if (
+      this.retiredBoundaryWait?.extendable &&
+      !content?.turnComplete &&
+      (content?.modelTurn ||
+        content?.outputTranscription ||
+        content?.generationComplete ||
+        message.toolCall)
+    ) {
+      this.clearRetiredBoundaryWait();
+      this.boundRetiredReply();
+    }
+    const retiredIds = (message.toolCall?.functionCalls || [])
+      .map((call) => call?.id)
+      .filter(validCallId);
+    this.rememberCallIds(retiredIds);
+    for (const id of retiredIds) this.cancelledCalls.add(id);
+    // Gemini documents interrupted -> turnComplete. Discard all retired
+    // output, including content coalesced with either marker. A natural
+    // completion racing the local claim also closes the old reply safely.
+    if (content?.turnComplete) {
+      this.clearRetiredBoundaryWait();
+      this.retiredReplyPending = false;
+      if (
+        this.typedIntent?.retiredAutomaticPredecessor ===
+        this.retiredAutomaticActivityOwner
+      )
+        this.typedIntent.retiredAutomaticPredecessor = null;
+      // A true replyPending now belongs to a successor submitted while
+      // this older reply was retired. Its boundary cannot revoke that input.
+      if (this.automaticActivityOwner === this.retiredAutomaticActivityOwner) {
+        this.automaticTurnOpen = false;
+        this.automaticActivityOwner = null;
+      }
+      this.retiredAutomaticActivityOwner = null;
+      if (this.goAway) {
+        this.clearDeferredInput();
+        if (
+          this.goAway.supersededSuccessor ||
+          (!this.replyPending &&
+            !this.automaticTurnOpen &&
+            !this.pendingTools &&
+            !this.audio?.pending &&
+            !this.controlQueue.length)
+        )
+          this.finishGoAway();
+      } else this.flushDeferredInput();
+    }
+    return true;
+  }
+
   handleMessage(message, epoch = this.epoch) {
     if (!this.owns(epoch)) return;
+    const initialGeneration = this.inputGeneration;
+    const initialTurn = this.turn;
+    const initialCurrent = () =>
+      this.owns(epoch) &&
+      this.inputGeneration === initialGeneration &&
+      this.turn === initialTurn;
     if (this.goAway && this.now() >= this.goAway.deadline) {
       this.finishGoAway();
       return;
@@ -1044,16 +1175,21 @@ export class GeminiSessionController {
     if (message.error) {
       this.fail(
         new Error(
-          'Gemini rejected the voice session. Start voice again to request a fresh session.',
+          msg(
+            'Gemini rejected the voice session. Start voice again to request a fresh session.',
+          ),
         ),
-        'Start voice again for a fresh session credential. If it repeats, check Gemini model and API access.',
+        msg(
+          'Start voice again for a fresh session credential. If it repeats, check Gemini model and API access.',
+        ),
       );
       return;
     }
     if (message.goAway) {
       this.beginGoAway(message.goAway.timeLeft, epoch);
-      if (!this.owns(epoch)) return;
+      if (!initialCurrent()) return;
     }
+    let prunedCancelledControls = false;
     for (const id of message.toolCallCancellation?.ids || []) {
       const action = this.tools.get(id);
       const results = [
@@ -1074,10 +1210,28 @@ export class GeminiSessionController {
       if (!action && !results.length && !queuedResponse) continue;
       this.cancelledCalls.add(id);
       action?.abort();
+      if (!initialCurrent()) return;
       for (const result of results) this.radio.cancelPlaybackResult(result);
+      if (!initialCurrent()) return;
+      const queuedControls = this.controlQueue.length;
       this.pruneControls();
+      prunedCancelledControls ||= this.controlQueue.length < queuedControls;
+    }
+    if (prunedCancelledControls) {
+      // Removing the last queued response can release an already complete turn.
+      this.finishPlayback();
+      // Completion observers may stop this session or accept a successor input.
+      if (!initialCurrent()) return;
     }
     const content = message.serverContent;
+    let receivedReplyPending = this.replyPending || this.retiredReplyPending;
+    const settleFencedBoundary = () => {
+      // Preserve this packet's old terminal without publishing its caption,
+      // audio or tools into the new input. A terminal already processed below
+      // must never be reused to close a successor retired by a final observer.
+      if (receivedReplyPending && content?.turnComplete)
+        this.discardRetiredReply(message, epoch);
+    };
     // A server acknowledgment of a local interruption belongs to the retired
     // reply; it must not revoke the successor's pointer, timing or turn token.
     if (content?.interrupted) {
@@ -1091,7 +1245,7 @@ export class GeminiSessionController {
         !this.retiredReplyPending &&
         !newAutomaticActivity &&
         predecessor?.epoch === epoch &&
-        this.readTypedTurnInput()
+        this.currentTypedInput()
       ) {
         // Automatic VAD may not have produced output before text superseded
         // it. This specific local predecessor owns one interruption boundary;
@@ -1106,10 +1260,13 @@ export class GeminiSessionController {
             preserveAdvisoryCaption: true,
             serverInterrupted: true,
           })
-        )
+        ) {
+          settleFencedBoundary();
           return;
+        }
       }
       this.retiredReplyPending = true;
+      receivedReplyPending = true;
       this.boundRetiredReply();
     }
     // Manual PTT owns its onset locally. Automatic speech takes one snapshot
@@ -1125,7 +1282,7 @@ export class GeminiSessionController {
           this.retiredReplyPending &&
           typedPredecessor &&
           typedPredecessor === this.retiredAutomaticActivityOwner &&
-          this.readTypedTurnInput()
+          this.currentTypedInput()
         ) {
           // This precise wait still belongs to the automatic predecessor, not
           // the submitted text. New speech revokes that text without inventing
@@ -1166,72 +1323,24 @@ export class GeminiSessionController {
         this.narration.userTurnEnded();
       }
     }
+    // Native activity above may intentionally advance the local input. From
+    // here, observers must not let the rest of this packet reach a successor.
+    const messageGeneration = this.inputGeneration;
+    const messageTurn = this.turn;
+    const messageCurrent = () =>
+      this.owns(epoch) &&
+      this.inputGeneration === messageGeneration &&
+      this.turn === messageTurn;
     // Native Live captions are unordered advisory segments. Never attach them
     // to a command token or use them to grant/revoke a tool's lifetime.
     if (content?.inputTranscription?.text) {
-      this.emit({
-        type: 'user-input-segment',
-        inputKind: 'speech',
-        inputId: null,
-        inputScope: 'unattributed-segment',
-        text: content.inputTranscription.text,
-      });
       this.transcript('user', content.inputTranscription);
-    }
-    if (this.retiredReplyPending) {
-      // Retired output proves the old reply is still running; only silence
-      // after it counts toward the first retirement's recovery bound.
-      if (
-        this.retiredBoundaryWait?.extendable &&
-        !content?.turnComplete &&
-        (content?.modelTurn ||
-          content?.outputTranscription ||
-          content?.generationComplete ||
-          message.toolCall)
-      ) {
-        this.clearRetiredBoundaryWait();
-        this.boundRetiredReply();
+      if (!messageCurrent()) {
+        settleFencedBoundary();
+        return;
       }
-      const retiredIds = (message.toolCall?.functionCalls || [])
-        .map((call) => call?.id)
-        .filter(validCallId);
-      this.rememberCallIds(retiredIds);
-      for (const id of retiredIds) this.cancelledCalls.add(id);
-      // Gemini documents interrupted -> turnComplete. Discard all retired
-      // output, including content coalesced with either marker. A natural
-      // completion racing the local claim also closes the old reply safely.
-      if (content?.turnComplete) {
-        this.clearRetiredBoundaryWait();
-        this.retiredReplyPending = false;
-        if (
-          this.typedIntent?.retiredAutomaticPredecessor ===
-          this.retiredAutomaticActivityOwner
-        )
-          this.typedIntent.retiredAutomaticPredecessor = null;
-        // A true replyPending now belongs to a successor submitted while
-        // this older reply was retired. Its boundary cannot revoke that input.
-        if (
-          this.automaticActivityOwner === this.retiredAutomaticActivityOwner
-        ) {
-          this.automaticTurnOpen = false;
-          this.automaticActivityOwner = null;
-        }
-        this.retiredAutomaticActivityOwner = null;
-        if (this.goAway) {
-          this.clearDeferredInput();
-          if (
-            this.goAway.supersededSuccessor ||
-            (!this.replyPending &&
-              !this.automaticTurnOpen &&
-              !this.pendingTools &&
-              !this.audio?.pending &&
-              !this.controlQueue.length)
-          )
-            this.finishGoAway();
-        } else this.flushDeferredInput();
-      }
-      return;
     }
+    if (this.discardRetiredReply(message, epoch)) return;
     if (
       content?.modelTurn ||
       content?.outputTranscription ||
@@ -1245,11 +1354,16 @@ export class GeminiSessionController {
         this.typedIntent.retiredAutomaticPredecessor = null;
       }
       this.replyPending = true;
+      receivedReplyPending = true;
     }
     if (content?.outputTranscription?.text) {
       this.userTurnPending = false;
       this.postToolOutput = true;
       this.transcript('assistant', content.outputTranscription);
+      if (!messageCurrent()) {
+        settleFencedBoundary();
+        return;
+      }
     }
     for (const part of (content?.interrupted
       ? []
@@ -1261,7 +1375,15 @@ export class GeminiSessionController {
         this.postToolOutput = true;
         if (!this.pttPlaybackSuppressed) {
           this.input.setVoiceSpeaker('ai');
+          if (!messageCurrent()) {
+            settleFencedBoundary();
+            return;
+          }
           this.audio?.play(part.inlineData.data, part.inlineData.mimeType);
+          if (!messageCurrent()) {
+            settleFencedBoundary();
+            return;
+          }
           this.modelSpoke = true;
           this.narration.audible();
         }
@@ -1297,6 +1419,7 @@ export class GeminiSessionController {
           final: true,
           responseId: this.intentResponseId,
         });
+        if (!messageCurrent()) return;
         this.transcripts.assistant = '';
       }
       this.finishPlayback();
@@ -1324,7 +1447,9 @@ export class GeminiSessionController {
     // Reserve the entire batch before changing policy or queuing any action.
     if (this.seenCalls.size + freshIds.size > MAX_SEEN_CALLS)
       throw new Error(
-        'Gemini action history is full. Start voice again for a fresh session.',
+        msg(
+          'Gemini action history is full. Start voice again for a fresh session.',
+        ),
       );
     for (const id of freshIds) this.seenCalls.add(id);
   }
@@ -1334,12 +1459,11 @@ export class GeminiSessionController {
       calls.length > MAX_TOOL_CALLS ||
       this.pendingTools + calls.length > MAX_TOOL_CALLS
     )
-      throw new Error('Gemini requested too many simultaneous actions');
+      throw new Error(msg('Gemini requested too many simultaneous actions'));
     const turn = this.turn;
     this.userTurnPending = false;
     this.modelComplete = false;
-    // Only accepted, new calls may affect turn policy. Malformed or replayed
-    // setter calls must not quarantine an otherwise unrelated current turn.
+    // Admit each valid native call ID once per connection.
     const batchIds = new Set();
     const acceptedCalls = calls.filter((call) => {
       if (
@@ -1353,10 +1477,6 @@ export class GeminiSessionController {
       return true;
     });
     this.rememberCallIds(acceptedCalls.map((call) => call.id));
-    // The model's own setter call marks a provider request without trusting
-    // captions. Refuse every not-yet-started tool for the rest of this turn.
-    if (acceptedCalls.some((call) => call.name === 'set_voice_provider'))
-      this.providerQuarantine = { epoch, turn };
     for (const call of acceptedCalls) {
       this.pendingTools++;
       const action = new AbortController();
@@ -1371,17 +1491,19 @@ export class GeminiSessionController {
       // Stronger Radio controls must reach their shared reservation/result
       // owner while an older selection is awaiting a service. Keep ordinary
       // siblings ordered, and retain every in-flight call in the drain promise.
-      // executeTool still checks currentness and provider policy before any
+      // executeTool still checks currentness before any
       // reservation; only a successful stronger result revokes older work.
-      const { stronger } = classifyVoiceTool(call.name, args);
+      const { stronger } = classifyGeminiTool(call.name, args);
       const execution = (stronger ? Promise.resolve() : priorTools)
         .then(async () => {
           if (!this.owns(epoch) || turn !== this.turn) return;
           if (this.cancelledCalls.has(call.id)) {
             if (this.tools.get(call.id) === action) this.tools.delete(call.id);
             this.pendingTools--;
-            if (!this.pendingTools)
-              this.setStatus('listening', 'Ask or command');
+            if (!this.pendingTools) {
+              this.setStatus('listening', msg('Ask or command'));
+              if (this.owns(epoch) && turn === this.turn) this.finishPlayback();
+            }
             return;
           }
           await this.executeTool(call, epoch, turn, action);
@@ -1400,34 +1522,19 @@ export class GeminiSessionController {
       call.args && typeof call.args === 'object' && !Array.isArray(call.args)
         ? call.args
         : {};
-    // The deadline bounds this call. Deferred work it leaves behind (for
-    // example an outline) belongs to the turn, so detach it on settlement.
     const deadline = AbortSignal.timeout(45_000);
     const expire = () => action.abort(deadline.reason);
     deadline.addEventListener('abort', expire, { once: true });
     const toolSignal = AbortSignal.any([action.signal, this.turnAbort.signal]);
-    const responseId = this.intentResponseId;
-    // The current socket/turn/call owns native tool dispatch. Only first-party
-    // typed text has independently known request content; speech captions do not.
-    const userTurn = this.readTypedTurnInput(turn);
-    const restriction =
-      call.name === 'set_voice_provider' || this.providerQuarantined(turn)
-        ? { kind: 'provider' }
-        : readVoiceRequestRestriction(userTurn);
-    const inputRestricted = Boolean(restriction);
     const {
       radioControl,
       radioVisibility,
-      radioAction,
       authorityDomain: authority,
       stronger,
       abortScope,
-    } = classifyVoiceTool(call.name, args);
-    const reservation =
-      stronger && !inputRestricted
-        ? this.radio.reserveRadioToolHandoff({ abortScope })
-        : null;
-    const handoffEpoch = this.radio.radioHandoffEpoch;
+    } = classifyGeminiTool(call.name, args);
+    let reservation = null;
+    let handoffEpoch = this.radio.radioHandoffEpoch;
     const current = () =>
       this.owns(epoch) && this.turn === turn && !toolSignal.aborted;
     const actionCurrent = () =>
@@ -1435,52 +1542,51 @@ export class GeminiSessionController {
       !this.radioSuperseded(action, authority, epoch, turn) &&
       (authority !== 'playback' ||
         handoffEpoch === this.radio.radioHandoffEpoch);
-    if (authority && !inputRestricted)
-      this.radio.registerTool(action, {
-        responseId: String(turn),
-        authorityDomain: authority,
-      });
-    if (!inputRestricted) {
-      this.setStatus('executing', 'Running command');
+    let result;
+    try {
+      if (!actionCurrent()) throw cancelled();
+      if (stronger)
+        reservation = this.radio.reserveRadioToolHandoff({ abortScope });
+      handoffEpoch = this.radio.radioHandoffEpoch;
+      if (!actionCurrent()) throw cancelled();
+      if (authority)
+        this.radio.registerTool(action, {
+          responseId: String(turn),
+          authorityDomain: authority,
+        });
+      this.setStatus('executing', msg('Running command'));
+      // A common state observer may synchronously stop/replace the session.
+      if (!actionCurrent()) throw cancelled();
       this.radio.pauseRadioForVoice();
+      if (!actionCurrent()) throw cancelled();
       if (this.modelSpoke) this.narration.preamble();
       this.narration.toolStarted(call.id, {
         name: call.name,
         label: narrationLabel(call.name, args),
         narrate: !radioControl && !radioVisibility,
       });
-    }
-    let result;
-    try {
       if (!actionCurrent()) throw cancelled();
-      if (inputRestricted) {
-        result = voiceRequestRestrictionResult(call.name, restriction, {
-          providerDropdown: this.providerDropdown() === true,
-        });
-      } else {
-        result = await awaitWithSignal(
-          this.runAction(call.name, args, {
-            signal: toolSignal,
-            callId: call.id,
-            userTurn,
-            responseId,
-            progress: (update) => {
-              if (actionCurrent()) this.narration.progress(call.id, update);
-            },
-            isCurrent: actionCurrent,
-          }),
-          toolSignal,
-        );
-      }
+      const execution = Promise.resolve(
+        this.runAction(call.name, args, {
+          signal: toolSignal,
+          callId: call.id,
+          progress: (update) => {
+            if (actionCurrent()) this.narration.progress(call.id, update);
+          },
+          isCurrent: actionCurrent,
+        }),
+      );
+      // action-call observers can abort before waitForSignal receives the
+      // already-started operation; retain its rejection handler in that case.
+      void execution.catch(() => {});
+      result = await waitForSignal(execution, toolSignal);
       if (!actionCurrent()) throw cancelled();
       if (result?.ok && result.radioPlaybackRequested) {
-        // A runner may reuse an envelope; handoff identity belongs to this call.
         const playbackResult = { ...result };
         this.radioPlaybackCalls.set(playbackResult, {
           id: call.id,
           epoch,
           turn,
-          userTurn,
         });
         this.radio.setPendingPlayback(playbackResult);
       }
@@ -1490,8 +1596,10 @@ export class GeminiSessionController {
         !hasStructuredViewIdentity(result) &&
         this.now() - this.lastViewportAt >= 1000
       ) {
-        const image = await this.captureViewport();
-        if (current() && image?.startsWith('data:image/jpeg;base64,')) {
+        const capture = Promise.resolve(this.captureViewport());
+        void capture.catch(() => {});
+        const image = await waitForSignal(capture, toolSignal);
+        if (actionCurrent() && image?.startsWith('data:image/jpeg;base64,')) {
           this.lastViewportAt = this.now();
           this.send({
             realtimeInput: {
@@ -1516,44 +1624,60 @@ export class GeminiSessionController {
     } finally {
       deadline.removeEventListener('abort', expire);
       if (this.tools.get(call.id) === action) this.tools.delete(call.id);
-      if (!inputRestricted) {
-        this.radio.releaseTool(action);
-        if (this.owns(epoch) && turn === this.turn)
-          this.narration.toolFinished(call.id);
-      }
+      this.radio.releaseTool(action);
+      if (this.owns(epoch) && turn === this.turn)
+        this.narration.toolFinished(call.id);
     }
     if (!this.owns(epoch) || turn !== this.turn) return;
     this.pendingTools--;
-    if (reservation) {
+    // Successful stronger ownership commits before the result is serialized.
+    // A failed reservation stays held until after its failure reaches transport.
+    if (reservation && result?.ok) {
       this.radio.settleRadioToolHandoffReservation(reservation, {
-        commit: Boolean(result?.ok),
+        commit: true,
         responseId: String(turn),
       });
-      if (result?.ok) this.noteRadioStrongerCommit(action, abortScope, turn);
+      reservation = null;
+      this.noteRadioStrongerCommit(action, abortScope, turn);
     }
+    if (!this.owns(epoch) || turn !== this.turn) return;
     const playbackObsolete =
       authority === 'playback' && handoffEpoch !== this.radio.radioHandoffEpoch;
-    result = reconcileRadioToolResult(result, {
-      dataManager: this.dataManager,
-      radioLayer: this.radioLayer,
-      suppressPlayback: playbackObsolete,
-    });
+    if (radioControl || radioVisibility) {
+      const state = this.radioLayer?.getUIState?.() || {};
+      const lifecycle = readLayerLifecycleSummary(this.dataManager, 'radio', {
+        fallbackEnabled: state.enabled ?? result?.enabled,
+      });
+      result = {
+        ...result,
+        ...lifecycle,
+        audioState: state.audioState || result?.audioState || 'stopped',
+        ...(result?.radioAction === 'pause' && lifecycle.enabled === false
+          ? { changed: false }
+          : {}),
+        ...(playbackObsolete && result?.ok && result.radioPlaybackRequested
+          ? { radioPlaybackRequested: false, radioPlaybackSuppressed: true }
+          : {}),
+      };
+    }
     if (
       !this.cancelledCalls.has(call.id) &&
-      shouldStopVoiceAfterToolResult(result)
+      shouldStopVoiceAfterRadioTool(result) &&
+      !result.radioPlaybackRequested &&
+      !result.radioPlaybackSuppressed
     )
       this.stopAfterReply = true;
-    // A server cancellation already discarded this call; do not revive it.
+    // Native call cancellation suppresses its output, without canceling siblings.
     if (!this.cancelledCalls.has(call.id)) {
       this.postToolOutput = false;
       this.modelComplete = false;
       this.replyPending = true;
       const mapSnapshot = [...this.pendingMapEvents];
       const mapEvents = mapSnapshot.map((text) => JSON.parse(text));
-      const response = projectVoiceToolResultForModel({
+      const response = {
         ...(result ?? { ok: false, error: 'Command returned no result' }),
-        responseGuidance: toolResultGuidance(result),
-      });
+        responseGuidance: responseInstructionForToolResult(result),
+      };
       this.send(
         {
           toolResponse: {
@@ -1571,7 +1695,16 @@ export class GeminiSessionController {
         { onSent: () => this.consumeMapEvents(mapSnapshot) },
       );
     }
-    if (!this.pendingTools) this.setStatus('listening', 'Ask or command');
+    if (!this.owns(epoch) || turn !== this.turn) return;
+    if (reservation)
+      this.radio.settleRadioToolHandoffReservation(reservation, {
+        commit: false,
+        responseId: String(turn),
+      });
+    if (this.owns(epoch) && turn === this.turn && !this.pendingTools) {
+      this.setStatus('listening', msg('Ask or command'));
+      if (this.owns(epoch) && turn === this.turn) this.finishPlayback();
+    }
   }
 
   finishPlayback() {
@@ -1611,17 +1744,14 @@ export class GeminiSessionController {
       // Old completion must not clear its metadata or overwrite its status.
       if (this.epoch !== completionEpoch || this.turn !== completionTurn)
         return;
-      // Provider completion is not a new first-party input boundary. Keep a
-      // typed request's authority for later tools in this same local turn.
-      if (!this.readTypedTurnInput())
-        this.userTurns.completeResponse(responseId);
+      // Caption completion does not create an input or tool authority boundary.
       this.clearSettledSpeechIntent();
     }
     // A completion observer may replace this provider immediately. Do not let
     // the retired session update UI or start delayed Radio work afterward.
     if (!this.isActive()) return;
     this.input.setVoiceSpeaker('idle');
-    this.setStatus('listening', 'Ask or command');
+    this.setStatus('listening', msg('Ask or command'));
     if (this.stopAfterReply && this.postToolOutput) {
       this.stop({ preserveRadioPlayback: true });
       return;
@@ -1637,9 +1767,10 @@ export class GeminiSessionController {
   sendTextCommand(text) {
     const clean = String(text || '').trim();
     if (!clean || this.goAway) return false;
-    if (clean.length > 16000) throw new Error('Voice text command is too long');
+    if (clean.length > 16000)
+      throw new Error(msg('Voice text command is too long'));
     if (this.channel?.readyState !== 'open')
-      throw new Error('Gemini voice is not connected');
+      throw new Error(msg('Gemini voice is not connected'));
     if (this.input.pushToTalkMode && this.captureOwner)
       this.captureOwner.retired = true;
     const automaticPredecessor =
@@ -1665,19 +1796,15 @@ export class GeminiSessionController {
         { captureId: this.forwardedCaptureId },
       );
     if (!owned()) return false;
-    this.userTurns.text(clean);
-    if (!owned()) return false;
     const typedIntent = {
       epoch: this.epoch,
       turn: this.turn,
+      text: clean,
       responseId: `gemini-response-${this.epoch}-${++this.intentSequence}`,
       automaticPredecessor,
       retiredAutomaticPredecessor: null,
     };
-    // Bind the accepted text now, rather than whatever input happens to be
-    // current when reliable transport or a retired reply eventually drains.
-    this.userTurns.expectResponse();
-    this.userTurns.bindResponse(typedIntent.responseId);
+    // Keep local presentation ownership while reliable transport drains.
     this.typedIntent = typedIntent;
     this.beginPointerTurn('text', undefined, owned);
     if (!owned()) return false;
@@ -1796,7 +1923,9 @@ export class GeminiSessionController {
     ) {
       this.fail(
         new Error(
-          'Gemini interrupted input exceeded its buffer or wait limit. Start voice again.',
+          msg(
+            'Gemini interrupted input exceeded its buffer or wait limit. Start voice again.',
+          ),
         ),
       );
       return false;
@@ -1839,7 +1968,9 @@ export class GeminiSessionController {
         )
           this.fail(
             new Error(
-              'Gemini did not finish the interrupted reply. Start voice again.',
+              msg(
+                'Gemini did not finish the interrupted reply. Start voice again.',
+              ),
             ),
           );
       },
@@ -1868,11 +1999,18 @@ export class GeminiSessionController {
     const owner = this.deferredInput;
     if (!owner) return;
     this.clearDeferredInput();
-    if (!this.owns(owner.epoch) || owner.turn !== this.turn) return;
+    const generation = this.inputGeneration;
+    const current = () =>
+      this.owns(owner.epoch) &&
+      owner.turn === this.turn &&
+      generation === this.inputGeneration;
+    if (!current()) return;
     if (this.now() >= owner.deadline) {
       this.fail(
         new Error(
-          'Gemini did not finish the interrupted reply. Start voice again.',
+          msg(
+            'Gemini did not finish the interrupted reply. Start voice again.',
+          ),
         ),
       );
       return;
@@ -1888,25 +2026,26 @@ export class GeminiSessionController {
     this.waitForRetiredBoundary(owner);
     this.replyPending = false;
     for (const message of owner.messages) {
+      if (!current()) return;
       const onSent = owner.onSent?.get(message);
-      if (
-        !this.send(message, {
-          captureId: owner.captureId ?? null,
-          onSent: () => {
-            onSent?.();
-            if (
-              (message.clientContent &&
-                message.clientContent.turnComplete !== false) ||
-              message.realtimeInput?.audio ||
-              message.realtimeInput?.text
-            )
-              this.replyPending = true;
-          },
-        })
-      )
-        continue;
+      this.send(message, {
+        captureId: owner.captureId ?? null,
+        onSent: () => {
+          if (!current()) return;
+          onSent?.();
+          if (!current()) return;
+          if (
+            (message.clientContent &&
+              message.clientContent.turnComplete !== false) ||
+            message.realtimeInput?.audio ||
+            message.realtimeInput?.text
+          )
+            this.replyPending = true;
+        },
+      });
+      if (!current()) return;
     }
-    if (owner.context && !this.controlQueue.length)
+    if (current() && owner.context && !this.controlQueue.length)
       this.consumePointerContext(owner.context);
   }
 
@@ -2032,7 +2171,7 @@ export class GeminiSessionController {
   }
 
   beginSpeechIntent(captureId) {
-    if (this.retiredReplyPending && this.readTypedTurnInput()) return;
+    if (this.retiredReplyPending && this.currentTypedInput()) return;
     // Local onset labels serve timing/UI only. They do not assert native
     // transcript ownership or mint a completed-speech authorization token.
     this.clearSettledSpeechIntent();
@@ -2043,30 +2182,17 @@ export class GeminiSessionController {
     this.intentCaptureId = captureId;
     // A physical speech onset clears display-only recent captions, including
     // when retirement already fenced the reply and no second interrupt runs.
-    const epoch = this.epoch;
-    const turn = this.turn;
-    const generation = this.inputGeneration;
-    this.emit({ type: 'user-caption-reset' });
-    if (
-      !this.owns(epoch) ||
-      this.turn !== turn ||
-      this.inputGeneration !== generation
-    )
-      return;
-    this.emit({ type: 'user-turn-start' });
+    this.emit({ type: 'transcript', role: 'user', text: '', final: false });
   }
 
   bindSpeechIntent() {
     if (!this.intentItemId || this.intentResponseId) return;
     this.intentResponseId = `gemini-response-${this.epoch}-${this.intentSequence}`;
-    this.emitIntentResponse();
   }
 
-  readTypedTurnInput(turn = this.turn) {
-    const intent = this.typedIntent;
-    if (!intent || intent.epoch !== this.epoch || intent.turn !== turn) return;
-    const input = this.userTurns.forResponse(intent.responseId);
-    return readVoiceUserTurnInputKind(input) === 'typed' ? input : undefined;
+  currentTypedInput(turn = this.turn) {
+    const input = this.typedIntent;
+    return input?.epoch === this.epoch && input.turn === turn ? input : null;
   }
 
   // Stronger Radio controls skip the ordered queue. An older Radio call still
@@ -2101,13 +2227,6 @@ export class GeminiSessionController {
     );
   }
 
-  providerQuarantined(turn = this.turn) {
-    const quarantine = this.providerQuarantine;
-    return Boolean(
-      quarantine && quarantine.epoch === this.epoch && quarantine.turn === turn,
-    );
-  }
-
   bindTextIntent(intent) {
     if (
       intent !== this.typedIntent ||
@@ -2117,16 +2236,12 @@ export class GeminiSessionController {
       return;
     this.clearSettledSpeechIntent();
     this.intentResponseId = intent.responseId;
-    this.emitIntentResponse();
-  }
-
-  emitIntentResponse() {
-    if (this.intentResponseId)
-      this.emit({
-        type: 'response-start',
-        responseId: this.intentResponseId,
-        userTurn: this.userTurns.forResponse(this.intentResponseId),
-      });
+    this.emit({
+      type: 'transcript',
+      role: 'user',
+      text: intent.text,
+      final: true,
+    });
   }
 
   clearSettledSpeechIntent() {
@@ -2169,7 +2284,7 @@ export class GeminiSessionController {
     this.radio.cancelRadioHandoff();
     this.setStatus(
       this.status,
-      'Gemini session expiring; finishing the current reply',
+      msg('Gemini session expiring; finishing the current reply'),
     );
     if (
       milliseconds === 0 ||
@@ -2187,9 +2302,11 @@ export class GeminiSessionController {
     if (!this.goAway) return;
     this.fail(
       new Error(
-        'Gemini Live connection is expiring. Start voice again for a new conversation.',
+        msg(
+          'Gemini Live connection is expiring. Start voice again for a new conversation.',
+        ),
       ),
-      'Start voice again for a fresh token and a new conversation.',
+      msg('Start voice again for a fresh token and a new conversation.'),
     );
   }
 
@@ -2226,7 +2343,6 @@ export class GeminiSessionController {
     if (this.disposed) return;
     this.epoch++;
     this.inputGeneration++;
-    this.userTurns.reset();
     this.clearSettledSpeechIntent();
     this.clearControls();
     if (this.goAway) this.clearTimer(this.goAway.timer);
@@ -2291,7 +2407,6 @@ export class GeminiSessionController {
     this.clearRetiredBoundaryWait();
     this.forwardedActivityOpen = false;
     this.forwardedCaptureId = null;
-    this.manualInputKind = null;
     this.captureEnabled = false;
     this.pttPlaybackSuppressed = false;
     this.microphoneRequested = false;
@@ -2309,7 +2424,7 @@ export class GeminiSessionController {
       this.signal?.removeEventListener('abort', this.lifetimeAbort);
       this.ui?.root?.remove();
       this.emit({ type: 'disposed' });
-    } else if (!preserveStatus) this.setStatus('idle', 'Voice off');
+    } else if (!preserveStatus) this.setStatus('idle', msg('Voice off'));
   }
 }
 
@@ -2320,8 +2435,9 @@ export function createGeminiSession(options) {
     capabilities: {
       costControls: false,
       pushToTalk: true,
-      advisoryLimit:
+      advisoryLimit: t(
         'Gemini voice sessions have a time limit. When a session expires, start voice again for a new conversation.',
+      ),
     },
     start: (settings) => controller.start(settings),
     getStartOptions: () => ({

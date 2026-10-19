@@ -1,7 +1,11 @@
 // Native automatic activity, reply ownership and expiry lifecycle regressions.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { harness, tick, deferred } from './geminiNativeHarness.mjs';
+import {
+  harness,
+  tick,
+  deferred,
+} from '../testSupport/geminiNativeHarness.mjs';
 const vad = (ws, type) => ws.message({ voiceActivity: { type } });
 const onset = (ws) => {
   vad(ws, 'ACTIVITY_START');
@@ -509,22 +513,24 @@ test('T-F1a PTT successor PCM survives retired boundary and a second input fence
       'old boundary cannot clear submitted successor',
     );
     assert.equal(h.c.sendTextCommand('Zoom out second request'), true);
-    assert.ok(h.c.readTypedTurnInput());
+    assert.ok(h.c.currentTypedInput());
     const played = a.played.length;
     ws.message(audio);
     tools(ws, 'late-ptt-predecessor');
     await h.c.toolQueue;
     assert.equal(a.played.length, played);
-    assert.equal(h.calls.length, 0, 'no old tool under newer typed userTurn');
+    assert.equal(
+      h.calls.length,
+      0,
+      'no old tool under newer local typed input',
+    );
     done(ws);
     tools(ws, 'current-typed');
     await h.c.toolQueue;
     assert.equal(h.calls.length, 1);
-    assert.deepEqual(
-      h.calls[0].options.userTurn,
-      h.c.readTypedTurnInput(),
-      'actual runner receives current typed input',
-    );
+    assert.equal(h.calls[0].options.userTurn, undefined);
+    assert.equal(h.calls[0].options.isCurrent(), true);
+    assert.equal(h.c.currentTypedInput().text, 'Zoom out second request');
   } finally {
     close(h);
   }
@@ -538,7 +544,7 @@ for (const expiryBeforeBoundary of [false, true])
       ws.message(audio);
       onset(ws);
       assert.equal(h.c.sendTextCommand('Zoom out successor'), true);
-      const typed = h.c.readTypedTurnInput();
+      const typed = h.c.currentTypedInput();
       assert.ok(typed);
       assert.equal(h.c.replyPending, true);
       if (expiryBeforeBoundary) ws.message({ goAway: { timeLeft: '30s' } });
@@ -549,7 +555,9 @@ for (const expiryBeforeBoundary of [false, true])
       tools(ws, 'valid-successor');
       await h.c.toolQueue;
       assert.equal(h.calls.length, 1);
-      assert.deepEqual(h.calls[0].options.userTurn, typed);
+      assert.equal(h.calls[0].options.userTurn, undefined);
+      assert.equal(h.calls[0].options.isCurrent(), true);
+      assert.equal(h.c.currentTypedInput(), typed);
       ws.message(audio);
       done(ws);
       assert.equal(h.c.isActive(), true);
@@ -570,7 +578,7 @@ for (const repeat of [false, true])
       assert.equal(h.c.replyPending, true);
       assert.equal(h.c.sendTextCommand('Zoom out B'), true);
       assert.equal(h.c.deferredInput.kind, 'user-text');
-      assert.ok(h.c.readTypedTurnInput());
+      assert.ok(h.c.currentTypedInput());
       onset(ws);
       assert.equal(h.c.automaticTurnOpen, true);
       ws.message({ goAway: { timeLeft: '30s' } });
@@ -775,7 +783,7 @@ test('T-C7 reentrant silent completion observer keeps new input pending', async 
     assert.equal(h.events.filter((e) => e.type === 'completion').length, 1);
     assert.equal(h.c.replyPending, true);
     assert.equal(h.c.userTurnPending, true);
-    assert.ok(h.c.readTypedTurnInput());
+    assert.ok(h.c.currentTypedInput());
     assert.equal(h.c.modelComplete, false);
   } finally {
     close(h);

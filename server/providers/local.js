@@ -31,9 +31,9 @@ import { windProxy } from './wind.js';
 
 /**
  * Construct the local provider plugins in their established order.
- * `realtime` configures the voice session token endpoint.
+ * `realtime` configures OpenAI; `gemini` explicitly opts into Gemini Live.
  */
-function localProviderPlugins({ realtime } = {}) {
+function localProviderPlugins({ realtime, gemini } = {}) {
   return [
     openSkyProxy(),
     celestrakProxy(),
@@ -56,7 +56,7 @@ function localProviderPlugins({ realtime } = {}) {
     aisLiveProxy(),
     trackBackfillProxies(),
     openAiRealtimeProxy({ realtime }),
-    geminiLiveProxy({ realtime }),
+    ...(gemini ? [geminiLiveProxy({ realtime: gemini })] : []),
     googlePlacesContextProxy(),
     windProxy(),
     weatherProxy(),

@@ -1,817 +1,888 @@
+// Imports intentionally target the candidate, never the immutable reference.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createProviderCommands,
   readVoiceProvider,
 } from './providerCommands.js';
-import { createVoiceCommands as bind } from './sessionCommands.js';
+import { createVoiceCommands as bindVoiceCommands } from './sessionCommands.js';
+import { createVoiceCommands as createCommands } from './commands.js';
+import { createGevActionRunner } from './gevActions.js';
+import { createPointerTracker } from './pointerContext.js';
+import { createReferentRegistry } from './referents.js';
+import { describeUnsavedWork, t as translate } from '../i18n/index.js';
 
-function element(properties = {}) {
-  const target = new EventTarget();
-  Object.assign(target, properties);
-  target.attributes = {};
-  target.setAttribute = (name, value) => {
-    target.attributes[name] = String(value);
-  };
-  target.getAttribute = (name) => target.attributes[name] ?? null;
-  target.focus = () => {
-    target.focused = true;
-  };
-  return target;
+const PROVIDER_KEY = 'gev.voice.provider';
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
 }
 
-function control() {
-  const button = element();
-  button.setAttribute = () => {};
-  const select = element();
-  select.options = [];
-  select.ownerDocument = { createElement: () => ({}) };
-  select.replaceChildren = (...options) => {
-    select.options = options;
-  };
-  const view = {
-    root: {
-      dataset: {},
-      remove() {
-        this.removed = true;
-      },
-    },
-    button,
-    providerSelect: select,
-    providerField: {
-      remove() {
-        this.removed = true;
-      },
-    },
-    status: {},
-    detail: {},
-    tierButton: {},
-    costValue: {},
-    helpDetail: {},
-  };
-  return view;
+// Listener counts observe the actual binder's registrations/removals.
+class Element extends EventTarget {
+  listeners = new Map();
+  attributes = new Map();
+  addEventListener(type, handler, options) {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    this.listeners.get(type).add(handler);
+    super.addEventListener(type, handler, options);
+  }
+  removeEventListener(type, handler, options) {
+    this.listeners.get(type)?.delete(handler);
+    super.removeEventListener(type, handler, options);
+  }
+  listenerCount(type) {
+    return this.listeners.get(type)?.size || 0;
+  }
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+  focus() {
+    this.focusCount = (this.focusCount || 0) + 1;
+  }
 }
-function setup(
+
+for (const custom of [false, true]) {
+  test(`public composition preserves the ${custom ? 'custom adapter' : 'default OpenAI adapter'} path`, async (t) => {
+    const prior = globalThis.window;
+    globalThis.window = new EventTarget();
+    let controls;
+    t.after(() => {
+      controls?.session.destroy();
+      globalThis.window = prior;
+    });
+    const ui = {
+      root: { dataset: {}, remove() {} },
+      button: new Element(),
+      status: {},
+      detail: {},
+      providerField: {},
+    };
+    let defaultCreated = 0;
+    let customCreated = 0;
+    const options = {
+      runner: async () => ({ ok: true }),
+      createControl: () => ui,
+      createController: ({ onSessionEvent }) => {
+        defaultCreated++;
+        return {
+          ui,
+          start({ pushToTalk }) {
+            this.pushToTalkMode = pushToTalk;
+            onSessionEvent({ type: 'state', state: 'listening' });
+          },
+          stop() {},
+          syncCostUi() {},
+          bindPushToTalkShortcut() {},
+          sendTextCommand: (text) => `default:${text}`,
+        };
+      },
+    };
+    if (custom) {
+      options.supportedProviders = ['gemini'];
+      options.createSession = ({ emit }) => {
+        customCreated++;
+        return {
+          capabilities: { pushToTalk: false },
+          start() {
+            emit({ type: 'state', state: 'listening' });
+          },
+          stop() {},
+          sendText: (text) => `custom:${text}`,
+          sendMapEvent: () => true,
+        };
+      };
+    }
+    controls = createCommands(options);
+    await controls.session.start({ pushToTalk: true });
+    assert.equal(defaultCreated, custom ? 0 : 1);
+    assert.equal(customCreated, custom ? 1 : 0);
+    assert.equal(
+      controls.session.sendText('test'),
+      `${custom ? 'custom' : 'default'}:test`,
+    );
+    assert.equal(ui.providerField.hidden, true);
+    assert.equal(ui.root.dataset.providerChoice, 'false');
+    if (!custom)
+      assert.deepEqual(controls.session.adapter.getStartOptions(), {
+        pushToTalk: true,
+      });
+  });
+}
+
+/** Real facade -> real binder -> real common session and real action runner.
+ * Adapters and passive UI/viewer boundaries are fixtures. Wrappers only count
+ * calls to real pointer/referent/conversation cleanup; they do not replace it.
+ */
+function compositionFixture(
   t,
   {
-    value = null,
-    runner = async () => ({ ok: true }),
-    deferredStart,
-    startGate,
-    startOptionsAvailable = true,
-    storedValues = new Map(),
     supportedProviders = ['openai', 'gemini'],
     factoryProviders = ['openai', 'gemini'],
+    savedProvider = null,
+    storageDenied = false,
+    gateStarts = () => false,
+    onSessionEvent = () => {},
   } = {},
 ) {
-  const prior = globalThis.window;
-  const priorDocument = globalThis.document;
-  globalThis.window = new EventTarget();
+  const original = new Map(
+    ['window', 'document'].map((key) => [
+      key,
+      Object.getOwnPropertyDescriptor(globalThis, key),
+    ]),
+  );
   const lifetime = new AbortController();
-  let controls;
-  t.after(() => {
-    controls?.destroy();
-    globalThis.window = prior;
-    globalThis.document = priorDocument;
-  });
-  let clock = 1000;
-  const timers = new Map();
-  let timerSequence = 0;
-  const hooks = {};
-  const starts = [];
-  const stops = [];
-  const claims = [];
-  const releases = [];
-  const localOutputBegins = [];
-  const localOutputEnds = [];
-  const localOutputLifecycle = [];
   const views = [];
+  const instances = [];
+  const mounts = [];
+  const events = [];
+  const order = [];
+  const annotations = new Set();
+  const storageWrites = [];
+  const counters = { pointer: 0, referents: 0, conversation: 0, dispose: 0 };
+  const state = { height: 1000, zooms: 0, renders: 0 };
+  let facade;
+  let pointer;
+  globalThis.window = new EventTarget();
   globalThis.document = {
     getElementById: (id) =>
       id === 'gev-voice-provider' ? views.at(-1)?.providerSelect : null,
   };
-  const sourceEvents = [];
-  const sessionEvents = [];
-  const sentTexts = [];
-  const mountedControls = [];
-  const instances = [];
-  const values = storedValues;
-  const storageWrites = [];
-  if (value != null) values.set('gev.voice.provider', value);
-  const storage = {
-    getItem: (key) => {
-      return values.get(key) ?? null;
+  t.after(async () => {
+    try {
+      facade?.destroy();
+      pointer?.destroy();
+      for (const instance of instances)
+        for (const gate of instance.gates) gate.resolve();
+      await Promise.allSettled(instances.flatMap((instance) => instance.jobs));
+    } finally {
+      for (const [key, descriptor] of original) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete globalThis[key];
+      }
+    }
+  });
+
+  const canvas = new EventTarget();
+  Object.assign(canvas, { clientWidth: 800, clientHeight: 600 });
+  const position = { x: 6379137, y: 0, z: 0 };
+  const viewer = {
+    clock: { onTick: { addEventListener: () => () => {} } },
+    camera: {
+      positionWC: position,
+      positionCartographic: { height: state.height },
+      moveEnd: { addEventListener() {} },
+      cancelFlight() {},
+      zoomIn(metres) {
+        position.x -= metres;
+        state.height -= metres;
+        this.positionCartographic.height = state.height;
+        state.zooms++;
+      },
+      zoomOut(metres) {
+        position.x += metres;
+        state.height += metres;
+        this.positionCartographic.height = state.height;
+        state.zooms++;
+      },
     },
-    setItem: (key, next) => {
-      storageWrites.push([key, next]);
-      values.set(key, next);
+    scene: {
+      canvas,
+      requestRender() {
+        state.renders++;
+      },
     },
   };
+  const dataManager = { layers: new Map() };
+  pointer = createPointerTracker({ element: null, now: () => 1000 });
+  const referents = createReferentRegistry();
+  const runner = createGevActionRunner({
+    viewer,
+    dataManager,
+    styleManager: {},
+    deixis: { pointer, referents },
+  });
+  for (const [object, method, counter] of [
+    [pointer, 'clear', 'pointer'],
+    [referents, 'clear', 'referents'],
+    [runner, 'resetConversation', 'conversation'],
+    [runner, 'dispose', 'dispose'],
+  ]) {
+    const originalMethod = object[method];
+    object[method] = (...args) => {
+      counters[counter]++;
+      order.push(counter);
+      return originalMethod.apply(object, args);
+    };
+  }
+
   const factories = Object.fromEntries(
     factoryProviders.map((provider) => [
       provider,
-      (h) => {
-        hooks[provider] = h;
-        let startGeneration = 0;
+      (hooks) => {
+        const id = instances.length;
+        let generation = 0;
         const instance = {
+          id,
           provider,
-          id: instances.length,
-          hooks: h,
-          startSettings: [],
-          stopSettings: [],
+          hooks,
           starts: [],
-          input: { pushToTalkMode: false, pushToTalkKeyHeld: false },
+          stops: [],
+          jobs: [],
+          gates: [],
+          acquired: 0,
           microphoneEnabled: false,
+          bound: 0,
+          input: { pushToTalk: false, held: false },
+          texts: [],
+          mapEvents: [],
         };
         instances.push(instance);
+        order.push(`factory:${id}`);
         const adapter = {
+          identity: `${provider}:${id}`,
           capabilities: {
-            costControls: provider === 'openai',
             pushToTalk: true,
+            costControls: provider === 'openai',
           },
-          start: (settings = {}) => {
-            const generation = ++startGeneration;
-            starts.push(provider);
-            instance.startSettings.push({ ...settings });
-            instance.input.pushToTalkMode = Boolean(settings.pushToTalk);
-            h.emit({ type: 'state', state: 'connecting', detail: provider });
-            const promise = (async () => {
-              const gate =
-                startGate?.(instance) ??
-                (provider === 'openai' ? deferredStart : null);
-              if (gate) await gate;
-              // Real adapters own a startup generation and suppress work after
-              // stop/disposal. Model that contract, not an impossible late emit.
-              if (generation !== startGeneration || h.signal.aborted) return;
+          controller: {
+            providerDiagnostic() {
+              return this.session.adapter.identity;
+            },
+          },
+          start(settings = {}) {
+            const attempt = ++generation;
+            instance.starts.push({ ...settings });
+            instance.input.pushToTalk = Boolean(settings.pushToTalk);
+            hooks.emit({
+              type: 'state',
+              state: 'connecting',
+              detail: `adapter:${provider}`,
+            });
+            const job = (async () => {
+              if (attempt !== generation || hooks.signal.aborted) return;
+              if (gateStarts(instance)) {
+                const gate = deferred();
+                instance.gates.push(gate);
+                await gate.promise;
+              }
+              // Adapters own cancellation of their asynchronous acquisition.
+              if (attempt !== generation || hooks.signal.aborted) return;
+              instance.acquired++;
               instance.microphoneEnabled =
-                !instance.input.pushToTalkMode ||
-                instance.input.pushToTalkKeyHeld;
-              h.emit({ type: 'state', state: 'listening', detail: provider });
+                !instance.input.pushToTalk || instance.input.held;
+              hooks.emit({
+                type: 'state',
+                state: 'listening',
+                detail: provider,
+              });
             })();
-            instance.starts.push(promise);
-            return promise;
+            instance.jobs.push(job);
+            return job;
           },
-          stop: (settings = {}) => {
-            startGeneration++;
-            stops.push(provider);
-            instance.stopSettings.push({ ...settings });
-            instance.input.pushToTalkMode = false;
-            instance.input.pushToTalkKeyHeld = false;
+          stop(settings = {}) {
+            generation++;
+            instance.stops.push({ ...settings });
+            order.push(`stop:${id}`);
+            instance.input.pushToTalk = instance.input.held = false;
             instance.microphoneEnabled = false;
           },
-          sendText: (text) => {
-            sentTexts.push({ provider, text });
-            return provider + ':' + text;
+          getStartOptions: () => ({ pushToTalk: instance.input.pushToTalk }),
+          bindControls() {
+            instance.bound++;
           },
-          sendMapEvent: () => true,
-          claimLocalProviderCommand: () => {
-            claims.push(provider);
+          sendText(text) {
+            instance.texts.push(text);
+            return `${provider}:${text}`;
+          },
+          sendMapEvent(event) {
+            instance.mapEvents.push(event);
             return true;
-          },
-          releaseLocalProviderCommand: () => {
-            releases.push(provider);
-            localOutputLifecycle.push(`${provider}:release`);
-          },
-          beginLocalOutput: () => {
-            localOutputBegins.push(provider);
-            localOutputLifecycle.push(`${provider}:begin`);
-            return true;
-          },
-          endLocalOutput: () => {
-            localOutputEnds.push(provider);
-            localOutputLifecycle.push(`${provider}:end`);
           },
         };
-        if (startOptionsAvailable)
-          adapter.getStartOptions = () => ({
-            pushToTalk: instance.input.pushToTalkMode,
-          });
         instance.adapter = adapter;
         return adapter;
       },
     ]),
   );
-  controls = createProviderCommands(
+
+  function createControl() {
+    const id = views.length;
+    order.push(`control:${id}`);
+    const providerSelect = new Element();
+    providerSelect.ownerDocument = { createElement: () => ({}) };
+    providerSelect.replaceChildren = (...options) => {
+      providerSelect.options = options;
+    };
+    const view = {
+      root: {
+        dataset: {},
+        classList: { remove() {} },
+        removeCount: 0,
+        remove() {
+          this.removeCount++;
+          order.push(`remove:${id}`);
+        },
+      },
+      button: new Element(),
+      providerSelect,
+      providerField: {},
+      status: {},
+      detail: {},
+      errorDetail: {},
+      tierButton: {},
+      costValue: {},
+      helpDetail: {},
+      card: {},
+    };
+    views.push(view);
+    return view;
+  }
+  function passiveView() {
+    return {
+      events: [],
+      outlines: [],
+      destroyed: 0,
+      handle(event) {
+        this.events.push(event);
+      },
+      outline(event) {
+        this.outlines.push(event);
+      },
+      destroy() {
+        this.destroyed++;
+      },
+    };
+  }
+
+  facade = createProviderCommands(
     {
       runner,
-      supportedProviders,
+      pointer,
+      referents,
+      dataManager,
       signal: lifetime.signal,
-      createControl: () => {
-        const view = control();
-        views.push(view);
-        return view;
+      supportedProviders,
+      createControl,
+      createCard() {
+        const card = passiveView();
+        views.at(-1).cardView = card;
+        return card;
       },
-      createCard: () => ({
-        enabled: true,
-        setEnabled(value) {
-          this.enabled = value;
+      createReticle() {
+        const reticle = passiveView();
+        views.at(-1).reticle = reticle;
+        return reticle;
+      },
+      annotations: {
+        onOutlineEvent(callback) {
+          annotations.add(callback);
+          return () => annotations.delete(callback);
         },
-        handle() {},
-        destroy() {},
-      }),
+      },
+      onSessionEvent(event) {
+        events.push(event);
+        onSessionEvent(event, facade);
+      },
     },
     {
-      bind: (options) => {
-        sourceEvents.push(options.onSessionEvent);
-        const onSessionEvent = options.onSessionEvent;
-        const mounted = bind({
-          ...options,
-          onSessionEvent: (event) => {
-            sessionEvents.push(event);
-            onSessionEvent(event);
-          },
-        });
-        mountedControls.push(mounted);
-        return mounted;
-      },
       factories,
-      storage,
-      now: () => clock,
-      setTimer: (callback, delay) => {
-        const id = ++timerSequence;
-        timers.set(id, { callback, deadline: clock + delay });
-        return id;
+      storage: {
+        getItem() {
+          if (storageDenied) throw Error('Storage denied');
+          return savedProvider;
+        },
+        setItem(key, value) {
+          if (storageDenied) throw Error('Storage denied');
+          storageWrites.push([key, value]);
+          savedProvider = value;
+        },
       },
-      clearTimer: (id) => timers.delete(id),
+      bind(options) {
+        // Keep the real callback so stale-event suppression tests exercise the
+        // facade's mount generation as well as the common session's disposal.
+        const mount = { options, callback: options.onSessionEvent };
+        mounts.push(mount);
+        mount.controls = bindVoiceCommands(options);
+        return mount.controls;
+      },
     },
   );
   return {
-    controls,
-    hooks,
-    starts,
-    stops,
-    claims,
-    releases,
-    localOutputBegins,
-    localOutputEnds,
-    localOutputLifecycle,
-    views,
-    sourceEvents,
-    sessionEvents,
-    sentTexts,
-    mountedControls,
-    instances,
-    storageWrites,
+    facade,
+    runner,
+    pointer,
+    referents,
     lifetime,
-    stored: () => values.get('gev.voice.provider') ?? null,
-    storedValue: (key) => values.get(key) ?? null,
-    timers,
-    setClock: (value) => {
-      clock = value;
-    },
-    selectProvider: (next) => {
-      const before = controls.provider;
-      const select = views.at(-1)?.providerSelect;
-      if (!select) return false;
-      select.value = next;
+    instances,
+    views,
+    mounts,
+    events,
+    order,
+    annotations,
+    counters,
+    storageWrites,
+    state,
+    select(provider) {
+      const select = views.at(-1).providerSelect;
+      select.value = provider;
       select.dispatchEvent(new Event('change'));
-      return controls.provider !== before;
     },
-    expireTimers: () => {
-      clock += 30000;
-      for (const [id, { callback, deadline }] of [...timers])
-        if (clock >= deadline) {
-          timers.delete(id);
-          callback();
-        }
-    },
-    advanceTime: (milliseconds) => {
-      clock += milliseconds;
-      for (const [id, { callback, deadline }] of [...timers])
-        if (clock >= deadline) {
-          timers.delete(id);
-          callback();
-        }
+    seedConversation() {
+      pointer.beginTurn('text', {
+        capturedSnapshot: { fresh: true, at: 'text' },
+      });
+      referents.recordResult('frame_overhead', {
+        ok: true,
+        display: { title: 'One aircraft' },
+        referents: [
+          { n: 1, id: 'aaa111', label: 'Fixture', layerId: 'flights' },
+        ],
+      });
+      assert.ok(pointer.activeSnapshot());
+      assert.equal(referents.list().length, 1);
     },
   };
 }
 
-function deferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((done, fail) => {
-    resolve = done;
-    reject = fail;
-  });
-  return { promise, resolve, reject };
-}
-
-async function settleStarts(instance) {
-  await Promise.allSettled(instance.starts);
-  await Promise.resolve(); // Let createVoiceSession publish any caught failure.
-}
-
-test('provider preference defaults to OpenAI and ignores invalid or unavailable storage', () => {
-  assert.equal(readVoiceProvider({ getItem: () => 'gemini' }), 'gemini');
-  for (const value of [null, '', 'other', 'GEMINI']) {
-    assert.equal(readVoiceProvider({ getItem: () => value }), 'openai');
-  }
+test('provider preference uses only the supplied host capability list', () => {
+  const stored = (value) => ({ getItem: () => value });
+  assert.equal(readVoiceProvider(stored('gemini'), ['openai']), 'openai');
+  assert.equal(readVoiceProvider(stored('openai'), ['gemini']), 'gemini');
   assert.equal(
-    readVoiceProvider({
-      getItem() {
-        throw new Error('denied');
-      },
-    }),
+    readVoiceProvider(stored('unknown'), ['gemini', 'openai']),
     'openai',
   );
-});
-
-test('selector stops the active provider, persists the choice, and keeps one public facade', async (t) => {
-  const f = setup(t);
-  const original = f.controls;
-  await original.start();
-  assert.equal(original.status, 'listening');
-  assert.equal(f.views[0].tierButton.hidden, false);
-  f.views[0].providerSelect.value = 'gemini';
-  f.views[0].providerSelect.dispatchEvent(new Event('change'));
-  assert.equal(window.__gevVoiceCommands, original);
-  assert.equal(original.provider, 'gemini');
-  assert.equal(f.stored(), 'gemini');
-  assert.equal(f.views[0].root.removed, true);
-  assert.equal(f.views[1].tierButton.hidden, true);
-  assert.deepEqual(f.starts, ['openai', 'gemini']);
-  assert.deepEqual(f.instances[1].startSettings, [{ pushToTalk: false }]);
-  assert.equal(original.sendTextCommand('hello'), 'gemini:hello');
-  assert.equal(original.status, 'listening');
-  assert.deepEqual(f.stops, ['openai']);
-  f.views[0].providerSelect.value = 'openai';
-  f.views[0].providerSelect.dispatchEvent(new Event('change'));
   assert.equal(
-    original.provider,
+    readVoiceProvider(stored('gemini'), ['openai', 'gemini']),
     'gemini',
-    'old selector listener was released',
+  );
+  assert.equal(
+    readVoiceProvider(
+      {
+        getItem() {
+          throw Error('denied');
+        },
+      },
+      ['gemini'],
+    ),
+    'gemini',
   );
 });
 
-test('the shared action runner keeps its identity and remains callable across provider switches', async (t) => {
-  const calls = [];
-  const result = { ok: true, hudVariant: 'minimal' };
-  const runner = async (...args) => {
-    calls.push(args);
-    return result;
-  };
-  const f = setup(t, { runner });
-  const args = { variant: 'minimal' };
-  const options = { signal: new AbortController().signal };
-  for (const provider of ['openai', 'gemini', 'openai']) {
-    f.selectProvider(provider);
-    assert.equal(f.controls.runner, runner);
-    assert.equal(window.__gevVoiceCommands.runner, runner);
-    assert.equal(
-      await f.controls.runner('set_hud_variant', args, options),
-      result,
+for (const scenario of [
+  {
+    title: 'OpenAI-only host ignores saved Gemini',
+    requested: ['openai'],
+    saved: 'gemini',
+    expected: ['openai'],
+    provider: 'openai',
+  },
+  {
+    title: 'Gemini-only host falls back from saved OpenAI',
+    requested: ['gemini'],
+    saved: 'openai',
+    expected: ['gemini'],
+    provider: 'gemini',
+  },
+  {
+    title: 'dual host restores Gemini',
+    requested: ['openai', 'gemini'],
+    saved: 'gemini',
+    expected: ['openai', 'gemini'],
+    provider: 'gemini',
+  },
+  {
+    title: 'unknown, duplicate and unavailable factories are excluded',
+    requested: ['unknown', 'gemini', 'openai', 'gemini'],
+    factories: ['gemini'],
+    saved: 'openai',
+    expected: ['gemini'],
+    provider: 'gemini',
+  },
+]) {
+  test(scenario.title, (t) => {
+    const f = compositionFixture(t, {
+      supportedProviders: scenario.requested,
+      factoryProviders: scenario.factories,
+      savedProvider: scenario.saved,
+    });
+    assert.deepEqual(f.facade.supportedProviders, scenario.expected);
+    assert.equal(Object.isFrozen(f.facade.supportedProviders), true);
+    assert.equal(f.facade.provider, scenario.provider);
+    assert.deepEqual(
+      f.views[0].providerSelect.options.map((option) => option.value),
+      scenario.expected,
     );
-    assert.equal(f.controls.status, 'idle');
-  }
-  assert.deepEqual(
-    calls,
-    Array.from({ length: 3 }, () => ['set_hud_variant', args, options]),
-  );
-  assert.deepEqual(
-    f.starts,
-    [],
-    'direct map actions do not start a voice connection',
-  );
-});
-
-test('switch during tool execution aborts old work without disturbing the new session', async (t) => {
-  let resolve;
-  let actionSignal;
-  const pending = new Promise((done) => {
-    resolve = done;
+    assert.equal(
+      f.views[0].providerField.hidden,
+      scenario.expected.length === 1,
+    );
+    assert.equal(
+      f.views[0].root.dataset.providerChoice,
+      String(scenario.expected.length > 1),
+    );
+    assert.equal(f.instances.length, 1);
+    assert.equal(
+      f.instances[0].starts.length,
+      0,
+      'discovery must not start a provider',
+    );
+    assert.equal(f.facade.state, 'idle');
   });
-  const f = setup(t, {
-    runner: async (_name, _args, options) => {
-      actionSignal = options.signal;
-      return pending;
+}
+
+test('invalid or empty host support fails before mounting a control', () => {
+  let mounts = 0;
+  const dependencies = {
+    bind() {
+      mounts++;
     },
-  });
-  await f.controls.start();
-  const oldAction = f.hooks.openai.runAction('fly_to_location', {});
-  f.selectProvider('gemini');
-  assert.equal(actionSignal.aborted, true);
-  assert.deepEqual(f.starts, ['openai', 'gemini']);
-  resolve({ ok: true });
-  await assert.rejects(oldAction, { name: 'AbortError' });
-  assert.equal(f.controls.status, 'listening');
-  assert.equal(f.controls.provider, 'gemini');
+    factories: { openai() {} },
+  };
+  assert.throws(
+    () =>
+      createProviderCommands({ supportedProviders: 'gemini' }, dependencies),
+    /must be an array/,
+  );
+  assert.throws(
+    () =>
+      createProviderCommands(
+        { supportedProviders: ['gemini', 'unknown'] },
+        dependencies,
+      ),
+    /No supported voice provider/,
+  );
+  assert.equal(mounts, 0);
 });
 
-test('provider swaps retain the shared runner and facade lifetime until final teardown', async (t) => {
-  let disposed = false;
-  let disposals = 0;
-  let resets = 0;
-  const runner = async () => {
+test('active switch keeps PTT mode, retires the held key, and disposes before mounting', async (t) => {
+  const f = compositionFixture(t);
+  const firstSession = f.facade.session;
+  const outerSignal = f.facade.signal;
+  const first = f.instances[0];
+  // PTT controls can activate the adapter directly; the facade must learn
+  // activity from its common events, not only from facade.start().
+  first.input.held = true;
+  await first.adapter.start({ pushToTalk: true });
+  assert.equal(first.microphoneEnabled, true);
+  assert.equal(f.facade.isActive(), true);
+  f.seedConversation();
+  const before = { ...f.counters };
+  f.select('gemini');
+  await settle();
+  const second = f.instances[1];
+  assert.equal(window.__gevVoiceCommands, f.facade);
+  assert.equal(f.facade.runner, f.runner);
+  assert.equal(f.facade.signal, outerSignal);
+  assert.equal(outerSignal.aborted, false);
+  assert.equal(firstSession.disposed, true);
+  assert.equal(first.hooks.signal.aborted, true);
+  assert.deepEqual(first.stops, [{ removeUi: true }]);
+  assert.equal(first.input.held, false);
+  assert.equal(first.microphoneEnabled, false);
+  assert.deepEqual(second.starts, [{ pushToTalk: true }]);
+  assert.equal(second.input.held, false);
+  assert.equal(
+    second.microphoneEnabled,
+    false,
+    'a held key must never migrate to the new adapter',
+  );
+  assert.equal(f.facade.state, 'listening');
+  assert.ok(f.order.indexOf('stop:0') < f.order.indexOf('control:1'));
+  assert.ok(f.order.indexOf('remove:0') < f.order.indexOf('control:1'));
+  assert.ok(f.order.indexOf('stop:0') < f.order.indexOf('factory:1'));
+  assert.equal(f.views[0].button.listenerCount('click'), 0);
+  assert.equal(f.views[0].providerSelect.listenerCount('change'), 0);
+  assert.equal(f.views[1].providerSelect.listenerCount('change'), 1);
+  assert.equal(f.views[1].providerSelect.focusCount, 1);
+  assert.equal(f.views[1].tierButton.hidden, true);
+  assert.equal(f.views[1].costValue.hidden, true);
+  assert.equal(f.facade.providerDiagnostic(), 'gemini:1');
+  assert.equal(f.pointer.activeSnapshot(), null);
+  assert.deepEqual(f.referents.list(), []);
+  for (const key of ['pointer', 'referents', 'conversation'])
     assert.equal(
-      disposed,
-      false,
-      'replacement must not permanently dispose the runner',
+      f.counters[key],
+      before[key] + 1,
+      `one explicit replacement reset: ${key}`,
     );
-    return { ok: true };
-  };
-  runner.resetConversation = () => resets++;
-  runner.dispose = () => {
-    disposed = true;
-    disposals++;
-  };
-  const f = setup(t, { runner });
-  const lifetime = f.controls.signal;
-  let lifetimeAborts = 0;
-  lifetime.addEventListener('abort', () => lifetimeAborts++);
-  await f.controls.start();
-  for (const provider of ['gemini', 'openai']) {
-    const outgoing = f.controls.session.signal;
-    f.selectProvider(provider);
-    assert.equal(outgoing.aborted, true);
-    assert.equal(f.controls.signal, lifetime);
-    assert.equal(lifetime.aborted, false);
-    assert.equal(disposals, 0);
-    assert.equal(f.controls.status, 'listening');
-    assert.deepEqual(await f.hooks[provider].runAction('zoom_to_globe', {}), {
-      ok: true,
-    });
-  }
-  assert.equal(resets, 2, 'each retired adapter forgets conversation state');
-  f.controls.destroy();
-  f.controls.destroy();
-  f.controls.stop({ removeUi: true });
-  f.lifetime.abort();
-  assert.equal(lifetime.aborted, true);
-  assert.equal(lifetimeAborts, 1);
-  assert.equal(disposals, 1);
-});
-
-test('late startup cannot revive a replaced provider; app teardown removes the latest controls', async (t) => {
-  let resolve;
-  const pending = new Promise((done) => {
-    resolve = done;
+  assert.equal(
+    f.counters.dispose,
+    0,
+    'provider replacement keeps the page runner',
+  );
+  assert.deepEqual(f.storageWrites, [[PROVIDER_KEY, 'gemini']]);
+  assert.equal(f.facade.sendTextCommand('hello'), 'gemini:hello');
+  assert.deepEqual(first.texts, []);
+  assert.deepEqual(second.texts, ['hello']);
+  const result = await f.facade.runner('adjust_camera_zoom', {
+    direction: 'in',
+    amount: 'little',
   });
-  const f = setup(t, { deferredStart: pending });
-  const first = f.controls.start();
-  f.selectProvider('gemini');
-  assert.deepEqual(f.starts, ['openai', 'gemini']);
-  resolve();
-  await first;
-  assert.equal(f.controls.status, 'listening');
-  assert.equal(f.views[1].detail.textContent, 'gemini');
-  f.lifetime.abort();
-  assert.equal(f.controls.disposed, true);
-  assert.equal(f.views[1].root.removed, true);
-  assert.equal(f.selectProvider('openai'), false);
-  assert.equal(f.controls.start(), false);
-  assert.equal(f.controls.sendTextCommand('late'), false);
+  assert.equal(
+    result.ok,
+    true,
+    'the actual shared action runner remains usable after switching',
+  );
+  assert.equal(f.state.zooms, 1);
 });
 
-test('restored Gemini choice retains the action runner without creating duplicate lifetimes', async (t) => {
-  const result = { ok: true, hudVariant: 'tactical' };
-  const runner = async (name) => {
-    assert.equal(name, 'get_current_view_state');
-    return result;
-  };
-  const f = setup(t, { value: 'gemini', runner });
-  assert.equal(f.controls.provider, 'gemini');
-  assert.equal(f.controls.runner, runner);
-  assert.equal(await f.controls.runner('get_current_view_state'), result);
-  assert.equal(f.selectProvider('gemini'), false);
-  assert.equal(f.selectProvider('unrecognized'), false);
-  assert.equal(f.views.length, 1);
-  assert.deepEqual(f.starts, []);
-});
+for (const initialState of ['idle', 'error']) {
+  test(`${initialState} selection never autostarts; manual start still works`, async (t) => {
+    const f = compositionFixture(t, { storageDenied: true });
+    if (initialState === 'error') {
+      await f.facade.start({ pushToTalk: true });
+      f.instances[0].adapter.stop({ preserveStatus: true });
+      f.instances[0].hooks.emit({
+        type: 'state',
+        state: 'error',
+        detail: 'Fixture failure',
+      });
+    }
+    f.select('gemini');
+    await settle();
+    assert.equal(
+      f.facade.provider,
+      'gemini',
+      'denied storage cannot block a supported selection',
+    );
+    assert.equal(f.facade.state, 'idle');
+    assert.deepEqual(f.instances[1].starts, []);
+    f.select('gemini');
+    f.select('unknown');
+    assert.equal(
+      f.instances.length,
+      2,
+      'same and unsupported selections cannot remount',
+    );
+    assert.equal(f.facade.provider, 'gemini');
+    await f.facade.start({ pushToTalk: false });
+    assert.deepEqual(f.instances[1].starts, [{ pushToTalk: false }]);
+    assert.equal(f.instances[1].microphoneEnabled, true);
+  });
+}
 
-for (const provider of ['openai', 'gemini']) {
-  test(`${provider} sends clear provider requests to the active model without changing provider state`, async (t) => {
-    const f = setup(t, { value: provider });
-    await f.controls.start();
-    const session = f.controls.session;
-    const starts = [...f.starts];
-    const stops = [...f.stops];
-    const mountedViews = f.views.length;
-    const requests = [
-      provider === 'openai' ? 'Switch to Gemini' : 'Switch to OpenAI',
-      `Switch to ${provider}`,
-      'Select a voice provider',
-      'Use another-provider as my voice provider',
-    ];
-
-    for (const text of requests)
-      assert.equal(f.controls.sendTextCommand(text), `${provider}:${text}`);
-
+for (const outcome of ['resolve', 'reject']) {
+  test(`retired startup ${outcome} and stale events cannot affect the current mount`, async (t) => {
+    const f = compositionFixture(t, {
+      gateStarts: (instance) => instance.id === 0,
+    });
+    const oldStart = f.facade.start({ pushToTalk: false });
+    const old = f.instances[0];
+    assert.equal(f.facade.state, 'connecting');
+    f.select('gemini');
+    await settle();
+    assert.equal(f.facade.state, 'listening');
+    const current = f.instances[1];
+    const eventCount = f.events.length;
+    const currentStops = current.stops.length;
+    const currentCardCount = f.views[1].cardView.events.length;
+    old.gates[0][outcome](new Error('Late retired startup failure'));
+    await oldStart;
+    for (const state of ['idle', 'error', 'connecting']) {
+      old.hooks.emit({ type: 'state', state, detail: 'retired adapter' });
+      f.mounts[0].callback({
+        type: 'state',
+        state,
+        detail: 'retired forward callback',
+      });
+    }
+    assert.equal(f.events.length, eventCount);
+    assert.equal(f.views[1].cardView.events.length, currentCardCount);
+    assert.equal(f.facade.state, 'listening');
+    assert.equal(old.acquired, 0);
+    assert.equal(current.stops.length, currentStops);
+    assert.equal(current.starts.length, 1);
+    f.facade.stop();
+    f.mounts[0].callback({ type: 'state', state: 'connecting' });
+    f.select('openai');
     assert.deepEqual(
-      f.sentTexts,
-      requests.map((text) => ({ provider, text })),
+      f.instances[2].starts,
+      [],
+      'a retired connecting callback cannot revive voice intent',
     );
-    assert.equal(f.controls.provider, provider);
-    assert.equal(f.controls.session, session);
-    assert.deepEqual(f.storageWrites, []);
-    assert.deepEqual(f.starts, starts);
-    assert.deepEqual(f.stops, stops);
-    assert.equal(f.views.length, mountedViews);
-    assert.deepEqual(f.claims, []);
-    assert.deepEqual(f.releases, []);
-    assert.equal(f.controls.session.adapter.acknowledgeLocalCommand, undefined);
-    assert.deepEqual(f.localOutputBegins, []);
-    assert.deepEqual(f.localOutputEnds, []);
-  });
-
-  test(`${provider} leaves spoken provider requests with the provider response already in progress`, async (t) => {
-    const f = setup(t, { value: provider });
-    await f.controls.start();
-    const session = f.controls.session;
-    const events = [
-      {
-        type: 'user-input-final',
-        inputKind: 'speech',
-        inputScope: 'utterance',
-        inputId: 'provider-request',
-        text: provider === 'openai' ? 'Switch to Gemini' : 'Switch to OpenAI',
-      },
-      {
-        type: 'user-input-final',
-        inputKind: 'speech',
-        inputScope: 'segment',
-        inputId: 'provider-request',
-        text: ' actually keep the current provider',
-      },
-    ];
-
-    for (const event of events) f.hooks[provider].emit(event);
-    await Promise.resolve();
-
-    assert.equal(f.controls.provider, provider);
-    assert.equal(f.controls.session, session);
-    assert.deepEqual(f.sentTexts, []);
-    assert.deepEqual(f.storageWrites, []);
-    assert.deepEqual(f.starts, [provider]);
-    assert.deepEqual(f.stops, []);
-    assert.equal(f.views.length, 1);
-    assert.deepEqual(f.claims, []);
-    assert.deepEqual(f.releases, []);
-    assert.equal(f.controls.session.adapter.acknowledgeLocalCommand, undefined);
-    assert.deepEqual(f.localOutputBegins, []);
-    assert.deepEqual(f.localOutputEnds, []);
+    assert.equal(f.facade.state, 'idle');
   });
 }
 
-for (const provider of ['openai', 'gemini']) {
-  test(`${provider} button activation resumes exactly once after a selector change`, async (t) => {
-    const f = setup(t, { value: provider });
-    const successor = provider === 'openai' ? 'gemini' : 'openai';
-    f.views[0].button.dispatchEvent(new Event('click'));
-    assert.equal(f.controls.state, 'listening');
-    assert.deepEqual(f.instances[0].startSettings, [{ pushToTalk: false }]);
-    f.views[0].providerSelect.value = successor;
-    f.views[0].providerSelect.dispatchEvent(new Event('change'));
-    assert.equal(f.controls.provider, successor);
-    assert.equal(f.views[1].providerSelect.focused, true);
-    assert.equal(f.controls.state, 'listening');
-    assert.deepEqual(f.starts, [provider, successor]);
-    assert.deepEqual(f.instances[1].startSettings, [{ pushToTalk: false }]);
-    await f.controls.start();
-    assert.deepEqual(
-      f.starts,
-      [provider, successor],
-      'an already active successor is not started twice',
-    );
+test('Stop during replacement startup defeats late settlement and further automatic resume', async (t) => {
+  const f = compositionFixture(t, {
+    gateStarts: (instance) => instance.id === 1,
   });
-}
-
-for (const route of [
-  'public-stop',
-  'session-stop',
-  'button-stop',
-  'preserve-status',
-  'session-preserve-status',
-]) {
-  test(`provider selection stays OFF after ${route}, even if a stale active state arrives`, async (t) => {
-    const f = setup(t, {});
-    await f.controls.start();
-    if (route === 'public-stop') f.controls.stop();
-    if (route === 'session-stop') f.controls.session.stop();
-    if (route === 'button-stop')
-      f.views[0].button.dispatchEvent(new Event('click'));
-    if (route === 'preserve-status') f.controls.stop({ preserveStatus: true });
-    if (route === 'session-preserve-status')
-      f.controls.session.stop({ preserveStatus: true });
-    // A stopped adapter may still have a queued presentation event. It must
-    // not re-create the user's ON intent without a new connecting transition.
-    f.hooks.openai.emit({
-      type: 'state',
-      state: 'listening',
-      detail: 'late display state',
-    });
-    f.hooks.openai.emit({
-      type: 'transcript',
-      role: 'user',
-      text: 'Show flights over London',
-      final: true,
-    });
-    f.selectProvider('gemini');
-    assert.equal(f.controls.provider, 'gemini');
-    assert.equal(f.controls.state, 'idle');
-    assert.deepEqual(f.starts, ['openai']);
-    assert.deepEqual(f.instances[1].startSettings, []);
-  });
-}
-
-test('a rejected old connect cannot stop the automatically connecting successor', async (t) => {
-  const oldGate = deferred();
-  const nextGate = deferred();
-  const f = setup(t, {
-    startGate: ({ id }) => (id === 0 ? oldGate.promise : nextGate.promise),
-  });
-  const first = f.controls.start();
-  assert.equal(f.controls.state, 'connecting');
-  f.selectProvider('gemini');
-  assert.deepEqual(f.starts, ['openai', 'gemini']);
-  assert.equal(f.controls.state, 'connecting');
-  oldGate.reject(new Error('retired connect failed'));
-  await first;
-  assert.equal(f.controls.provider, 'gemini');
-  assert.equal(f.controls.state, 'connecting');
-  assert.deepEqual(f.instances[1].stopSettings, []);
-  nextGate.resolve();
-  await settleStarts(f.instances[1]);
-  assert.equal(f.controls.state, 'listening');
-});
-
-test('rapid active switches start each replacement once and only the newest mount can finish', async (t) => {
-  const gates = [deferred(), deferred(), deferred()];
-  const f = setup(t, { startGate: ({ id }) => gates[id].promise });
-  const first = f.controls.start();
-  f.selectProvider('gemini');
-  f.selectProvider('openai');
-  assert.equal(f.controls.provider, 'openai');
-  assert.equal(f.controls.state, 'connecting');
-  assert.deepEqual(f.starts, ['openai', 'gemini', 'openai']);
-  assert.equal(f.instances[0].hooks.signal.aborted, true);
-  assert.equal(f.instances[1].hooks.signal.aborted, true);
-  assert.equal(f.instances[2].hooks.signal.aborted, false);
-  gates[1].resolve();
-  gates[0].resolve();
-  await first;
-  await settleStarts(f.instances[1]);
-  for (const instance of f.instances.slice(0, 2)) {
-    instance.hooks.emit({ type: 'state', state: 'error', detail: 'retired' });
-    instance.hooks.emit({ type: 'state', state: 'listening' });
-  }
-  assert.equal(f.controls.state, 'connecting');
-  gates[2].resolve();
-  await settleStarts(f.instances[2]);
-  assert.equal(f.controls.state, 'listening');
-  assert.equal(f.controls.session.signal, f.instances[2].hooks.signal);
-  assert.deepEqual(
-    f.instances.map((instance) => instance.startSettings.length),
-    [1, 1, 1],
+  await f.facade.start();
+  f.select('gemini');
+  const replacement = f.instances[1];
+  assert.equal(f.facade.state, 'connecting');
+  f.facade.stop();
+  replacement.gates[0].resolve();
+  await Promise.all(replacement.jobs);
+  assert.equal(replacement.acquired, 0);
+  assert.equal(f.facade.state, 'idle');
+  f.select('openai');
+  assert.deepEqual(f.instances[2].starts, []);
+  await f.facade.start();
+  assert.equal(
+    f.facade.state,
+    'listening',
+    'a later explicit start remains healthy',
   );
 });
 
-for (const route of [
-  'public-stop',
-  'session-stop',
-  'button-stop',
-  'destroy',
-  'parent-abort',
-]) {
-  test(`${route} defeats an automatic successor startup that has not settled`, async (t) => {
-    const nextGate = deferred();
-    const f = setup(t, {
-      startGate: ({ provider }) =>
-        provider === 'gemini' ? nextGate.promise : null,
-    });
-    await f.controls.start();
-    f.selectProvider('gemini');
-    assert.deepEqual(f.starts, ['openai', 'gemini']);
-    assert.equal(f.controls.state, 'connecting');
-    if (route === 'public-stop') f.controls.stop();
-    if (route === 'session-stop') f.controls.session.stop();
-    if (route === 'button-stop')
-      f.views[1].button.dispatchEvent(new Event('click'));
-    if (route === 'destroy') f.controls.destroy();
-    if (route === 'parent-abort') f.lifetime.abort();
-    nextGate.resolve();
-    await settleStarts(f.instances[1]);
-    assert.equal(f.controls.state, 'idle');
-    assert.equal(f.instances[1].microphoneEnabled, false);
-    assert.equal(f.instances[1].stopSettings.length, 1);
-    assert.deepEqual(f.starts, ['openai', 'gemini']);
-    if (route === 'destroy' || route === 'parent-abort') {
-      assert.equal(f.controls.disposed, true);
-      assert.equal(f.views[1].root.removed, true);
-    } else {
-      f.selectProvider('openai');
-      assert.equal(f.controls.state, 'idle');
-      assert.deepEqual(f.starts, ['openai', 'gemini']);
+for (const emitsIdle of [false, true]) {
+  test(`Stop and error clear pointer/referents/conversation once: adapter emitsIdle=${emitsIdle}`, async (t) => {
+    const f = compositionFixture(t);
+    if (emitsIdle) {
+      const instance = f.instances[0];
+      const originalStop = instance.adapter.stop;
+      instance.adapter.stop = function (settings = {}) {
+        originalStop.call(this, settings);
+        if (!settings.preserveStatus && !settings.removeUi)
+          instance.hooks.emit({ type: 'state', state: 'idle' });
+      };
+    }
+    for (const end of ['stop', 'error']) {
+      await f.facade.start();
+      f.seedConversation();
+      const before = { ...f.counters };
+      const generation = f.referents.generation();
+      if (end === 'stop') f.facade.stop();
+      else {
+        f.instances[0].adapter.stop({ preserveStatus: true });
+        f.instances[0].hooks.emit({
+          type: 'state',
+          state: 'error',
+          detail: 'Fixture failure',
+        });
+      }
+      assert.equal(f.pointer.activeSnapshot(), null);
+      assert.deepEqual(f.referents.list(), []);
+      assert.equal(f.referents.generation(), generation + 1);
+      for (const key of ['pointer', 'referents', 'conversation'])
+        assert.equal(f.counters[key], before[key] + 1, `${end}: ${key}`);
     }
   });
 }
 
-test('failed automatic startup keeps the selected provider in error without fallback or retries', async (t) => {
-  const nextGate = deferred();
-  const f = setup(t, {
-    startGate: ({ provider }) =>
-      provider === 'gemini' ? nextGate.promise : null,
+test('outer destruction disposes the runner once and removes each provider binding', async (t) => {
+  const priorUnsaved = describeUnsavedWork();
+  const f = compositionFixture(t);
+  await f.facade.start();
+  f.select('gemini');
+  await settle();
+  assert.equal(f.annotations.size, 1);
+  assert.ok(
+    describeUnsavedWork().includes(translate('the active voice session')),
+  );
+  const oldCardEvents = f.views[0].cardView.events.length;
+  for (const callback of f.annotations) callback({ id: 'fixture-outline' });
+  assert.equal(f.views[0].cardView.outlines.length, 0);
+  assert.equal(f.views[1].cardView.outlines.length, 1);
+  assert.equal(f.instances[1].mapEvents.length, 1);
+  f.facade.destroy();
+  f.facade.destroy();
+  f.facade.stop({ removeUi: true });
+  f.lifetime.abort();
+  assert.equal(f.counters.dispose, 1);
+  assert.equal(f.facade.signal.aborted, true);
+  assert.equal(f.facade.disposed, true);
+  assert.equal(f.annotations.size, 0);
+  assert.deepEqual(describeUnsavedWork(), priorUnsaved);
+  const finalEvents = f.events.length;
+  const starts = f.instances.map((instance) => instance.starts.length);
+  for (const [index, view] of f.views.entries()) {
+    assert.equal(view.root.removeCount, 1);
+    assert.equal(view.cardView.destroyed, 1);
+    assert.equal(view.reticle.destroyed, 1);
+    assert.equal(view.button.listenerCount('click'), 0);
+    assert.equal(view.providerSelect.listenerCount('change'), 0);
+    assert.equal(f.instances[index].hooks.signal.aborted, true);
+    view.button.dispatchEvent(new Event('click'));
+    view.providerSelect.value = 'openai';
+    view.providerSelect.dispatchEvent(new Event('change'));
+    f.instances[index].hooks.emit({ type: 'state', state: 'connecting' });
+    f.mounts[index].callback({ type: 'state', state: 'connecting' });
+  }
+  assert.equal(f.events.length, finalEvents);
+  assert.equal(f.views[0].cardView.events.length, oldCardEvents);
+  assert.deepEqual(
+    f.instances.map((instance) => instance.starts.length),
+    starts,
+  );
+  assert.equal(f.instances.length, 2);
+  assert.equal(f.facade.start(), false);
+  assert.equal(f.facade.sendText('after destroy'), false);
+  assert.equal(f.facade.notifyMapEvent({}), false);
+  const result = await f.facade.runner('adjust_camera_zoom', {
+    direction: 'in',
+    amount: 'little',
   });
-  await f.controls.start();
-  f.selectProvider('gemini');
-  assert.equal(f.controls.state, 'connecting');
-  nextGate.reject(new Error('Microphone permission denied'));
-  await settleStarts(f.instances[1]);
-  assert.equal(f.controls.provider, 'gemini');
-  assert.equal(f.stored(), 'gemini');
-  assert.equal(f.controls.state, 'error');
-  assert.equal(f.views[1].detail.textContent, 'Microphone permission denied');
-  assert.equal(f.instances[0].hooks.signal.aborted, true);
-  assert.deepEqual(f.instances[1].stopSettings, [{ preserveStatus: true }]);
-  assert.deepEqual(f.starts, ['openai', 'gemini']);
-  f.selectProvider('openai');
-  assert.equal(f.controls.state, 'idle', 'failure cleared the resume intent');
-  assert.deepEqual(f.starts, ['openai', 'gemini']);
+  assert.equal(result.cancelled, true);
+  assert.equal(
+    f.state.zooms,
+    0,
+    'the actual runner cannot move the camera after outer disposal',
+  );
 });
 
-for (const provider of ['openai', 'gemini']) {
-  for (const pushToTalk of [false, true]) {
-    test(`${provider} direct adapter activation preserves ${pushToTalk ? 'PTT' : 'open-mic'} mode without transferring a held key`, async (t) => {
-      const f = setup(t, { value: provider });
-      const original = f.instances[0];
-      original.input.pushToTalkKeyHeld = pushToTalk;
-      // Native PTT starts the controller rather than facade.start(). The
-      // adapter emits connecting, then the common session observes its state.
-      await original.adapter.start({ pushToTalk });
-      assert.equal(f.controls.state, 'listening');
-      f.selectProvider(provider === 'openai' ? 'gemini' : 'openai');
-      const successor = f.instances[1];
-      assert.equal(f.controls.state, 'listening');
-      assert.deepEqual(successor.startSettings, [{ pushToTalk }]);
+for (const action of ['stop', 'destroy']) {
+  for (const phase of ['common', 'adapter']) {
+    test(`${action} from replacement ${phase} connecting observer prevents resume`, async (t) => {
+      let intercepted = 0;
+      const f = compositionFixture(t, {
+        onSessionEvent(event, facade) {
+          if (
+            facade?.provider !== 'gemini' ||
+            event.type !== 'state' ||
+            event.state !== 'connecting'
+          )
+            return;
+          const matching =
+            phase === 'common'
+              ? event.detail === undefined
+              : event.detail === 'adapter:gemini';
+          if (matching && intercepted++ === 0) facade[action]();
+        },
+      });
+      await f.facade.start({ pushToTalk: true });
+      f.select('gemini');
+      await settle();
+      const replacement = f.instances[1];
+      assert.equal(intercepted, 1);
+      assert.equal(replacement.starts.length, phase === 'common' ? 0 : 1);
+      assert.equal(replacement.acquired, 0);
+      assert.equal(replacement.microphoneEnabled, false);
+      assert.equal(f.facade.isActive(), false);
+      assert.equal(f.facade.state, 'idle');
       assert.equal(
-        original.input.pushToTalkMode,
-        false,
-        'retirement resets the old input after its settings were captured',
+        f.events.filter(
+          (event) => event.state === 'listening' && event.detail === 'gemini',
+        ).length,
+        0,
       );
-      assert.equal(successor.input.pushToTalkKeyHeld, false);
-      assert.equal(
-        successor.microphoneEnabled,
-        !pushToTalk,
-        'PTT waits muted for a new physical hold',
-      );
+      assert.equal(f.facade.disposed, action === 'destroy');
+      assert.equal(f.counters.dispose, action === 'destroy' ? 1 : 0);
+      if (action === 'stop') {
+        f.select('openai');
+        assert.deepEqual(
+          f.instances[2].starts,
+          [],
+          'Stop cleared the intent to resume',
+        );
+        await f.facade.start({ pushToTalk: false });
+        assert.equal(f.facade.state, 'listening');
+      } else {
+        f.select('openai');
+        assert.equal(f.instances.length, 2);
+        assert.equal(f.facade.start(), false);
+      }
     });
   }
 }
-
-test('an adapter without resume options still resumes an active session in open-mic mode', async (t) => {
-  const f = setup(t, { startOptionsAvailable: false });
-  await f.controls.start();
-  f.selectProvider('gemini');
-  assert.equal(f.controls.state, 'listening');
-  assert.deepEqual(f.instances[1].startSettings, [{ pushToTalk: false }]);
-});
-
-test('the public facade exposes no provider-mutation method', (t) => {
-  const f = setup(t);
-  assert.equal(f.controls.setProvider, undefined);
-  assert.equal(f.controls.requestProviderChange, undefined);
-  assert.equal(f.controls.provider, 'openai');
-  assert.deepEqual(f.starts, []);
-  assert.deepEqual(f.storageWrites, []);
-});
-
-test('supported factories determine restoration, facade selection and actual selector options', async (t) => {
-  for (const config of [
-    { supportedProviders: ['openai'], value: 'gemini', expected: 'openai' },
-    { supportedProviders: ['gemini'], value: 'openai', expected: 'gemini' },
-    {
-      supportedProviders: ['gemini', 'openai'],
-      factoryProviders: ['openai'],
-      value: 'gemini',
-      expected: 'openai',
-    },
-    { supportedProviders: ['unknown', 'gemini', 'gemini'], expected: 'gemini' },
-  ]) {
-    await t.test(JSON.stringify(config), async (t) => {
-      const f = setup(t, config);
-      assert.equal(f.controls.provider, config.expected);
-      assert.deepEqual(f.controls.supportedProviders, [config.expected]);
-      assert.deepEqual(
-        f.views[0].providerSelect.options.map(({ value }) => value),
-        [config.expected],
-      );
-      assert.equal(f.instances.length, 1);
-      assert.equal(f.instances[0].provider, config.expected);
-      const unsupported = config.expected === 'openai' ? 'gemini' : 'openai';
-      assert.equal(f.selectProvider(unsupported), false);
-      assert.deepEqual(f.storageWrites, []);
-      await f.controls.start();
-      assert.deepEqual(f.starts, [config.expected]);
-    });
-  }
-});
-
-test('a host without an available supported factory fails before mounting controls', (t) => {
-  assert.throws(
-    () =>
-      setup(t, {
-        supportedProviders: ['gemini'],
-        factoryProviders: ['openai'],
-      }),
-    /No supported voice provider/,
-  );
-});

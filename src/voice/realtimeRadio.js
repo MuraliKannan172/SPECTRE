@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 import {
   silenceRadioForVoice,
   startPreparedRadioAfterPlaybackReady,
@@ -36,11 +37,7 @@ export class RealtimeRadio {
     this.radioVisibilityOffPending = false;
     this.radioToolHandoffReservations = new Map();
     this.radioHandoffDeferredByReservation = false;
-    this.radioVoiceResume = null;
-    this.radioVoiceResumeEpoch = 0;
-    this.radioTuningPause = null;
     this.radioControlUnsubscribe = null;
-    this.radioStateUnsubscribe = null;
     this.radioVisibilityRequestUnsubscribe = null;
     this.radioVisibilityUnsubscribe = null;
   }
@@ -70,45 +67,16 @@ export class RealtimeRadio {
           event.origin === 'user' &&
           (event.action === 'pause' || event.action === 'stop')
         ) {
-          // Tuner drag pauses the stream internally while Radio still owns the
-          // speaker. Its cancellation/commit settles through public state.
-          if (
-            event.action === 'pause' &&
-            this.radioLayer?.getUIState?.()?.tuningActive
-          ) {
-            this.radioTuningPause = { attemptId: event.attemptId };
-            return;
-          }
           this.cancelRadioHandoff();
-          this.resumeVoiceAfterRadio(event.action, event.attemptId);
-        } else if (event.origin === 'user' && event.action === 'play-request') {
-          // A Radio-only replacement keeps the voice it interrupted. Bind the
-          // right to resume to the new stream before any delayed old callbacks.
-          this.radioTuningPause = null;
-          this.radioVoiceResumeEpoch++;
-          if (this.radioVoiceResume)
-            this.radioVoiceResume = {
-              ...this.radioVoiceResume,
-              attemptId: event.attemptId,
-            };
-        } else if (event.origin === 'user' && event.action === 'play') {
-          // The public player emits play only after the new stream succeeds.
-          // A failed Audio.play() must leave active voice alone.
-          this.suspendVoiceForRadio(event.attemptId);
+        } else if (
+          event.origin === 'user' &&
+          event.action === 'play' &&
+          this.isActive()
+        ) {
+          // Explicit user playback has already reached `playing` under the voice
+          // hard mute. Hand the speaker to Radio without tearing its stream down.
+          this.stop({ preserveRadioPlayback: true });
         }
-      }) || null;
-    let wasTuning = false;
-    this.radioStateUnsubscribe =
-      this.radioLayer?.subscribe?.((state) => {
-        const finishedTuning = wasTuning && state?.tuningActive === false;
-        wasTuning = Boolean(state?.tuningActive);
-        if (!finishedTuning || state.tuningAwaitingStationId) return;
-        // Cancel, release without a station or an invalid commit all end the
-        // drag paused with no new stream: the interrupted voice may return.
-        const tuningPause = this.radioTuningPause;
-        this.radioTuningPause = null;
-        if (tuningPause && state.audioState === 'paused')
-          this.resumeVoiceAfterRadio('tuning-ended', tuningPause.attemptId);
       }) || null;
     this.radioVisibilityRequestUnsubscribe =
       this.dataManager?.subscribeVisibilityRequests?.((change) => {
@@ -122,30 +90,8 @@ export class RealtimeRadio {
       }) || null;
   }
 
-  /** Remember voice only when confirmed Radio playback actually suspends it. */
-  suspendVoiceForRadio(attemptId) {
-    if (!this.isActive()) {
-      // No voice to suspend, but a voice handoff hard-muted Radio before it
-      // started. Confirmed playback must still become audible.
-      this.radioVoiceDucked = false;
-      this.radioLayer?.setVoiceDucked?.(false);
-      return;
-    }
-    const settings = this.readVoiceResumeSettings?.() || {};
-    const resumeEpoch = this.radioVoiceResumeEpoch;
-    this.stop({ preserveRadioPlayback: true });
-    // Tell the host why voice went quiet; Radio playback caused this stop.
-    this.notifyVoiceSuspended?.({ reason: 'radio' });
-    // Synchronous explicit OFF or provider retirement defeats this suspension.
-    if (resumeEpoch !== this.radioVoiceResumeEpoch) return;
-    this.radioVoiceResumeEpoch++;
-    this.radioVoiceResume = { settings, attemptId };
-  }
-
   /** Pause Radio for explicit voice ownership; never resumes it automatically. */
   pauseRadioForVoice() {
-    this.radioVoiceResume = null;
-    this.radioVoiceResumeEpoch++;
     return silenceRadioForVoice({
       duckRadio: () => this.setRadioVoiceDucking(true),
       pauseRadio: () => this.radioLayer?.pause?.({ origin: 'voice-duck' }),
@@ -179,7 +125,6 @@ export class RealtimeRadio {
         if (this.dataManager?.isEnabled?.('radio') === false) {
           this.radioHandoffDeferredByReservation = false;
           this.cancelRadioHandoff({ abortRadioSiblings: true });
-          this.resumeVoiceAfterRadio('disabled');
           return;
         }
         this.resumeDeferredRadioHandoffIfUnreserved();
@@ -287,7 +232,7 @@ export class RealtimeRadio {
       {
         prepareRadio: () =>
           this.radioLayer?.playForVoice?.({ attemptId: handoffAttemptId }),
-        stopVoice: () => this.suspendVoiceForRadio(handoffAttemptId),
+        stopVoice: () => this.stop({ preserveRadioPlayback: true }),
         cancelRadio: () =>
           this.radioLayer?.stopPlayback?.({
             origin: 'voice-cleanup',
@@ -295,7 +240,6 @@ export class RealtimeRadio {
           }),
         isCurrent: () =>
           this.radioHandoffInFlight &&
-          this.radioHandoffAttemptId === handoffAttemptId &&
           !this.isRadioHandoffReserved() &&
           handoffEpoch === this.radioHandoffEpoch &&
           !this.userTurnPending &&
@@ -317,7 +261,7 @@ export class RealtimeRadio {
     if (radioHandoff.result?.ok || radioHandoff.cancelled || !stillCurrent)
       return;
     if (this.dc?.readyState === 'open' && !this.userTurnPending) {
-      this.setStatus('listening', 'Radio did not start');
+      this.setStatus('listening', t('Radio did not start'));
       this.queueResponseCreate(
         'Say exactly one short correction: “The Radio station could not start. Voice is still on.”',
       );
@@ -337,8 +281,8 @@ export class RealtimeRadio {
     this.radioHandoffInFlightResult = null;
     this.radioHandoffInFlight = false;
     this.radioHandoffAttemptId = null;
-    // Do not advance the group epoch or release another tool's reservation.
-    // Late preflight completion remains bound to its own attempt ID.
+    // Keep the group epoch and sibling reservations; release ownership before
+    // Stop can synchronously notify playback observers.
     if (shouldStopPlayback)
       this.radioLayer?.stopPlayback?.({ origin: 'voice-cleanup', attemptId });
   }
@@ -365,23 +309,23 @@ export class RealtimeRadio {
       epoch: this.radioHandoffEpoch,
       responseId: responseId || null,
     };
-    // Release only the old handoff before abort listeners can create a new one.
-    const shouldStopPlayback = this.radioHandoffInFlight;
-    const attemptId = this.radioHandoffAttemptId;
-    const radioLayer = this.radioLayer;
-    this.pendingRadioPlaybackResult = null;
-    this.radioHandoffInFlightResult = null;
-    this.radioToolHandoffReservations.clear();
-    this.radioHandoffDeferredByReservation = false;
-    this.radioHandoffInFlight = false;
-    this.radioHandoffAttemptId = null;
     if (abortTools) {
       this.abortTools();
     } else if (abortRadioSiblings) {
       this.abortRadioSiblingTools();
     }
+    this.pendingRadioPlaybackResult = null;
+    this.radioHandoffInFlightResult = null;
+    this.radioToolHandoffReservations.clear();
+    this.radioHandoffDeferredByReservation = false;
+    const shouldStopPlayback = this.radioHandoffInFlight;
+    const attemptId = this.radioHandoffAttemptId;
+    // Release ownership before Stop synchronously notifies playback observers;
+    // the resulting callback is then idempotent instead of re-entering Stop.
+    this.radioHandoffInFlight = false;
+    this.radioHandoffAttemptId = null;
     if (shouldStopPlayback) {
-      radioLayer?.stopPlayback?.({ origin: 'voice-cleanup', attemptId });
+      this.radioLayer?.stopPlayback?.({ origin: 'voice-cleanup', attemptId });
     }
   }
 
@@ -389,10 +333,6 @@ export class RealtimeRadio {
     this.radioHandoffEpoch++;
   }
   stopHandoff({ preserveRadioPlayback = false } = {}) {
-    if (!preserveRadioPlayback) {
-      this.radioVoiceResume = null;
-      this.radioVoiceResumeEpoch++;
-    }
     const radioHandoffAttemptId = this.radioHandoffAttemptId;
     if (this.radioHandoffInFlight && !preserveRadioPlayback) {
       this.radioLayer?.stopPlayback?.({
@@ -414,15 +354,9 @@ export class RealtimeRadio {
   }
 
   detachObservers() {
-    this.radioVoiceResume = null;
-    this.radioVoiceResumeEpoch++;
     if (this.radioControlUnsubscribe) {
       this.radioControlUnsubscribe();
       this.radioControlUnsubscribe = null;
-    }
-    if (this.radioStateUnsubscribe) {
-      this.radioStateUnsubscribe();
-      this.radioStateUnsubscribe = null;
     }
     if (this.radioVisibilityRequestUnsubscribe) {
       this.radioVisibilityRequestUnsubscribe();
@@ -448,30 +382,5 @@ export class RealtimeRadio {
   }
   deferHandoff() {
     this.radioHandoffDeferredByReservation = true;
-  }
-
-  /** Resume once after the same voice-owned Radio handoff is paused or disabled. */
-  resumeVoiceAfterRadio(reason, attemptId) {
-    const lease = this.radioVoiceResume;
-    if (!lease) return false;
-    if (attemptId !== undefined && attemptId !== lease.attemptId) return false;
-    const resumeEpoch = ++this.radioVoiceResumeEpoch;
-    void Promise.resolve()
-      .then(() => {
-        if (
-          resumeEpoch !== this.radioVoiceResumeEpoch ||
-          this.radioVoiceResume !== lease
-        )
-          return;
-        this.radioVoiceResume = null;
-        return this.resumeVoice?.(lease.settings);
-      })
-      .catch((error) =>
-        this.debugLog?.('radio.voice_resume_failed', {
-          reason,
-          error: error?.message || String(error),
-        }),
-      );
-    return true;
   }
 }

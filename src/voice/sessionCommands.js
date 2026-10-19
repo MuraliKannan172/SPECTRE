@@ -1,10 +1,9 @@
-import { createVoiceControl } from './control.js';
+import { createVoiceControl, voiceStatusLabel } from './control.js';
 import { createVoiceSession } from './session.js';
 import { VoiceCardControls } from './voiceCard.js';
 import { PointerReticle } from './pointerReticle.js';
-
-const DEFAULT_ERROR_HINT =
-  'Check microphone permission and network access, then try again.';
+import { VOICE_PROVIDERS } from './providerCapabilities.js';
+import { msg, registerUnsavedWork, t } from '../i18n/index.js';
 
 function createDefaultReticle(pointer) {
   const element = pointer?.element;
@@ -28,11 +27,11 @@ export function createVoiceCommands({
   debugSink,
   createControl = createVoiceControl,
   resetExisting = true,
+  disposeRunner = true,
   provider,
   supportedProviders,
   onProviderChange,
   onSessionEvent,
-  disposeRunner = true,
   createCard = (options) => new VoiceCardControls(options),
   pointer = null,
   referents = null,
@@ -40,24 +39,8 @@ export function createVoiceCommands({
 }) {
   if (resetExisting) window.__gevVoiceCommands?.stop?.({ removeUi: true });
   const ui = createControl({ reset: true });
-  const hasProviderChoice = () =>
-    new Set(
-      Array.from(ui.providerSelect?.options || [], (option) =>
-        option.disabled ? null : option.value,
-      ).filter(Boolean),
-    ).size > 1;
   const session = createVoiceSession({
     runner,
-    providerDropdown: () =>
-      Boolean(
-        onProviderChange &&
-        ui.providerSelect &&
-        !ui.providerSelect.disabled &&
-        !ui.providerSelect.hidden &&
-        ui.providerField &&
-        hasProviderChoice() &&
-        !ui.providerField.hidden,
-      ),
     signal,
     createAdapter: (hooks) =>
       createSession({
@@ -82,48 +65,54 @@ export function createVoiceCommands({
         ...supportedProviders.map((name) => {
           const option = doc.createElement('option');
           option.value = name;
-          option.textContent = name === 'openai' ? 'OpenAI' : 'Gemini';
+          option.textContent = VOICE_PROVIDERS[name].label;
           return option;
         }),
       );
     }
     ui.providerSelect.value = provider;
-    if (capabilities.advisoryLimit)
-      ui.providerSelect.title = `Changing provider reconnects voice if it is on. ${capabilities.advisoryLimit}`;
-    ui.root.dataset.provider = provider;
+    ui.providerSelect.title = [
+      t('Changing provider reconnects voice if it is on.'),
+      capabilities.advisoryLimit,
+    ]
+      .filter(Boolean)
+      .join(' ');
     ui.providerSelect.addEventListener('change', providerHandler);
+    ui.root.dataset.provider = provider;
   }
-  if (ui.providerField)
-    ui.providerField.hidden = !onProviderChange || !hasProviderChoice();
+  const hasProviderChoice = Boolean(
+    onProviderChange && supportedProviders?.length > 1,
+  );
+  if (ui.providerField) ui.providerField.hidden = !hasProviderChoice;
+  ui.root.dataset.providerChoice = String(hasProviderChoice);
   if (ui.tierButton) ui.tierButton.hidden = !capabilities.costControls;
   if (ui.costValue) ui.costValue.hidden = !capabilities.costControls;
   if (!capabilities.pushToTalk) {
-    ui.button.setAttribute('aria-label', 'Toggle voice control');
-    if (ui.helpDetail) ui.helpDetail.textContent = 'Activate to toggle voice';
+    ui.button.setAttribute('aria-label', t('Toggle voice control'));
+    if (ui.helpDetail)
+      ui.helpDetail.textContent = t('Activate to toggle voice');
   }
   // Retain the existing controller's inspection surface for browser tools.
   const controls = adapter.controller || session;
   controls.session = session;
   controls.ui = ui;
   const updateStatus = session.subscribe((event) => {
-    onSessionEvent?.(event);
     if (event.type !== 'state') return;
     ui.root.dataset.status = event.state;
-    ui.status.textContent =
-      event.state === 'idle' ? 'OFF' : event.state.toUpperCase();
+    // States are machine values; only the label is translated.
+    ui.status.textContent = voiceStatusLabel(event.state);
+    // The portable session reports 'Voice off' in English: show the idle
+    // label instead. Other details are provider messages, shown as they come.
+    const idle = event.state === 'idle';
+    const detail = event.detail === 'Voice off' ? '' : event.detail;
     ui.detail.textContent =
-      event.detail || (event.state === 'idle' ? 'Voice off' : 'Voice active');
+      detail || (idle ? t('Voice off') : t('Voice active'));
     ui.button.setAttribute('aria-pressed', String(session.isActive()));
     if (ui.errorDetail)
       ui.errorDetail.textContent =
         event.state === 'error'
-          ? event.detail || 'Voice could not be started.'
+          ? event.detail || t('Voice could not be started.')
           : '';
-    if (ui.errorHint)
-      ui.errorHint.textContent =
-        event.state === 'error' && event.recovery
-          ? event.recovery
-          : DEFAULT_ERROR_HINT;
     if (event.state === 'error') ui.root.classList?.remove('error-dismissed');
   });
   // Captions, plan and result card nested in the control; it only reads
@@ -148,50 +137,44 @@ export function createVoiceCommands({
   });
   controls.pointer = pointer;
   controls.referents = referents;
+  // Forward last: a host observer may synchronously replace or stop this mount.
+  const forwardEvents = onSessionEvent
+    ? session.subscribe(onSessionEvent)
+    : null;
   const annotationUnsubscribe = annotations?.onOutlineEvent?.((event) => {
     card?.outline(event);
     session.sendMapEvent({ type: 'map_annotation_outline', ...event });
   });
+  // A reload (the language switch) ends the conversation: ask first.
+  const unregisterUnsavedWork = registerUnsavedWork(() =>
+    session.isActive() ? msg('the active voice session') : null,
+  );
   const buttonHandler = () => {
     if (adapter.ignoreButtonClick?.()) return;
     if (session.isActive()) session.stop();
     else void session.start({ pushToTalk: false });
   };
   ui.button.addEventListener('click', buttonHandler);
-  session.signal.addEventListener(
-    'abort',
-    () => {
-      ui.button.removeEventListener('click', buttonHandler);
-      ui.providerSelect?.removeEventListener('change', providerHandler);
-      annotationUnsubscribe?.();
-      updateStatus();
-      updateCard?.();
-      updatePointer();
-      reticle?.destroy();
-      card?.destroy();
-      pointer?.clear();
-      referents?.clear();
-      runner.resetConversation?.();
-      if (disposeRunner) runner.dispose?.();
-      ui.root.remove();
-    },
-    { once: true },
-  );
-  if (session.disposed) {
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
     ui.button.removeEventListener('click', buttonHandler);
     ui.providerSelect?.removeEventListener('change', providerHandler);
+    unregisterUnsavedWork();
     annotationUnsubscribe?.();
     updateStatus();
     updateCard?.();
     updatePointer();
+    forwardEvents?.();
     reticle?.destroy();
     card?.destroy();
-    pointer?.clear();
-    referents?.clear();
-    runner.resetConversation?.();
     if (disposeRunner) runner.dispose?.();
     ui.root.remove();
-  } else adapter.bindControls?.();
+  };
+  session.signal.addEventListener('abort', cleanup, { once: true });
+  if (session.disposed) cleanup();
+  else adapter.bindControls?.();
   window.__gevVoiceCommands = controls;
   return controls;
 }

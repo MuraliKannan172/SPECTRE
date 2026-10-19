@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { harness, tick, deferred } from './geminiNativeHarness.mjs';
-import { readVoiceUserTurnText } from './userTurnIntent.js';
+import {
+  harness,
+  tick,
+  deferred,
+} from '../testSupport/geminiNativeHarness.mjs';
 import { withToolCatalog } from './gevRealtime.js';
 
 const audioContent = (data) => ({
@@ -213,22 +216,24 @@ for (const [id, prior] of [
   });
 }
 
-test('H05 native: typed token survives audio drain for same-turn tools and revokes on new input', async () => {
+test('H05 native: local typed presentation survives audio drain and new input revokes old call ownership', async () => {
   const h = harness();
   try {
     await h.c.start();
     const ws = h.sockets[0],
       audio = h.captures[0];
     h.c.sendTextCommand('Show the current view');
-    const response = h.events.findLast((e) => e.type === 'response-start');
+    const response = h.c.currentTypedInput();
+    assert.equal(response.text, 'Show the current view');
     assert.equal(
-      readVoiceUserTurnText(response.userTurn),
-      'Show the current view',
+      h.events.findLast((e) => e.type === 'transcript' && e.role === 'user')
+        .text,
+      response.text,
     );
     request(ws, 'first');
     await h.c.toolQueue;
-    assert.equal(h.calls[0].options.userTurn, response.userTurn);
-    assert.equal(h.calls[0].options.responseId, response.responseId);
+    assert.equal(h.calls[0].options.userTurn, undefined);
+    assert.equal(h.calls[0].options.isCurrent(), true);
     ws.message({
       serverContent: {
         ...audioContent('confirmation'),
@@ -249,15 +254,17 @@ test('H05 native: typed token survives audio drain for same-turn tools and revok
     assert.equal(completion.responseId, response.responseId);
     assert.equal(completion.spoken, true);
     assert.equal(completion.audioDrained, true);
-    assert.equal(
-      readVoiceUserTurnText(response.userTurn),
-      'Show the current view',
-    );
+    assert.equal(h.c.currentTypedInput(), response);
+    assert.equal(response.text, 'Show the current view');
     request(ws, 'same-turn');
     await h.c.toolQueue;
-    assert.equal(h.calls[1].options.userTurn, response.userTurn);
+    assert.equal(h.calls[1].options.userTurn, undefined);
+    assert.equal(h.c.currentTypedInput(), response);
     h.c.sendTextCommand('New request');
-    assert.equal(readVoiceUserTurnText(response.userTurn), undefined);
+    assert.notEqual(h.c.currentTypedInput(), response);
+    assert.equal(h.c.currentTypedInput().text, 'New request');
+    assert.equal(h.calls[0].options.isCurrent(), false);
+    assert.equal(h.calls[1].options.isCurrent(), false);
   } finally {
     h.c.stop();
   }
@@ -337,14 +344,18 @@ test('H10 native: held speech dispatches without caption authority and new text 
     );
     h.c.input.setMicrophoneEnabled(false);
     caption(ws, 'Show the current view');
-    const response = h.events.findLast((e) => e.type === 'response-start');
-    assert.equal(response.userTurn, undefined);
+    assert.equal(h.c.currentTypedInput(), null);
+    assert.equal(
+      h.events.findLast((e) => e.type === 'transcript' && e.role === 'user')
+        .text,
+      'Show the current view',
+    );
     request(ws, 'held');
     await tick();
     const oldWork = h.c.toolQueue;
     assert.equal(executions.length, 1);
     assert.equal(executions[0].options.userTurn, undefined);
-    assert.equal(executions[0].options.responseId, response.responseId);
+    assert.equal(executions[0].options.isCurrent(), true);
     h.c.sendTextCommand('new intent');
     await oldWork;
     assert.equal(executions[0].options.signal.aborted, true);
@@ -497,7 +508,7 @@ for (const [id, exit] of [
       const oldWork = h.c.toolQueue;
       assert.equal(h.c.pendingTools, 1);
       if (exit === 'stop') h.c.stop();
-      else h.c.sendTextCommand('switch voice provider to Gemini');
+      else h.c.sendTextCommand('Show the whole globe');
       caption(ws, 'zoom in');
       await oldWork;
       assert.deepEqual(mutations, []);
@@ -507,15 +518,147 @@ for (const [id, exit] of [
         ws.message({
           serverContent: { interrupted: true, turnComplete: true },
         });
-        request(ws, 'typed-provider-camera', 'zoom_to_globe');
+        request(ws, 'fresh-camera', 'zoom_to_globe');
         await h.c.toolQueue;
-        assert.deepEqual(mutations, []);
-        assert.deepEqual(observed, []);
-        assert.equal(
-          responses(ws).at(-1).response.providerRequestBlocked,
-          true,
-        );
+        assert.deepEqual(mutations, ['zoom_to_globe']);
+        assert.deepEqual(observed, ['zoom_to_globe']);
+        assert.equal(responses(ws).at(-1).response.ok, true);
       }
+    } finally {
+      h.c.stop();
+    }
+    assert.equal(h.timers.size, 0);
+  });
+}
+
+for (const settlement of ['queued', 'running']) {
+  test(`native: cancelled ${settlement} tool settles a completed provider turn`, async () => {
+    const result = deferred();
+    let executions = 0;
+    const h = harness({
+      runAction: () => {
+        executions++;
+        return result.promise;
+      },
+    });
+    try {
+      await h.c.start();
+      h.c.sendTextCommand('Read current view');
+      const ws = h.sockets[0];
+      request(ws, 'cancelled-query');
+      if (settlement === 'running') await tick();
+      ws.message({ toolCallCancellation: { ids: ['cancelled-query'] } });
+      ws.message({ serverContent: { turnComplete: true } });
+      await h.c.toolQueue;
+      assert.equal(h.c.pendingTools, 0);
+      assert.equal(executions, settlement === 'queued' ? 0 : 1);
+      assert.deepEqual(responses(ws), []);
+      assert.equal(
+        h.events.filter((event) => event.type === 'completion').length,
+        1,
+      );
+      assert.equal(h.c.pendingCompletionStatus, null);
+      result.resolve({ ok: true });
+      await tick();
+      h.captures[0].drain();
+      assert.equal(
+        h.events.filter((event) => event.type === 'completion').length,
+        1,
+      );
+      assert.deepEqual(responses(ws), []);
+    } finally {
+      result.resolve({ ok: true });
+      h.c.stop();
+    }
+    assert.equal(h.timers.size, 0);
+  });
+}
+
+for (const order of ['before', 'after']) {
+  test(`native: cancelling queued output ${order} turnComplete emits one completion`, async () => {
+    const h = harness();
+    try {
+      await h.c.start();
+      h.c.sendTextCommand('Read current view');
+      const ws = h.sockets[0];
+      ws.bufferedAmount = 1e9;
+      request(ws, 'queued-output');
+      await h.c.toolQueue;
+      assert.equal(h.c.pendingTools, 0);
+      assert.equal(h.c.controlQueue.length, 1);
+      assert.equal(responses(ws).length, 0);
+      if (order === 'after')
+        ws.message({ serverContent: { turnComplete: true } });
+      ws.message({ toolCallCancellation: { ids: ['queued-output'] } });
+      if (order === 'before')
+        ws.message({ serverContent: { turnComplete: true } });
+      assert.equal(h.c.controlQueue.length, 0);
+      assert.equal(h.c.controlTimer, null);
+      assert.equal(h.c.pendingCompletionStatus, null);
+      assert.equal(h.events.filter((e) => e.type === 'completion').length, 1);
+      ws.bufferedAmount = 0;
+      h.advance(1000);
+      h.captures[0].drain();
+      assert.deepEqual(responses(ws), []);
+      assert.equal(h.events.filter((e) => e.type === 'completion').length, 1);
+    } finally {
+      h.c.stop();
+    }
+    assert.equal(h.timers.size, 0);
+  });
+}
+
+for (const successor of ['input', 'stop']) {
+  test(`native: queued-output cancellation completion fences reentrant ${successor}`, async () => {
+    let h;
+    let successorTurn;
+    h = harness({
+      emit: (event) => {
+        h.events.push(event);
+        if (event.type !== 'completion') return;
+        h.sockets[0].bufferedAmount = 0;
+        if (successor === 'stop') h.c.stop();
+        else {
+          h.c.sendTextCommand('Show the whole globe');
+          successorTurn = h.c.turn;
+        }
+      },
+    });
+    try {
+      await h.c.start();
+      h.c.sendTextCommand('Read current view');
+      const ws = h.sockets[0];
+      ws.bufferedAmount = 1e9;
+      request(ws, 'queued-output');
+      await h.c.toolQueue;
+      ws.message({ serverContent: { turnComplete: true } });
+      const callCount = h.calls.length;
+      ws.message({
+        toolCallCancellation: { ids: ['queued-output'] },
+        serverContent: {
+          outputTranscription: { text: 'Retired packet caption' },
+          turnComplete: true,
+        },
+        toolCall: {
+          functionCalls: [
+            { id: 'retired-tool', name: 'get_current_view_state', args: {} },
+          ],
+        },
+      });
+      await h.c.toolQueue;
+      assert.equal(h.events.filter((e) => e.type === 'completion').length, 1);
+      assert.equal(h.calls.length, callCount);
+      assert.deepEqual(responses(ws), []);
+      assert.ok(
+        !h.events.some((e) =>
+          JSON.stringify(e).includes('Retired packet caption'),
+        ),
+      );
+      if (successor === 'input') {
+        assert.equal(h.c.turn, successorTurn);
+        assert.equal(h.c.modelComplete, false);
+        assert.equal(h.c.replyPending, true);
+      } else assert.equal(h.c.isActive(), false);
     } finally {
       h.c.stop();
     }

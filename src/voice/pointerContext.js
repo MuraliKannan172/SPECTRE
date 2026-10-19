@@ -331,16 +331,16 @@ export function createPointerTracker({
      * the turn's referent (null when stale).
      */
     beginTurn(at, { recentMs = POINTER_FRESH_MS, capturedSnapshot } = {}) {
+      // Delayed admitted audio keeps its capture's pointer without replacing a
+      // newer physical hold. Undefined preserves existing caller behavior.
+      if (capturedSnapshot !== undefined) {
+        const snapshot = destroyed ? { fresh: false, at } : capturedSnapshot;
+        active = snapshot?.fresh ? snapshot : null;
+        return snapshot;
+      }
       const reuse =
         at !== 'text' && held && now() - held.heldAt <= POINTER_HOLD_MS;
-      // A delayed worklet admission may arrive after Space release. The
-      // provider owns this previously captured, local gesture snapshot.
-      const snapshot =
-        capturedSnapshot !== undefined
-          ? capturedSnapshot
-          : reuse
-            ? held.snapshot
-            : capture(at, { recentMs });
+      const snapshot = reuse ? held.snapshot : capture(at, { recentMs });
       if (!reuse && at !== 'text') held = null;
       active = snapshot?.fresh ? snapshot : null;
       return snapshot;
