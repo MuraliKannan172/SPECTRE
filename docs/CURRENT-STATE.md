@@ -2733,11 +2733,16 @@ down | auth-failed` (plus the unchanged `missing-key`/`unsupported`) with
 >   first later successful fetch. Smaller chunks reduce timeout risk; complete
 >   camera batches still wait for their sequential requests, and unresolved
 >   placement continues to use the existing prior until real heights arrive.
-> - **Overpass cache admission:** `/api/overpass` parses and sanitizes requests,
->   then checks fresh memory, identical in-flight work, and fresh disk entries
->   before invoking its local 90/min limiter. Cache and single-flight responses
->   therefore do not spend quota; upstream-bound misses retain the existing
->   limiter, configured-upstream, stale, and sanitization behavior. An unconfigured transport serves dated stale data or a non-retryable capability error.
+> - **Overpass cache admission:** `/api/overpass` refuses cross-site and forwarded
+>   POSTs through the shared local-request gate, then limits requests to 300/min
+>   per socket peer and 900/min globally before reading or validating bodies.
+>   Tag-filter brackets are scanned once; nested or unmatched brackets return 400.
+>   It then checks fresh memory, identical in-flight work, and fresh disk entries
+>   before invoking its separate local 90/min upstream limiter. Cache and
+>   single-flight responses therefore do not spend upstream quota; upstream-bound
+>   misses retain the existing limiter, configured-upstream, stale, and sanitization
+>   behavior. An unconfigured transport serves dated stale data or a non-retryable
+>   capability error.
 > - **CCTV world-click focus:** clicking an in-world CCTV icon or ambient card
 >   activates it and routes the camera flight through the panel FOCUS policy.
 >   Aircraft/satellite tracking releases outside cockpit; cockpit retains the
