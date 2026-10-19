@@ -1,5 +1,10 @@
 # God's Eye View Current State
 
+Share links and structured views accept only own keys in their style registries.
+Inherited names such as `constructor` and `__proto__` fall back to the existing
+normal/null defaults without interrupting other restored fields. Programmatic
+visual-style calls ignore unknown or non-string values before mutating state.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,
