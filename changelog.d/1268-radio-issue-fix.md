@@ -1,0 +1,1 @@
+- Normalize station tags and retain valid mixed rows (asturksever, #1268).
