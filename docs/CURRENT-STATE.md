@@ -1,5 +1,14 @@
 # God's Eye View Current State
 
+Docker Compose forwards `GEV_KEY_SETUP_TRUSTED_PEERS` and `GEV_ALLOWED_HOSTS`
+from the shell or project `.env` before `scripts/docker-start.mjs` runs; shell
+values take precedence. The launcher's `none` policy resolves to an empty trusted
+peer list and is assigned before importing Vite, preventing later dotenv loading
+from replacing it. Unset or blank values retain automatic gateway discovery.
+Startup logs distinguish an explicit `none` policy from a missing default route.
+This changes neither loopback-only port publishing nor the Provider Settings
+Host, Origin, proxy-header and sharing checks.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,
