@@ -511,6 +511,11 @@ function pickOntarioCctvView(views) {
 
 let ontarioKeyMissingLogged = false;
 
+/** Test seam: let the next keyless call log the missing-key line again. */
+export function _resetOntarioKeyWarningForTest() {
+  ontarioKeyMissingLogged = false;
+}
+
 /**
  * Fetch Ontario 511 CCTV cameras. The camera list comes from the 511 API,
  * which now requires a free developer key (511on.ca/developers/doc, "Requires a
@@ -521,7 +526,7 @@ let ontarioKeyMissingLogged = false;
  * view are kept.
  *
  * @param {object} [_options] The catalog's loader options (unused).
- * @param {object} [env] Environment to read the key from.
+ * @param {object} [env] Environment to read the key and the source cap from.
  * @returns {Promise<Array<object>>} Normalized camera source objects.
  */
 export async function loadOntarioSourcesFromOpenData(
@@ -547,12 +552,12 @@ export async function loadOntarioSourcesFromOpenData(
     });
     if (!resp.ok) {
       // The API answers 400 "Invalid Key" to a wrong or revoked key.
-      console.warn(
-        '[CCTV] Ontario 511 camera download failed:',
-        resp.status,
+      const keyHint =
         resp.status === 400 || resp.status === 401 || resp.status === 403
-          ? '(check ONTARIO_511_API_KEY)'
-          : '',
+          ? ' (check ONTARIO_511_API_KEY)'
+          : '';
+      console.warn(
+        `[CCTV] Ontario 511 camera download failed: ${resp.status}${keyHint}`,
       );
       return [];
     }
@@ -616,7 +621,7 @@ export async function loadOntarioSourcesFromOpenData(
       new Map(cameras.map((camera) => [camera.id, camera])).values(),
     );
     const maxRaw = Number(
-      process.env.CCTV_ONTARIO_MAX_SOURCES || DEFAULT_ONTARIO_MAX_SOURCES,
+      env.CCTV_ONTARIO_MAX_SOURCES || DEFAULT_ONTARIO_MAX_SOURCES,
     );
     const maxCount = Number.isFinite(maxRaw)
       ? Math.max(8, Math.min(1000, Math.floor(maxRaw)))
