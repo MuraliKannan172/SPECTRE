@@ -4557,6 +4557,12 @@ Retry-After; absent delays back off from 30 seconds to five minutes. Empty
 remain. Malformed capability-probe responses remain unknown and are retried after the existing 30-second backoff; valid configured decisions remain memoized.
 Consumer capability misses never schedule automatic retries.
 
+Keyless browser validation also probes the optional Google tiles-token route.
+The token client cancels rejected response bodies before returning unavailable,
+so they do not remain pending in browser network observation. The Overpass gate
+accepts only that same-origin route's expected 404 console diagnostic; other
+HTTP and JavaScript errors still fail acceptance.
+
 Operator-configured Overpass area and focus-footprint queries use body-level
 `out geom` (with `center` for focus), preserving relation member outlines.
 Member geometry is printed only inside a box around the point (6 km for
