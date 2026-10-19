@@ -1,5 +1,7 @@
 # God's Eye View Current State
 
+Wind and weather parameter changes may supersede a first-load request without rejecting the layer’s enable transaction. Obsolete responses cannot publish data; a replacement request remains visible through the loading state. Explicit caller cancellation, disable, and destroy still reject the obsolete update. Source failures continue to report their existing unavailable state.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,

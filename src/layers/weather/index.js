@@ -357,7 +357,7 @@ export function createWeatherLayer({
           signal: controller.signal,
         });
         if (!enabled || controller.signal.aborted || request !== controller)
-          return false;
+          return enabled && !signal?.aborted && request !== controller;
         if (snapshot.unavailable) {
           error = msg(
             'Weather source unavailable; previous observation retained',
@@ -376,7 +376,9 @@ export function createWeatherLayer({
           )
             await show(snapshot.latest, controller.signal);
           return (
-            !controller.signal.aborted && request === controller && enabled
+            enabled &&
+            !signal?.aborted &&
+            (!controller.signal.aborted || request !== controller)
           );
         }
         const time =
@@ -388,9 +390,14 @@ export function createWeatherLayer({
           (satellite && rendering.getDiagnostics().infrared !== infrared)
         )
           await show(time, controller.signal);
-        return !controller.signal.aborted && request === controller && enabled;
+        return (
+          enabled &&
+          !signal?.aborted &&
+          (!controller.signal.aborted || request !== controller)
+        );
       } catch (cause) {
-        if (controller.signal.aborted || request !== controller) return false;
+        if (controller.signal.aborted || request !== controller)
+          return enabled && !signal?.aborted && request !== controller;
         error = cause?.message || msg('Weather unavailable');
         stop();
         return true;
