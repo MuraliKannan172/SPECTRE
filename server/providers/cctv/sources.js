@@ -1200,7 +1200,7 @@ export function parseTarkteeDatexImages(xml) {
  */
 export async function loadTarkteeSourcesFromDatex() {
   try {
-    const [locResp, imgResp] = await Promise.all([
+    const responses = await Promise.allSettled([
       fetch(TARKTEE_LOCATIONS_URL, {
         headers: { Accept: 'application/xml,text/xml,*/*' },
         redirect: 'manual',
@@ -1212,6 +1212,9 @@ export async function loadTarkteeSourcesFromDatex() {
         signal: AbortSignal.timeout(TARKTEE_FETCH_TIMEOUT_MS),
       }),
     ]);
+    const [locResp, imgResp] = responses.map((result) =>
+      result.status === 'fulfilled' ? result.value : undefined,
+    );
     // Both responses are fetched in parallel; if either is rejected or overflows
     // its byte cap, both bodies must be released so neither transport leaks.
     const discardBoth = async () => {
@@ -1221,6 +1224,11 @@ export async function loadTarkteeSourcesFromDatex() {
       ]);
       return [];
     };
+    const rejected = responses.find((result) => result.status === 'rejected');
+    if (rejected) {
+      await discardBoth();
+      throw rejected.reason;
+    }
     if (
       (locResp.status >= 300 && locResp.status < 400) ||
       (imgResp.status >= 300 && imgResp.status < 400)

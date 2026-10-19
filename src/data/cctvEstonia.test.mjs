@@ -168,6 +168,46 @@ test('Tarktee loader refuses a redirect and cancels both response bodies', async
   assert.equal(cancelled.images, true, 'sibling 200 body is also cancelled');
 });
 
+test('Tarktee loader cancels fulfilled bodies when either fetch rejects', async (t) => {
+  for (const failedUrl of [TARKTEE_LOCATIONS_URL, TARKTEE_IMAGES_URL]) {
+    for (const delayedSibling of [false, true]) {
+      await t.test(
+        `${failedUrl}, delayed sibling: ${delayedSibling}`,
+        async (t) => {
+          quiet(t);
+          let cancelled = false;
+          const response = new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode('<xml/>'));
+              },
+              cancel() {
+                cancelled = true;
+              },
+            }),
+          );
+          t.mock.method(globalThis, 'fetch', async (url) => {
+            if (String(url) === failedUrl) throw new TypeError('fetch failed');
+            if (delayedSibling) await new Promise(setImmediate);
+            return response;
+          });
+
+          try {
+            assert.deepEqual(await loadTarkteeSourcesFromDatex(), []);
+            assert.equal(
+              cancelled,
+              true,
+              'fulfilled sibling body is cancelled',
+            );
+          } finally {
+            await response.body.cancel();
+          }
+        },
+      );
+    }
+  }
+});
+
 test('Tarktee loader cancels the sibling body when one feed fails or overflows the byte cap', async (t) => {
   quiet(t);
   let siblingCancelled = false;

@@ -4457,6 +4457,11 @@ silently demoting every later lookup for the session.
   empty keeps the old catalog and is retried after another 15 minutes, not on the next
   request. Estonia's Tarktee DATEX feeds, which answer in 2 to 16.6 s, get 30 s
   (`TARKTEE_FETCH_TIMEOUT_MS`) where other packs get 15 s.
+  Both Tarktee XML catalogs refuse redirects and have a 4 MiB per-document
+  limit, enforced against declared length and streamed bytes. A rejected fetch,
+  unsuccessful response, or body-read failure releases both available response
+  bodies; read failures also cancel an active sibling reader. Cameras sharing
+  an image number are deduplicated before the Tarktee pack cap is applied.
 - **CCTV v3 UX — viewshed + calibration gizmo** (built 2026-07-05 and field
   validated 2026-07-21): the COVERAGE toggle is a
   tri-state cycle `OFF → ON → VIEWSHED`; viewshed mode renders each visible camera's frustum
