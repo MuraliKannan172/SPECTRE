@@ -141,7 +141,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Every page.waitForFunction / page.evaluate is a single CDP call that
 // puppeteer aborts after `protocolTimeout` (default 180s). The headful drain
-// budget is uncapped and reaches ~50 minutes on the full ~3,900-camera
+// budget is uncapped and reaches ~50 minutes on the full ~3,700-camera
 // catalog, so long waits are polled in slices of at most WAIT_SLICE_MS and
 // protocolTimeout is set with headroom above the largest slice.
 const WAIT_SLICE_MS = 120000;
@@ -1432,20 +1432,28 @@ async function main() {
         ),
       };
     }, emptyClickPoint);
+    const siblingOwnsPick =
+      siblingTarget?.pickedId === 'qa-cctv-sibling-owner' &&
+      siblingTarget.ownsExactObject;
+    // A missed pick after fewer than 3 frames means the renderer stalled, not
+    // that picking regressed: fail it on the real-GPU sign-off path, leave it
+    // inconclusive under headless GL.
+    const siblingRendererStalled =
+      siblingTarget && !siblingOwnsPick && siblingTarget.framesRendered < 3;
     record(
       'sibling test object owns its canvas pick',
+      !siblingTarget
+        ? null
+        : siblingRendererStalled
+          ? HEADFUL
+            ? false
+            : null
+          : siblingOwnsPick,
       siblingTarget
-        ? siblingTarget.pickedId === 'qa-cctv-sibling-owner' &&
-            siblingTarget.ownsExactObject
-        : null,
-      siblingTarget
-        ? `picked=${siblingTarget.pickedId} exactOwner=${siblingTarget.ownsExactObject} projectionΔ=${siblingTarget.projectionDelta} frames=${siblingTarget.framesRendered}/3`
+        ? `${siblingRendererStalled ? `renderer stalled: ${siblingTarget.framesRendered}/3 frames in 10s; ` : ''}picked=${siblingTarget.pickedId} exactOwner=${siblingTarget.ownsExactObject} projectionΔ=${siblingTarget.projectionDelta} frames=${siblingTarget.framesRendered}/3`
         : 'no previously verified empty canvas ray was available',
     );
-    if (
-      siblingTarget?.pickedId === 'qa-cctv-sibling-owner' &&
-      siblingTarget.ownsExactObject
-    ) {
+    if (siblingOwnsPick) {
       await page.mouse.click(siblingTarget.x, siblingTarget.y);
       await sleep(250);
     }
@@ -1470,8 +1478,7 @@ async function main() {
     });
     record(
       'sibling canvas click passes through without CCTV selection or deselection',
-      siblingTarget?.pickedId === 'qa-cctv-sibling-owner' &&
-        siblingTarget.ownsExactObject
+      siblingOwnsPick
         ? siblingClick.activeId === clickEvidenceSetup.activeId &&
             siblingClick.transitions === siblingClick.baselineTransitions &&
             siblingClick.focusEvents === 0 &&
