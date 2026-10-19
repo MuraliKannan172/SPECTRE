@@ -4417,7 +4417,7 @@ silently demoting every later lookup for the session.
 - **FIRMS**: no ground clamping (zero 3D-tiles height sampling), ≤18 screen-decluttered ambient labels, click-to-inspect detail card, 2.5k/3k sprite budgets viewport-clipped by FRP.
 - **CCTV v2 foundation:** a pitched
   frustum wireframe (4 corner rays + far-cap rectangle) with a monitor plane at the frustum's
-  far cap, retargeting the existing video/canvas texture pipeline. Manual calibration only —
+  far cap, retargeting the existing video/canvas texture pipeline. Stills are drawn at their source aspect, centered on the placeholder dark (`#01070c`), instead of being stretched to the 16:9 canvas. Manual calibration only —
   auto-calibration and the drape mesh pipeline are deleted. A one-shot activation obstruction
   probe (`pickFromRay` on camera activation, clamping the plane short of the first hit) remains;
   ground placement is superseded by the shared-floor v3 behavior below. Calibration persists to
@@ -4435,7 +4435,7 @@ silently demoting every later lookup for the session.
   ground clamp now lifts the cap _center_ only so the wireframe stays a true pyramid welded to
   the plane (was a flattened fan / the ~47.5 m divergence — RESOLVED), re-selecting the active
   camera is a no-op (killed a click-flash), and texture swaps gate on canvas content (killed a
-  periodic white flash). Coverage is now **metro-wide: 250 cameras** (`CCTV_AUSTIN_MAX_SOURCES`
+  periodic white flash). Camera icons are cyan for stills, violet for cameras with a video feed, and amber for the active camera. Coverage is now **metro-wide: 250 cameras** (`CCTV_AUSTIN_MAX_SOURCES`
   default 36 → 250, hard bound 300), filtered to `camera_status === TURNED_ON` (~815 live of
   1,003 rows). City packs (2026-07-04): Caltrans (districts 4/7/11/3 — SF, LA, San Diego,
   Sacramento; cap 300) and TfL London JamCams (cap 250) join Austin (cap 250) as keyless default
