@@ -17,6 +17,7 @@ export function isGeminiRequestOriginAllowed(
     typeof host !== 'string' ||
     typeof origin !== 'string' ||
     !host ||
+    !origin ||
     /[\s/?#@\\]/.test(host)
   )
     return false;
@@ -31,29 +32,14 @@ export function isGeminiRequestOriginAllowed(
     }).ok
   )
     return false;
+  // The shared gate compares a present Origin exactly with this authority;
+  // this route also requires the Origin and an allowed Host.
   const boundHost = String(configuredHost || '')
     .trim()
     .toLowerCase();
-  if (
-    !isAllowedHost(host, resolveAllowedHosts(configuredAllowedHosts), [
-      boundHost,
-    ])
-  )
-    return false;
-  try {
-    const authority = new URL(`${protocol}//${host}`);
-    const source = new URL(origin);
-    return (
-      source.origin === authority.origin &&
-      source.username === '' &&
-      source.password === '' &&
-      source.pathname === '/' &&
-      source.search === '' &&
-      source.hash === ''
-    );
-  } catch {
-    return false;
-  }
+  return isAllowedHost(host, resolveAllowedHosts(configuredAllowedHosts), [
+    boundHost,
+  ]);
 }
 
 /** Admit only the existing input gesture; callers cannot supply model/setup. */

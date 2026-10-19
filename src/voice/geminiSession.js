@@ -12,8 +12,9 @@ import { readResponseJsonCapped } from '../sources/httpBody.js';
 import { readLayerLifecycleSummary } from './layerSummary.js';
 import {
   POINTER_OPEN_MIC_RECENT_MS,
-  pointerChip,
-  pointerContextItem,
+  pointerAnnouncement,
+  pointerTurnContext,
+  pointerTurnEvent,
 } from './pointerContext.js';
 import {
   hasStructuredViewIdentity,
@@ -32,7 +33,7 @@ const CONTROL_POLL_MS = 25;
 const MAX_GO_AWAY_MS = 10 * 60 * 1000;
 const MAX_MESSAGE_LENGTH = 3 * 1024 * 1024;
 const MAX_TOOL_CALLS = 16;
-const MAX_SEEN_CALLS = 256;
+const MAX_SEEN_CALLS = 4096;
 const MAX_CALL_ID_LENGTH = 1024;
 const MAX_MAP_EVENTS = 16;
 const MAX_MAP_CONTEXT_LENGTH = 16000;
@@ -206,6 +207,8 @@ export class GeminiSessionController {
     // Live output has no response ID. A locally retired reply keeps ownership
     // of incoming output until its ordered server turnComplete boundary.
     this.replyPending = false;
+    // A reply Gemini started without a request; it gets no tool authority.
+    this.unrequestedReply = false;
     this.automaticTurnOpen = false;
     this.automaticActivityOwner = null;
     this.retiredAutomaticActivityOwner = null;
@@ -1035,6 +1038,7 @@ export class GeminiSessionController {
       this.retiredReplyPending = true;
     }
     this.replyPending = false;
+    this.unrequestedReply = false;
     if (['push-to-talk', 'user-text'].includes(reason)) {
       this.automaticTurnOpen = false;
       this.automaticActivityOwner = null;
@@ -1341,12 +1345,43 @@ export class GeminiSessionController {
       }
     }
     if (this.discardRetiredReply(message, epoch)) return;
+    // Push-to-talk owns every input boundary locally: a call that arrives with
+    // no input, reply or tool result outstanding was not requested, and nor is
+    // anything else in the reply it starts. Open-mic turns start on Gemini's
+    // server-side activity detection, which reports no boundary to gate on.
+    const unrequested =
+      this.input.pushToTalkMode &&
+      !this.replyPending &&
+      !this.userTurnPending &&
+      !this.pendingTools;
+    let toolCalls = message.toolCall?.functionCalls || [];
+    if (toolCalls.length && (unrequested || this.unrequestedReply)) {
+      this.refuseUnrequestedTools(toolCalls);
+      toolCalls = [];
+    }
+    // In push-to-talk, a caption alone after its turn ended still belongs to
+    // that turn. It must not open a reply the next input would retire,
+    // discarding that input's own tool calls while it waits for a boundary
+    // that never comes. Open mic cannot tell it from a new reply's first
+    // caption, so there it still opens one.
+    const lateCaption =
+      this.input.pushToTalkMode &&
+      !this.replyPending &&
+      !this.userTurnPending &&
+      !this.automaticTurnOpen &&
+      !this.pendingTools &&
+      !content?.modelTurn &&
+      !content?.generationComplete &&
+      !toolCalls.length;
     if (
       content?.modelTurn ||
-      content?.outputTranscription ||
+      (content?.outputTranscription && !lateCaption) ||
       content?.generationComplete ||
-      message.toolCall
+      toolCalls.length
     ) {
+      // Output with nothing outstanding starts a reply nobody requested; a
+      // later call in it is refused like one that arrived first.
+      if (unrequested) this.unrequestedReply = true;
       // Once successor output is observed, an unattributed later interruption
       // cannot still claim the unobserved automatic predecessor's boundary.
       if (this.typedIntent) {
@@ -1386,11 +1421,14 @@ export class GeminiSessionController {
           }
           this.modelSpoke = true;
           this.narration.audible();
+          if (!messageCurrent()) {
+            settleFencedBoundary();
+            return;
+          }
         }
       }
     }
-    if (message.toolCall?.functionCalls?.length)
-      this.enqueueTools(message.toolCall.functionCalls, epoch);
+    if (toolCalls.length) this.enqueueTools(toolCalls, epoch);
     if (content?.turnComplete) {
       if (this.typedIntent) {
         this.typedIntent.automaticPredecessor = null;
@@ -1401,6 +1439,7 @@ export class GeminiSessionController {
       // pending tools and queued controls still gate presentation completion.
       this.userTurnPending = false;
       this.replyPending = false;
+      this.unrequestedReply = false;
       this.automaticTurnOpen = false;
       this.automaticActivityOwner = null;
       this.retiredAutomaticActivityOwner = null;
@@ -1438,6 +1477,42 @@ export class GeminiSessionController {
       final: false,
       responseId: role === 'user' ? null : this.intentResponseId,
       ...(role === 'user' ? { attribution: 'unverified', delta: true } : {}),
+    });
+  }
+
+  /**
+   * Answer unrequested calls without running them: every declaration is
+   * BLOCKING, so Live waits for a result. The reply stays tracked, so the next
+   * input retires it and its late boundary cannot close the user's turn.
+   */
+  refuseUnrequestedTools(calls) {
+    const refused = new Map();
+    for (const call of calls)
+      if (
+        validCallId(call?.id) &&
+        typeof call.name === 'string' &&
+        !this.seenCalls.has(call.id)
+      )
+        refused.set(call.id, call.name);
+    this.rememberCallIds([...refused.keys()]);
+    if (!refused.size) return;
+    this.unrequestedReply = true;
+    this.replyPending = true;
+    this.send({
+      toolResponse: {
+        functionResponses: [...refused].map(([id, name]) => ({
+          id,
+          name,
+          response: {
+            ok: false,
+            action: name,
+            changed: false,
+            error: 'No user request is active.',
+            responseGuidance:
+              'Do not call another tool or claim an action ran. Wait for the user.',
+          },
+        })),
+      },
     });
   }
 
@@ -2076,42 +2151,25 @@ export class GeminiSessionController {
       snapshot = null;
     }
     if (!isCurrent()) return null;
-    const chip = pointerChip(snapshot);
-    this.pointerAnnounced = gesture && chip ? snapshot : null;
-    this.emit({
-      type: 'pointer',
-      pointer:
-        gesture && chip ? { ...chip, screenPx: snapshot.screenPx } : null,
-    });
+    const event = pointerTurnEvent(snapshot, gesture);
+    this.pointerAnnounced = event.announced;
+    this.emit({ type: 'pointer', pointer: event.pointer });
     if (!isCurrent()) return null;
-    const item = !chip
-      ? this.pointerSentKey && this.pointerSentKey !== 'none'
-        ? { type: 'pointer_context', at, target: 'none' }
-        : null
-      : gesture
-        ? pointerContextItem(snapshot)
-        : {
-            type: 'pointer_context',
-            at,
-            pointing: snapshot.entity?.kind || 'ground',
-          };
-    const { at: _at, ...identity } = item || {};
-    const key = chip ? JSON.stringify(identity) : 'none';
-    this.pendingPointerContext =
-      item && key !== this.pointerSentKey ? { item, key } : null;
+    this.pendingPointerContext = pointerTurnContext(snapshot, {
+      at,
+      gesture,
+      sentKey: this.pointerSentKey,
+    });
     return snapshot;
   }
 
   /** Reveal an implicit referent only after the shared action runner uses it. */
   announcePointer() {
     const snapshot = this.pointer?.activeSnapshot?.() || null;
-    const chip = pointerChip(snapshot);
-    if (!chip || snapshot === this.pointerAnnounced) return false;
+    const pointer = pointerAnnouncement(snapshot, this.pointerAnnounced);
+    if (!pointer) return false;
     this.pointerAnnounced = snapshot;
-    this.emit({
-      type: 'pointer',
-      pointer: { ...chip, screenPx: snapshot.screenPx },
-    });
+    this.emit({ type: 'pointer', pointer });
     return true;
   }
 
@@ -2398,6 +2456,7 @@ export class GeminiSessionController {
     this.pendingMapEvents = [];
     this.userTurnPending = false;
     this.replyPending = false;
+    this.unrequestedReply = false;
     this.automaticTurnOpen = false;
     this.automaticActivityOwner = null;
     this.retiredAutomaticActivityOwner = null;

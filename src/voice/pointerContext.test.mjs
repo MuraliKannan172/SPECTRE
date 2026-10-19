@@ -6,8 +6,13 @@ import {
   POINTER_HOLD_MS,
   buildPointerSnapshot,
   createPointerTracker,
+  POINTER_NONE_KEY,
   formatPointerContext,
+  pointerAnnouncement,
   pointerChip,
+  pointerContextItem,
+  pointerTurnContext,
+  pointerTurnEvent,
 } from './pointerContext.js';
 
 function harness({ pick } = {}) {
@@ -226,4 +231,66 @@ test('chip: "this" names an entity, "here" gives the ground coordinate', () => {
   const ground = buildPointerSnapshot({ at: 'keydown', x: 1, y: 1, width: 2, height: 2, pick: { ground: { lat: 30.2672, lon: -97.7431 } } });
   assert.deepEqual(pointerChip(ground), { kind: 'here', label: '30.27, -97.74' });
   assert.equal(pointerChip(null), null);
+});
+
+test('pointer turn helpers reveal gesture targets, describe implicit ones by kind and dedupe repeats', () => {
+  const snapshot = {
+    fresh: true,
+    at: 'keydown',
+    entity: { kind: 'aircraft', layerId: 'flights', label: 'UAL1' },
+    lat: 10,
+    lon: 20,
+    screen: { x: 5, y: 6 },
+    screenPx: { x: 5, y: 6 },
+  };
+  const shown = pointerTurnEvent(snapshot, true);
+  assert.equal(shown.announced, snapshot);
+  assert.deepEqual(shown.pointer, {
+    kind: 'this',
+    label: 'UAL1',
+    screenPx: { x: 5, y: 6 },
+  });
+  assert.deepEqual(pointerTurnEvent(snapshot, false), {
+    announced: null,
+    pointer: null,
+  });
+
+  const gesture = pointerTurnContext(snapshot, {
+    at: 'keydown',
+    gesture: true,
+    sentKey: null,
+  });
+  assert.deepEqual(gesture.item, pointerContextItem(snapshot));
+  assert.equal(
+    pointerTurnContext(snapshot, {
+      at: 'keydown',
+      gesture: true,
+      sentKey: gesture.key,
+    }),
+    null,
+  );
+  assert.deepEqual(
+    pointerTurnContext(snapshot, { at: 'text', gesture: false, sentKey: null })
+      .item,
+    { type: 'pointer_context', at: 'text', pointing: 'aircraft' },
+  );
+
+  const cleared = pointerTurnContext(null, {
+    at: 'text',
+    gesture: false,
+    sentKey: gesture.key,
+  });
+  assert.deepEqual(cleared, {
+    item: { type: 'pointer_context', at: 'text', target: 'none' },
+    key: POINTER_NONE_KEY,
+  });
+  for (const sentKey of [null, POINTER_NONE_KEY])
+    assert.equal(
+      pointerTurnContext(null, { at: 'text', gesture: false, sentKey }),
+      null,
+    );
+
+  assert.deepEqual(pointerAnnouncement(snapshot, null), shown.pointer);
+  assert.equal(pointerAnnouncement(snapshot, snapshot), null);
+  assert.equal(pointerAnnouncement(null, null), null);
 });

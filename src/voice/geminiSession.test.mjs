@@ -3193,3 +3193,208 @@ for (const segments of [['use foo as my voice provider', 'and zoom out']]) {
     assert.equal(h.timers.size, 0);
   });
 }
+
+const zoomCall = (id) => ({
+  toolCall: {
+    functionCalls: [
+      { id, name: 'adjust_camera_zoom', args: { direction: 'in' } },
+    ],
+  },
+});
+const toolResponses = (ws, from = 0) =>
+  ws.sent
+    .slice(from)
+    .flatMap((message) => message.toolResponse?.functionResponses || []);
+
+async function completedPttTurn() {
+  const h = harness();
+  await h.c.start({ pushToTalk: true });
+  const ws = h.sockets[0];
+  establishToolInput(h);
+  ws.message({ serverContent: { ...replyAudio('answer'), turnComplete: true } });
+  h.captures[0].drain();
+  await tick();
+  return { h, ws };
+}
+
+test('push-to-talk refuses an unrequested tool call and every call in its reply', async () => {
+  const { h, ws } = await completedPttTurn();
+  const sent = ws.sent.length;
+  ws.message(zoomCall('unrequested'));
+  ws.message(zoomCall('follow-up'));
+  await h.c.toolQueue;
+  assert.deepEqual(h.calls, []);
+  assert.deepEqual(
+    toolResponses(ws, sent).map(({ id, response }) => [id, response.ok]),
+    [
+      ['unrequested', false],
+      ['follow-up', false],
+    ],
+  );
+  ws.message({ serverContent: { turnComplete: true } });
+  establishToolInput(h, 'Zoom in');
+  // A refused ID stays spent; only the newly requested call runs.
+  ws.message(zoomCall('unrequested'));
+  ws.message(zoomCall('requested'));
+  await h.c.toolQueue;
+  assert.deepEqual(
+    h.calls.map((call) => call.name),
+    ['adjust_camera_zoom'],
+  );
+  assert.equal(toolResponses(ws, sent).length, 3);
+  h.c.stop();
+});
+
+test('push-to-talk refuses a call after unprompted speech that started the reply', async () => {
+  const { h, ws } = await completedPttTurn();
+  const sent = ws.sent.length;
+  ws.message({
+    serverContent: { outputTranscription: { text: 'Let me zoom in' } },
+  });
+  ws.message(zoomCall('after-speech'));
+  await h.c.toolQueue;
+  assert.deepEqual(h.calls, []);
+  assert.deepEqual(
+    toolResponses(ws, sent).map(({ id, response }) => [id, response.ok]),
+    [['after-speech', false]],
+  );
+  h.c.stop();
+});
+
+test('a refusal does not hold back the completion of the reply still playing', async () => {
+  const h = harness();
+  await h.c.start({ pushToTalk: true });
+  const ws = h.sockets[0];
+  establishToolInput(h);
+  ws.message({ serverContent: { ...replyAudio('answer'), turnComplete: true } });
+  ws.message(zoomCall('unrequested'));
+  h.captures[0].drain();
+  await tick();
+  assert.equal(h.events.filter((e) => e.type === 'completion').length, 1);
+  assert.deepEqual(h.calls, []);
+  h.c.stop();
+});
+
+test('open microphone still runs a call Gemini makes without a local boundary', async () => {
+  const h = harness();
+  await h.c.start();
+  h.sockets[0].message(zoomCall('server-detected'));
+  await h.c.toolQueue;
+  assert.deepEqual(
+    h.calls.map((call) => call.name),
+    ['adjust_camera_zoom'],
+  );
+  h.c.stop();
+});
+
+test('a late caption after a completed push-to-talk turn cannot retire the next request', async () => {
+  const { h, ws } = await completedPttTurn();
+  ws.message({ serverContent: { outputTranscription: { text: ' done.' } } });
+  establishToolInput(h, 'Zoom in');
+  ws.message(zoomCall('requested'));
+  await h.c.toolQueue;
+  h.advance(5_000);
+  assert.deepEqual(
+    h.calls.map((call) => call.name),
+    ['adjust_camera_zoom'],
+  );
+  assert.equal(h.c.lastError, null);
+  h.c.stop();
+});
+
+test('an open-mic reply that starts with a caption is retired by newer typed input', async () => {
+  const h = harness();
+  await h.c.start();
+  const ws = h.sockets[0];
+  establishToolInput(h);
+  ws.message({ serverContent: { ...replyAudio('answer'), turnComplete: true } });
+  h.captures[0].drain();
+  await tick();
+  ws.message({ serverContent: { outputTranscription: { text: 'Zooming' } } });
+  establishToolInput(h, 'Replacement request');
+  ws.message(zoomCall('earlier-reply'));
+  ws.message({ serverContent: { turnComplete: true } });
+  await h.c.toolQueue;
+  assert.deepEqual(h.calls, []);
+  h.c.stop();
+});
+
+test('a refused reply boundary that arrives after new push-to-talk input cannot close it', async () => {
+  const { h, ws } = await completedPttTurn();
+  const audio = h.captures[0];
+  ws.message(zoomCall('unrequested'));
+  h.c.input.pushToTalkKeyHeld = true;
+  h.c.input.setMicrophoneEnabled(true);
+  audio.callbacks.onAudio(
+    { data: 'AAAB', mimeType: 'audio/pcm;rate=16000' },
+    audio.metadata,
+  );
+  h.c.input.pushToTalkKeyHeld = false;
+  h.c.input.setMicrophoneEnabled(false);
+  const completions = h.events.filter((e) => e.type === 'completion').length;
+  ws.message({ serverContent: { turnComplete: true } });
+  assert.equal(
+    h.events.filter((e) => e.type === 'completion').length,
+    completions,
+  );
+  ws.message(zoomCall('requested'));
+  await h.c.toolQueue;
+  assert.deepEqual(
+    h.calls.map((call) => call.name),
+    ['adjust_camera_zoom'],
+  );
+  h.c.stop();
+});
+
+test('push-to-talk admits a call made while an earlier requested tool is still running', async () => {
+  const running = deferred();
+  const h = harness({
+    runAction: async (name) => {
+      h.calls.push({ name });
+      if (h.calls.length === 1) await running.promise;
+      return { ok: true, action: name };
+    },
+  });
+  await h.c.start({ pushToTalk: true });
+  const ws = h.sockets[0];
+  establishToolInput(h, 'Zoom in');
+  ws.message(zoomCall('first'));
+  await tick();
+  ws.message({ serverContent: { turnComplete: true } });
+  ws.message(zoomCall('second'));
+  running.resolve();
+  await h.c.toolQueue;
+  assert.equal(h.calls.length, 2);
+  assert.equal(
+    toolResponses(ws).some(({ response }) => response.ok === false),
+    false,
+  );
+  h.c.stop();
+});
+
+test('a narration callback that submits a successor keeps the old packet tools from running', async () => {
+  const h = harness();
+  await h.c.start({ pushToTalk: true });
+  const ws = h.sockets[0];
+  establishToolInput(h, 'Zoom in');
+  const audible = h.c.narration.audible.bind(h.c.narration);
+  let submitted = false;
+  h.c.narration.audible = () => {
+    audible();
+    if (submitted) return;
+    submitted = true;
+    assert.equal(h.c.sendTextCommand('New request'), true);
+  };
+  ws.message({
+    serverContent: replyAudio('old'),
+    toolCall: {
+      functionCalls: [
+        { id: 'old', name: 'adjust_camera_zoom', args: { direction: 'in' } },
+      ],
+    },
+  });
+  await h.c.toolQueue;
+  assert.equal(submitted, true);
+  assert.deepEqual(h.calls, []);
+  h.c.stop();
+});
