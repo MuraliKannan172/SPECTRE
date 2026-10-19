@@ -6,7 +6,6 @@ import {
   parseTarkteeDatexImages,
   parseTarkteeDatexLocations,
 } from '../../server/providers/cctv/sources.js';
-import { TARKTEE_FETCH_TIMEOUT_MS } from '../../server/providers/cctv/constants.js';
 
 const SAMPLE_LOCATIONS_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <d2LogicalModel xmlns="http://datex2.eu/schema/2/2_0">
@@ -107,6 +106,5 @@ test('Tarktee DATEX requests wait 30 s, past the slow answers measured live', as
   );
   const cameras = await loadTarkteeSourcesFromDatex();
   assert.deepEqual(timeouts, [30_000, 30_000]);
-  assert.equal(TARKTEE_FETCH_TIMEOUT_MS, 30_000);
   assert.equal(cameras.length, 1);
 });

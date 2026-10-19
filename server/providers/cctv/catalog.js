@@ -195,9 +195,11 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
   /** @type {Promise<Array<object>>|null} In-flight refresh, shared by concurrent
    * callers so a post-TTL burst launches ONE refetch, not one per request. */
   let _cctvSourceInflight = null;
-  /** @type {Array<{pack: string, available: number, served: number}>} Packs
-   * that serve fewer cameras than they offer. */
-  let _cctvTrimmedPacks = [];
+  /** @type {WeakMap<Array<object>, Array<{pack: string, available: number, served: number}>>}
+   * Packs that serve fewer cameras than they offer, keyed by the source list
+   * they describe, so a request served the old list during a background
+   * refresh never pairs it with the new list's trim notes. */
+  const _cctvTrimmedPacks = new WeakMap();
 
   /**
    * Assemble and cache the merged CCTV source list.
@@ -225,11 +227,16 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
         _cctvSourceInflight = null;
       });
       // A background refresh has no caller waiting on it: report its failure
-      // here, once per refresh rather than once per request it serves.
+      // here, once per refresh rather than once per request it serves. Keep
+      // the old catalog for another TTL, as an empty refresh does, so a refresh
+      // that keeps failing is retried once per TTL, not back to back.
       if (_cctvSourceCache.length) {
         _cctvSourceInflight.catch((error) => {
+          _cctvSourceCacheAt = Date.now();
           console.warn(
-            '[CCTV] background catalog refresh failed:',
+            '[CCTV] background catalog refresh failed; serving',
+            _cctvSourceCache.length,
+            'cameras from the last catalog:',
             error?.message || error,
           );
         });
@@ -329,7 +336,7 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
     }
     if (capped.length > 0 || _cctvSourceCache.length === 0) {
       _cctvSourceCache = capped;
-      _cctvTrimmedPacks = trimmedPacks;
+      _cctvTrimmedPacks.set(capped, trimmedPacks);
     } else {
       // Every source came back empty (all live packs timed out / upstream outage)
       // but a good catalog is already cached — serve it stale rather than blanking
@@ -343,7 +350,10 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
     return _cctvSourceCache;
   }
 
-  /** Packs serving fewer cameras than they offer, as of the last refresh. */
-  getCctvSources.trimmedPacks = () => _cctvTrimmedPacks;
+  /** Packs serving fewer cameras than they offer in `sources` (by default the
+   * current catalog). Pass the list a request was served to keep the two in
+   * step while a background refresh swaps the catalog. */
+  getCctvSources.trimmedPacks = (sources = _cctvSourceCache) =>
+    _cctvTrimmedPacks.get(sources) ?? [];
   return getCctvSources;
 }
