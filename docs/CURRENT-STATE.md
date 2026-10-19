@@ -812,7 +812,11 @@ position stay off the map. Genuine zero coordinates remain valid. Undisclosed
 stage coordinates, downrange distance and flight numbers remain unknown; the
 mission panel omits the flight-number label when no number was reported.
 Pending mission requests abort on disable/destruction and malformed launch
-snapshots preserve the last accepted display. Catalog groups, propagation cadence,
+snapshots preserve the last accepted display. A Launch Library stale-cache fallback
+retains its missions but reports STALE in Data Layers; a fresh snapshot clears that
+provenance. Hiding retained missions does not relabel them as fresh, and teardown
+clears the instance state. Injected getLaunches-only sources remain supported.
+Catalog groups, propagation cadence,
 tracking intent, replay timing, controls and source attribution remain unchanged.
 
 The fire layer now exposes `./layers/firms`: an instance factory with separate
@@ -1477,6 +1481,14 @@ request coalescing and optional LL2 server token retain existing behavior.
 The Node-only `gods-eye-view/server/providers/space` export supplies factories;
 `sources/space` supplies fixed upstream URL builders with no I/O or environment
 access. Callers retain validation, transport and response policy.
+
+LL2 recent-launch requests use UTC minute-aligned bounds over the same 30-day
+window, so installations refreshing in the same minute share an upstream cache
+key. The upper bound trails the current time by less than one minute. Requests
+identify the app and repository through User-Agent; the existing 15-minute local
+cache, stale fallback and optional server-only Authorization remain unchanged.
+Provider Settings identifies LL2 tokens as optional paid higher-rate upgrades:
+standard public access needs no key, and its field can remain blank.
 
 The shared TLE text parser skips incomplete named sets and resumes at the next
 complete set. A missing orbital line does not discard the later satellites in
