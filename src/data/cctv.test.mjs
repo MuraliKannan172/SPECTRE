@@ -81,7 +81,7 @@ import {
   ACTIVE_CAMERA_COLOR,
   IDLE_CAMERA_COLOR,
   LIVE_CAMERA_COLOR,
-} from '../layers/cctv/policy.js'
+} from '../layers/cctv/policy.js';
 
 const CCTV_PRESENTATION_SOURCE = fs.readFileSync(
   path.join(
