@@ -99,8 +99,11 @@ export function getWorldPacket(options = {}) {
     styleManager,
     dataManager,
     sceneDirector = null,
-    now = Date.now(),
+    now: requestedNow,
   } = options ?? {};
+  // A default parameter only covers undefined; null or NaN would age every
+  // feed against the epoch and report stale data as "just now".
+  const now = Number.isFinite(requestedNow) ? requestedNow : Date.now();
   if (!viewer?.camera?.positionWC)
     throw new TypeError('World Packet requires a viewer camera');
   if (!dataManager || typeof dataManager.getAll !== 'function')
