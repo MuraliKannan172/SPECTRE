@@ -356,11 +356,11 @@ const findPick = (page, prefix, { box = null, step = 3 } = {}) =>
 async function findPickUntil(
   page,
   prefix,
-  { timeout = 30_000, box = null } = {},
+  { timeout = 30_000, box = null, step } = {},
 ) {
   const deadline = Date.now() + timeout;
   for (;;) {
-    const hit = await findPick(page, prefix, { box });
+    const hit = await findPick(page, prefix, { box, step });
     if (hit || Date.now() >= deadline) return hit;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -607,7 +607,9 @@ async function main() {
             page,
             (u) => u.sequence.selectedId && !u.sequence.loading,
           );
-          const cone = await findPick(page, 'mly:img:', {
+          // Cones clamp to the ground: on a slow GPU (CI's SwiftShader) they
+          // can take a few frames after the selection to become pickable.
+          const cone = await findPickUntil(page, 'mly:img:', {
             box: {
               x: Math.max(0, line.local.x - 150),
               y: Math.max(0, line.local.y - 150),
