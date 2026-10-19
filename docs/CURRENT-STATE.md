@@ -1,5 +1,13 @@
 # God's Eye View Current State
 
+Location search preserves successful geocoder results, including contemporary
+places that share a Natural Earth name. After geocoding and nearby-place recovery
+miss, a natural region can resolve from the current view only when exactly one
+matching region contains it. Annotation outlines use the same containment rule
+for view-based recovery. Analyst queries retain their offline unique-name lookup;
+duplicate names use a geocoded anchor, and follow-ups retain boundary provenance.
+Cancelled region lookups preserve the previous analyst cohort and boundary source.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,

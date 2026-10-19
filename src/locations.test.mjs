@@ -152,6 +152,208 @@ test('regionFramingPlan: E-W elongated region looks along the east axis', () => 
   assert.equal(plan.headingDeg, 90);
 });
 
+// Synthetic service responses exercise collisions with the physical-region
+// pack. These are authored fixtures, not captured geocoder responses.
+for (const [query, label, lat, lng, type, bounds] of [
+  ['Gold Coast', 'Gold Coast, Queensland, Australia', -28, 153.4, 'locality', [-28.2, 153.2, -27.8, 153.6]],
+  ['Santa Cruz', 'Santa Cruz, California, USA', 37, -122, 'locality', [36.9, -122.1, 37.1, -121.9]],
+  ['Isabela', 'Isabela, Philippines', 17, 122, 'administrative_area_level_1', [16.5, 121.5, 17.5, 122.5]],
+  ['India', 'India', 22, 79, 'country', [7, 67, 37, 91]],
+  ['Korea', 'South Korea', 36, 128, 'country', [33, 126, 39, 130]],
+]) {
+  test(`search keeps the geocoded ${label} over its Natural Earth namesake`, async () => {
+    const viewer = stubViewer();
+    const geocodes = [];
+    const result = await searchAndFlyTo(viewer, query, {
+      placeSearch: {
+        async geocode(request) {
+          geocodes.push(request);
+          return { place: { lat, lng, label, types: [type, 'political'], viewport: boxOf(...bounds) } };
+        },
+      },
+      recoverNearView: async () => null,
+    });
+    assert.deepEqual(geocodes, [query]);
+    assert.equal(result.label, label);
+    assert.equal(result.navigationMode, type === 'locality' ? 'city-overview' : 'region-overview');
+    assert.equal(viewer.flights.length, 1);
+    const flown = flownRectangleDegrees(viewer);
+    assert.ok(Math.abs((flown.south + flown.north) / 2 - lat) < 0.000001, `${query}: latitude remains geocoded`);
+    assert.ok(Math.abs((flown.west + flown.east) / 2 - lng) < 0.000001, `${query}: longitude remains geocoded`);
+    assert.ok(flown.south <= bounds[0] && flown.north >= bounds[2], 'frames the geocoded north-south extent');
+    assert.ok(flown.west <= bounds[1] && flown.east >= bounds[3], 'frames the geocoded east-west extent');
+    assert.ok(flown.widthDeg < (bounds[3] - bounds[1]) * 1.6, 'keeps the geocoded place scale');
+  });
+}
+
+function alpsViewer() {
+  const viewer = stubViewer();
+  Object.assign(viewer.camera.positionCartographic, {
+    latitude: Cesium.Math.toRadians(46.5),
+    longitude: Cesium.Math.toRadians(10),
+    height: 248_000,
+  });
+  return viewer;
+}
+
+for (const answered of [true, false]) {
+  test(`search recovers contained Alps only after geocoder ${answered ? 'miss' : 'unavailability'} and nearby recovery miss`, async () => {
+    const viewer = alpsViewer();
+    const order = [];
+    const result = await searchAndFlyTo(viewer, 'the Alps', {
+      placeSearch: { async geocode() { order.push('geocode'); return { place: null, answered }; } },
+      recoverNearView: async () => { order.push('nearby'); return null; },
+    });
+    assert.deepEqual(order, ['geocode', 'nearby']);
+    assert.equal(result?.label, 'Alps');
+    assert.equal(result?.navigationMode, 'natural-region-swath');
+    assert.equal(viewer.flights.length, 1);
+    const target = Cesium.Cartographic.fromCartesian(viewer.flights[0].sphere.center);
+    assert.ok(Cesium.Math.toDegrees(target.latitude) > 43 && Cesium.Math.toDegrees(target.latitude) < 49);
+    assert.ok(Cesium.Math.toDegrees(target.longitude) > 5 && Cesium.Math.toDegrees(target.longitude) < 17);
+  });
+}
+
+test('a successful nearby recovery keeps precedence over a contained natural region', async () => {
+  const viewer = alpsViewer();
+  const result = await searchAndFlyTo(viewer, 'the Alps', {
+    placeSearch: { async geocode() { return { place: null, answered: true }; } },
+    recoverNearView: async () => ({
+      lat: 46.6,
+      lon: 10.1,
+      label: 'The Alps local landmark',
+      types: ['locality', 'political'],
+      viewport: { low: { latitude: 46.5, longitude: 10 }, high: { latitude: 46.7, longitude: 10.2 } },
+    }),
+  });
+  assert.equal(result.label, 'The Alps local landmark');
+  assert.equal(result.navigationMode, 'city-overview');
+  assert.equal(viewer.flights.length, 1);
+});
+
+test('missing searches never choose a natural namesake outside the view or without a view anchor', async () => {
+  const withoutAnchor = alpsViewer();
+  delete withoutAnchor.camera.positionCartographic;
+  for (const [query, viewer] of [['the Alps', stubViewer()], ['not a real location', alpsViewer()], ['the Alps', withoutAnchor]]) {
+    const result = await searchAndFlyTo(viewer, query, {
+      placeSearch: { async geocode() { return { place: null, answered: true }; } },
+      recoverNearView: async () => null,
+    });
+    assert.equal(result, null, query);
+    assert.equal(viewer.flights.length, 0, query);
+  }
+});
+
+test('a duplicate natural name can recover when exactly one candidate contains the view', async () => {
+  const viewer = stubViewer();
+  Object.assign(viewer.camera.positionCartographic, {
+    latitude: Cesium.Math.toRadians(5),
+    longitude: Cesium.Math.toRadians(-73),
+  });
+  const result = await searchAndFlyTo(viewer, 'Cordillera Oriental', {
+    placeSearch: { async geocode() { return { place: null, answered: true }; } },
+    recoverNearView: async () => null,
+  });
+  assert.equal(result?.label, 'Cordillera Oriental');
+  assert.equal(result?.navigationMode, 'natural-region-swath');
+  assert.equal(viewer.flights.length, 1);
+  const target = Cesium.Cartographic.fromCartesian(viewer.flights[0].sphere.center);
+  assert.ok(Cesium.Math.toDegrees(target.latitude) > 0, 'frames the northern candidate');
+});
+
+test('an overlapping natural name stays unresolved after geocoder and nearby recovery miss', async () => {
+  const viewer = stubViewer();
+  Object.assign(viewer.camera.positionCartographic, {
+    latitude: Cesium.Math.toRadians(45.6336),
+    longitude: Cesium.Math.toRadians(-74.86493),
+  });
+  const result = await searchAndFlyTo(viewer, 'Canadian Shield', {
+    placeSearch: { async geocode() { return { place: null, answered: true }; } },
+    recoverNearView: async () => null,
+  });
+  assert.equal(result, null);
+  assert.equal(viewer.flights.length, 0);
+});
+
+test('a geocoder rejection propagates without natural-region recovery or a flight', async () => {
+  const viewer = alpsViewer();
+  const failure = new Error('geocoder failed');
+  let recoveries = 0;
+  await assert.rejects(searchAndFlyTo(viewer, 'the Alps', {
+    placeSearch: { async geocode() { throw failure; } },
+    recoverNearView: async () => { recoveries += 1; return null; },
+  }), (error) => error === failure);
+  assert.equal(recoveries, 0);
+  assert.equal(viewer.flights.length, 0);
+});
+
+test('search cancellation before or during geocoding cannot issue a fallback flight', async () => {
+  for (const preAborted of [true, false]) {
+    const viewer = alpsViewer();
+    const controller = new AbortController();
+    if (preAborted) controller.abort();
+    let geocodes = 0;
+    let recoveries = 0;
+    await assert.rejects(searchAndFlyTo(viewer, 'the Alps', {
+      signal: controller.signal,
+      placeSearch: {
+        async geocode(_query, { signal }) {
+          geocodes += 1;
+          assert.equal(signal, controller.signal);
+          controller.abort();
+          return { place: null, answered: true };
+        },
+      },
+      recoverNearView: async () => { recoveries += 1; return null; },
+    }), { name: 'AbortError' });
+    assert.equal(geocodes, preAborted ? 0 : 1);
+    assert.equal(recoveries, 0);
+    assert.equal(viewer.flights.length, 0);
+  }
+});
+
+test('cancellation while the bundled fallback is resolving cannot issue a flight', async () => {
+  const viewer = alpsViewer();
+  const carto = viewer.camera.positionCartographic;
+  const controller = new AbortController();
+  let recoveryFinished = false;
+  let fallbackRead = false;
+  let authorityChecks = 0;
+  Object.defineProperty(viewer.camera, 'positionCartographic', {
+    get() {
+      if (recoveryFinished && !fallbackRead) {
+        fallbackRead = true;
+        // The fallback reads the view after nearby recovery, then awaits the
+        // bundled lookup. Abort in that async gap, even when the pack is warm.
+        queueMicrotask(() => controller.abort());
+      }
+      return carto;
+    },
+  });
+  await assert.rejects(searchAndFlyTo(viewer, 'the Alps', {
+    signal: controller.signal,
+    placeSearch: { async geocode() { return { place: null, answered: true }; } },
+    recoverNearView: async () => { recoveryFinished = true; return null; },
+    beforeFly: () => { authorityChecks += 1; return true; },
+  }), { name: 'AbortError' });
+  assert.equal(fallbackRead, true, 'reached the bundled recovery');
+  assert.equal(authorityChecks, 0);
+  assert.equal(viewer.flights.length, 0);
+});
+
+test('a final authority veto blocks a contained natural-region recovery flight', async () => {
+  const viewer = alpsViewer();
+  const order = [];
+  const result = await searchAndFlyTo(viewer, 'the Alps', {
+    placeSearch: { async geocode() { order.push('geocode'); return { place: null, answered: true }; } },
+    recoverNearView: async () => { order.push('nearby'); return null; },
+    beforeFly: () => { order.push('veto'); return false; },
+  });
+  assert.deepEqual(order, ['geocode', 'nearby', 'veto']);
+  assert.equal(result, CANCELLED_SEARCH);
+  assert.equal(viewer.flights.length, 0);
+});
+
 test('regionFramingPlan: park- and lake-scale viewports keep full framing', () => {
   // Zilker Park (~3 km).
   assert.equal(regionFramingPlan({

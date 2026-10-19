@@ -120,6 +120,123 @@ test('Georgia resolves from camera geography without a geocoder', async () => {
   assert.deepEqual(geocodes, []);
 });
 
+test('the Alps under the view resolve before an unrelated remote geocode', async () => {
+  const { resolve, lookups, geocodes } = harness({
+    lat: -27.96,
+    lng: 152.2,
+    label: 'The Alps, Queensland',
+    name: 'The Alps',
+    types: ['locality', 'political'],
+  });
+  const resolved = await resolve('the Alps', viewerAt(46.5, 10, 248_000));
+  assert.equal(resolved?.source, 'bundled');
+  assert.equal(resolved.naturalRegion, 'Alps');
+  assert.equal(resolved.synthesized, false);
+  assert.equal(resolved.footprintKind, 'area');
+  assert.ok(resolved.ring.length >= 8);
+  assert.deepEqual(resolved.ring[0], resolved.ring.at(-1));
+  assert.equal(resolved.resolveOutline, undefined);
+  assert.deepEqual(geocodes, []);
+  assert.deepEqual(lookups, []);
+});
+
+test('Gold Coast in Australia cannot acquire its West African namesake outline', async () => {
+  for (const types of [['locality', 'political'], ['natural_feature']]) {
+    const { resolve, geocodes } = harness({
+      lat: -28.0167,
+      lng: 153.4,
+      label: 'Gold Coast, Australia',
+      name: 'Gold Coast',
+      types,
+    });
+    const resolved = await resolve('Gold Coast', viewerAt(-28.0167, 153.4));
+    assert.equal(resolved?.source, 'geocode');
+    assert.equal(resolved.lat, -28.0167);
+    assert.equal(resolved.lon, 153.4);
+    assert.equal(resolved.naturalRegion, undefined);
+    const outline = await resolved.resolveOutline();
+    assert.equal(outline?.naturalRegion, undefined);
+    assert.deepEqual(geocodes, ['Gold Coast']);
+  }
+});
+
+test('unique natural names without a containing view still need a geocoded anchor', async () => {
+  for (const viewer of [AUSTIN, {}]) {
+    const miss = harness();
+    assert.equal(await miss.resolve('the Alps', viewer), null);
+    assert.ok(miss.geocodes.includes('the Alps'));
+  }
+  const anchored = harness({
+    lat: 46.5,
+    lng: 10,
+    label: 'Alps',
+    name: 'Alps',
+    types: ['natural_feature'],
+  });
+  const resolved = await anchored.resolve('the Alps', {});
+  assert.equal(resolved.source, 'geocode');
+  const outline = await resolved.resolveOutline();
+  assert.equal(outline.naturalRegion, 'Alps');
+  assert.ok(outline.ring.length >= 8);
+});
+
+test('overlapping natural candidates continue through geocoding without choosing a ring', async () => {
+  const { resolve, geocodes } = harness({
+    lat: 45.6336,
+    lng: -74.86493,
+    label: 'Canadian Shield',
+    name: 'Canadian Shield',
+    types: ['natural_feature'],
+  });
+  const resolved = await resolve(
+    'Canadian Shield',
+    viewerAt(45.6336, -74.86493),
+  );
+  assert.equal(resolved?.source, 'geocode');
+  assert.equal((await resolved.resolveOutline())?.naturalRegion, undefined);
+  assert.deepEqual(geocodes, ['Canadian Shield']);
+});
+
+test('natural view recovery preserves point, explicit-coordinate, entity and around intent', async () => {
+  for (const extra of [
+    { footprint: false },
+    { latitude: 46.5, longitude: 10 },
+    { entityKind: 'building' },
+    { entityKind: 'compound' },
+    { entityKind: 'district' },
+    { entityKind: 'street' },
+    { entityKind: 'point_feature' },
+    { intent: 'around_the_thing' },
+  ]) {
+    const { resolve, geocodes } = harness({
+      lat: 46.5,
+      lng: 10,
+      label: 'Alps',
+      name: 'Alps',
+      types:
+        extra.entityKind === 'district' ? ['locality'] : ['natural_feature'],
+    });
+    const resolved = await resolve('the Alps', viewerAt(46.5, 10), extra);
+    assert.notEqual(resolved?.source, 'bundled');
+    assert.equal(resolved?.naturalRegion, undefined);
+    if (extra.entityKind === 'district')
+      assert.ok(geocodes.includes('the Alps'));
+    if (extra.intent === 'around_the_thing' || extra.entityKind === 'district')
+      assert.equal((await resolved.resolveOutline())?.naturalRegion, undefined);
+  }
+});
+
+test('cancellation while a natural view lookup is pending cannot publish its outline', async () => {
+  const controller = new AbortController();
+  const { resolve, geocodes } = harness();
+  const pending = resolve('the Alps', viewerAt(46.5, 10), {
+    signal: controller.signal,
+  });
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.deepEqual(geocodes, []);
+});
+
 test('country asks and geocoded country scopes use the bundled outline', async () => {
   const direct = harness();
   for (const name of ['Switzerland', 'Iran', 'France', 'Japan']) {
@@ -233,4 +350,39 @@ test('the engine keeps every part on the mark, drawn at once or upgraded', async
     seen.some(([kind, parts]) => kind === 'update' && parts === polygons),
   );
   engine.destroy();
+});
+
+test('cancellation after the admin miss rejects the resumed natural view lookup', async () => {
+  const controller = new AbortController();
+  const signal = controller.signal;
+  const throwIfAborted = signal.throwIfAborted.bind(signal);
+  const checkpoints = [];
+  let abortCheckpoint = null;
+  // This exact path has entry, post-admin-miss and post-natural checkpoints.
+  // Queue at the known post-admin checkpoint: after this callback returns,
+  // the real natural lookup runs synchronously to its await before the queued
+  // abort executes. No timeout or guessed number of promise turns is used.
+  Object.defineProperty(signal, 'throwIfAborted', {
+    value() {
+      checkpoints.push(signal.aborted);
+      throwIfAborted();
+      if (checkpoints.length === 2) {
+        queueMicrotask(() => {
+          abortCheckpoint = checkpoints.length;
+          controller.abort();
+        });
+      }
+    },
+  });
+  const { resolve, lookups, geocodes } = harness();
+  const pending = resolve('the Alps', viewerAt(46.5, 10), { signal });
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.equal(
+    abortCheckpoint,
+    2,
+    'abort follows admin miss, before natural resume',
+  );
+  assert.deepEqual(checkpoints, [false, false, true]);
+  assert.deepEqual(lookups, []);
+  assert.deepEqual(geocodes, []);
 });

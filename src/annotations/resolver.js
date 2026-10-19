@@ -202,6 +202,22 @@ export function createAnnotationResolver({
       );
       signal?.throwIfAborted();
       if (admin) return bundledAdminTarget(viewer, admin, trace.query);
+
+      // A unique pack name can still name an unrelated modern place. Recover
+      // natural outlines only from a containing view, including unique names.
+      if (
+        center &&
+        entityKind !== 'district' &&
+        intent !== 'around_the_thing'
+      ) {
+        const natural = await lookupNaturalRegionOutline(
+          trace.query,
+          center.lat,
+          center.lon,
+        ).catch(() => null);
+        signal?.throwIfAborted();
+        if (natural) return bundledNaturalTarget(viewer, natural, trace.query);
+      }
     }
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
@@ -444,6 +460,7 @@ export function createAnnotationResolver({
      * AFTER the anchor mark is drawn and upgrade the mark in place.
      */
     const resolveOutline = async () => {
+      signal?.throwIfAborted();
       let scope = baseScope;
       const isAdmin =
         scope === 'country' ||
@@ -469,6 +486,7 @@ export function createAnnotationResolver({
         const ne = await lookupNaturalRegionOutline(target, lat, lon).catch(
           () => null,
         );
+        signal?.throwIfAborted();
         if (ne) {
           registerDynamicCredit(viewer, NATURAL_EARTH_CREDIT);
           const neCentroid = ringCentroid(ne.ring);
@@ -834,6 +852,37 @@ export function createAnnotationResolver({
       viewport: {
         low: { latitude: south, longitude: west },
         high: { latitude: north, longitude: east },
+      },
+    };
+  }
+
+  /** A complete annotation target for a natural ring containing the view. */
+  function bundledNaturalTarget(viewer, natural, query) {
+    const ring = closeRing([...natural.ring]);
+    const centroid = ringCentroid(ring);
+    if (!centroid) return null;
+    registerDynamicCredit(viewer, NATURAL_EARTH_CREDIT);
+    const lons = ring.map(([lon]) => lon);
+    const lats = ring.map(([, lat]) => lat);
+    console.log(
+      `[Resolver] "${query}": bundled ${natural.kind} "${natural.name}" ` +
+        '(natural-earth, view-contained) → FINAL source=bundled',
+    );
+    return {
+      lon: centroid.lon,
+      lat: centroid.lat,
+      height: sampleGroundHeight(viewer, centroid.lon, centroid.lat),
+      ring,
+      footprintKind: 'area',
+      buildingHeight: null,
+      label: natural.name,
+      source: 'bundled',
+      synthesized: false,
+      outlineUnavailable: false,
+      naturalRegion: natural.name,
+      viewport: {
+        low: { latitude: Math.min(...lats), longitude: Math.min(...lons) },
+        high: { latitude: Math.max(...lats), longitude: Math.max(...lons) },
       },
     };
   }
@@ -2004,8 +2053,8 @@ export function createAnnotationResolver({
   /**
    * Region ring for ANALYST queries ("how many flights over Texas / the Alps") —
    * a name-only entry point that reuses this module's boundary machinery
-   * without the annotation pipeline. Natural Earth pack first (offline,
-   * instant; largest-area match is correct for a global name-only ask), then
+   * without the annotation pipeline. Unique Natural Earth names resolve first
+   * (offline); duplicate names require a geocoded containment anchor, then
    * geocode + admin boundary for states/countries/counties (Tier A disk-cached
    * Overpass, so repeat asks are instant). Returns null when the name doesn't
    * resolve to a region-like boundary — the analyst engine reports that
@@ -2020,7 +2069,7 @@ export function createAnnotationResolver({
    * @param {AbortSignal} [signal]
    * @param {object} [placeSearch]
    * @param {{budgetMs?: number}} [options]  `Infinity` waits for the lookup.
-   * @returns {Promise<{name:string, ring:Array<[number,number]>}|{name:string, ring:null, error:'region-timeout'}|null>}
+   * @returns {Promise<{name:string, ring:Array<[number,number]>, source:string}|{name:string, ring:null, error:'region-timeout'}|null>}
    */
   async function resolveRegionRingForQuery(
     name,
@@ -2037,16 +2086,24 @@ export function createAnnotationResolver({
     const q = String(name || '').trim();
     if (!q) return null;
     const ne = await findNaturalRegion(q).catch(() => null);
-    if (ne?.polygons?.length) {
+    signal?.throwIfAborted();
+    if (ne?.candidates === 1 && ne.polygons?.length) {
       // Largest ring carries the query scope; multi-ring regions (Andes) keep
       // their main cordillera — good enough for containment counting.
       const ring = [...ne.polygons].sort((a, b) => b.length - a.length)[0];
-      if (ring?.length >= 3) return { name: ne.name, ring };
+      if (ring?.length >= 3)
+        return { name: ne.name, ring, source: 'natural-earth' };
     }
     // Bundled states/provinces/counties by name (offline); the main part only,
     // like the Natural Earth rung above.
     const admin = await findAdminArea(q).catch(() => null);
-    if (admin) return { name: admin.name, ring: [...admin.ring] };
+    signal?.throwIfAborted();
+    if (admin)
+      return {
+        name: admin.name,
+        ring: [...admin.ring],
+        source: 'bundled-admin',
+      };
     const lookup = resolveAdminRegionRing(q, signal, placeSearch);
     if (!Number.isFinite(budgetMs)) return lookup;
     let timer;
@@ -2067,8 +2124,26 @@ export function createAnnotationResolver({
     const geo = await geocodePlace(q, null, signal, placeSearch).catch(
       () => null,
     );
+    signal?.throwIfAborted();
     if (!geo) return null;
     const scope = scopeFromTypes(geo.types);
+    if (
+      scope === 'auto' ||
+      (scope === 'compound' && geo.types?.includes('natural_feature'))
+    ) {
+      const natural = await lookupNaturalRegionOutline(
+        q,
+        geo.lat,
+        geo.lon,
+      ).catch(() => null);
+      signal?.throwIfAborted();
+      if (natural)
+        return {
+          name: natural.name,
+          ring: natural.ring,
+          source: 'natural-earth',
+        };
+    }
     if (!['country', 'state', 'county', 'city'].includes(scope)) return null;
     if (scope === 'state' || scope === 'county' || scope === 'country') {
       const admin = await findAdminAreaAt(
@@ -2077,12 +2152,16 @@ export function createAnnotationResolver({
         geo.lon,
         scope,
       ).catch(() => null);
-      if (admin) return { name: q, ring: [...admin.ring] };
+      signal?.throwIfAborted();
+      if (admin)
+        return { name: q, ring: [...admin.ring], source: 'bundled-admin' };
     }
     const fp = await fetchAdminArea(geo.lat, geo.lon, q, scope, signal).catch(
       () => null,
     );
-    if (fp?.ring?.length >= 3) return { name: q, ring: fp.ring };
+    signal?.throwIfAborted();
+    if (fp?.ring?.length >= 3)
+      return { name: q, ring: fp.ring, source: 'remote-boundary' };
     return null;
   }
 

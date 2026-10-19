@@ -7,11 +7,13 @@ import { greatCircleKm } from './geoDistance.js';
 import {
   viewportBias,
   placesNearViewRecovery,
+  pickWorldFromScreen,
 } from './annotations/annotationResolver.js';
 import { unavailablePlaceSearch } from './search/placeSearch.js';
 import { cancelCameraArrival } from './data/cameraArrival.js';
 import { guardCameraAboveGround } from './cameraGroundGuard.js';
 import { CITY_POIS } from './cityPois.js';
+import { lookupNaturalRegionOutline } from './data/naturalEarthRegions.js';
 
 /** Newest landmark arrival; an older post-arrival ground guard yields to it. */
 let arrivalGeneration = 0;
@@ -299,6 +301,47 @@ export function findPoiByName(query) {
 /** Distinguishes an authority veto from a genuine not-found result. */
 export const CANCELLED_SEARCH = Object.freeze({ cancelled: true });
 
+/** Frame a natural ring only after its name and view containment are resolved. */
+function naturalRegionSearchPlace(region) {
+  const points = region?.ring || [];
+  if (points.length < 3) return null;
+  const latitudes = points.map(([, lat]) => lat).filter(Number.isFinite);
+  const longitudes = points
+    .map(([lon]) => lon)
+    .filter(Number.isFinite)
+    .map((lon) => ((lon % 360) + 360) % 360)
+    .sort((a, b) => a - b);
+  if (latitudes.length < 3 || longitudes.length < 3) return null;
+  let gapIndex = longitudes.length - 1;
+  let largestGap = longitudes[0] + 360 - longitudes.at(-1);
+  for (let index = 0; index < longitudes.length - 1; index += 1) {
+    const gap = longitudes[index + 1] - longitudes[index];
+    if (gap > largestGap) {
+      largestGap = gap;
+      gapIndex = index;
+    }
+  }
+  const viewport = {
+    southwest: {
+      lat: Math.min(...latitudes),
+      lng: wrapLongitude(longitudes[(gapIndex + 1) % longitudes.length]),
+    },
+    northeast: {
+      lat: Math.max(...latitudes),
+      lng: wrapLongitude(longitudes[gapIndex]),
+    },
+  };
+  const metrics = viewportMetrics(viewport);
+  if (!metrics) return null;
+  return {
+    lat: metrics.centerLat,
+    lng: metrics.centerLng,
+    label: region.name,
+    types: ['natural_feature'],
+    viewport,
+  };
+}
+
 /**
  * Geocode a place name through the supplied service, then fly there at a scale
  * appropriate to the request. Countries and cities use their viewport by
@@ -344,7 +387,26 @@ export async function searchAndFlyTo(viewer, query, options = {}) {
     label = recovered.label || label;
     types = recovered.types || [];
     viewport = placesViewportToBounds(recovered.viewport) || viewport;
-  } else if (!result) return null;
+  } else if (!result) {
+    // A pack name may also name a contemporary city or country. Only rescue a
+    // missing geocode, and only with a ring containing what the user is viewing.
+    const carto = viewer?.camera?.positionCartographic;
+    const center =
+      pickWorldFromScreen(viewer, 0.5, 0.5) ||
+      (carto && {
+        lat: Cesium.Math.toDegrees(carto.latitude),
+        lon: Cesium.Math.toDegrees(carto.longitude),
+      });
+    const natural =
+      center &&
+      (await lookupNaturalRegionOutline(query, center.lat, center.lon).catch(
+        () => null,
+      ));
+    signal?.throwIfAborted();
+    const place = naturalRegionSearchPlace(natural);
+    if (!place) return null;
+    ({ lat, lng, label, types, viewport } = place);
+  }
 
   const requestedRange = finitePositive(options.range);
   const duration = finitePositive(options.duration) || 3.0;
