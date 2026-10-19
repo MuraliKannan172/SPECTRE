@@ -1,9 +1,25 @@
 import * as Cesium from 'cesium';
-import { positionMarkerGlyph } from './glyphs.js';
+import { positionMarkerGlyph, viewConeMarkerGlyph } from './glyphs.js';
 import { COLORS, POSITION_PICK_ID } from './policy.js';
 import { createHorizonCull } from './view.js';
 
 const SPRITE_ID = 'street-level:marker';
+
+function markerLook(style) {
+  if (style?.kind === 'view-cone') {
+    const color = style.color || COLORS.position;
+    return {
+      key: `view-cone:${color}`,
+      image: viewConeMarkerGlyph({ color }),
+      size: 48,
+    };
+  }
+  return {
+    key: 'pin',
+    image: positionMarkerGlyph({ color: COLORS.position }),
+    size: 40,
+  };
+}
 
 /** On-globe marker for the open image, clamped to the ground. */
 export function createMarker({ state }) {
@@ -29,8 +45,8 @@ export function createMarker({ state }) {
     sprites?.registerSpriteCollection?.(SPRITE_ID, state.marker.collection);
   }
 
-  /** Move (or create) the marker; a null position removes it. */
-  function set(position, bearing) {
+  /** Move (or create) the marker; null removes it. `style`: the provider's `marker`. */
+  function set(position, bearing, style = null) {
     const collection = state.marker.collection;
     if (!collection) return;
     if (!position) {
@@ -41,14 +57,20 @@ export function createMarker({ state }) {
       return;
     }
     const cartesian = Cesium.Cartesian3.fromDegrees(position.lon, position.lat);
+    const look = markerLook(style);
+    if (state.marker.billboard && state.marker.look !== look.key) {
+      collection.remove?.(state.marker.billboard);
+      state.marker.billboard = null;
+    }
     if (!state.marker.billboard) {
+      state.marker.look = look.key;
       state.marker.billboard = collection.add({
         id: POSITION_PICK_ID,
         position: cartesian,
-        image: positionMarkerGlyph({ color: COLORS.position }),
-        imageId: 'sl-position',
-        width: 40,
-        height: 40,
+        image: look.image,
+        imageId: `sl-position:${look.key}`,
+        width: look.size,
+        height: look.size,
         alignedAxis: Cesium.Cartesian3.UNIT_Z,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,

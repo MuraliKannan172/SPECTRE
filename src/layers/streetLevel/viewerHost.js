@@ -1,3 +1,4 @@
+import { msg } from '../../i18n/index.js';
 import { freshStreet } from './state.js';
 
 /**
@@ -25,11 +26,23 @@ export function createViewerHost({ state, parts }) {
       altitude: Number.isFinite(pose.altitude) ? pose.altitude : null,
       isPano: pose.isPano === true,
       capturedAt: pose.capturedAt ?? null,
+      capturedAtPrecision:
+        pose.capturedAtPrecision === 'month' ? 'month' : 'day',
+      title: pose.title || null,
       sequenceId: pose.sequenceId ?? null,
       creator: pose.creator || null,
+      license: pose.license || null,
       externalUrl: pose.externalUrl || null,
+      // FIT / FILL, unless this image has no frame to fit (a panorama).
+      renderModes:
+        typeof active.adapter.setRenderMode === 'function' &&
+        active.adapter.supportsRenderModes?.() !== false,
     });
-    parts.marker.set(state.street.position, state.street.bearing);
+    parts.marker.set(
+      state.street.position,
+      state.street.bearing,
+      state.providers.get(active.id)?.def.marker,
+    );
     // Select the sequence only once the image is on screen, so its lookup
     // never competes with the image download.
     if (!state.street.loading && state.street.sequenceId !== previousSequence)
@@ -85,19 +98,25 @@ export function createViewerHost({ state, parts }) {
     return promise;
   }
 
-  /** Open an image: true once its first pose is in, false if it failed or was overtaken. */
-  async function open(providerId, imageId) {
+  /**
+   * Open an image: true once its first pose is in, false if it failed or was
+   * overtaken. `frame: false` leaves the camera where it is.
+   */
+  async function open(providerId, imageId, { frame = true } = {}) {
     const entry = state.providers.get(providerId);
     if (!entry || !imageId) return false;
     if (!state.street.host) {
-      state.street.error = 'Open the Street Level panel to view imagery';
+      // A nearest-image lookup may have set it; nothing is loading now.
+      state.street.loading = false;
+      // English data: the Street Level panel translates it (translateKnown).
+      state.street.error = msg('Open the Street Level panel to view imagery');
       notify();
       return false;
     }
     const seq = ++openSeq;
     const current = () => seq === openSeq;
     // Claimed now, honoured after loading only if nothing newer took the camera.
-    const ticket = parts.framing.begin();
+    const ticket = frame ? parts.framing.begin() : null;
     Object.assign(state.street, {
       loading: true,
       error: null,
@@ -110,12 +129,14 @@ export function createViewerHost({ state, parts }) {
     try {
       const adapter = await mount(entry);
       if (!current()) return false;
+      // Per open: close() resets it, and a reopen skips mount().
+      state.street.renderModes = typeof adapter.setRenderMode === 'function';
       await adapter.open(String(imageId));
       if (!current()) return false;
       if (ticket) parts.framing.frame(ticket);
     } catch (error) {
       if (current())
-        state.street.error = error?.message || 'Image could not be opened';
+        state.street.error = error?.message || msg('Image could not be opened');
     } finally {
       if (current()) state.street.loading = false;
       notify();

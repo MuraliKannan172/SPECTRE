@@ -1,6 +1,11 @@
 /** Shared Street Level test stand-ins: provider snapshot and provider, Mapillary source, photo viewer, Cesium viewer, ray-casting camera. */
 import * as Cesium from 'cesium';
-import { MAPILLARY_CREDIT_HTML } from '../layers/streetLevel/policy.js';
+import { MAPILLARY_CREDIT_HTML } from '../layers/streetLevel/providers/mapillary/policy.js';
+import {
+  latToTileY,
+  lonToTileX,
+  tileBounds,
+} from '../layers/streetLevel/tileMath.js';
 
 const RAD = Math.PI / 180;
 
@@ -31,6 +36,7 @@ export function fakeStreetLevelProvider({
   id = 'mapillary',
   pickPrefix = 'mly:',
   html = MAPILLARY_CREDIT_HTML,
+  nearestImage = async () => null,
 } = {}) {
   const calls = { activate: 0, deactivate: 0, mount: 0, open: [], unmount: 0 };
   const filters = [];
@@ -65,6 +71,7 @@ export function fakeStreetLevelProvider({
         setFilter: (filter) => filters.push(filter),
         coverageStats: () => ({ ...stats }),
         handlePick: () => false,
+        nearestImage,
         viewer: {
           mount: async () => calls.mount++,
           open: async (imageId) => calls.open.push(imageId),
@@ -258,6 +265,95 @@ export function rayCamera({
       const ray = new Cesium.Ray(position, direction);
       const hit = Cesium.IntersectionTests.rayEllipsoid(ray, ellipsoid);
       return hit ? Cesium.Ray.getPoint(ray, hit.start) : undefined;
+    },
+  };
+}
+
+/** The centre of the tile holding a point at zoom `z`, so a small view is one tile. */
+export function tileCentre(lon, lat, z = 14) {
+  const x = lonToTileX(lon, z);
+  const y = latToTileY(lat, z);
+  const { west, east, south, north } = tileBounds(x, y, z);
+  return {
+    tile: { x, y, z },
+    lon: (west + east) / 2,
+    lat: (south + north) / 2,
+  };
+}
+
+/** A scene collection that remembers what is on the globe. */
+function sceneCollection() {
+  const items = new Set();
+  return {
+    items,
+    add(primitive) {
+      items.add(primitive);
+      return primitive;
+    },
+    remove(primitive) {
+      return items.delete(primitive);
+    },
+  };
+}
+
+/**
+ * A viewer looking straight down on a 0.004° square around `view`
+ * (`{lon, lat, height}`, mutable), enough for line coverage to attach,
+ * refresh and draw. Cesium's one-time terrain-height download is skipped.
+ */
+export function coverageViewer(view, t) {
+  const initialize = Cesium.GroundPolylinePrimitive.initializeTerrainHeights;
+  Cesium.GroundPolylinePrimitive.initializeTerrainHeights = () =>
+    Promise.resolve();
+  t?.after(() => {
+    Cesium.GroundPolylinePrimitive.initializeTerrainHeights = initialize;
+  });
+  // Node has no WebGL context to report line-width limits.
+  Cesium.ContextLimits._minimumAliasedLineWidth = 1;
+  Cesium.ContextLimits._maximumAliasedLineWidth = 10;
+  const listeners = () => {
+    const set = new Set();
+    return {
+      set,
+      addEventListener(listener) {
+        set.add(listener);
+        return () => set.delete(listener);
+      },
+    };
+  };
+  return {
+    view,
+    scene: {
+      canvas: { clientWidth: 100, clientHeight: 100 },
+      globe: { show: false, ellipsoid: Cesium.Ellipsoid.WGS84 },
+      frameState: { mode: Cesium.SceneMode.SCENE3D },
+      updateHeight: () => () => {},
+      getHeight: () => undefined,
+      groundPrimitives: sceneCollection(),
+      primitives: sceneCollection(),
+      postRender: listeners(),
+      preRender: listeners(),
+    },
+    camera: {
+      changed: new Cesium.Event(),
+      moveEnd: new Cesium.Event(),
+      get positionWC() {
+        return Cesium.Cartesian3.fromDegrees(view.lon, view.lat, view.height);
+      },
+      get positionCartographic() {
+        return {
+          longitude: view.lon * RAD,
+          latitude: view.lat * RAD,
+          height: view.height,
+        };
+      },
+      pickEllipsoid(point) {
+        return Cesium.Cartesian3.fromDegrees(
+          view.lon - 0.002 + (point.x / 100) * 0.004,
+          view.lat + 0.002 - (point.y / 100) * 0.004,
+        );
+      },
+      computeViewRectangle: () => undefined,
     },
   };
 }

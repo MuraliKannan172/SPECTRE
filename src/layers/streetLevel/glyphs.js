@@ -1,4 +1,4 @@
-/** Billboard glyphs as SVG data URLs: the image cone, the 360° ring and the position marker. */
+/** Billboard glyphs as SVG data URLs: the image cone, the 360° ring and the position markers. */
 
 const px = (n) => Number(n.toFixed(2));
 
@@ -43,6 +43,16 @@ export function imageConeGlyph({
         'rgba(10,10,15,0.85)',
         Math.max(1, size * 0.05),
       ),
+  );
+}
+
+/** Street View-style marker: a field-of-view cone from a white-ringed dot. */
+export function viewConeMarkerGlyph({ size = 56, color = '#4285f4' } = {}) {
+  return svg(
+    size,
+    wedge(size, size * 0.48, 0.62, color, 0.38) +
+      wedge(size, size * 0.3, 0.62, color, 0.3) +
+      dot(size, size * 0.13, color, '#ffffff', Math.max(2, size * 0.05)),
   );
 }
 

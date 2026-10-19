@@ -27,6 +27,15 @@ export const THUMB_HOST = 'qa-fixture.mapillary.com';
 
 const METRES_PER_DEG_LAT = 110_540;
 
+/** Ground distance in metres, as the app's metresBetween. */
+export function metresApart(a, b) {
+  const lat = (((a.lat + b.lat) / 2) * Math.PI) / 180;
+  return Math.hypot(
+    (b.lon - a.lon) * 111_320 * Math.cos(lat),
+    (b.lat - a.lat) * METRES_PER_DEG_LAT,
+  );
+}
+
 /**
  * Photos along PHOTO_LINE, south to north; every third one is a panorama.
  * @returns {Array<{id: string, lon: number, lat: number, isPano: boolean, capturedAt: number, compassAngle: number}>}
@@ -108,7 +117,7 @@ const json = (status, body) => ({
 });
 
 let photoBytes = null;
-function photoJpeg() {
+export function photoJpeg() {
   photoBytes ??= readFileSync(new URL('./street-640x320.jpg', import.meta.url));
   return photoBytes;
 }

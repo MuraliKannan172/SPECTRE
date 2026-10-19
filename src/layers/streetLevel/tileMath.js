@@ -90,10 +90,17 @@ export function tilesForBbox(bbox, z, { limit = Infinity, from = null } = {}) {
         [-180, south, east, north],
       ]
     : [bbox];
-  const grid = halves
-    .map(normalizeBbox)
-    .filter(Boolean)
-    .flatMap((box) => tileGrid(box, z));
+  // The halves share a column when the gap between east and west is
+  // narrower than a tile: count it once, so a capped set holds no repeats.
+  const grid = [
+    ...new Map(
+      halves
+        .map(normalizeBbox)
+        .filter(Boolean)
+        .flatMap((box) => tileGrid(box, z))
+        .map((tile) => [`${tile.x}/${tile.y}`, tile]),
+    ).values(),
+  ];
   const n = 2 ** z;
   const centre = from || {
     lon: wrapLon(west + (east - west + (across ? 360 : 0)) / 2),

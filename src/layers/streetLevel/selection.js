@@ -18,9 +18,32 @@ export function createSelection({ state, parts }) {
     const id = picking?.resolvePickId
       ? picking.resolvePickId(picked)
       : picked?.id;
-    const hit = parts.router.resolve(id);
+    const route = parts.router.resolve(id);
+    // Not ours: the ground handler decides whether it is the map itself.
+    if (!route) {
+      parts.openAtGround?.(click.position, picked);
+      return;
+    }
     // The position marker is the core's own: nothing to select.
-    if (hit?.instance) hit.instance.handlePick(hit.id);
+    if (!route.instance) return;
+    route.instance.handlePick(route.id, {
+      groundPoint: () => groundPointAt(viewer, click.position),
+    });
+  }
+
+  /** Lon/lat of the ground under a screen point, or null (sky, no picker). */
+  function groundPointAt(viewer, screenPosition) {
+    const position = state.services.scenePick?.pickGroundPosition?.(
+      viewer,
+      screenPosition,
+    );
+    const carto = position && Cesium.Cartographic.fromCartesian(position);
+    return carto
+      ? {
+          lon: Cesium.Math.toDegrees(carto.longitude),
+          lat: Cesium.Math.toDegrees(carto.latitude),
+        }
+      : null;
   }
 
   /**

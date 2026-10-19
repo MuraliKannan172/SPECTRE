@@ -3,16 +3,17 @@
  * Browser QA for the Street Level layer against a running server:
  * `npm run qa:street-level -- --url http://localhost:4173`.
  *
- * `--fixtures` (CI) answers every *.mapillary.com request and the coverage
- * tile route from fixtures, so nothing reaches Mapillary; the server still
- * needs a (dummy) token because the bundle carries it. `--strict` fails on any
+ * `--fixtures` (CI) answers every *.mapillary.com, KartaView and Panoramax
+ * request and the coverage tile route from fixtures, so nothing reaches those
+ * providers; the server still needs a (dummy) Mapillary token because the
+ * bundle carries it. `--strict` fails on any
  * skip other than "fixtures only". A failed run saves evidence under
  * qa-artifacts/street-level/.
  */
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { tileBounds } from '../src/layers/streetLevel/tileMath.js';
-import { encodeCoverageTile } from '../src/layers/streetLevel/coverageFixture.mjs';
+import { encodeCoverageTile } from '../src/layers/streetLevel/providers/mapillary/coverageFixture.mjs';
 import {
   hookRenderErrors,
   readRenderErrors,
@@ -26,6 +27,21 @@ import {
   PHOTO_SEQUENCE_ID,
   photoImages,
 } from './fixtures/street-level/mapillaryGraph.mjs';
+import {
+  answerKartaViewRequest,
+  describeKartaViewCall,
+  KV_LINE,
+  KV_SEQUENCE_ID,
+  kartaViewPhotos,
+  resetKartaViewFixture,
+} from './fixtures/street-level/kartaView.mjs';
+import {
+  answerPanoramaxRequest,
+  describePanoramaxCall,
+  PNX_PARK,
+  panoramaxPictures,
+  resetPanoramaxFixture,
+} from './fixtures/street-level/panoramax.mjs';
 
 const VIEWPORT = { width: 1440, height: 900 };
 /** Over downtown Sacramento, above the fixture photo line, looking down. */
@@ -90,9 +106,24 @@ function fixtureTile(z, x, y, now = Date.now()) {
   return encodeCoverageTile({ x, y, z }, { sequences });
 }
 
+/** Fixture answers and call names per keyless provider host. */
+const KEYLESS_HOSTS = [
+  {
+    host: /(^|\.)(kartaview|openstreetcam)\.org$/,
+    describe: describeKartaViewCall,
+    answer: answerKartaViewRequest,
+  },
+  {
+    host: /^(api\.panoramax\.xyz|panoramax\.openstreetmap\.fr)$/,
+    describe: describePanoramaxCall,
+    answer: answerPanoramaxRequest,
+  },
+];
+
 /**
- * Answer the page's Mapillary requests from `fixture`, which steps may change
- * mid-run. `configured: undefined` lets the server's real status route answer.
+ * Answer the page's Mapillary, KartaView and Panoramax requests from
+ * `fixture`, which steps may change mid-run. `configured: undefined` lets the
+ * server's real status route answer.
  */
 async function serveFixtures(page, fixture) {
   // CDP Fetch on just these URLs: page-wide interception stalls Cesium workers.
@@ -101,6 +132,11 @@ async function serveFixtures(page, fixture) {
     patterns: [
       { urlPattern: '*://*.mapillary.com/*' },
       { urlPattern: '*/api/mapillary/*' },
+      { urlPattern: '*://api.kartaview.org/*' },
+      { urlPattern: '*://cdn.kartaview.org/*' },
+      { urlPattern: '*://*.openstreetcam.org/*' },
+      { urlPattern: '*://api.panoramax.xyz/*' },
+      { urlPattern: '*://panoramax.openstreetmap.fr/*' },
     ],
   });
   const json = (status, payload) => ({
@@ -116,6 +152,16 @@ async function serveFixtures(page, fixture) {
         url: address.href,
         images: fixture.images,
       });
+      fixture.calls.add(call);
+      if (!answer.known) fixture.unknown.push(call);
+      return answer;
+    }
+    const keyless = KEYLESS_HOSTS.find(({ host }) =>
+      host.test(address.hostname),
+    );
+    if (keyless) {
+      const call = keyless.describe(method, address);
+      const answer = keyless.answer({ method, url: address.href });
       fixture.calls.add(call);
       if (!answer.known) fixture.unknown.push(call);
       return answer;
@@ -195,6 +241,11 @@ const uiUntil = (page, test, arg = null, timeout = 30_000) =>
     `(${test})(window.__godsEyeView.dataManager.layers.get('street-level').module.getUIState(), ${JSON.stringify(arg)})`,
     { timeout, polling: 100 },
   );
+
+/** `id` is the one provider lit. */
+const litAlone = (u, id) =>
+  u.providers.find((p) => p.id === id)?.on === true &&
+  u.providers.filter((p) => p.on).length === 1;
 
 const getUI = (page) =>
   page.evaluate(() =>
@@ -287,6 +338,7 @@ const findPick = (page, prefix, { box = null, step = 3 } = {}) =>
               x: rect.left + px,
               y: rect.top + py,
               local: { x: px, y: py },
+              id,
             };
         }
       return null;
@@ -301,17 +353,21 @@ const findPick = (page, prefix, { box = null, step = 3 } = {}) =>
  * worker after their tile decoded, so a scan right after LOADING clears can
  * come too early on a slow machine.
  */
-async function findPickUntil(page, prefix, { timeout = 30_000 } = {}) {
+async function findPickUntil(
+  page,
+  prefix,
+  { timeout = 30_000, box = null } = {},
+) {
   const deadline = Date.now() + timeout;
   for (;;) {
-    const hit = await findPick(page, prefix);
+    const hit = await findPick(page, prefix, { box });
     if (hit || Date.now() >= deadline) return hit;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
 
-/** Park the camera over the photo line; a late startup flight can move it. */
-async function park(page) {
+/** Park the camera at `at`; a late startup flight can move it. */
+async function park(page, at = PARK) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const stayed = await page.evaluate(async (at) => {
       const v = window.__godsEyeView.viewer;
@@ -329,10 +385,10 @@ async function park(page) {
         Math.abs((c.longitude * 180) / Math.PI - at.lon) < 0.001 &&
         Math.abs((c.latitude * 180) / Math.PI - at.lat) < 0.001
       );
-    }, PARK);
+    }, at);
     if (stayed) return;
   }
-  throw new Error('the camera would not stay parked over the photo line');
+  throw new Error(`the camera would not stay parked at ${JSON.stringify(at)}`);
 }
 
 async function main() {
@@ -353,13 +409,16 @@ async function main() {
   });
   let count = 0;
   const skips = [];
-  const step = async (label, fn) => {
-    await fn();
-    console.log(`ok ${++count} ${label}`);
-  };
   const skip = (reason, label) => {
     skips.push(reason);
     console.log(`skip (${reason}) ${++count} ${label}`);
+  };
+  // `fn` may call `skipped(reason)` when a live run has nothing to test.
+  const step = async (label, fn) => {
+    let reason = null;
+    await fn({ skipped: (why) => (reason = why) });
+    if (reason) skip(reason, label);
+    else console.log(`ok ${++count} ${label}`);
   };
   const fixtureStep = (label, fn) =>
     fixtures ? step(label, fn) : skip('fixtures only', label);
@@ -387,9 +446,78 @@ async function main() {
       ),
     );
 
+  /**
+   * A keyless provider: lighting its chip darkens the others and draws its
+   * coverage with its credit; a click on a line opens a photo from it; ×
+   * closes it. Leaves that provider lit.
+   */
+  const keylessProviderStep = ({
+    id,
+    name,
+    at,
+    linePrefix,
+    box,
+    reset,
+    check,
+  }) =>
+    step(
+      `${name}: its chip draws keyless coverage and its credit, a line opens its photo, × closes it`,
+      async ({ skipped }) => {
+        reset();
+        await park(page, at);
+        await press(page, `#sl-provider-chips [data-chip-id="${id}"]`);
+        await uiUntil(page, litAlone, id);
+        await waitForCoverage(page);
+        await page.waitForFunction(
+          (credit) => document.body.innerHTML.includes(credit),
+          { timeout: 15_000 },
+          `${name}</a> contributors`,
+        );
+        const area =
+          box === 'column'
+            ? await page.evaluate(() => {
+                const { height, width } =
+                  window.__godsEyeView.viewer.scene.canvas.getBoundingClientRect();
+                return { x: Math.round(width * 0.3), y: 0, w: 1, h: height };
+              })
+            : null;
+        const line = await findPickUntil(page, linePrefix, { box: area });
+        if (!line && !fixtures) return skipped(`no ${name} line in view`);
+        assert.ok(line, `a ${name} line in view`);
+        await page.mouse.click(line.x, line.y);
+        await uiUntil(
+          page,
+          (u) => (u.street.imageId && !u.street.loading) || u.street.error,
+          null,
+          90_000,
+        );
+        const { street } = await getUI(page);
+        if (!fixtures && /No street-level imagery/.test(street.error || ''))
+          return skipped(`no ${name} photo near the line`);
+        assert.equal(street.error, null, `viewer error: ${street.error}`);
+        assert.equal(street.providerId, id);
+        assert.equal(
+          await page.$eval('#sl-viewer-wrap', (node) => node.hidden),
+          false,
+        );
+        if (fixtures)
+          check(street, line.id.slice(linePrefix.length).split('~')[0]);
+        await press(page, '#sl-viewer-close');
+        await uiUntil(
+          page,
+          (u) => !u.street.open && u.sequence.selectedId === null,
+        );
+        assert.equal(
+          await page.$eval('#sl-viewer-wrap', (node) => node.hidden),
+          true,
+        );
+      },
+    );
+  let page = null;
+
   try {
     const fixture = newFixture();
-    const page = await open('main', fixtures && fixture);
+    page = await open('main', fixtures && fixture);
     const { configured } = await page.evaluate(() =>
       fetch('/api/mapillary/status').then((res) => res.json()),
     );
@@ -543,6 +671,43 @@ async function main() {
         );
       });
 
+      await keylessProviderStep({
+        id: 'kartaview',
+        name: 'KartaView',
+        at: PARK,
+        linePrefix: 'kv:line:',
+        // A row across the middle crosses the drive, west of the old street.
+        box: null,
+        reset: resetKartaViewFixture,
+        check: (street) => {
+          assert.equal(street.sequenceId, KV_SEQUENCE_ID);
+          assert.ok(
+            kartaViewPhotos().some((photo) => photo.id === street.imageId),
+            `fixture photo ${street.imageId}`,
+          );
+        },
+      });
+      await keylessProviderStep({
+        id: 'panoramax',
+        name: 'Panoramax',
+        at: PNX_PARK,
+        linePrefix: 'pnx:seq:',
+        // The street runs east-west: scan a column left of the middle.
+        box: 'column',
+        reset: resetPanoramaxFixture,
+        check: (street, lineId) => {
+          assert.equal(street.sequenceId, lineId, 'the line clicked');
+          assert.ok(
+            panoramaxPictures().some((photo) => photo.id === street.imageId),
+            `fixture picture ${street.imageId}`,
+          );
+        },
+      });
+      // Back to Mapillary, where the next page and a reload expect it.
+      await press(page, '#sl-provider-chips [data-chip-id="mapillary"]');
+      await uiUntil(page, litAlone, 'mapillary');
+      await park(page);
+
       await fixtureStep(
         'keyless server (second page): KEY REQUIRED gates the controls',
         async () => {
@@ -558,7 +723,7 @@ async function main() {
       );
 
       await fixtureStep(
-        'every Mapillary request was answered from a fixture',
+        'every Mapillary, KartaView and Panoramax request was answered from a fixture',
         () => {
           console.log(`  (answered: ${[...fixture.calls].sort().join(' | ')})`);
           assert.deepEqual(fixture.unknown, []);

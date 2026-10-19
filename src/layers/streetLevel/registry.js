@@ -1,5 +1,11 @@
 import { encodeIdSwitches } from '../../data/idSwitches.js';
 
+export const IMAGERY_FILTERS = Object.freeze(['pano', 'since']);
+
+export function filtersOf(provider) {
+  return provider?.filters ?? IMAGERY_FILTERS;
+}
+
 /**
  * The contract an imagery provider registers with the Street Level layer.
  *
@@ -9,16 +15,26 @@ import { encodeIdSwitches } from '../../data/idSwitches.js';
  * @property {string} label         Chip text and link label, e.g. 'MAPILLARY'.
  * @property {string|null} requiresKeyId  Key-setup id the provider needs, or null when keyless.
  * @property {string} pickPrefix    Every primitive id the provider creates starts with it.
- * @property {{coverage: string}} colors   The source's one colour.
+ * @property {{coverage: string}} colors   The source's one colour, from policy.js PROVIDER_COLORS.
  * @property {{html: string}} credit   On-globe attribution while the provider is active.
+ * @property {boolean} [groundClick]   No coverage: a ground click at street zoom opens its nearest image.
+ * @property {string} [requiresMapStack]   Usable only on this map stack.
+ * @property {boolean} [defaultOn]     Default true; the first that defaults on is lit.
+ * @property {{kind: 'view-cone', color: string}} [marker]   Default: GEV's pin.
+ * @property {Array<'pano'|'since'>} [filters]   Filters it honours (default both).
+ * @property {{noun: string, action: string}} [coverageLabel]   How the panel counts its lines and says what a click does (default: sequences, "click a line for its photos").
+ * @property {'capture'|'upload'} [sinceBasis]   What SINCE compares (default 'capture'); 'upload' puts a note under the slider while the provider is lit.
  * @property {(context: ProviderContext) => ProviderInstance} create
  *
  * @typedef {object} ProviderContext   Handed to `create()` once by the core.
- * @property {object} services         Scene services: picking, input, render, sprites.
+ * @property {object} services         Scene services: picking, input, render, sprites, scenePick (ground clicks need it).
  * @property {() => {pano: string, sinceMs: number|null}} getFilter   Filter resolved against now; read it on every use so "since N days" keeps up.
  * @property {() => boolean} isActive  Layer enabled and this provider switched on.
  * @property {() => void} notify       Ask the core to publish a new UI snapshot.
- * @property {{openImage: (imageId: string) => Promise<boolean>}} actions
+ * @property {{openImage: (imageId: string, options?: {frame?: boolean}) => Promise<boolean>, openNearest: (point: {lon: number, lat: number}) => Promise<boolean>, reportError: (message: string|null) => void}} actions
+ *   `openNearest` opens this provider's image nearest a point the user picked
+ *   (needs `nearestImage`); `reportError` shows a viewer or key error in the
+ *   panel, or withdraws this provider's own (null).
  *
  * @typedef {object} ProviderInstance
  * @property {(options?: {signal?: AbortSignal}) => Promise<{configured: boolean}>} status   Whether a usable key is set; the core gives up on a hung answer through `signal`.
@@ -28,10 +44,11 @@ import { encodeIdSwitches } from '../../data/idSwitches.js';
  * @property {(viewer: object) => void} destroy
  * @property {(filter: {pano: string, sinceMs: number|null}) => void} setFilter   The filter changed: redraw (reading `getFilter()`).
  * @property {() => {count: number, loading: boolean, hint: string, error: string|null, keyRequired: boolean, keyRejected?: boolean}} coverageStats
- * @property {(pickId: string) => boolean} handlePick   The id carries the provider's own prefix.
+ * @property {(pickId: string, click?: {groundPoint: () => {lon: number, lat: number}|null}) => boolean} handlePick   The id carries the provider's own prefix; `groundPoint` is where the click met the ground.
  * @property {(sequenceId: string) => Promise<void>} [selectSequence]
  * @property {() => void} [clearSequence]
  * @property {() => {selectedId: string|null, images: number, loading: boolean, error?: string|null}} [sequenceStats]
+ * @property {(point: {lat: number, lon: number}, options?: {signal?: AbortSignal}) => Promise<string|null>} [nearestImage]   For ground clicks and `openNearest`; an aborted lookup gives up (it may reject with an AbortError).
  * @property {ViewerAdapter} viewer
  *
  * @typedef {object} ViewerAdapter
@@ -41,16 +58,22 @@ import { encodeIdSwitches } from '../../data/idSwitches.js';
  * @property {() => void} unmount                             Destroy the instance (host handed to another provider).
  * @property {() => void} resize
  * @property {(mode: 'letterbox'|'fill') => void} [setRenderMode]
+ * @property {() => boolean} [supportsRenderModes]   False while the image has no frame to fit (a panorama): FIT / FILL hide.
  * @property {(listener: (pose: StreetPose) => void) => () => void} onPose
  *
  * @typedef {object} StreetPose
+ * @property {string} providerId
  * @property {string} imageId
  * @property {{lon: number, lat: number}} position
  * @property {number|null} bearing
+ * @property {number|null} tilt
  * @property {number|null} altitude
  * @property {boolean} isPano
  * @property {number|null} capturedAt   Epoch milliseconds.
+ * @property {'day'|'month'} [capturedAtPrecision]   How exactly the provider dates images (default 'day').
+ * @property {string|null} [title]     A place name for the caption, e.g. the address.
  * @property {string|null} creator
+ * @property {string|null} [license]   The image's licence when it is per image, e.g. 'CC BY-SA 4.0'.
  * @property {string|null} sequenceId
  * @property {string} externalUrl      Deep link to the image on the provider's site.
  */
@@ -108,6 +131,34 @@ export function validateProviders(providers) {
     )
       throw new TypeError(
         `Street Level provider ${label} needs a coverage colour`,
+      );
+    if (
+      provider.marker !== undefined &&
+      !(
+        provider.marker?.kind === 'view-cone' &&
+        typeof provider.marker.color === 'string'
+      )
+    )
+      throw new TypeError(
+        `Street Level provider ${label}: marker must be {kind: 'view-cone', color}`,
+      );
+    if (
+      provider.filters !== undefined &&
+      !(
+        Array.isArray(provider.filters) &&
+        provider.filters.every((key) => IMAGERY_FILTERS.includes(key))
+      )
+    )
+      throw new TypeError(
+        `Street Level provider ${label}: filters must list ${IMAGERY_FILTERS.join(' or ')}`,
+      );
+    if (
+      provider.sinceBasis !== undefined &&
+      provider.sinceBasis !== 'capture' &&
+      provider.sinceBasis !== 'upload'
+    )
+      throw new TypeError(
+        `Street Level provider ${label}: sinceBasis must be 'capture' or 'upload'`,
       );
     ids.add(provider.id);
     prefixes.push(provider.pickPrefix);

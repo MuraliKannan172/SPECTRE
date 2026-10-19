@@ -76,6 +76,13 @@ function groundHit(camera, point, ellipsoid, maxRange) {
   return Cesium.Cartographic.fromCartesian(cartesian, ellipsoid) || null;
 }
 
+/** Camera height (m) above the ground under it. */
+export function cameraHeightAboveGround(viewer) {
+  const carto = viewer?.camera?.positionCartographic;
+  if (!carto) return null;
+  return carto.height - (groundUnderCamera(viewer) ?? 0);
+}
+
 /** Screen rays per side, less one, that `visibleBbox` casts. */
 const BBOX_GRID = 5;
 
@@ -255,4 +262,23 @@ export function createHorizonCull({ getViewer, items, onChange }) {
   }
 
   return { update, stop };
+}
+
+/** The middle of the visible ground, else the point under the camera; null without a camera. */
+export function viewCentre(viewer) {
+  if (!viewer) return null;
+  const bbox = visibleBbox(viewer);
+  if (bbox) {
+    // Across the date line (west > east) the middle is on the far side of 0°.
+    const span = bbox[2] - bbox[0] + (bbox[0] > bbox[2] ? 360 : 0);
+    let lon = bbox[0] + span / 2;
+    if (lon > 180) lon -= 360;
+    return { lat: (bbox[1] + bbox[3]) / 2, lon };
+  }
+  const carto = viewer.camera?.positionCartographic;
+  if (!carto) return null;
+  return {
+    lat: Cesium.Math.toDegrees(carto.latitude),
+    lon: Cesium.Math.toDegrees(carto.longitude),
+  };
 }

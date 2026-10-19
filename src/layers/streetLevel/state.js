@@ -13,39 +13,22 @@ export function freshStreet() {
     imageId: null,
     position: null,
     bearing: null,
+    tilt: null,
     altitude: null,
     isPano: false,
     capturedAt: null,
+    /** 'day', or 'month' for providers that date images by month (Google). */
+    capturedAtPrecision: 'day',
+    /** A place name for the caption (Google's address), or null. */
+    title: null,
+    /** Whether the open viewer has FIT/FILL render modes. */
+    renderModes: true,
     sequenceId: null,
     creator: null,
+    license: null,
     externalUrl: null,
     loading: false,
     error: null,
-  };
-}
-
-/** A provider's coverage bookkeeping, before the first refresh. */
-export function freshCoverage() {
-  return {
-    zoom: null,
-    /** Current zoom's tiles by `z/x/y` key. */
-    tiles: new Map(),
-    /** The selected sequence drawn over the coverage, or null. */
-    highlight: null,
-    /** Tile key → its request's controller; any entry means LOADING. */
-    pending: new Map(),
-    lastError: null,
-    /**
-     * Why tile requests are paused, or null: 'status' until the key status
-     * answers, 'no-key', 'rejected' (until the provider goes off) or
-     * 'rate-limited' (until `blockTimer` fires).
-     */
-    blocked: 'status',
-    blockTimer: null,
-    debounceTimer: null,
-    removeCameraListener: null,
-    terrainReady: null,
-    hint: '',
   };
 }
 
@@ -69,7 +52,10 @@ export function createState({ services }) {
       ...freshStreet(),
     },
 
-    marker: { collection: null, billboard: null },
+    /** Whether the camera is low enough for a ground click to open an image. */
+    groundClickReady: false,
+
+    marker: { collection: null, billboard: null, look: null },
     clickHandler: null,
   };
 }

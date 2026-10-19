@@ -31,6 +31,7 @@ function setup() {
       collection: {
         show: true,
         add: (options) => ({ ...options }),
+        remove() {},
         removeAll() {},
       },
       billboard: null,
@@ -86,4 +87,26 @@ test('the marker is clamped to the ground and turned to the bearing', () => {
   const placed = Cesium.Cartographic.fromCartesian(billboard.position);
   assert.ok(Math.abs(Cesium.Math.toDegrees(placed.longitude) + 121.5) < 1e-9);
   assert.equal(billboard.rotation, -Cesium.Math.toRadians(90));
+});
+
+test('a Street View photo gets a blue view cone; a Mapillary photo GEV\u2019s pin', () => {
+  const { state, marker } = setup();
+  const removed = [];
+  state.marker.collection.remove = (billboard) => removed.push(billboard);
+  const streetView = { kind: 'view-cone', color: '#4285f4' };
+  marker.set({ lon: -121.49, lat: 38.58 }, 45, streetView);
+  const cone = state.marker.billboard;
+  assert.equal(cone.imageId, 'sl-position:view-cone:#4285f4');
+  assert.equal(
+    cone.rotation,
+    -Cesium.Math.toRadians(45),
+    'it turns with the view',
+  );
+  // Dragging the panorama keeps the look and the billboard.
+  marker.set({ lon: -121.49, lat: 38.58 }, 90, streetView);
+  assert.equal(state.marker.billboard, cone);
+  // A Mapillary photo next (its provider has no marker): the pin.
+  marker.set({ lon: -121.49, lat: 38.58 }, 90, undefined);
+  assert.equal(state.marker.billboard.imageId, 'sl-position:pin');
+  assert.deepEqual(removed, [cone]);
 });

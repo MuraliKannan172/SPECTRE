@@ -5,7 +5,7 @@ import { createSelection } from './selection.js';
 import { createPickRouter } from './pickRouter.js';
 
 /** The selection installed on a stand-in viewer, with what its clicks reach. */
-function harness({ selected = false } = {}) {
+function harness({ selected = false, services = {}, providers = [] } = {}) {
   const saved = globalThis.document;
   globalThis.document = new EventTarget();
   // The document's keydown listeners, so a test can hand them any target.
@@ -26,6 +26,7 @@ function harness({ selected = false } = {}) {
   };
   const sequences = { selected, cleared: 0, selects: [] };
   const opened = [];
+  const groundClicks = [];
   /** What the pointer is over: a pick id, or nothing. */
   const scene = { under: null };
   const canvas = Object.assign(new EventTarget(), {
@@ -40,7 +41,7 @@ function harness({ selected = false } = {}) {
     viewer,
     enabled: true,
     clickHandler: null,
-    services: { picking: null, input: null },
+    services: { picking: null, input: null, ...services },
     providers: new Map([
       [
         'mapillary',
@@ -56,6 +57,7 @@ function harness({ selected = false } = {}) {
           },
         },
       ],
+      ...providers,
     ]),
   };
   const parts = {
@@ -63,6 +65,7 @@ function harness({ selected = false } = {}) {
       positionId: 'sl:pos',
     }),
     hasSelectedSequence: () => sequences.selected,
+    openAtGround: (position, picked) => groundClicks.push({ position, picked }),
     clearSequences() {
       sequences.cleared++;
       sequences.selected = false;
@@ -76,8 +79,9 @@ function harness({ selected = false } = {}) {
     state,
     sequences,
     opened,
+    groundClicks,
     scene,
-    click: () => action('LEFT_CLICK')({ position: { x: 10, y: 10 } }),
+    click: (x = 10) => action('LEFT_CLICK')({ position: { x, y: 10 } }),
     /** A keydown reaching the document from `target`; the event as handled. */
     key(key, target, { defaultPrevented = false } = {}) {
       const event = {
@@ -112,6 +116,11 @@ test('a click on a line selects its sequence, on a cone opens its image, elsewhe
       h.click();
     }
     assert.deepEqual([h.sequences.selects, h.opened], [['abc'], ['42']]);
+    // The marker is ours; nothing and another layer's pick go to the ground.
+    assert.deepEqual(
+      h.groundClicks.map(({ picked }) => picked?.id),
+      [undefined, 'cctv:7'],
+    );
   } finally {
     h.restore();
   }
@@ -166,6 +175,67 @@ test('Esc in a text field or rich-text editor keeps the selection (M61)', () => 
     // A <div contenteditable> (or anything inside one) is a text field too.
     h.key('Escape', element('div', { isContentEditable: true }));
     assert.equal(h.sequences.cleared, 0, 'typing in a contenteditable');
+  } finally {
+    h.restore();
+  }
+});
+
+test('a click on nothing of ours goes to the ground handler with the pick, which decides', () => {
+  const h = harness();
+  try {
+    h.click(5);
+    h.scene.under = 'flight:abc';
+    h.click(6);
+    assert.deepEqual(
+      h.groundClicks.map(({ position, picked }) => [position.x, picked?.id]),
+      [
+        [5, undefined],
+        [6, 'flight:abc'],
+      ],
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test('a click on a provider line hands it the ground under the click, measured only if asked', () => {
+  const handled = [];
+  const groundPicks = [];
+  const h = harness({
+    providers: [
+      [
+        'kartaview',
+        {
+          def: { id: 'kartaview', pickPrefix: 'kv:' },
+          instance: {
+            handlePick: (id, click) => handled.push({ id, click }),
+          },
+        },
+      ],
+    ],
+    services: {
+      scenePick: {
+        pickGroundPosition: (viewer, position) => {
+          groundPicks.push(position);
+          return Cesium.Cartesian3.fromDegrees(-83.0458, 42.3314, 190);
+        },
+      },
+    },
+  });
+  try {
+    h.scene.under = 'kv:line:14/1/2/3';
+    h.click(40);
+    assert.equal(handled.length, 1);
+    assert.equal(handled[0].id, 'kv:line:14/1/2/3');
+    assert.equal(
+      groundPicks.length,
+      0,
+      'no depth read until the provider asks',
+    );
+    const point = handled[0].click.groundPoint();
+    assert.ok(Math.abs(point.lon + 83.0458) < 1e-9);
+    assert.ok(Math.abs(point.lat - 42.3314) < 1e-9);
+    assert.deepEqual(groundPicks, [{ x: 40, y: 10 }]);
   } finally {
     h.restore();
   }

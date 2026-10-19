@@ -27,7 +27,8 @@ registerHooks({
     return { format: 'module', shortCircuit: true, source };
   },
 });
-const { createMapillaryViewer } = await import('./viewer.js');
+const { createMapillaryViewer } =
+  await import('./providers/mapillary/viewer.js');
 
 /**
  * A viewer host over `adapter`. `marker` records where the position marker
@@ -472,4 +473,82 @@ test('a photo asks for the camera when it starts opening and frames with that ti
   openGate.resolve();
   assert.equal(await opening, true);
   assert.equal(framing.started, 1);
+});
+
+/** The harness with a second provider, `google`, whose adapter has no render modes. */
+function twoProviders() {
+  const mapillary = fakeAdapter();
+  mapillary.prewarm = async () => {};
+  mapillary.setRenderMode = () => {};
+  const google = fakeAdapter();
+  google.prewarm = async () => {};
+  const h = harness(mapillary);
+  h.state.providers.set('google', {
+    def: { id: 'google', name: 'Google Street View', label: 'STREET VIEW' },
+    instance: { viewer: google },
+    on: true,
+  });
+  h.state.providers.get('mapillary').on = true;
+  return { ...h, mapillary, google };
+}
+
+test('the render modes follow the viewer that is open', async () => {
+  const { state, host } = twoProviders();
+  await host.open('mapillary', 'm-1');
+  assert.equal(state.street.renderModes, true);
+  await host.open('google', 'g-1');
+  assert.equal(state.street.renderModes, false, 'Google always fills');
+});
+
+test('a pose can date its image by month and name its place', async () => {
+  const { state, host, google } = twoProviders();
+  await host.open('google', 'g-1');
+  google.emitPose('g-1', {
+    providerId: 'google',
+    capturedAtPrecision: 'month',
+    title: '1014 10th St',
+    capturedAt: Date.UTC(2023, 0, 1),
+  });
+  assert.equal(state.street.capturedAtPrecision, 'month');
+  assert.equal(state.street.title, '1014 10th St');
+  host.close();
+  assert.deepEqual(
+    [state.street.capturedAtPrecision, state.street.title],
+    ['day', null],
+  );
+});
+
+test('FIT/FILL stays hidden for a second Street View panorama after a close', async () => {
+  const { state, host } = twoProviders();
+  await host.open('google', 'g-1');
+  assert.equal(state.street.renderModes, false);
+  host.close();
+  await host.open('google', 'g-2');
+  assert.equal(state.street.renderModes, false);
+});
+
+test('an adapter that can frame but says this image has no frame offers no FIT / FILL', async () => {
+  const adapter = fakeAdapter();
+  let frameable = false;
+  adapter.setRenderMode = () => {};
+  adapter.supportsRenderModes = () => frameable;
+  const { state, host } = harness(adapter);
+  await host.open('mapillary', 'pano-1');
+  assert.equal(state.street.imageId, 'pano-1', 'the pose arrived');
+  assert.equal(state.street.renderModes, false);
+  frameable = true;
+  await host.open('mapillary', 'flat-1');
+  assert.equal(state.street.renderModes, true, 'a flat image can be framed');
+});
+
+test('a pose’s licence reaches the caption state, and a closed viewer forgets it', async () => {
+  const { state, host, google } = twoProviders();
+  await host.open('google', 'g-1');
+  google.emitPose('g-1', { providerId: 'google', license: 'CC BY-SA 4.0' });
+  assert.equal(state.street.license, 'CC BY-SA 4.0');
+  google.emitPose('g-1', { providerId: 'google' });
+  assert.equal(state.street.license, null, 'none given: none shown');
+  google.emitPose('g-1', { providerId: 'google', license: 'CC0' });
+  host.close();
+  assert.equal(state.street.license, null);
 });
