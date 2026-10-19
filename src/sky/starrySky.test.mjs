@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
 import {
+  MILKY_WAY_INTENSITY,
   STARRY_SKY_CESIUM_VERSION,
   SKY_ROTATION_EPSILON_SECONDS,
   StarrySky,
   computeSkyRotation,
   isSkyRotationCurrent,
 } from './starrySky.js';
+
+const close = (actual, expected, epsilon = 1e-9) =>
+  assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} vs ${expected}`);
 
 test('the sky-box adapter was validated against this engine version', () => {
   assert.equal(
@@ -115,3 +119,11 @@ for (const iso of ['1970-01-01T00:00:00Z', '2060-01-01T00:00:00Z']) {
     }
   });
 }
+
+test('the Milky Way glow scales with its visibility, for styles that hide it', () => {
+  const sky = new StarrySky({ requestRender: () => {} });
+  close(sky._milkyWayUniforms.u_intensity(), MILKY_WAY_INTENSITY);
+  sky.milkyWayVisibility = 0;
+  assert.equal(sky._milkyWayUniforms.u_intensity(), 0);
+  sky.destroy();
+});

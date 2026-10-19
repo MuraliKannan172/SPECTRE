@@ -167,6 +167,8 @@ export class StarrySky {
     /** Matches `SkyBox#show`. */
     this.show = true;
     this.milkyWayIntensity = MILKY_WAY_INTENSITY;
+    /** 0..1 multiplier a style sets to hide the glow (see visualEffects.js). */
+    this.milkyWayVisibility = 1;
     this.starIntensity = STAR_INTENSITY;
     this._requestRender = requestRender;
     this._rotation = Cesium.Matrix3.clone(Cesium.Matrix3.IDENTITY);
@@ -190,7 +192,7 @@ export class StarrySky {
     this._milkyWayUniforms = {
       ...uniforms,
       u_milkyWay: () => this._cubeMap,
-      u_intensity: () => this.milkyWayIntensity,
+      u_intensity: () => this.milkyWayIntensity * this.milkyWayVisibility,
     };
     this._starUniforms = {
       ...uniforms,

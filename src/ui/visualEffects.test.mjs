@@ -158,6 +158,27 @@ test('direct Cockpit intensity writes are reconciled before rendering', () => {
   f.effects.destroy();
 });
 
+test('the anime stage fades the Milky Way out with its own intensity', () => {
+  const f = fixture();
+  const sky = { milkyWayVisibility: 1 };
+  f.effects.viewer.scene.skyBox = sky;
+  f.effects.initStyles();
+  f.effects.setStageIntensity(f.effects.stages.thermal, 1);
+  assert.equal(sky.milkyWayVisibility, 1, 'other styles keep the glow');
+  f.effects.setStageIntensity(f.effects.stages.anime, 0.25);
+  assert.equal(sky.milkyWayVisibility, 0.75);
+  f.effects.setStageIntensity(f.effects.stages.anime, 1);
+  assert.equal(sky.milkyWayVisibility, 0);
+  f.effects.setStageIntensity(f.effects.stages.anime, 0);
+  assert.equal(sky.milkyWayVisibility, 1);
+  // A sky box without the knob (Cesium's own) is left alone.
+  const plain = {};
+  f.effects.viewer.scene.skyBox = plain;
+  f.effects.setStageIntensity(f.effects.stages.anime, 1);
+  assert.deepEqual(plain, {});
+  f.effects.destroy();
+});
+
 test('bloom retains its dead zone, normalized intensity and independent toggle', () => {
   const f = fixture();
   f.effects.initPostProcess();
