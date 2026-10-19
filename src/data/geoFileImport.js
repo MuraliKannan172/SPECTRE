@@ -1040,26 +1040,86 @@ export function detachImportedTime(dataSource) {
   return dataSource;
 }
 
+/** Repair only the first KML opening tag, scanning its delimiter once. */
+export function repairKmlRootNamespaces(value, what = 'KML') {
+  const text = String(value);
+  // Skip XML comments and processing instructions without treating their
+  // literal '<kml' text as an opening root tag.
+  let start = 0;
+  for (;;) {
+    start = text.indexOf('<', start);
+    if (start < 0) return text;
+    if (text.slice(start, start + 9).toUpperCase() === '<!DOCTYPE') {
+      let quote = null;
+      let subsetDepth = 0;
+      let end = start + 9;
+      for (; end < text.length; end++) {
+        const char = text[end];
+        if (quote) {
+          if (char === quote) quote = null;
+        } else if (char === '"' || char === "'") quote = char;
+        else if (char === '[') subsetDepth++;
+        else if (char === ']') subsetDepth--;
+        else if (char === '>' && subsetDepth === 0) break;
+      }
+      if (end === text.length) return text;
+      start = end + 1;
+      continue;
+    }
+    const close = text.startsWith('<!--', start)
+      ? '-->'
+      : text.startsWith('<?', start)
+        ? '?>'
+        : null;
+    if (!close) break;
+    const end = text.indexOf(close, start + 2);
+    if (end < 0) return text; // The XML parser reports an unterminated preamble.
+    start = end + close.length;
+  }
+  const match = /^<kml\b/i.exec(text.slice(start, start + 5));
+  if (!match) return text;
+  let quote = null;
+  let end = -1;
+  for (let index = start + match[0].length; index < text.length; index++) {
+    const char = text[index];
+    if (char === '<') break; // Raw '<' is invalid even inside an XML attribute.
+    if (quote) {
+      if (char === quote) quote = null;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === '>') {
+      end = index + 1;
+      break;
+    }
+  }
+  if (end < 0)
+    throw new GeoImportError(
+      `That ${what} file is not valid XML.`,
+      msg('That {format} file is not valid XML.'),
+      { format: what },
+    );
+  const seen = new Set();
+  let root = text
+    .slice(start, end)
+    .replace(
+      /\sxmlns:([\w.-]+)\s*=\s*(["'])[^"']*\2/g,
+      (declaration, prefix) => {
+        if (seen.has(prefix)) return '';
+        seen.add(prefix);
+        return declaration;
+      },
+    );
+  if (!seen.has('xsi') && /[<\s]xsi:/.test(text))
+    root = root.replace(
+      /(\/?)>$/,
+      ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"$1>',
+    );
+  return text.slice(0, start) + root + text.slice(end);
+}
+
 function parseXml(text, what) {
   // Match the namespace repairs Cesium applies to ordinary exported KML.
-  if (what !== 'GPX')
-    text = String(text).replace(/<kml\b[^>]*>/i, (root) => {
-      const seen = new Set();
-      root = root.replace(
-        /\s+xmlns:([\w.-]+)\s*=\s*(["'])[^"']*\2/g,
-        (declaration, prefix) => {
-          if (seen.has(prefix)) return '';
-          seen.add(prefix);
-          return declaration;
-        },
-      );
-      if (!seen.has('xsi') && /[<\s]xsi:/.test(text))
-        root = root.replace(
-          />$/,
-          ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
-        );
-      return root;
-    });
+  if (what !== 'GPX') text = repairKmlRootNamespaces(text, what);
   const doc = new DOMParser().parseFromString(
     String(text).replace(/^﻿/, ''),
     'application/xml',

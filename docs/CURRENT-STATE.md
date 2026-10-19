@@ -1,5 +1,11 @@
 # God's Eye View Current State
 
+KML namespace repair locates the opening token once and scans its quoted tag
+delimiter once. Malformed or unterminated tags fail before DOM parsing, so a file
+of repeated incomplete `<kml` prefixes cannot trigger quadratic regex rescans.
+Duplicate namespace repair and missing xsi declarations remain supported; GPX
+continues through its existing XML parsing path.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,
