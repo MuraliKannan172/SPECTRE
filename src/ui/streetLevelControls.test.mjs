@@ -57,7 +57,15 @@ class FakeNode {
         return on;
       },
     };
-    this.style = {};
+    const style = {};
+    this.style = Object.assign(style, {
+      setProperty: (key, value) => {
+        style[key] = value;
+      },
+      removeProperty: (key) => {
+        delete style[key];
+      },
+    });
     Object.defineProperty(this, 'className', {
       get: () => [...names].join(' '),
       set: (value) => {

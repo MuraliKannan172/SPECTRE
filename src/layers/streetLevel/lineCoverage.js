@@ -162,18 +162,27 @@ export function createLineCoverage({
   /**
    * A tile's sequences, filtered then capped: capping first could leave a
    * dense tile of newer flat captures with no 360° lines at all. A line past
-   * the point budget is skipped; a shorter one may still fit.
+   * the point budget is skipped; a shorter one may still fit. The selected
+   * sequence is the answer to a click: it is drawn whatever the caps leave
+   * out, and not counted against them.
    */
   function drawnSequences(entry) {
     const drawn = [];
     const current = filter();
+    const selectedId = state.sequence.selectedId ?? null;
     let points = 0;
+    let counted = 0;
     for (const sequence of entry.sequenceList) {
-      if (drawn.length >= perTileSequenceCap) break;
       if (!passes(sequence, current)) continue;
+      if (sequence.id === selectedId) {
+        drawn.push(sequence);
+        continue;
+      }
+      if (counted >= perTileSequenceCap) continue;
       const size = pointsOf(sequence);
       if (points + size > perTilePointCap) continue;
       points += size;
+      counted++;
       drawn.push(sequence);
     }
     return drawn;
@@ -207,9 +216,14 @@ export function createLineCoverage({
       state.coverage.highlight = null;
     }
     if (!sequenceId || !scene) return;
+    // From every loaded line, drawn or not: a sequence selected after its
+    // tiles were drawn may have been left out by their caps.
+    const current = filter();
     const parts = [];
-    for (const entry of state.coverage.tiles.values())
-      parts.push(...(entry.sequences.get(sequenceId)?.parts || []));
+    for (const entry of state.coverage.tiles.values()) {
+      const sequence = entry.sequenceList.find(({ id }) => id === sequenceId);
+      if (sequence && passes(sequence, current)) parts.push(...sequence.parts);
+    }
     const instances = lineInstances(
       [{ id: sequenceId, parts }],
       Cesium.Color.fromCssColorString(colors.selected),

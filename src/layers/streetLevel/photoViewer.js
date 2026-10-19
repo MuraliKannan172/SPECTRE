@@ -6,11 +6,17 @@ import {
 import { imageSize } from './imageSize.js';
 import { msg, t } from '../../i18n/index.js';
 
-/** A photo download (tens of kilobytes to a few megabytes). */
-/** EXPAND puts the viewer's wrap full screen, or (iPhone) opens it as a popover. */
-const EXPANDED_SELECTOR =
-  '.sl-viewer-wrap:fullscreen, .sl-viewer-wrap:popover-open';
+/**
+ * EXPAND puts the viewer's wrap full screen, or (iPhone) opens it as a
+ * popover. Each is tried on its own: a browser that cannot parse one
+ * (Safari before 16.4) throws on the selector.
+ */
+const EXPANDED_SELECTORS = [
+  '.sl-viewer-wrap:fullscreen',
+  '.sl-viewer-wrap:popover-open',
+];
 
+/** A photo download (tens of kilobytes to a few megabytes). */
 export const IMAGE_TIMEOUT_MS = 15_000;
 
 /** A picture file or decoded side past these is refused (a photo is a few MB). */
@@ -745,12 +751,13 @@ export function createPhotoViewer({
 
   /** The viewer is expanded (full screen, or the iPhone popover), not docked in the panel. */
   function isExpanded() {
-    try {
-      return Boolean(root?.closest?.(EXPANDED_SELECTOR));
-    } catch {
-      // A browser without :popover-open has no popover EXPAND either.
-      return Boolean(root?.closest?.('.sl-viewer-wrap:fullscreen'));
-    }
+    return EXPANDED_SELECTORS.some((selector) => {
+      try {
+        return Boolean(root?.closest?.(selector));
+      } catch {
+        return false;
+      }
+    });
   }
 
   /** Another photo, or none: a sharper panorama still on its way is not needed. */

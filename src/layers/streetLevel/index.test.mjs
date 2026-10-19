@@ -1058,3 +1058,13 @@ test('switching source by params clears a failed lookup’s error; reapplying th
   second.setParams({ mapillary: false, other: true });
   assert.equal(second.getUIState().street.error, kept);
 });
+
+test('the panel says why a lit Street View draws nothing off Google 3D', async (t) => {
+  const { presentStreetLevelPanel } =
+    await import('../../ui/streetLevelPresentation.js');
+  const { layer, stack } = await withStreetView(t);
+  layer.setProviderEnabled('google', true);
+  stack.switchTo('esri-imagery');
+  const view = presentStreetLevelPanel(layer.getUIState());
+  assert.match(view.meta, /Google Street View needs the Google 3D map/);
+});

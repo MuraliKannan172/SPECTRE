@@ -591,3 +591,34 @@ test('a tile that fails before the terrain table loads is reported at once, neve
     process.off('unhandledRejection', onUnhandled);
   }
 });
+
+test('the selected sequence is drawn and highlighted even past the per-tile cap', async () => {
+  const { state, source, coverage, centre, viewer } = setup();
+  const line = (n) => [
+    [
+      [centre.lon - 0.001, centre.lat + n * 1e-6],
+      [centre.lon + 0.001, centre.lat + n * 1e-6],
+    ],
+  ];
+  const sequences = [];
+  for (let i = 0; i < 700; i++)
+    sequences.push({
+      id: `new-${i}`,
+      parts: line(i),
+      capturedAt: 2_000_000_000_000 + i,
+    });
+  sequences.push({
+    id: 'old',
+    parts: line(800),
+    capturedAt: 1_000_000_000_000,
+  });
+  state.sequence.selectedId = 'old';
+  coverage.refresh();
+  source.calls[0].resolve(encodeCoverageTile(centre.tile, { sequences }));
+  await settle();
+  const [entry] = state.coverage.tiles.values();
+  assert.ok(entry.sequences.has('old'), 'the selected line is drawn');
+  coverage.highlight('old');
+  assert.ok(state.coverage.highlight, 'the selected line is highlighted');
+  coverage.clear();
+});

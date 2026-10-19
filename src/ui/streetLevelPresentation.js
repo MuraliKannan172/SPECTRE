@@ -232,9 +232,12 @@ function presentMeta(state) {
   const providers = state.providers || [];
   if (providers.length === 0) return translateHint(state.coverage.hint);
   if (!state.enabled) return t('Switch Street Level on to draw its coverage.');
+  // A lit source that cannot run on this map is not listed: the core's hint
+  // says which map it needs.
   if (!providers.some((p) => p.on))
-    return t(
-      'Every provider is switched off: light a chip to draw its coverage.',
+    return (
+      translateHint(state.coverage.hint) ||
+      t('Every provider is switched off: light a chip to draw its coverage.')
     );
   // Key-gated with another source ready: say how to use it.
   if (state.keyRequired && state.keyAlternatives?.length)
