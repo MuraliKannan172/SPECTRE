@@ -1,0 +1,1 @@
+- Preserve enable during first-load replacement (asturksever, #1275).
