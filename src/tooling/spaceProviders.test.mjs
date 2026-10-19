@@ -161,7 +161,11 @@ test('CelesTrak answers 502 to an oversized TLE body without caching it', async 
   assert.ok(bodies[0].pulled <= 17, 'reading stops at the 16 MiB cap');
   assert.equal(fsp.writeFile.mock.callCount(), 0);
   assert.equal((await request('/api/celestrak', '/stations')).status, 502);
-  assert.equal(bodies.length, 2, 'nothing was cached in memory');
+  assert.equal(
+    bodies.length,
+    1,
+    'failed bodies are not cached but a cooldown bounds retry work',
+  );
 });
 
 for (const preview of [false, true])
@@ -190,3 +194,79 @@ for (const preview of [false, true])
     assert.equal(hit.body, first.body);
     assert.equal(calls, 1);
   });
+
+test('space providers honor Retry-After, gate groups, preserve stale dates and recover', async (t) => {
+  isolateDisk(t);
+  t.mock.method(console, 'warn', () => {});
+  let now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  for (const kind of ['tle', 'launches']) {
+    for (const retryAfter of ['90', new Date(now + 90000).toUTCString()]) {
+      let calls = 0;
+      let fail = false;
+      let cancelled = false;
+      t.mock.method(globalThis, 'fetch', async () => {
+        calls++;
+        if (fail)
+          return new Response(
+            new ReadableStream({
+              cancel() {
+                cancelled = true;
+              },
+            }),
+            {
+              status: kind === 'tle' ? 403 : 429,
+              headers: { 'Retry-After': retryAfter },
+            },
+          );
+        return new Response(
+          kind === 'tle'
+            ? 'ISS\n1 25544U fixture\n2 25544 fixture\n'
+            : '{"results":[]}',
+        );
+      });
+      const request = install(
+        kind === 'tle' ? celestrakProxy() : rocketLaunchesProxy(),
+      );
+      const route = kind === 'tle' ? '/api/celestrak' : '/api/launches';
+      const url = kind === 'tle' ? '/stations' : '/';
+      if (kind === 'tle') {
+        assert.equal(
+          (await request(route, '/not-a-supported-group')).status,
+          400,
+        );
+        assert.equal(calls, 0);
+      }
+      const first = await request(route, url);
+      now += 7 * 3600000;
+      // Recompute the HTTP-date relative to the clock at the failed refresh.
+      const originalFetch = globalThis.fetch;
+      t.mock.method(globalThis, 'fetch', async (...args) => {
+        const response = await originalFetch(...args);
+        if (fail && !/^\d+$/.test(retryAfter))
+          response.headers.set(
+            'Retry-After',
+            new Date(now + 90000).toUTCString(),
+          );
+        return response;
+      });
+      fail = true;
+      const stale = await request(route, url);
+      assert.equal(stale.status, 200);
+      assert.equal(stale.body, first.body);
+      assert.equal(stale.headers['Retry-After'], '90');
+      assert.ok(
+        stale.headers[kind === 'tle' ? 'X-TLE-Cached-At' : 'X-GEV-Cached-At'],
+      );
+      assert.equal(cancelled, true);
+      await request(route, url);
+      if (kind === 'tle')
+        assert.equal((await request(route, '/visual')).status, 502);
+      assert.equal(calls, 2, 'cooldown applies across TLE groups');
+      now += 91000;
+      fail = false;
+      assert.equal((await request(route, url)).status, 200);
+      assert.equal(calls, 3);
+    }
+  }
+});

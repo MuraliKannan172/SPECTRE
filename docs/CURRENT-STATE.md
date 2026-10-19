@@ -1,5 +1,12 @@
 # God's Eye View Current State
 
+CelesTrak accepts only the seven satellite groups used by the app and gates
+requests before provider work. CelesTrak and Launch Library failures start a
+provider-wide cooldown: Retry-After seconds or HTTP dates are bounded to 5 seconds
+through 30 minutes, with a 60-second fallback. During cooldown dated last-good
+data is served with stale provenance, otherwise the proxy returns a bounded
+error without another upstream attempt. Error bodies are cancelled before reading.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,
