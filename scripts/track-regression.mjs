@@ -657,7 +657,6 @@ async function main() {
     // SHARE LINK V2 — real reload restores the same logical plane.
     // ============================================================
     console.log('\nShare Link v2 — tracked aircraft survives a full reload');
-    await evalPage(() => window.__godsEyeView.styleManager.initialRestorePromise);
     const shareTracked = await evalPage(() => (
       window.__godsEyeView.dataManager.layers
         .get('flights').module.trackById('aaa001', { origin: 'user' })

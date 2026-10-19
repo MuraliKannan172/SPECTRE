@@ -247,18 +247,6 @@ test('mint locks canonical action schemas and server instructions with no perman
   });
 });
 
-test('browser token requests cannot override server capabilities', async (t) => {
-  for (const body of [
-    { providerDropdown: true },
-    { inputMode: 'push-to-talk', providerDropdown: true },
-    { capabilities: { providerDropdown: true } },
-  ]) {
-    const f = await fixture(t);
-    assert.equal((await f.send({ body: JSON.stringify(body) })).status, 400);
-    assert.equal(f.calls.length, 0);
-  }
-});
-
 test('missing key and malformed model fail without an upstream request', async (t) => {
   const missing = await fixture(t, { resolveApiKey: () => '' });
   assert.equal((await missing.send()).status, 503);
@@ -487,6 +475,9 @@ test('client bodies cannot override model or locked settings and stay byte bound
     '{"inputMode":"push-to-talk","model":"gemini-other"}',
     '{"inputMode":"push-to-talk","tools":[]}',
     '{"inputMode":"push-to-talk","extra":false}',
+    '{"providerDropdown":true}',
+    '{"inputMode":"push-to-talk","providerDropdown":true}',
+    '{"capabilities":{"providerDropdown":true}}',
     '{"inputMode":true}',
     '{"inputMode":null}',
     '{"inputMode":{}}',

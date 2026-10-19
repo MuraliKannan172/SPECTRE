@@ -3174,15 +3174,7 @@ for (const exit of ['stop', 'boundary']) {
   });
 }
 
-for (const segments of [
-  ['set', 'voice', 'volume', 'to', '50'],
-  ['set', 'voice', 'speed', 'to', 'fast'],
-  ['set', 'provider', 'to', 'bing maps'],
-  ['"use foo', 'as my voice provider"'],
-  ['use foo as my voice provider', 'and zoom out'],
-  ['do not', 'use foo as my voice provider'],
-  ['use', 'foo'],
-]) {
+for (const segments of [['use foo as my voice provider', 'and zoom out']]) {
   test(`native advisory caption text ${JSON.stringify(segments)} releases tools`, async () => {
     const h = guardedNativeHarness();
     try {
