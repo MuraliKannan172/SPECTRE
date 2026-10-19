@@ -410,6 +410,9 @@ export const IDLE_CAMERA_COLOR =
 export const ACTIVE_CAMERA_COLOR =
   Cesium.Color.fromCssColorString('#ffd97a').withAlpha(0.95);
 
+export const LIVE_CAMERA_COLOR =
+  Cesium.Color.fromCssColorString('#b48cff').withAlpha(0.88);
+
 export const IDLE_COVERAGE_COLOR =
   Cesium.Color.fromCssColorString('#2fe0ff').withAlpha(0.24);
 
