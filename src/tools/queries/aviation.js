@@ -175,6 +175,7 @@ export const aircraftInArea = defineTool({
     const groups = args.group_by
       ? breakdown(rows, args.group_by, groupValue(args.group_by))
       : null;
+    const airborne = rows.filter((row) => !row.on_ground);
     return {
       summary:
         `${rows.length} ${kind} in ${area.label}` +
@@ -189,12 +190,10 @@ export const aircraftInArea = defineTool({
         ...(groups ? { breakdown: groups } : {}),
         ...(args.stats
           ? {
+              // Parked aircraft would pull both figures toward zero.
               stats: {
-                altitude_m: numericSummary(
-                  rows.filter((row) => !row.on_ground),
-                  'altitude_m',
-                ),
-                speed_mps: numericSummary(rows, 'speed_mps'),
+                altitude_m: numericSummary(airborne, 'altitude_m'),
+                speed_mps: numericSummary(airborne, 'speed_mps'),
               },
             }
           : {}),

@@ -395,7 +395,11 @@ test('aircraft in an area can be counted by operator over every match', async ()
     record('a1', 37.6, -122.3, { operator: 'United' }),
     record('a2', 37.61, -122.3, { operator: 'Delta' }),
     record('a3', 37.62, -122.3, { operator: 'United', baroAltitudeM: 3000 }),
-    record('a4', 37.63, -122.3, { onGround: true, baroAltitudeM: 0 }),
+    record('a4', 37.63, -122.3, {
+      onGround: true,
+      baroAltitudeM: 0,
+      speedMps: 0,
+    }),
     record('a5', 51.5, -0.1, { operator: 'British Airways' }),
   ];
   const catalog = composeCatalog({
@@ -422,15 +426,44 @@ test('aircraft in an area can be counted by operator over every match', async ()
     other_count: 0,
     unknown_count: 1,
   });
-  // Altitude covers airborne aircraft only; speed covers every match.
-  assert.deepEqual(result.data.stats.altitude_m, {
-    count: 3,
-    min: 3000,
-    median: 10000,
-    mean: 7666.7,
-    max: 10000,
+  // Both figures cover airborne aircraft only: the parked a4 stands at 0 m
+  // and 0 m/s and would pull each mean down.
+  assert.deepEqual(result.data.stats, {
+    altitude_m: {
+      count: 3,
+      min: 3000,
+      median: 10000,
+      mean: 7666.7,
+      max: 10000,
+    },
+    speed_mps: { count: 3, min: 230, median: 230, mean: 230, max: 230 },
   });
-  assert.equal(result.data.stats.speed_mps.count, 4);
+});
+
+test('aircraft stats are empty when every match is on the ground', async () => {
+  const catalog = composeCatalog({
+    tools: coreTools,
+    services: {
+      aircraft: feed([
+        record('g1', 37.6, -122.3, {
+          onGround: true,
+          baroAltitudeM: 0,
+          speedMps: 0,
+        }),
+        record('g2', 37.61, -122.3, {
+          onGround: true,
+          baroAltitudeM: 0,
+          speedMps: 4,
+        }),
+      ]),
+    },
+  });
+  const result = await catalog.call('aircraft_in_area', {
+    area: bay,
+    stats: true,
+  });
+  assert.match(result.summary, /^2 aircraft in /);
+  assert.deepEqual(result.data.stats, { altitude_m: null, speed_mps: null });
 });
 
 test('aircraft answers carry no breakdown or stats unless asked', async () => {
