@@ -1071,5 +1071,6 @@
   "src/tooling/changelogFragments.test.mjs",
   "src/data/gbfsProxyRateLimit.test.mjs",
   "src/terrainHeightsBounds.test.mjs",
-  "server/providers/overpass/requestAdmission.test.mjs"
+  "server/providers/overpass/requestAdmission.test.mjs",
+  "src/tooling/trackArrivalObservation.test.mjs"
 ]
