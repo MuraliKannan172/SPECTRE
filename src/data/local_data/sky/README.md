@@ -42,10 +42,11 @@ Centre.
 (<https://www.eso.org/public/outreach/copyright/>). **Credit: ESO/S. Brunier.**
 
 **Changes made** (CC BY 4.0 asks for them to be stated): resampled to
-4096×2048, two planets (Jupiter, by position) painted over with the surrounding sky,
-stars removed with a 7×7 morphological opening, blurred (σ = 0.4°),
-reprojected from galactic coordinates to ICRF cube faces, black level set at
-the darkest 25 % of the sky, gamma-encoded and saved as WebP. Build:
+4096×2048, stars removed with a 7×7 morphological opening, two planets
+(Jupiter, by position) painted over with the median of the surrounding sky,
+blurred (σ = 0.4°), reprojected from galactic coordinates to ICRF cube faces,
+black level set at the darkest 25 % of the sky, gamma-encoded and saved as
+WebP. Build:
 `node scripts/build-milky-way.mjs <eso0932a.tif>`.
 
 The panorama is a photographic mosaic, not an astrometric map: bright stars

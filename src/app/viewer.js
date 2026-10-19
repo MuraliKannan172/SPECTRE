@@ -120,9 +120,10 @@ export function createApplicationViewer({ container, creditContainer }) {
     selectionIndicator: false,
     infoBox: false,
     baseLayer: false,
-    // Replaced below: the default Tycho-2 cube map is too coarse for the
-    // whole-globe view and its JPEG blocks show around the Earth.
-    skyBox: false,
+    // Instead of the default Tycho-2 cube map, whose JPEG blocks show around
+    // the whole globe. Passed here, not assigned later: `skyBox: false` would
+    // also stop CesiumWidget from creating the Sun and the Moon.
+    skyBox: new StarrySky(),
     creditContainer,
     msaaSamples: 4,
     contextOptions: { webgl: { preserveDrawingBuffer: true } },
@@ -134,7 +135,6 @@ export function createApplicationViewer({ container, creditContainer }) {
     // render loop. See app/atmosphereCompat.js.
     applyModelAtmosphereWorkaround(viewer.scene);
     viewer.scene.globe.show = false;
-    viewer.scene.skyBox = new StarrySky();
     viewer.scene.skyAtmosphere.show = true;
     viewer.scene.skyAtmosphere.atmosphereLightIntensity = 18;
     viewer.scene.skyAtmosphere.saturationShift = -0.12;

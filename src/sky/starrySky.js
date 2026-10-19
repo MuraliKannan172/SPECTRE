@@ -174,6 +174,7 @@ export class StarrySky {
     this._rotationPrecise = false;
     this._icrfRequest = undefined;
     this._icrfUnavailable = false;
+    this._icrfMissing = undefined;
     this._loading = false;
     this._starData = undefined;
     this._faceImages = undefined;
@@ -237,7 +238,7 @@ export class StarrySky {
   _updateRotation(time) {
     // An approximate rotation is final only while nothing better can come.
     const settled =
-      this._rotationPrecise || this._icrfRequest || this._icrfUnavailable;
+      this._rotationPrecise || this._icrfRequest || !this._canPreloadIcrf(time);
     if (settled && isSkyRotationCurrent(this._rotationTime, time)) return;
     const { precise } = computeSkyRotation(time, this._rotation);
     this._rotationPrecise = precise;
@@ -245,9 +246,20 @@ export class StarrySky {
     if (!precise) this._preloadIcrf(time);
   }
 
-  /** Fetch Cesium's IAU 2006 tables around `time` once; retry on new spans. */
+  /** Whether loading Cesium's IAU 2006 tables could still help at `time`. */
+  _canPreloadIcrf(time) {
+    return (
+      !this._icrfUnavailable &&
+      !(
+        this._icrfMissing &&
+        Cesium.TimeInterval.contains(this._icrfMissing, time)
+      )
+    );
+  }
+
+  /** Fetch Cesium's IAU 2006 tables around `time` once per span. */
   _preloadIcrf(time) {
-    if (this._icrfRequest || this._icrfUnavailable) return;
+    if (this._icrfRequest || !this._canPreloadIcrf(time)) return;
     const interval = new Cesium.TimeInterval({
       start: Cesium.JulianDate.addDays(time, -1, new Cesium.JulianDate()),
       stop: Cesium.JulianDate.addDays(time, 1, new Cesium.JulianDate()),
@@ -257,7 +269,14 @@ export class StarrySky {
     )
       .then(
         () => {
+          // The tables cover roughly 1975–2050; outside them the preload
+          // resolves with nothing, and TEME stays for this span.
+          if (!Cesium.Transforms.computeIcrfToFixedMatrix(time)) {
+            this._icrfMissing = interval;
+            return;
+          }
           this._rotationTime = undefined;
+          if (!this._destroyed) this._requestRender();
         },
         (error) => {
           // TEME is within a fraction of a degree; do not retry every frame.
@@ -267,7 +286,6 @@ export class StarrySky {
       )
       .finally(() => {
         this._icrfRequest = undefined;
-        if (!this._destroyed) this._requestRender();
       });
   }
 

@@ -15,12 +15,12 @@
  *
  * Transform (deterministic):
  *   1. Resample to WORK_WIDTH×WORK_WIDTH/2 and convert sRGB to linear light.
- *   2. Paint out the planets the 2008–2010 exposures caught (PLANETS): they
- *      sit where today's sky has nothing and are far brighter than any star.
- *   3. Remove stars with a morphological opening (minimum, then maximum, over
+ *   2. Remove stars with a morphological opening (minimum, then maximum, over
  *      a (2·OPEN_RADIUS+1)² window): anything smaller than the window — every
  *      star — drops to the surrounding sky; the renderer draws catalogue stars
  *      itself, sharp and in the right place.
+ *   3. Paint out the planets the 2008–2010 exposures caught (PLANETS): they
+ *      sit where today's sky has nothing and are far brighter than any star.
  *   4. Blur with a three-pass box approximation of a Gaussian, σ = BLUR_DEG on
  *      the sky: rows wrap in longitude and widen by 1/cos(latitude) so the
  *      blur stays round towards the poles.
@@ -234,16 +234,18 @@ function galacticVector(l, b) {
 }
 
 /**
- * Replace a disc of the sky with the mean of the ring just outside it, per
- * channel. The blur that follows hides the seam.
+ * Replace a disc of the sky with the median of the ring just outside it, per
+ * channel. A median, not a mean: the planet's diffraction spikes reach far
+ * past the disc and would lift a mean well above the sky. The blur that
+ * follows hides the seam.
  */
 function paintOut(planes, width, height, { l, b, radiusDeg }) {
   const centre = galacticVector(l, b);
   const inner = Math.cos((radiusDeg * Math.PI) / 180);
-  const outer = Math.cos(((radiusDeg + 0.5) * Math.PI) / 180);
+  const outer = Math.cos(((radiusDeg + 1) * Math.PI) / 180);
   const disc = [];
   const ring = [];
-  const span = Math.ceil(((radiusDeg + 0.5) / 180) * height);
+  const span = Math.ceil(((radiusDeg + 1) / 180) * height);
   const row = Math.round((0.5 - b / 180) * height);
   for (let y = Math.max(0, row - span); y < Math.min(height, row + span); y++) {
     const latitude = 90 - ((y + 0.5) * 180) / height;
@@ -256,10 +258,9 @@ function paintOut(planes, width, height, { l, b, radiusDeg }) {
     }
   }
   for (const plane of planes) {
-    let sum = 0;
-    for (const index of ring) sum += plane[index];
-    const mean = sum / ring.length;
-    for (const index of disc) plane[index] = mean;
+    const values = Float32Array.from(ring, (index) => plane[index]).sort();
+    const median = values[values.length >> 1];
+    for (const index of disc) plane[index] = median;
   }
 }
 
@@ -323,12 +324,14 @@ async function main() {
   const { default: sharp } = await import('sharp');
   const { width, height, planes } = await decodePanorama(sharp, file);
   const sigmaPx = (BLUR_DEG / 180) * height;
-  for (const planet of PLANETS) paintOut(planes, width, height, planet);
   for (const plane of planes) {
     extremumPlane(plane, width, height, OPEN_RADIUS, Math.min);
     extremumPlane(plane, width, height, OPEN_RADIUS, Math.max);
-    blurPlane(plane, width, height, sigmaPx);
   }
+  // After the opening: it sinks the starry sky to the dark gaps between
+  // stars, and a fill taken before it would stay brighter than the sky.
+  for (const planet of PLANETS) paintOut(planes, width, height, planet);
+  for (const plane of planes) blurPlane(plane, width, height, sigmaPx);
   const black = luminancePercentile(planes, BLACK_PERCENTILE);
   const white = luminancePercentile(planes, WHITE_PERCENTILE);
   let total = 0;

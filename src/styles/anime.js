@@ -12,6 +12,7 @@ export const animeShader = {
   },
   fragmentShader: /* glsl */ `
     uniform sampler2D colorTexture;
+    uniform sampler2D depthTexture;
     uniform vec2 colorTextureDimensions;
     uniform float intensity;
     uniform float saturation;
@@ -38,9 +39,12 @@ export const animeShader = {
       vec2 texel = 1.0 / colorTextureDimensions;
       vec4 color = texture(colorTexture, uv);
 
-      // Cel-shade: quantize luminance into bands
+      // Cel-shade: quantize luminance into bands. Not the far plane: four
+      // bands turn the faint Milky Way behind the globe into blotches. Its
+      // packed depth reads a few 1e-7 short of 1.0.
       float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-      float bands = mix(256.0, 4.0, intensity);
+      bool space = czm_readDepth(depthTexture, uv) > 0.99999;
+      float bands = space ? 256.0 : mix(256.0, 4.0, intensity);
       float celLuma = floor(luma * bands + 0.5) / bands;
       float lumaScale = (luma > 0.001) ? celLuma / luma : 1.0;
       vec3 celColor = color.rgb * lumaScale;

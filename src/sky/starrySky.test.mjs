@@ -87,3 +87,31 @@ test('the sky draws nothing when hidden, outside 3D, or in a pick pass', () => {
   assert.equal(sky.destroy(), undefined);
   assert.equal(sky.isDestroyed(), true);
 });
+
+const frame = () => new Promise((resolve) => setImmediate(resolve));
+
+for (const iso of ['1970-01-01T00:00:00Z', '2060-01-01T00:00:00Z']) {
+  test(`a clock outside the IAU 2006 tables (${iso}) settles on TEME instead of re-rendering every frame`, async () => {
+    const time = Cesium.JulianDate.fromIso8601(iso);
+    let renders = 0;
+    let preloads = 0;
+    const original = Cesium.Transforms.preloadIcrfFixed;
+    Cesium.Transforms.preloadIcrfFixed = (interval) => {
+      preloads += 1;
+      return original(interval);
+    };
+    try {
+      const sky = new StarrySky({ requestRender: () => (renders += 1) });
+      for (let i = 0; i < 20; i += 1) {
+        sky._updateRotation(time); // what update() does once per frame
+        await frame();
+      }
+      assert.ok(
+        renders <= 1 && preloads <= 1,
+        `20 frames at a frozen clock -> ${preloads} preloads, ${renders} render requests (expected <= 1 each)`,
+      );
+    } finally {
+      Cesium.Transforms.preloadIcrfFixed = original;
+    }
+  });
+}
