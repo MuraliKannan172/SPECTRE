@@ -1,5 +1,7 @@
 # God's Eye View Current State
 
+The standalone military source no longer requests the unavailable, undocumented ADSB.lol trace endpoint. Tracking retains its locally accumulated trail, and custom sources may still supply optional getTrack history. The old HTTP route validates the identifier then reports 503 history_unavailable without any upstream request, rather than forwarding a misleading 403. This does not restore historical coverage or download bulk daily archives.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,
