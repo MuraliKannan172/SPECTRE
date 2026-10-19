@@ -347,22 +347,32 @@ export const KARTVERKET_HEIGHT_URL =
  * extra points from contour lines (`hoydekurver`, metres to ~20 m off) or not
  * at all; at 20 nearly every camera resolves from the 1 m terrain model. */
 export const KARTVERKET_MAX_POINTS = 20;
-/** Requests in flight at once. The whole country is ~36 requests of ~1-2 s,
- * so a cold lookup takes ~6 s. */
+/** Requests in flight at once. The whole country is ~36 requests of
+ * 0.6-9.5 s each, so a cold lookup takes ~6-13 s. */
 export const KARTVERKET_CONCURRENCY = 8;
-/** Deadline for one complete lookup, shared by every request. */
+/** Deadline for one complete lookup, shared by every request. A lookup cut
+ * short by it is resumed on the next refresh, without a backoff. */
 export const KARTVERKET_LOOKUP_TIMEOUT_MS = 30 * 1000;
+/** One request that takes longer than this counts as a failing service. */
+export const KARTVERKET_REQUEST_TIMEOUT_MS = 10 * 1000;
 /** The Vegvesen lane's budget, measured from the start of the loader (catalog
  * fetch included), for waiting on heights. Under the 15 s per-provider fetch
  * timeout so this pack is never the catalog's slowest lane. A lookup still
  * running after it keeps filling the cache for the next refresh. */
 export const KARTVERKET_CATALOG_WAIT_MS = 12 * 1000;
+/** The lane only waits when more than this share of its cameras has no
+ * answer yet (a cold cache). A few new cameras or expired misses are looked
+ * up in the background instead of holding the refresh. */
+export const KARTVERKET_WAIT_MISSING_SHARE = 0.1;
 /** A point Kartverket has no height for (some ferry quays and bridges) is not
  * asked about again for this long. */
 export const KARTVERKET_NULL_TTL_MS = 6 * 60 * 60 * 1000;
-/** After a 429, a 5xx or a network failure, no lookup starts for this long,
- * or for the Retry-After the service sent, bounded to [1 min, 1 h]. */
-export const KARTVERKET_FAILURE_BACKOFF_MS = 10 * 60 * 1000;
+/** After a failing request (408, 429, 5xx, a network error, a request
+ * timeout or an unreadable body), no lookup starts for this long, or for the
+ * Retry-After the service sent, bounded to [1 min, 1 h]. Longer than the
+ * 15-minute catalog refresh (CCTV_SOURCE_CACHE_MS), so a failing service
+ * costs one attempt per backoff, not one per refresh. */
+export const KARTVERKET_FAILURE_BACKOFF_MS = 30 * 60 * 1000;
 export const KARTVERKET_MAX_BACKOFF_MS = 60 * 60 * 1000;
 export const KARTVERKET_MAX_RESPONSE_BYTES = 256 * 1024;
 /** Plausible Norwegian terrain: below sea level only at the shore, and no road
