@@ -4397,7 +4397,11 @@ silently demoting every later lookup for the session.
   GATHERING stations carry 2,256 in-collection presets, prioritized to 300 against seven anchors
   on the main road spine. `CCTV_MAX_SOURCES` is a 4,000 catalog-wide ceiling shared round-robin
   across packs, so a lower global cap thins every region instead of starving the last pack.
-  ~1,100 cameras total, all RAW PRIOR poses, stills-first.
+  ~1,100 cameras total, all RAW PRIOR poses, stills-first. The catalog lives for 15 minutes; once
+  it expires, `/api/cctv` keeps answering from it while one background refresh reloads every
+  pack, so only the very first load waits for the slowest pack (a live first load took about
+  22 s). Estonia's Tarktee DATEX feeds, which answer in 2 to 16.6 s, get 30 s
+  (`TARKTEE_FETCH_TIMEOUT_MS`) where other packs get 15 s.
 - **CCTV v3 UX — viewshed + calibration gizmo** (built 2026-07-05 and field
   validated 2026-07-21): the COVERAGE toggle is a
   tri-state cycle `OFF → ON → VIEWSHED`; viewshed mode renders each visible camera's frustum
