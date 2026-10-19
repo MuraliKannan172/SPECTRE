@@ -1,0 +1,1 @@
+- Preserve successful place-search matches, require an unambiguous containing natural region for recovery, and retain analyst boundary provenance through follow-ups (manjunath22466, #1235).
