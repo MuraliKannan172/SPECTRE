@@ -1,44 +1,51 @@
-// Repro for revmain-opus-1 (+ revmain-opus-6, + a guard for the fix).
-// Anime exempts "space" pixels from cel-shading (src/styles/anime.js). This
-// script compiles the CURRENT anime fragment shader from the checkout with its
-// last line swapped for a debug output (R = pixel exempt from quantization,
-// G = raw depth 1.0), runs it as an extra post-process stage in the running app
-// (headless) and counts misclassified pixels.
-//
-// Cases:
-//   satellites  whole globe from 20 000 km with the satellites layer on
-//               (near clamps to 0.1 m): Earth pixels must NOT be exempt.   [revmain-opus-1]
-//   keyless     keyless stack, Denver 1700 m looking west: terrain above the
-//               ellipsoid horizon must NOT be exempt.                       [revmain-opus-6]
-//   milkyway    the real anime style, looking away from the Earth at the
-//               Galactic Centre: the sky must show no cel bands (the faint
-//               glow used to turn into blotches; the glow now fades out
-//               with the style, src/ui/visualEffects.js).
-//
-// Usage: node scripts/qa-anime-space-mask.mjs --url http://localhost:4333/ [--case satellites|keyless|milkyway|all]
-//        [--space-expr "<GLSL bool expression>"]   (try a candidate fix without editing anime.js)
-// Exit: 0 all pass, 1 a case failed, 2 a scenario was not reached.
+#!/usr/bin/env node
+/**
+ * qa-anime-sky — the anime style must cel-shade the Earth, and leave the sky
+ * without bands.
+ *
+ * Earlier the anime shader exempted the far plane, judged from the
+ * post-process depth, from its luminance bands. That depth cannot tell the
+ * sky from far geometry, so the Earth lost its bands. The shader now matches
+ * main, and src/ui/visualEffects.js fades the Milky Way out with the style.
+ * Each case runs headless against a Vite dev server:
+ *
+ *   satellites  whole globe from 20 000 km with the satellites layer on
+ *               (near clamps to 0.1 m): no Earth pixel may skip the bands.
+ *   keyless     keyless stack, Denver 1700 m looking west: no terrain pixel
+ *               above the ellipsoid horizon may skip the bands.
+ *   milkyway    the real anime style, looking away from the Earth at the
+ *               Galactic Centre: at most 0.5 % of the sky (the stars) may
+ *               reach the first band.
+ *
+ * The first two cases compile the checkout's anime shader with a debug
+ * output (R = pixel skipped the bands, G = raw depth 1.0) as an extra stage.
+ *
+ * Usage: node scripts/qa-anime-sky.mjs [--url http://localhost:4333/] [--case satellites|keyless|milkyway|all]
+ * Exit: 0 all pass, 1 a case failed, 2 a scenario was not reached or the case is unknown.
+ */
+import puppeteer from 'puppeteer';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const opt = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
-const ROOT = path.resolve(opt('repo', process.cwd()));
 const URL_ = opt('url', 'http://localhost:4333/');
-const CASES =
-  opt('case', 'all') === 'all'
-    ? ['satellites', 'keyless', 'milkyway']
-    : [opt('case')];
-const SPACE_EXPR = opt('space-expr');
-// Run from the repository root, or pass --repo.
-const { default: puppeteer } = await import(
-  path.join(ROOT, 'node_modules/puppeteer/lib/puppeteer/puppeteer.js')
-);
+const ALL_CASES = ['satellites', 'keyless', 'milkyway'];
+const requested = opt('case', 'all');
+const CASES = requested === 'all' ? ALL_CASES : [requested];
+if (!CASES.every((c) => ALL_CASES.includes(c))) {
+  console.error(
+    `unknown case ${requested}; expected ${ALL_CASES.join('|')}|all`,
+  );
+  process.exit(2);
+}
 
-let fs = readFileSync(path.join(ROOT, 'src/styles/anime.js'), 'utf8');
+let fs = readFileSync(
+  fileURLToPath(new URL('../src/styles/anime.js', import.meta.url)),
+  'utf8',
+);
 fs = fs
   .slice(fs.indexOf('/* glsl */ `') + 12, fs.lastIndexOf('`'))
   .replace('uniform float intensity;', 'const float intensity = 1.0;')
@@ -49,11 +56,6 @@ if (!/uniform\s+sampler2D\s+depthTexture/.test(fs))
     'uniform sampler2D colorTexture;',
     'uniform sampler2D colorTexture;\n    uniform sampler2D depthTexture;',
   );
-if (SPACE_EXPR) {
-  const m = fs.match(/bool space = ([^;]+);/);
-  if (!m) throw new Error('--space-expr: no `bool space = …;` in anime.js');
-  fs = fs.replace(m[0], `bool space = ${SPACE_EXPR};`);
-}
 if (!/float bands\b/.test(fs))
   throw new Error(
     'anime.js has no `bands` variable: adapt the debug line of this script',
@@ -289,7 +291,15 @@ try {
           total: px.length / 4,
           banded,
           visibility: s.skyBox.milkyWayVisibility,
-          anime: g.styleManager.currentStyle ?? null,
+          animeOn: (() => {
+            const stages = s.postProcessStages;
+            for (let i = 0; i < stages.length; i++) {
+              const stage = stages.get(i);
+              if (stage.name === 'godsEyeView_anime')
+                return stage.enabled && stage.uniforms.intensity > 0.99;
+            }
+            return false;
+          })(),
         };
         g.styleManager.setStyle('normal', { userInitiated: true });
         window.__dbg.enabled = true;
@@ -298,7 +308,7 @@ try {
       verdict(
         'milkyway',
         r.banded <= 0.005 * r.total,
-        r.total > 0,
+        r.total > 0 && r.animeOn,
         `${r.banded} of ${r.total} sky pixels at or above the first cel band (luma >= 0.2)`,
         r,
       );

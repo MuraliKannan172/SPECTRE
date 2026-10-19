@@ -1076,5 +1076,7 @@
   "src/sky/stars.test.mjs",
   "src/sky/starrySky.test.mjs",
   "src/tooling/skyAssets.test.mjs",
-  "src/tooling/skyAssets.paintOut.test.mjs"
+  "src/tooling/skyAssets.paintOut.test.mjs",
+  "scripts/qa-sky-sun-moon.mjs",
+  "scripts/qa-anime-sky.mjs"
 ]

@@ -179,6 +179,24 @@ test('the anime stage fades the Milky Way out with its own intensity', () => {
   f.effects.destroy();
 });
 
+test('destroying the effects gives a surviving viewer its Milky Way back', () => {
+  const f = fixture();
+  const sky = { milkyWayVisibility: 1 };
+  f.effects.viewer.scene.skyBox = sky;
+  f.effects.initStyles();
+  f.effects.startTransition('anime', 0, 1);
+  f.tick(250);
+  f.effects.stop();
+  const frozen = sky.milkyWayVisibility;
+  assert.ok(
+    frozen > 0 && frozen < 1,
+    'stop keeps the stages, and the fade, as they are',
+  );
+  f.effects.destroy();
+  assert.equal(sky.milkyWayVisibility, 1);
+  assert.equal(f.requests.at(-1), 'style-stage');
+});
+
 test('bloom retains its dead zone, normalized intensity and independent toggle', () => {
   const f = fixture();
   f.effects.initPostProcess();
