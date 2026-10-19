@@ -29,9 +29,9 @@
  *      axes as the cube axes — +X to the March equinox, +Z to the north
  *      celestial pole — rotating each direction into galactic coordinates
  *      with the IAU J2000 matrix.
- *   6. Map the darkest 25 % of the sky to black and the brightest 0.01 % to
- *      white, encode with gamma 1/2.2 and ±0.5 LSB dither against banding;
- *      WebP.
+ *   6. Map the median sky to black, easing in with a soft knee, and the
+ *      brightest 0.01 % to white (on luminance, keeping each pixel's hue),
+ *      encode with gamma 1/2.2 and ±0.5 LSB dither against banding; WebP.
  *
  * Usage:
  *   node scripts/build-milky-way.mjs <eso0932a.tif>
@@ -46,10 +46,12 @@ export const BLUR_DEG = 0.4;
 const WORK_WIDTH = 4096;
 const OPEN_RADIUS = 3;
 const WEBP_QUALITY = 96;
-// The darkest quarter of the sky is the black level: away from the galactic
-// plane the panorama carries a mottled glow of unresolved stars that would
-// read as grey fog around the globe.
-const BLACK_PERCENTILE = 0.25;
+// The median sky is the black level: away from the galactic plane the
+// panorama carries a mottled glow of unresolved stars and dust that reads as
+// grey blotches around the globe. A hard cut there draws edges of its own, so
+// the level eases in over SOFT_KNEE (a fraction of the black-to-white range).
+const BLACK_PERCENTILE = 0.5;
+const SOFT_KNEE = 0.03;
 const WHITE_PERCENTILE = 0.9999;
 const OUT_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -289,6 +291,15 @@ function dither(index, channel) {
   return (h >>> 0) / 4294967296 - 0.5;
 }
 
+/**
+ * Black level with a soft knee: 0 at and below the level, then a quadratic
+ * ease that joins the straight line, so faint sky fades out instead of
+ * ending in a contour.
+ */
+export function softBlack(x, knee = SOFT_KNEE) {
+  return x <= 0 ? 0 : (x * x) / (x + knee);
+}
+
 /** Value at `fraction` of the sorted luminance. */
 function luminancePercentile(planes, fraction) {
   const [r, g, b] = planes;
@@ -346,12 +357,14 @@ async function main() {
         );
         const [u, v] = directionToPlateCarree(...icrfToGalactic(direction));
         const index = j * FACE_SIZE + i;
+        const rgb = [0, 1, 2].map((c) =>
+          samplePlane(planes[c], width, height, u, v),
+        );
+        const luminance = (rgb[0] + rgb[1] + rgb[2]) / 3;
+        const level = softBlack((luminance - black) / (white - black));
         for (let c = 0; c < 3; c++) {
-          const linear = Math.max(
-            (samplePlane(planes[c], width, height, u, v) - black) /
-              (white - black),
-            0,
-          );
+          // Scale every channel by the luminance curve to keep the hue.
+          const linear = luminance > 0 ? (rgb[c] / luminance) * level : 0;
           const encoded = Math.min(linear, 1) ** (1 / 2.2) * 255;
           pixels[index * 3 + c] = Math.min(
             255,

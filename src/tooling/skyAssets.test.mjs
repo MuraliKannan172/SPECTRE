@@ -9,6 +9,7 @@ import {
   cubeFaceDirection,
   directionToPlateCarree,
   icrfToGalactic,
+  softBlack,
 } from '../../scripts/build-milky-way.mjs';
 import { raDecToUnitVector } from '../sky/stars.js';
 
@@ -104,4 +105,19 @@ test('the galactic rotation puts the Galactic Centre and pole where the IAU does
   );
   close(u, 0.5 + (360 - 280.47) / 360, 2e-3);
   close(v, 0.5 + 32.89 / 180, 2e-3);
+});
+
+test('the black level eases in instead of cutting the faint sky into contours', () => {
+  assert.equal(softBlack(-0.2), 0);
+  assert.equal(softBlack(0), 0);
+  // Continuous, rising, with no step at the black level.
+  let previous = 0;
+  for (let x = 0.001; x <= 1; x += 0.001) {
+    const y = softBlack(x);
+    assert.ok(y > previous && y - previous < 0.0011, `step at ${x.toFixed(3)}`);
+    previous = y;
+  }
+  // Starts flat, then joins the straight line just below it.
+  assert.ok(softBlack(0.003) < 0.0003);
+  close(softBlack(1), 1 - 0.03, 1e-3);
 });
