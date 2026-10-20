@@ -281,6 +281,7 @@
   "src/ui/applicationShell.js",
   "src/ui/panelLayoutController.js",
   "src/ui/panelPositionControls.js",
+  "src/ui/panelPositionControls.test.mjs",
   "src/ui/recordingControls.js",
   "src/ui/shellElements.js",
   "src/ui/shellFeedback.js",

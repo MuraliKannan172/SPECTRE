@@ -21,6 +21,8 @@ export function createMapillaryViewer({ source, render } = {}) {
   let viewer = null;
   let Library = null;
   let container = null;
+  /** The viewer being built for a host: a second mount joins it, not a twin. */
+  let building = null;
   let pendingOpen = null;
   /** Bumped by `unmount`, so a construction it overtook builds nothing. */
   let generation = 0;
@@ -100,8 +102,17 @@ export function createMapillaryViewer({ source, render } = {}) {
     }
   }
 
-  async function ensureViewer(host) {
-    if (viewer && container === host) return viewer;
+  function ensureViewer(host) {
+    if (viewer && container === host) return Promise.resolve(viewer);
+    if (building?.host === host) return building.promise;
+    const promise = buildViewer(host).finally(() => {
+      if (building?.promise === promise) building = null;
+    });
+    building = { host, promise };
+    return promise;
+  }
+
+  async function buildViewer(host) {
     const built = generation;
     destroyViewer();
     const { Viewer } = await ensureLibrary();
@@ -177,6 +188,7 @@ export function createMapillaryViewer({ source, render } = {}) {
       pendingOpen = null;
       // A build still waiting for the library gives up when it arrives.
       generation++;
+      building = null;
       destroyViewer();
     },
 

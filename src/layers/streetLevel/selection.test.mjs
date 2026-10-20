@@ -180,6 +180,19 @@ test('Esc in a text field or rich-text editor keeps the selection (M61)', () => 
   }
 });
 
+test('a click on the position marker neither selects nor opens at the ground', () => {
+  const h = harness();
+  try {
+    h.scene.under = 'sl:pos';
+    h.click();
+    assert.deepEqual(h.groundClicks, []);
+    assert.deepEqual(h.opened, []);
+    assert.deepEqual(h.sequences.selects, []);
+  } finally {
+    h.restore();
+  }
+});
+
 test('a click on nothing of ours goes to the ground handler with the pick, which decides', () => {
   const h = harness();
   try {

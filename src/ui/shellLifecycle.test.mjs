@@ -228,7 +228,7 @@ test('recording restores the original HUD after repeated entry and revokes retai
   }
 });
 
-test('weather rail orders between CCTV and Context, resets positions, observes and syncs chrome', (t) => {
+test('weather rail orders between CCTV and Context, observes and syncs chrome', (t) => {
   const f = fixture();
   const observed = new Set();
   const previousResizeObserver = globalThis.ResizeObserver;
@@ -263,16 +263,7 @@ test('weather rail orders between CCTV and Context, resets positions, observes a
     ]) {
       const panel = f.nodes.get(id) || f.element();
       panel.id = id;
-      const positions = new Map(
-        ['top', 'right', 'bottom', 'left', 'z-index'].map((key) => [
-          key,
-          '20px',
-        ]),
-      );
-      panel.style = {
-        removeProperty: (key) => positions.delete(key),
-        positions,
-      };
+      panel.style = {};
       panel.classList.add('collapsed');
       const button = f.element();
       button.closest = () => panel;
@@ -307,7 +298,6 @@ test('weather rail orders between CCTV and Context, resets positions, observes a
     );
     assert.ok(synced.includes('weather-panel'));
     assert.ok(observed.has(weather));
-    assert.equal(weather.style.positions.size, 0);
     assert.equal(weather.button.textContent, '◀');
     assert.equal(weather.button.getAttribute('aria-expanded'), 'false');
     assert.equal(weather.button.title, 'Expand WEATHER');

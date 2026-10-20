@@ -53,8 +53,7 @@ import { applyLocaleChoice, mountLocalePicker } from './localePicker.js';
  * Responsibilities:
  * - Visual controls and presets backed by the VisualEffects controller.
  * - Bloom and sharpen post-processing toggle/intensity control.
- * - Draggable/collapsible panel system with localStorage persistence,
- *   z-order stacking, and viewport-clamped positioning.
+ * - Collapsible rail panels with their collapsed state kept in localStorage.
  * - CCTV panel: camera selection, coverage toggle, projection, calibration
  *   sliders, auto-hop, and summary typewriter effect.
  * - Location bar with city/POI preset pills, QWERTY key navigation,
@@ -1203,19 +1202,6 @@ export class StyleManager extends ShellFacade {
     });
     return true;
   }
-
-  /**
-   * Makes a panel draggable via its handle element. Implements:
-   * - Z-order promotion: each pointerdown increments the global z-counter
-   *   so the clicked panel floats above siblings.
-   * - Viewport clamping: drag moves are clamped to a 6px inset from all edges.
-   * - Right-rail pinning: pp-toggles panel is re-anchored right after drag.
-   * - CCTV viewport sync: cctv-panel recalculates scroll height after drag.
-   * @param {string} panelId - DOM id of the panel.
-   * @param {HTMLElement} panelEl - The panel DOM element.
-   * @param {HTMLElement} handleEl - The drag handle element within the panel.
-   * @returns {void}
-   */
 
   /**
    * Programmatically collapses or expands a panel, persists the state,

@@ -11,7 +11,7 @@ const MAX_ZOOM = 14;
  * (positions come from the Graph API), so it is dropped in transit.
  */
 const DROP_LAYERS = ['image'];
-/** A z14 tile with its image layer is ~11 MB; anything past this is wrong. */
+/** A z14 tile with its image layer is ~12 MB; anything past this is wrong. */
 export const TILE_MAX_BYTES = 48 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 60_000;
 /** Upstream fetches at once; more wait their turn. */
@@ -260,4 +260,6 @@ export function _resetTileCacheForTest() {
   memory.clear();
   inFlight.clear();
   refusal = null;
+  upstreamActive = 0;
+  upstreamWaiting.length = 0;
 }

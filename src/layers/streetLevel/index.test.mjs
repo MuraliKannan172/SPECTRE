@@ -352,8 +352,11 @@ function fakeViewer() {
     },
     creditDisplay: {
       addStaticCredit: (credit) => credits.push(credit),
-      removeStaticCredit: (credit) =>
-        credits.splice(credits.indexOf(credit), 1),
+      removeStaticCredit: (credit) => {
+        // Cesium ignores a credit it does not hold.
+        const at = credits.indexOf(credit);
+        if (at !== -1) credits.splice(at, 1);
+      },
     },
   };
 }
@@ -784,6 +787,62 @@ test('Street View appears only on the Google 3D map: chip, credit, source and im
   assert.equal(ui().street.open, false, 'closed with the map');
   assert.equal(credited(), false);
   assert.deepEqual(listed(), ['mapillary']);
+});
+
+test('under Google 3D the ground is measured again once its tiles load, without a move', async (t) => {
+  const saved = globalThis.document;
+  globalThis.document = new EventTarget();
+  t.after(() => {
+    globalThis.document = saved;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const viewer = fakeViewer();
+  // 4 km up the ellipsoid, 2 km over a city whose tiles are still loading.
+  let ground;
+  viewer.camera.positionCartographic = { height: 4000 };
+  viewer.scene.globe = { show: false };
+  viewer.scene.sampleHeightSupported = true;
+  viewer.scene.sampleHeight = () => ground;
+  const layer = createStreetLevelLayer({ providers: [fakeProvider()] });
+  layer.init(viewer);
+  layer.enable(viewer);
+  t.after(() => layer.destroy());
+  assert.equal(layer.getUIState().groundClickReady, false);
+
+  ground = 2000;
+  t.mock.timers.tick(1000);
+  assert.equal(layer.getUIState().groundClickReady, true);
+});
+
+test('an unknown ground is measured only a few times, and not after the layer is off', (t) => {
+  const saved = globalThis.document;
+  globalThis.document = new EventTarget();
+  t.after(() => {
+    globalThis.document = saved;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const viewer = fakeViewer();
+  let samples = 0;
+  viewer.camera.positionCartographic = { height: 4000 };
+  viewer.scene.globe = { show: false };
+  viewer.scene.sampleHeightSupported = true;
+  viewer.scene.sampleHeight = () => {
+    samples++;
+    return undefined;
+  };
+  const layer = createStreetLevelLayer({ providers: [fakeProvider()] });
+  layer.init(viewer);
+  layer.enable(viewer);
+  t.after(() => layer.destroy());
+  t.mock.timers.tick(60_000);
+  const measured = samples;
+  assert.ok(measured > 1 && measured <= 12, `measured ${measured} times`);
+
+  viewer.camera.moveEnd.raiseEvent();
+  layer.disable();
+  const atDisable = samples;
+  t.mock.timers.tick(60_000);
+  assert.equal(samples, atDisable, 'no measuring once the layer is off');
 });
 
 test('the UI state says when a click (or the button) can open Street View here', async (t) => {

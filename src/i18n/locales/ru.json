@@ -2949,7 +2949,7 @@
   "Zoom in to see street-level coverage": "Приблизьтесь, чтобы увидеть покрытие уличных снимков",
   "Point the camera at the ground for street-level coverage": "Направьте камеру на землю, чтобы увидеть покрытие уличных снимков",
   "Sequence images unavailable": "Снимки последовательности недоступны",
-  "Switch Street Level on to draw its coverage.": "Включите Street Level, чтобы показать покрытие.",
+  "Switch Street Level on to draw its coverage.": "Включите «Уличные снимки», чтобы показать покрытие.",
   "Every provider is switched off: light a chip to draw its coverage.": "Все источники выключены: включите один, чтобы показать его покрытие.",
   "No sequences in view match the filter": "Ни одна последовательность в кадре не подходит под фильтр",
   "No coverage in view": "В кадре нет покрытия",

@@ -651,7 +651,7 @@ The UI facade composes separate owners for navigation authority, share restorati
 visual settings and panel chrome. Navigation owns request generations and follow
 handoff; restoration owns its coordinator, deferred notices, gestures and timer;
 visual settings own style/detection overrides and sensor cleanup; panel chrome
-owns disclosure, docking and Cockpit panel snapshots. Each takes explicit
+owns disclosure and Cockpit panel snapshots. Each takes explicit
 operations and reads instead of the complete shell. Existing controls, share
 formats and one-application-per-page behavior are preserved.
 
@@ -977,10 +977,9 @@ start with current state, isolate listener failures and stop on disposal.
 
 The standalone entry composes the UI with the application's existing layer,
 terrain, navigation and rendering operations. The shell receives those instances
-and assembles the controls. Panel layout scheduling, position preferences and
-active drags, loading notices, recording presentation and DOM lookup have focused
+and assembles the controls. Panel layout scheduling, loading notices, recording presentation and DOM lookup have focused
 owners. Disposal revokes queued presentation and listeners before asynchronous
-Context restoration, cancels an unfinished drag without saving it, restores the
+Context restoration, restores the
 recording HUD and releases status decoration without replacing accessible text.
 The ordinary control snapshot includes the current 3D model toggle and mode.
 
@@ -3771,7 +3770,9 @@ runs against real Mapillary and needs `MAPILLARY_CLIENT_TOKEN`. `npm run
 qa:street-level:fixtures -- --url <server>` answers every Mapillary request
 from fixtures (`providers/mapillary/coverageFixture.mjs`,
 `scripts/fixtures/street-level/`), and KartaView's and Panoramax's too, so it
-needs no network and covers the whole photo flow. CI runs the fixture gate against a production build served by `vite preview` with a dummy token.
+needs no network. It opens and closes a photo from Mapillary, KartaView and
+Panoramax; stepping, EXPAND, FIT/FILL, the filters and Street View stay with
+the unit tests. CI runs the fixture gate against a production build served by `vite preview` with a dummy token.
 
 Directions is a keyless front end to the routing the voice agent already
 uses. Its row chips are the whole interface: DRIVE / WALK / BIKE pick the
@@ -5064,7 +5065,7 @@ pins and share links already supply complete boxes.
   Pixel-mode pinch deltas receive bounded amplification before reaching the
   canvas; ordinary wheel, line/page-mode and native touch-pinch paths are left
   unchanged. The application scene owns and removes the relay listener.
-- Z ladder: panels promote within 100–139 (renormalized on wrap), voice pill 150, toast 200, clean-view exit 300.
+- Z ladder: panels around 100, voice pill 150, toast 200, clean-view exit 300.
 - Panel POSITION keys are versioned `v8` (`godsEyeView.v8.panelPos.<id>`); collapsed-state keys remain `v6`. The one-time position reset clears stale DISPLAY placements that could overlap the Context rail.
 - Map Source lives in the bottom Visual Presets tray. The left accordion contains no MAP STACK panel, and the `k` panel token that addressed it is gone from the share registry, so legacy `ui=k...` state takes the ordinary unknown-token skip.
 - A dock popover (Visual Presets, Location) auto-dismisses on mouse-away unless pinned. Focus inside the tray defers that dismissal only when the browser reports `:focus-visible` — keyboard focus and typed-into fields hold the tray open; a mouse-clicked tile does not, because Chromium focuses a `<button>` on press.

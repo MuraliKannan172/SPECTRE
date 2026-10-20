@@ -14,7 +14,7 @@ import {
   keyAlternatives,
   summarizeCoverage,
 } from './uiState.js';
-import { viewCentre } from './view.js';
+import { groundUnderCamera, viewCentre } from './view.js';
 import { createGroundClick, groundClickHeightOk } from './groundClick.js';
 import { msg, t, translateKnown } from '../../i18n/index.js';
 import {
@@ -29,6 +29,9 @@ export { STREET_LEVEL_LAYER_ID } from './policy.js';
 
 /** Longest wait for a provider's key status; past it, the provider decides. */
 const KEY_STATUS_TIMEOUT_MS = 10_000;
+/** Re-measures of a ground not loaded yet (Google 3D), a second apart. */
+const GROUND_RETRY_LIMIT = 5;
+const GROUND_RETRY_MS = 1000;
 
 /**
  * The Street Level layer over imagery providers (contract in registry.js).
@@ -163,22 +166,50 @@ export function createStreetLevelLayer({
         parts.viewerHost.unmount(entry.def.id);
       }
     }
+    remeasureGround();
     notify();
   }
 
-  /** Whether a ground click can open an image: the camera is at street zoom. */
+  let groundRetry = null;
+  let groundRetries = 0;
+  function cancelGroundRetry() {
+    clearTimeout(groundRetry);
+    groundRetry = null;
+  }
+
+  /**
+   * Whether a ground click can open an image: the camera is at street zoom.
+   * Under Google 3D the ground is unknown until its tiles load, so an unknown
+   * ground is measured again a few times instead of waiting for the next move.
+   */
   function syncGroundClickReady() {
+    cancelGroundRetry();
     const ready = state.enabled && groundClickHeightOk(state.viewer);
+    if (
+      state.enabled &&
+      !ready &&
+      groundRetries < GROUND_RETRY_LIMIT &&
+      groundUnderCamera(state.viewer) === null
+    ) {
+      groundRetries++;
+      groundRetry = setTimeout(syncGroundClickReady, GROUND_RETRY_MS);
+    }
     if (ready === state.groundClickReady) return;
     state.groundClickReady = ready;
     notify();
+  }
+
+  /** A camera move or a map change measures afresh. */
+  function remeasureGround() {
+    groundRetries = 0;
+    syncGroundClickReady();
   }
 
   let removeCameraListener = null;
   function watchCamera(viewer) {
     removeCameraListener?.();
     removeCameraListener =
-      viewer?.camera?.moveEnd?.addEventListener(syncGroundClickReady) || null;
+      viewer?.camera?.moveEnd?.addEventListener(remeasureGround) || null;
   }
 
   const activeEntries = () =>
@@ -463,7 +494,7 @@ export function createStreetLevelLayer({
       parts.selection.install(viewer);
       for (const entry of activeEntries()) activate(entry);
       watchCamera(viewer);
-      syncGroundClickReady();
+      remeasureGround();
       notify();
     },
 
@@ -472,6 +503,7 @@ export function createStreetLevelLayer({
       abortNearest();
       removeCameraListener?.();
       removeCameraListener = null;
+      cancelGroundRetry();
       parts.viewerHost.unmount();
       for (const entry of state.providers.values()) entry.instance.deactivate();
       syncGroundClickReady();

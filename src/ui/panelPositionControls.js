@@ -8,6 +8,11 @@ const PANEL_LAYOUT_STORAGE_VERSION = 'v6';
  * the layout-reset notice and the documented key.
  */
 const PANEL_POSITION_STORAGE_VERSION = 'v8';
+/** Floating panels' stored positions and hint flag: nothing reads them now. */
+const RETIRED_PANEL_KEY_PREFIXES = [
+  `godsEyeView.${PANEL_POSITION_STORAGE_VERSION}.panelPos.`,
+  `godsEyeView.${PANEL_POSITION_STORAGE_VERSION}.panelFloatHintShown`,
+];
 export class PanelPositionControls {
   constructor({ syncPanelCollapseButton, showToast }) {
     this._syncPanelCollapseButton = syncPanelCollapseButton;
@@ -15,6 +20,7 @@ export class PanelPositionControls {
   }
 
   _maybeNotifyLayoutReset() {
+    this._dropRetiredPanelKeys();
     try {
       const marker = `godsEyeView.${PANEL_POSITION_STORAGE_VERSION}.layoutResetNotified`;
       if (localStorage.getItem(marker)) return;
@@ -27,6 +33,16 @@ export class PanelPositionControls {
           t('Panel layout updated — positions reset to new defaults'),
         );
       }
+    } catch {
+      // storage unavailable
+    }
+  }
+
+  _dropRetiredPanelKeys() {
+    try {
+      for (const key of Object.keys(localStorage))
+        if (RETIRED_PANEL_KEY_PREFIXES.some((prefix) => key.startsWith(prefix)))
+          localStorage.removeItem(key);
     } catch {
       // storage unavailable
     }

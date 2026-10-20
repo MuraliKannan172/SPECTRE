@@ -205,8 +205,11 @@ export function fakeCesiumViewer({ view = false } = {}) {
     camera,
     creditDisplay: {
       addStaticCredit: (credit) => credits.push(credit),
-      removeStaticCredit: (credit) =>
-        credits.splice(credits.indexOf(credit), 1),
+      removeStaticCredit: (credit) => {
+        // Cesium ignores a credit it does not hold.
+        const at = credits.indexOf(credit);
+        if (at !== -1) credits.splice(at, 1);
+      },
     },
   };
 }

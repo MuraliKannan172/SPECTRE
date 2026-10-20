@@ -385,6 +385,19 @@ test('a Mapillary viewer unmounted mid-download is never built; the next mount b
   assert.equal(viewers.live, 0, 'nothing left holding a WebGL context');
 });
 
+test('two mounts on one host during the first download build one Mapillary viewer', async () => {
+  const { gate, viewers } = fakeLibrary();
+  const adapter = createMapillaryViewer({ source: { token: 't' } });
+  const element = {};
+  const first = adapter.mount(element);
+  const second = adapter.mount(element);
+  gate.resolve();
+  await Promise.all([first, second]);
+  assert.equal(viewers.created, 1);
+  adapter.unmount();
+  assert.equal(viewers.live, 0, 'nothing left holding a WebGL context');
+});
+
 test('closing the photo stops sequence playback in the hidden viewer', async () => {
   const { gate, viewers } = fakeLibrary();
   gate.resolve();
