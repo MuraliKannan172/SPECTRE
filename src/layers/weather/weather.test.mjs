@@ -2341,3 +2341,18 @@ test('a product replacement accepts supersession but never paints the obsolete f
   assert.equal(h.layer.getParams().product, 'clouds');
   h.layer.destroy();
 });
+
+test('disabled weather releases its camera listener and re-enabling binds only once', () => {
+  const h = layerHarness();
+  h.layer.disable();
+  assert.equal(h.moveEnd.size, 0, 'disabled layers own no active camera work');
+  h.layer.enable();
+  h.layer.enable();
+  assert.equal(h.moveEnd.size, 1);
+  h.layer.disable();
+  assert.equal(h.moveEnd.size, 0);
+  h.layer.enable();
+  assert.equal(h.moveEnd.size, 1);
+  h.layer.destroy();
+  assert.equal(h.moveEnd.size, 0);
+});

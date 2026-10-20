@@ -141,7 +141,7 @@ const snapshot = (page) =>
         ),
       },
       weather,
-      windCells: wind.gpu?.pathCount ?? wind.paths ?? null,
+      windCells: wind.gpu?.pathCount ?? wind.paths ?? 0,
       enabled: [...dm.layers].filter(([, e]) => e.enabled).map(([id]) => id),
     };
   });
@@ -220,7 +220,7 @@ try {
   const baseline = await snapshot(a.page);
   console.log('baseline', JSON.stringify(baseline));
   for (const id of WEATHER) await setLayer(a.page, id, true);
-  await a.page
+  const weatherReady = await a.page
     .waitForFunction(
       () =>
         ['weather-radar', 'weather-satellite', 'weather-lightning'].every(
@@ -233,7 +233,13 @@ try {
         ),
       { timeout: 120_000 },
     )
-    .catch(() => console.log('  !! weather not ready'));
+    .then(
+      () => true,
+      () => false,
+    );
+  results.weatherReady = weatherReady;
+  if (!weatherReady)
+    console.log('  !! weather not ready — feature coverage incomplete');
   await sleep(2000);
   // exercise: history playback, wind reading, storm selection, product switch
   await a.page.evaluate(() => {
@@ -331,11 +337,25 @@ try {
     'errors (control run):',
     results.errorsB.length ? results.errorsB : 'none',
   );
+  // Resource ownership is an acceptance check; provider availability remains
+  // separately reported diagnostic evidence in both runs.
+  if (
+    !weatherReady ||
+    Object.keys(leak).length ||
+    [...a.errors, ...b.errors].some((e) => e.startsWith('pageerror:'))
+  ) {
+    process.exitCode = 1;
+  }
+} catch (error) {
+  results.failure = { name: error.name, message: error.message };
+  throw error;
+} finally {
+  // Preserve completed resource evidence even if a later provider or browser
+  // phase aborts. A partial run still exits nonzero.
   writeFileSync(
     path.join(outDir, 'results.json'),
     JSON.stringify(results, null, 2),
   );
   console.log(`wrote ${path.join(outDir, 'results.json')}`);
-} finally {
   await browser.close();
 }

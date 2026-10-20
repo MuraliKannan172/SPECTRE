@@ -296,10 +296,6 @@ export function createWeatherLayer({
       motion?.addEventListener?.('change', onVisibility);
       documentRef?.addEventListener?.('visibilitychange', onVisibility);
       registerClock();
-      removeCamera = viewer.camera.moveEnd?.addEventListener(() => {
-        checkHost();
-        if (enabled) notify();
-      });
     },
     attachShellServices(services) {
       imageryHost =
@@ -315,10 +311,18 @@ export function createWeatherLayer({
     },
     enable() {
       enabled = true;
+      if (!removeCamera) {
+        removeCamera = viewer.camera.moveEnd?.addEventListener(() => {
+          checkHost();
+          notify();
+        });
+      }
       registerClock();
     },
     disable() {
       enabled = false;
+      removeCamera?.();
+      removeCamera = null;
       unregisterClock?.();
       unregisterClock = null;
       ++generation;

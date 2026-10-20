@@ -253,6 +253,7 @@ catalog construction owns each instance.
 
 Wind animates one forecast without advancing forecast time. Separate Weather
 observation layers provide radar and satellite history; none claims measured cloud volume.
+Weather imagery releases its camera move listener on disable and registers it once on re-enable. Disabling also clears active imagery work.
 Weather imagery drapes onto the globe basemap. On photorealistic 3D Tiles each
 observed product is instead a raised, translucent shell: one rectangle over the
 product bounds at a fixed height (global infrared 5.5 km, regional infrared
