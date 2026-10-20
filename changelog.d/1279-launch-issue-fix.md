@@ -1,0 +1,1 @@
+- Throttle hover picks and clear stale cursors (asturksever, #1279).
