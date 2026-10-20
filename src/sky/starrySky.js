@@ -12,7 +12,7 @@ import { buildStarVertices, STAR_VERTEX_FLOATS } from './stars.js';
  */
 export const STARRY_SKY_CESIUM_VERSION = '1.138.0';
 
-/** Opacity of the Milky Way glow over black; the stars carry the sky. */
+/** Brightness of the Milky Way glow; the stars carry the sky. */
 export const MILKY_WAY_INTENSITY = 0.4;
 /** Clock change, in seconds, below which the sky rotation is reused. */
 export const SKY_ROTATION_EPSILON_SECONDS = 1;
@@ -48,8 +48,8 @@ const MILKY_WAY_FACE_URLS = Object.freeze({
   ),
 });
 
-// Directions, not points: w = 0 drops the camera translation, and z = w puts
-// every fragment on the far plane, inside the clip volume at any frustum.
+// Directions, not points: w = 0 drops the camera translation, and z just
+// under w keeps every fragment at the far plane, inside any frustum.
 const SKY_DIRECTION_GLSL = `
 uniform mat3 u_icrfToFixed;
 vec4 skyClipPosition(vec3 icrfDirection)

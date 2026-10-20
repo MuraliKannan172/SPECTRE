@@ -3,17 +3,13 @@
  *
  * Pure functions, no Cesium. The pack is `local_data/sky/bright_stars.json`
  * (Yale Bright Star Catalogue, built by scripts/build-bright-stars.mjs): a
- * flat `[raDeg, decDeg, vmag, bv, …]` array in ICRF/J2000.
- *
- * Every star is drawn as a point sprite holding a small Gaussian. Its width
- * is set in CSS pixels and scaled by the device pixel ratio in the shader, so
- * a star covers the same screen area at any DPR and stays a crisp dot rather
- * than a texel stretched across several pixels.
+ * flat `[raDeg, decDeg, vmag, bv, …]` array in ICRF/J2000. Each star is a
+ * small Gaussian sprite, sized in CSS pixels so it stays a crisp dot at any DPR.
  *
  * @module sky/stars
  */
 
-/** Faintest magnitude drawn distinctly (fainter catalogue stars look like it); the brightness reference. */
+/** Brightness reference; fainter catalogue stars are drawn like it. */
 export const STAR_LIMIT_MAGNITUDE = 6.5;
 /** Gaussian σ of the faintest star, CSS pixels. */
 export const STAR_MIN_SIGMA_PX = 0.55;

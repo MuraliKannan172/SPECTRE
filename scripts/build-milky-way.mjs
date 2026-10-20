@@ -14,27 +14,16 @@
  *              Centre, galactic longitude increasing to the left.
  *
  * Transform (deterministic):
- *   1. Resample to WORK_WIDTH×WORK_WIDTH/2 and convert sRGB to linear light.
- *   2. Remove stars with a morphological opening (minimum, then maximum, over
- *      a (2·OPEN_RADIUS+1)² window): anything smaller than the window — every
- *      star — drops to the surrounding sky; the renderer draws catalogue stars
- *      itself, sharp and in the right place.
- *   3. Paint out the planets the 2008–2010 exposures caught (PLANETS): they
- *      sit where today's sky has nothing and are far brighter than any star.
- *   4. Blur with a three-pass box approximation of a Gaussian, σ = BLUR_DEG on
- *      the sky: rows wrap in longitude and widen by 1/cos(latitude) so the
- *      blur stays round towards the poles. Faint glow blends to a second,
- *      FAINT_BLUR_DEG blur, so it carries no clumps of unresolved stars.
- *   5. Resample into six FACE_SIZE² cube faces in the standard WebGL face
- *      orientation (the renderer uploads them without flipY), with the ICRF
- *      axes as the cube axes — +X to the March equinox, +Z to the north
- *      celestial pole — rotating each direction into galactic coordinates
- *      with the IAU J2000 matrix.
- *   6. Map the median sky to black, easing in with a soft knee, and the
- *      brightest 0.01 % to about 97 % white, the knee's offset there (both
- *      levels taken before the faint-glow blend; on luminance, keeping each
- *      pixel's hue),
- *      encode with gamma 1/2.2 and ±0.5 LSB dither against banding; WebP.
+ *   1. Resample to WORK_WIDTH×WORK_WIDTH/2, sRGB to linear light.
+ *   2. Remove stars with a morphological opening: the renderer draws
+ *      catalogue stars itself, sharp and in the right place.
+ *   3. Paint out the planets the 2008–2010 exposures caught (PLANETS).
+ *   4. Blur, round on the sphere: σ = BLUR_DEG, widening to FAINT_BLUR_DEG
+ *      in the faint glow so unresolved stars leave no clumps.
+ *   5. Resample into six WebGL cube faces (uploaded without flipY) with the
+ *      ICRF axes: +X to the March equinox, +Z to the north celestial pole.
+ *   6. Median sky to black with a soft knee, brightest 0.01 % to ~97 %
+ *      white, on luminance to keep the hue; gamma 1/2.2, dither, WebP.
  *
  * Usage:
  *   node scripts/build-milky-way.mjs <eso0932a.tif>
@@ -46,19 +35,16 @@ import { fileURLToPath } from 'node:url';
 
 export const FACE_SIZE = 1024;
 export const BLUR_DEG = 0.4;
-// Faint glow takes a much wider blur: there the panorama is grain of
-// unresolved stars, which a 0.4° blur leaves as clumps. Bright parts keep the
-// fine blur and their dust lanes; FAINT_RANGE (fraction of black-to-white)
-// is where the two blend.
+// Faint glow is grain of unresolved stars and needs the wide blur; bright
+// parts keep the fine one and their dust lanes. FAINT_RANGE (fraction of
+// black-to-white) is where the two blend.
 export const FAINT_BLUR_DEG = 2;
 const FAINT_RANGE = [0.005, 0.08];
 const WORK_WIDTH = 4096;
 const OPEN_RADIUS = 3;
 const WEBP_QUALITY = 96;
-// The median sky is the black level: away from the galactic plane the
-// panorama carries a mottled glow of unresolved stars and dust that reads as
-// grey blotches around the globe. A hard cut there draws edges of its own, so
-// the level eases in over SOFT_KNEE (a fraction of the black-to-white range).
+// The median sky is black: above it the glow away from the plane reads as
+// grey blotches. SOFT_KNEE eases the cut in so it draws no edges.
 const BLACK_PERCENTILE = 0.5;
 const SOFT_KNEE = 0.03;
 const WHITE_PERCENTILE = 0.9999;

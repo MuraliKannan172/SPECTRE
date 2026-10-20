@@ -93,7 +93,7 @@ test('plate carrée is centred on longitude 0, growing to the left, north up', (
 });
 
 test('the galactic rotation puts the Galactic Centre and pole where the IAU does', () => {
-  // Sgr A*-adjacent origin l = b = 0 at RA 266.405°, Dec −28.936° (J2000).
+  // Galactic origin l = b = 0 at RA 266.405°, Dec −28.936° (J2000).
   const centre = icrfToGalactic(raDecToUnitVector(266.40499, -28.93617));
   close(centre[0], 1, 1e-6);
   // North galactic pole at RA 192.85948°, Dec +27.12825°.

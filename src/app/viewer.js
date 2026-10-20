@@ -118,9 +118,8 @@ export function applicationViewerOptions(creditContainer) {
     selectionIndicator: false,
     infoBox: false,
     baseLayer: false,
-    // Instead of the default Tycho-2 cube map, whose JPEG blocks show around
-    // the whole globe. Passed here, not assigned later: `skyBox: false` would
-    // also stop CesiumWidget from creating the Sun and the Moon.
+    // Replaces the blocky Tycho-2 default. An option, not `skyBox: false`,
+    // which would also stop CesiumWidget from creating the Sun and Moon.
     skyBox: new StarrySky(),
     creditContainer,
     msaaSamples: 4,

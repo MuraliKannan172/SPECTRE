@@ -112,10 +112,8 @@ export class VisualEffects {
     if (this.stopped || !stage) return;
     stage.uniforms.intensity = value;
     stage.enabled = value > 0.001;
-    // Anime's four luminance bands turn the faint Milky Way into blotches, and
-    // a post-process cannot tell the sky from far geometry reliably (near
-    // plane clamps, keyless terrain above the ellipsoid horizon): fade the
-    // glow out with the style instead. Bright stars survive as banded points.
+    // Anime's bands turn the faint Milky Way into blotches, and depth cannot
+    // tell the sky from far geometry, so the glow fades with the style.
     if (stage === this.stages.anime)
       this.viewer.scene.skyBox.milkyWayVisibility = 1 - value;
     if (stage.enabled && stage.uniforms.time !== undefined)

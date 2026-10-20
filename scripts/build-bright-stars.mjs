@@ -8,7 +8,7 @@
  * Format:   fixed-width ASCII, 197 bytes per record, byte layout in
  *           https://cdsarc.cds.unistra.fr/ftp/V/50/ReadMe
  * License:  public domain (Yale University Observatory / NASA ADC); CDS asks
- *           for an acknowledgement, which DATA_SOURCES.md carries.
+ *           for an acknowledgement, which the Data attribution popover carries.
  *
  * Transform (deterministic):
  *   1. J2000 RA/Dec (bytes 76-90), V magnitude (103-107) and B−V (110-114).

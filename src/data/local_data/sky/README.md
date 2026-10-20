@@ -1,9 +1,7 @@
 # Sky background
 
-The space behind the globe (`src/sky/starrySky.js`): catalogue stars drawn as
-sharp point sprites over a soft Milky Way cube map. It replaces Cesium's
-default Tycho-2 sky box, whose six 1024² JPEGs stretch 3–6× around the
-whole-globe view and show compression blocks.
+Catalogue stars over a soft Milky Way, drawn by `src/sky/starrySky.js` in
+place of Cesium's blocky Tycho-2 sky box.
 
 | File | Content | Size |
 | ---- | ------- | ---- |
@@ -12,57 +10,42 @@ whole-globe view and show compression blocks.
 
 ## Stars — Yale Bright Star Catalogue
 
-**Source:** Yale Bright Star Catalogue, 5th Revised Edition (Hoffleit &
-Warren 1991), CDS VizieR catalogue
+**Source:** 5th Revised Edition (Hoffleit & Warren 1991), CDS catalogue
 [V/50](https://cdsarc.cds.unistra.fr/viz-bin/cat/V/50), file
 `https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz` (sha256
 `3dc44b1e90be8fbe5bcc7656032560f51275f985c7e3f783c9028e1838ec7bed`, fetched
 2026-10-19).
 
-**License:** public domain (Yale University Observatory / NASA Astronomical
-Data Center). CDS asks for an acknowledgement; the in-app "Data attribution"
-popover carries it.
+**License:** public domain. CDS asks for an acknowledgement; the "Data
+attribution" popover carries it.
 
-**Build:** `node scripts/build-bright-stars.mjs [catalog.gz]` — every record
-with a J2000 position (14 novae and non-stellar entries dropped), RA/Dec
-rounded to 0.001°, magnitudes to 0.01. The renderer maps magnitude to sprite
-width and opacity and B−V to a desaturated black-body colour
-(`src/sky/stars.js`).
+**Build:** `node scripts/build-bright-stars.mjs [catalog.gz]`. Drops the 14
+records without a J2000 position; rounds RA/Dec to 0.001° and magnitudes to
+0.01.
 
 ## Milky Way — ESO/S. Brunier
 
-**Source:** "The Milky Way panorama", ESO image
-[eso0932a](https://www.eso.org/public/images/eso0932a/), full-size original
+**Source:** ESO image [eso0932a](https://www.eso.org/public/images/eso0932a/),
 `https://cdn.eso.org/images/original/eso0932a.tif` (6000×3000 sRGB TIFF, sha256
 `10f209ab83e1fd89e7fa1ed70277ffc6ed19c43549f04ec637c6806d98aff035`, fetched
-2026-10-19). Plate carrée in galactic coordinates, centred on the Galactic
-Centre.
+2026-10-19).
 
-**License:** [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-(<https://www.eso.org/public/outreach/copyright/>). **Credit: ESO/S. Brunier.**
+**License:** [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+**Credit: ESO/S. Brunier.**
 
-**Changes made** (CC BY 4.0 asks for them to be stated): resampled to
-4096×2048, stars removed with a 7×7 morphological opening, two planets
-(Jupiter, by position) painted over with the median of the surrounding sky,
-blurred (σ = 0.4°, blending to σ = 2° in the faint glow so unresolved
-stars leave no clumps), reprojected from galactic coordinates to ICRF cube faces,
-black level set at the median sky with a soft knee (the faint glow away
-from the galactic plane fades to black), gamma-encoded and saved as
-WebP. Build:
-`node scripts/build-milky-way.mjs <eso0932a.tif>`.
+**Changes made** (CC BY 4.0 asks for them): resampled to 4096×2048; stars
+removed; two images of Jupiter painted over; blurred (0.4°, 2° in the faint
+glow); reprojected to ICRF cube faces; black level at the median sky; saved as
+WebP. Build: `node scripts/build-milky-way.mjs <eso0932a.tif>`.
 
-The panorama is a photographic mosaic, not an astrometric map: bright stars
-sit up to ~2° from their catalogue positions. That is invisible in a glow
-blurred this much, and every sharp star on screen comes from the catalogue.
+The panorama's stars sit up to ~2° off; that is invisible in the blurred glow,
+and every sharp star comes from the catalogue.
 
-The NASA SVS "Deep Star Maps 2020" Milky Way layer was considered and not
-used: it is derived from Gaia DR2, which ESA distributes under CC BY-NC 3.0
-IGO with prior authorization required for commercial use.
+NASA SVS "Deep Star Maps 2020" was not used: it derives from Gaia DR2, which
+ESA licenses CC BY-NC 3.0 IGO.
 
 ## Frame
 
-Both layers are in ICRF/J2000. The cube faces use the standard WebGL face
-layout with +X towards the March equinox and +Z towards the north celestial
-pole, uploaded without `flipY`. At runtime one rotation —
-`Transforms.computeIcrfToFixedMatrix` at the scene clock — turns both into
-Earth-fixed coordinates.
+Both layers are in ICRF/J2000. The cube faces use the WebGL face layout, +X
+to the March equinox and +Z to the north celestial pole, uploaded without
+`flipY`.
