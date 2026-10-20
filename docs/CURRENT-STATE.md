@@ -628,8 +628,9 @@ Voice action argument schemas have one portable owner under `src/voice/actionSch
 layer visibility lifecycle. Results distinguish successful changes from
 manager-reported failures or cancellation and report enabled state and lifecycle
 uncertainty. A caller-supplied abort signal reaches the manager; a late abort
-preserves an already committed change. Missing-layer errors, other CCTV actions
-and the exported `controlCctv` helper retain their existing behavior.
+preserves an already committed change. Missing-layer errors and other CCTV
+actions retain their existing behavior. The exported `controlCctv` helper refuses direct
+enable/disable requests and directs callers to `set_layer_visibility`.
 
 `src/voice/layerManifest.js` declares each catalog layer's voice capabilities: spoken aliases, `toggle`, in-view `context`, `track`, and analyst `query` fields with type and unit, or `noQuery` with the reason. The `set_layer_visibility`, `show_data_layers_menu`, `get_entity_context` and `analyst_query` layer enums, the runner's alias table and the analyst field hints are generated from it. `src/voice/layerManifest.test.mjs` fails when a catalog layer is neither listed nor named in `VOICE_OFF_LAYERS` (today only the two scene-driven Bhote Koshi layers). Global Context is listed with `toggle: false`; `set_context_mode` reaches it. `set_panel_open` also opens `weather-panel` and `recent-imagery-panel`.
 

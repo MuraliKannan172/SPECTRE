@@ -1444,13 +1444,10 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
   }
 
   if (action === 'enable' || action === 'disable') {
-    await dataManager.setEnabled('cctv', action === 'enable', {
-      origin: 'voice',
-    });
     return {
-      ok: true,
+      ok: false,
       action: 'control_cctv',
-      enabled: dataManager.isEnabled('cctv'),
+      error: 'Enable or disable CCTV through set_layer_visibility',
     };
   }
   if (!dataManager.isEnabled('cctv')) {

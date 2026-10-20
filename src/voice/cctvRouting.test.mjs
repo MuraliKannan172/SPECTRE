@@ -2,7 +2,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DataLayerManager } from '../data/manager.js';
 import { CCTV_FOCUS_RESULT } from '../layers/cctv/index.js';
-import { createGevActionRunner } from './gevActions.js';
+import { controlCctv, createGevActionRunner } from './gevActions.js';
 
 const originalWindow = globalThis.window;
 before(() => {
@@ -293,6 +293,20 @@ test(
     }
   },
 );
+
+test('exported controlCctv refuses toggles without calling the manager', async () => {
+  const manager = {
+    layers: new Map([['cctv', { module: {} }]]),
+    setEnabled: () => assert.fail('direct helper must not change visibility'),
+    isEnabled: () => assert.fail('direct toggle must not read enabled state'),
+  };
+  for (const action of ['ENABLE', 'disable']) {
+    const result = await controlCctv(manager, { action });
+    assert.equal(result.ok, false);
+    assert.equal(result.action, 'control_cctv');
+    assert.match(result.error, /set_layer_visibility/);
+  }
+});
 
 test(
   'CCTV fallback managers report rejection, transitional state, and uncertainty',
