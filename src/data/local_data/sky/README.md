@@ -8,7 +8,7 @@ whole-globe view and show compression blocks.
 | File | Content | Size |
 | ---- | ------- | ---- |
 | `bright_stars.json` | 9,096 stars: J2000 RA/Dec, V magnitude, B−V | 235 KB |
-| `milkyway_{px,nx,py,ny,pz,nz}.webp` | Milky Way glow, six 1024² cube faces, no stars | 85 KB |
+| `milkyway_{px,nx,py,ny,pz,nz}.webp` | Milky Way glow, six 1024² cube faces, no stars | 62 KB |
 
 ## Stars — Yale Bright Star Catalogue
 
@@ -44,7 +44,8 @@ Centre.
 **Changes made** (CC BY 4.0 asks for them to be stated): resampled to
 4096×2048, stars removed with a 7×7 morphological opening, two planets
 (Jupiter, by position) painted over with the median of the surrounding sky,
-blurred (σ = 0.4°), reprojected from galactic coordinates to ICRF cube faces,
+blurred (σ = 0.4°, blending to σ = 2° in the faint glow so unresolved
+stars leave no clumps), reprojected from galactic coordinates to ICRF cube faces,
 black level set at the median sky with a soft knee (the faint glow away
 from the galactic plane fades to black), gamma-encoded and saved as
 WebP. Build:

@@ -23,7 +23,8 @@
  *      sit where today's sky has nothing and are far brighter than any star.
  *   4. Blur with a three-pass box approximation of a Gaussian, σ = BLUR_DEG on
  *      the sky: rows wrap in longitude and widen by 1/cos(latitude) so the
- *      blur stays round towards the poles.
+ *      blur stays round towards the poles. Faint glow blends to a second,
+ *      FAINT_BLUR_DEG blur, so it carries no clumps of unresolved stars.
  *   5. Resample into six FACE_SIZE² cube faces in the standard WebGL face
  *      orientation (the renderer uploads them without flipY), with the ICRF
  *      axes as the cube axes — +X to the March equinox, +Z to the north
@@ -43,6 +44,12 @@ import { fileURLToPath } from 'node:url';
 
 export const FACE_SIZE = 1024;
 export const BLUR_DEG = 0.4;
+// Faint glow takes a much wider blur: there the panorama is grain of
+// unresolved stars, which a 0.4° blur leaves as clumps. Bright parts keep the
+// fine blur and their dust lanes; FAINT_RANGE (fraction of black-to-white)
+// is where the two blend.
+export const FAINT_BLUR_DEG = 2;
+const FAINT_RANGE = [0.005, 0.08];
 const WORK_WIDTH = 4096;
 const OPEN_RADIUS = 3;
 const WEBP_QUALITY = 96;
@@ -300,6 +307,26 @@ export function softBlack(x, knee = SOFT_KNEE) {
   return x <= 0 ? 0 : (x * x) / (x + knee);
 }
 
+export function smoothstep(edge0, edge1, x) {
+  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Per pixel, keep `fine` where `weight(luminance of coarse)` is 1 and take
+ * `coarse` where it is 0, blending in between. The weight follows the coarse
+ * copy, so it is smooth itself and draws no seams along dark lanes. Writes
+ * into `fine`.
+ */
+function blendByBrightness(fine, coarse, weight) {
+  const [r] = fine;
+  for (let i = 0; i < r.length; i++) {
+    const w = weight((coarse[0][i] + coarse[1][i] + coarse[2][i]) / 3);
+    for (let c = 0; c < 3; c++)
+      fine[c][i] = coarse[c][i] + (fine[c][i] - coarse[c][i]) * w;
+  }
+}
+
 /** Value at `fraction` of the sorted luminance. */
 function luminancePercentile(planes, fraction) {
   const [r, g, b] = planes;
@@ -342,9 +369,19 @@ async function main() {
   // After the opening: it sinks the starry sky to the dark gaps between
   // stars, and a fill taken before it would stay brighter than the sky.
   for (const planet of PLANETS) paintOut(planes, width, height, planet);
+  const wide = planes.map((plane) => Float32Array.from(plane));
   for (const plane of planes) blurPlane(plane, width, height, sigmaPx);
+  for (const plane of wide)
+    blurPlane(plane, width, height, (FAINT_BLUR_DEG / 180) * height);
   const black = luminancePercentile(planes, BLACK_PERCENTILE);
   const white = luminancePercentile(planes, WHITE_PERCENTILE);
+  blendByBrightness(planes, wide, (luminance) =>
+    smoothstep(
+      FAINT_RANGE[0],
+      FAINT_RANGE[1],
+      (luminance - black) / (white - black),
+    ),
+  );
   let total = 0;
   for (const face of CUBE_FACES) {
     const pixels = Buffer.alloc(FACE_SIZE * FACE_SIZE * 3);

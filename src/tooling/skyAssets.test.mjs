@@ -9,6 +9,7 @@ import {
   cubeFaceDirection,
   directionToPlateCarree,
   icrfToGalactic,
+  smoothstep,
   softBlack,
 } from '../../scripts/build-milky-way.mjs';
 import { raDecToUnitVector } from '../sky/stars.js';
@@ -120,4 +121,12 @@ test('the black level eases in instead of cutting the faint sky into contours', 
   // Starts flat, then joins the straight line just below it.
   assert.ok(softBlack(0.003) < 0.0003);
   close(softBlack(1), 1 - 0.03, 1e-3);
+});
+
+test('the faint-glow blend weight eases between its edges', () => {
+  assert.equal(smoothstep(0.1, 0.2, 0), 0);
+  assert.equal(smoothstep(0.1, 0.2, 0.1), 0);
+  close(smoothstep(0.1, 0.2, 0.15), 0.5, 1e-9);
+  assert.equal(smoothstep(0.1, 0.2, 0.2), 1);
+  assert.equal(smoothstep(0.1, 0.2, 9), 1);
 });
