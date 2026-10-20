@@ -4002,6 +4002,8 @@ animation. Polls, surface completions and trail fades request individual renders
 Disable clears vehicles, detection references, requests, timers and holds;
 destruction also releases collections and registrations.
 
+The `scripts/qa-layer-visibility.mjs` gate uses the development-only registration seam and real browser tab visibility to prove periodic work pauses while hidden, explicit refresh still works, resume performs one overdue refresh, and disabled layers stay stopped.
+
 **Acceptance harness.** Run against an already running development server:
 
 ```sh

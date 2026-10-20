@@ -275,6 +275,10 @@ const browser = await puppeteer.launch({
   ],
 });
 const page = await browser.newPage();
+// This gate measures visible-page motion. OS minimization must not silently
+// switch it into the app's intentional hidden-tab polling pause.
+const focus = await page.createCDPSession();
+await focus.send('Emulation.setFocusEmulationEnabled', { enabled: true });
 boundPageEvaluations(page);
 await page.setViewport({ width: 1920, height: 1080 });
 const pageErrors = [];
