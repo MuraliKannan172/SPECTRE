@@ -153,7 +153,7 @@ async function main() {
 
   let exitCode = 0;
   try {
-    const page = await browser.newPage();
+    let page = await browser.newPage();
     // Keep this visible-page regression deterministic even if the OS starts
     // Chrome minimized. Use browser focus emulation, not patched DOM getters.
     const focusSession = await page.createCDPSession();
@@ -162,7 +162,7 @@ async function main() {
       const response = fixtureResponse(request);
       if (response) void request.respond(response); else void request.continue();
     };
-    if (FIXTURES) { await page.setRequestInterception(true); page.on('request', onFixture); }
+    if (FIXTURES) { await page.setCacheEnabled(false); await page.setRequestInterception(true); page.on('request', onFixture); }
     await page.setViewport({ width: 1440, height: 900 });
 
     // Track flow-tile requests + traffic console lines for (ii)/(iii)/(v).
@@ -281,7 +281,16 @@ async function main() {
 
     // ── (v) KEYLESS fallback (intercepted — server key untouched) ────────────
     console.log('\n(v) KEYLESS — intercepted status, expect pure simulation...');
-    if (FIXTURES) page.off('request', onFixture);
+    // Keyless is an independent fresh-session contract. Close the keyed page
+    // so its workers, terrain work and intercepted cache cannot leak into it.
+    await page.close();
+    page = await browser.newPage();
+    await page.setViewport({ width: 1440, height: 900 });
+    const keylessFocus = await page.createCDPSession();
+    await keylessFocus.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    page.on('pageerror', error => { pageErrors.push(error.message); console.error('PAGE ERROR:', error.message); });
+    page.on('console', message => { if (message.type() === 'error') console.error('BROWSER ERROR:', message.text()); });
+    await page.setCacheEnabled(false);
     await page.setRequestInterception(true);
     const keylessFlowReqs = [];
     page.on('request', (req) => {
@@ -299,7 +308,7 @@ async function main() {
       if (response) { void req.respond(response); return; }
       try { req.continue(); } catch { /* already handled */ }
     });
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForFunction(
       () => window.__godsEyeView?.viewer && window.__godsEyeView?.dataManager,
       { timeout: 60000 },
