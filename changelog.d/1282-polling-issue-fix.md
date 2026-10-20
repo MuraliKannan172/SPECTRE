@@ -1,1 +1,3 @@
 - Pause periodic network updates in hidden tabs (asturksever, #1282).
+- Report and guard browser visibility during Transit QA so hidden-page polling pauses cannot masquerade as playback regressions (asturksever, #1282).
+- Require each live city to supply its own feed vehicles in Transit QA; retained vehicles cannot qualify another city (asturksever, #1282).

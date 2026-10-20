@@ -266,6 +266,7 @@ const browser = await puppeteer.launch({
   executablePath: chromeExecutablePath(),
   args: [
     '--no-sandbox',
+    '--disable-backgrounding-occluded-windows',
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--window-size=1920,1080',
@@ -391,22 +392,42 @@ try {
         orientation: { heading: 0, pitch: (-40 * Math.PI) / 180, roll: 0 },
       });
     }, city);
-    await page.waitForFunction(
-      () =>
-        (window.__godsEyeView.dataManager.layers
-          .get('transit')
-          .module.getStats().count || 0) > 0,
-      { timeout: 90_000 },
-    );
+    const arrived = await page
+      .waitForFunction(
+        (feedId) =>
+          [
+            ...window.__godsEyeView.dataManager.layers
+              .get('transit')
+              .module._transitStateForTest()
+              ._vehicles.keys(),
+          ].some((key) => key.startsWith(`${feedId}:`)),
+        { timeout: 90_000 },
+        city.feedId,
+      )
+      .then(
+        () => true,
+        () => false,
+      );
+    if (!arrived) {
+      check(
+        `${city.label}: live feed arrived`,
+        false,
+        `No vehicles from ${city.feedId}; retained vehicles from other cities cannot qualify this view`,
+        { unexercised: true },
+      );
+      continue;
+    }
     await wait(9_000);
-    const fleet = await page.evaluate(() => {
+    const fleet = await page.evaluate((feedId) => {
       const layer =
         window.__godsEyeView.dataManager.layers.get('transit').module;
       return {
-        count: layer._transitStateForTest()._vehicles.size,
+        count: [...layer._transitStateForTest()._vehicles.keys()].filter(
+          (key) => key.startsWith(`${feedId}:`),
+        ).length,
         stats: layer.getStats(),
       };
-    });
+    }, city.feedId);
     check(
       `${city.label}: vehicles are rendered`,
       fleet.count >= 20,
@@ -428,6 +449,7 @@ try {
         .module._transitStateForTest();
       let best = null;
       for (const entry of state._vehicles.values()) {
+        if (!entry.key.startsWith(`${c.feedId}:`)) continue;
         const d = Math.hypot(entry.to.lat - c.lat, entry.to.lon - c.lon);
         if (!best || d < best.d)
           best = { d, lat: entry.to.lat, lon: entry.to.lon, key: entry.key };
