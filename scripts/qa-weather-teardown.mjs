@@ -61,6 +61,10 @@ const browser = await puppeteer.launch({
 
 const boot = async () => {
   const page = await browser.newPage();
+  // This probe measures active rendering; an OS-minimized window must not
+  // silently exercise the application's intentional hidden-page pause.
+  const focus = await page.createCDPSession();
+  await focus.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await page.setViewport({ width: 1400, height: 920, deviceScaleFactor: 1 });
   const errors = [];
   page.on('pageerror', (e) =>
