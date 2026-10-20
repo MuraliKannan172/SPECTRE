@@ -291,10 +291,20 @@ html:not([lang='en']) .sl-meta-row .sl-nearest-btn {
   outline-offset: 3px;
 }
 
-.sl-since-note {
+/* The value and its note share a line: ANY DATE (by upload date). */
+.sl-since-value {
   grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  min-width: 0;
+}
+
+.sl-since-note {
   font-family: var(--font-mono);
-  font-size: var(--sl-text-small);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
   color: var(--text-secondary);
 }
 
@@ -303,7 +313,6 @@ html:not([lang='en']) .sl-meta-row .sl-nearest-btn {
 }
 
 .sl-since-label {
-  grid-column: 2;
   font-family: var(--font-mono);
   font-size: var(--sl-text);
   letter-spacing: 0.08em;
