@@ -82,6 +82,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Enable traffic + teleport, then poll the layer until settled. */
 async function settleTraffic(page, view, { minCount = 1, timeoutS = 30 } = {}) {
+  // The app deliberately stops rendering hidden pages. Programmatic camera
+  // changes do not activate a headful window the way a real UI click does.
+  await page.bringToFront();
+  await page.waitForFunction(() => document.visibilityState === 'visible');
   return page.evaluate(async (v, minC, tS) => {
     const gev = window.__godsEyeView;
     const dm = gev.dataManager;
@@ -99,6 +103,7 @@ async function settleTraffic(page, view, { minCount = 1, timeoutS = 30 } = {}) {
     });
     let s = null;
     for (let i = 0; i < tS; i++) {
+      if (document.visibilityState !== 'visible') throw new Error('Traffic QA page became hidden; rendering is intentionally paused');
       await new Promise((r) => setTimeout(r, 1000));
       s = mod.getStats();
       // Retained roads from the previous city can satisfy count/loading before
@@ -140,7 +145,7 @@ async function main() {
       '--no-sandbox', '--disable-setuid-sandbox',
       ...(!HEADFUL ? ['--use-gl=angle', '--use-angle=swiftshader'] : []),
       '--disable-backgrounding-occluded-windows',
-      '--disable-dev-shm-usage', '--disable-web-security',
+      '--disable-dev-shm-usage',
       '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
       '--window-size=1440,900',
     ],
@@ -149,6 +154,10 @@ async function main() {
   let exitCode = 0;
   try {
     const page = await browser.newPage();
+    // Keep this visible-page regression deterministic even if the OS starts
+    // Chrome minimized. Use browser focus emulation, not patched DOM getters.
+    const focusSession = await page.createCDPSession();
+    await focusSession.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     const onFixture = (request) => {
       const response = fixtureResponse(request);
       if (response) void request.respond(response); else void request.continue();
@@ -162,6 +171,9 @@ async function main() {
       if (req.url().includes('/api/tomtom/flow/')) flowRequests.push(req.url());
     });
     const trafficLogs = [];
+    const pageErrors = [];
+    page.on('pageerror', error => { pageErrors.push(error.message); console.error('PAGE ERROR:', error.message); });
+    page.on('console', message => { if (message.type() === 'error') console.error('BROWSER ERROR:', message.text()); });
     page.on('console', (msg) => {
       const t = msg.text();
       if (t.includes('[Data:Traffic]')) trafficLogs.push(t);
@@ -319,6 +331,7 @@ async function main() {
       await sleep(1000);
       await page.screenshot({ path: path.join(SHOTS_DIR, 'traffic-sim-keyless.png') });
     }
+    record('BROWSER: no uncaught page exceptions', pageErrors.length === 0, pageErrors.join('; '));
   } catch (e) {
     console.error('\x1b[31mHarness error:\x1b[0m', e);
     exitCode = 3;

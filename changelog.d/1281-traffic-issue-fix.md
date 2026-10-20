@@ -1,2 +1,4 @@
 - Hold rendering only for animated content (asturksever, #1281).
 - Exercise current vector road sources and published camera bounds in Traffic fixture QA (asturksever, #1281).
+- Establish browser-level foreground visibility for Traffic QA and reject hidden-page samples (asturksever, #1281).
+- Supply CORS headers on cross-origin traffic fixtures and report browser exceptions without disabling browser security (asturksever, #1281).

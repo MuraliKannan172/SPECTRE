@@ -1,7 +1,9 @@
 import { PbfWriter } from 'pbf';
 
+const corsHeaders = { 'access-control-allow-origin': '*' };
 const json = (body) => ({
   status: 200,
+  headers: corsHeaders,
   contentType: 'application/json',
   body: JSON.stringify(body),
 });
@@ -80,6 +82,7 @@ export function trafficFixtureResponse(request) {
       return {
         status: 200,
         contentType: 'application/octet-stream',
+        headers: corsHeaders,
         body: flatTerrain,
       };
     throw new Error(`Unexpected terrain fixture request: ${url.pathname}`);
@@ -93,6 +96,7 @@ export function trafficFixtureResponse(request) {
     return {
       status: 200,
       contentType: 'application/x-protobuf',
+      headers: corsHeaders,
       body: trafficFixtureTile(Number(flow[1]), true),
     };
   if (url.hostname !== 'tiles.openfreemap.org') return null;
@@ -109,6 +113,7 @@ export function trafficFixtureResponse(request) {
   return {
     status: 200,
     contentType: 'application/x-protobuf',
+    headers: corsHeaders,
     body: trafficFixtureTile(Number(road[1])),
   };
 }

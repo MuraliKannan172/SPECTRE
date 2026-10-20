@@ -33,9 +33,9 @@ test('traffic fixtures provide aligned current road tiles and partial flow cover
 
 test('fixture TileJSON and every road/flow request stay on intercepted sources', () => {
   const request = (url) => trafficFixtureResponse({ url: () => url });
-  const metadata = JSON.parse(
-    request('https://tiles.openfreemap.org/planet').body,
-  );
+  const tileJson = request('https://tiles.openfreemap.org/planet');
+  assert.equal(tileJson.headers['access-control-allow-origin'], '*');
+  const metadata = JSON.parse(tileJson.body);
   const tileUrl = metadata.tiles[0]
     .replace('{z}', '14')
     .replace('{x}', '935')
