@@ -1,0 +1,1 @@
+- Pause periodic network updates in hidden tabs (asturksever, #1282).
