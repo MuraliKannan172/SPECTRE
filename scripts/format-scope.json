@@ -443,6 +443,7 @@
   "src/data/satellites.js",
   "src/data/rocketLaunches.js",
   "src/layers/satellites/source.test.mjs",
+  "src/layers/satellites/stale.test.mjs",
   "src/layers/launches/source.test.mjs",
   "src/layers/launches/ingestion.test.mjs",
   "src/layers/installations/lifecycle.js",
@@ -1059,5 +1060,6 @@
   "scripts/assemble-changelog.mjs",
   "src/tooling/changelogFragments.test.mjs",
   "src/data/gbfsProxyRateLimit.test.mjs",
+  "src/data/routeSegment.test.mjs",
   "src/terrainHeightsBounds.test.mjs"
 ]
