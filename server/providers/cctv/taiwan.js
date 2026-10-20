@@ -13,6 +13,13 @@ export const TAIWAN_FREEWAY_CCTV_URL =
 /** The whole network is ~1.2 MB. */
 export const TAIWAN_MAX_CATALOG_BYTES = 6 * 1024 * 1024;
 export const DEFAULT_TAIWAN_MAX_SOURCES = 600;
+/** After a failed download, wait this long before asking again. The catalog
+ * host does not answer from some networks outside Taiwan, and every attempt
+ * there holds the shared catalog refresh until the connect timeout. */
+export const TAIWAN_RETRY_AFTER_FAILURE_MS = 60 * 60 * 1000;
+/** The table is republished daily; a good copy stands in for a failed
+ * download for up to this long. */
+export const TAIWAN_LAST_GOOD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 // The table publishes each camera's MJPEG stream. The same camera servers
 // answer a single JPEG for the same camera ID on a sibling path, which is what
@@ -62,9 +69,20 @@ const XML_ENTITIES = {
   apos: "'",
 };
 
+function codePoint(value, radix) {
+  const code = parseInt(value, radix);
+  return Number.isInteger(code) && code > 0 && code <= 0x10ffff
+    ? String.fromCodePoint(code)
+    : '';
+}
+
 function decodeXml(text) {
   return String(text ?? '')
-    .replace(/&(amp|lt|gt|quot|apos);/g, (_, name) => XML_ENTITIES[name])
+    .replace(
+      /&(?:(amp|lt|gt|quot|apos)|#(\d{1,7})|#x([0-9a-fA-F]{1,6}));/g,
+      (_, name, dec, hex) =>
+        name ? XML_ENTITIES[name] : codePoint(dec ?? hex, dec ? 10 : 16),
+    )
     .trim();
 }
 
@@ -156,9 +174,11 @@ export function taiwanCameraToSource(row) {
     .map((part) => String(part ?? '').trim())
     .filter(Boolean)
     .join('→');
+  // A bare carriageway letter is not a name; fall back to the published ID.
   const name =
-    [road, direction, mile].filter(Boolean).join(' ') +
-      (section ? ` ${section}` : '') ||
+    (road || mile || section
+      ? [road, direction, mile, section].filter(Boolean).join(' ')
+      : '') ||
     rawId ||
     `Freeway camera ${frame.camera}`;
 
@@ -191,13 +211,42 @@ export function taiwanCameraToSource(row) {
   };
 }
 
+let lastGood = null;
+let lastGoodAt = 0;
+let retryAfter = 0;
+
+/** Forget the last good table and any failure backoff (tests only). */
+export function resetTaiwanSourcesCache() {
+  lastGood = null;
+  lastGoodAt = 0;
+  retryAfter = 0;
+}
+
+function fallbackSources() {
+  return lastGood && Date.now() - lastGoodAt <= TAIWAN_LAST_GOOD_MAX_AGE_MS
+    ? lastGood
+    : [];
+}
+
+function taiwanSourceCap() {
+  const rawCap = Number(
+    process.env.CCTV_TAIWAN_MAX_SOURCES || DEFAULT_TAIWAN_MAX_SOURCES,
+  );
+  return Number.isFinite(rawCap)
+    ? Math.max(1, Math.min(2000, Math.floor(rawCap)))
+    : DEFAULT_TAIWAN_MAX_SOURCES;
+}
+
 /**
  * Fetch Taiwan Freeway Bureau cameras from the keyless MOTC 2.0 XML table.
- * One bounded request per shared catalog refresh.
+ * One bounded request per shared catalog refresh. A failed download serves the
+ * last good table (up to a day old) and is not retried for an hour, so a host
+ * that cannot reach the Freeway Bureau does not wait on it every refresh.
  *
  * @returns {Promise<Array<object>>}
  */
 export async function loadTaiwanSources() {
+  if (Date.now() < retryAfter) return fallbackSources();
   try {
     const signal = AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS);
     const response = await fetch(
@@ -210,13 +259,11 @@ export async function loadTaiwanSources() {
     );
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
-      console.warn(
-        '[CCTV] Taiwan camera download failed:',
+      throw new Error(
         response.status >= 300 && response.status < 400
           ? 'catalog redirected; redirects are not followed'
-          : response.status,
+          : `HTTP ${response.status}`,
       );
-      return [];
     }
     const xml = await readResponseTextCapped(
       response,
@@ -228,22 +275,29 @@ export async function loadTaiwanSources() {
       const camera = taiwanCameraToSource(row);
       if (camera && !cameras.has(camera.id)) cameras.set(camera.id, camera);
     }
-    const rawCap = Number(
-      process.env.CCTV_TAIWAN_MAX_SOURCES || DEFAULT_TAIWAN_MAX_SOURCES,
+    if (!cameras.size) throw new Error('no usable cameras in the table');
+    const sources = prioritizeSources(
+      [...cameras.values()],
+      taiwanSourceCap(),
+      ANCHORS,
     );
-    const cap = Number.isFinite(rawCap)
-      ? Math.max(1, Math.min(2000, Math.floor(rawCap)))
-      : DEFAULT_TAIWAN_MAX_SOURCES;
-    const sources = prioritizeSources([...cameras.values()], cap, ANCHORS);
     console.log(
       `[CCTV] Loaded Taiwan camera sources: ${cameras.size} (using ${sources.length})`,
     );
+    lastGood = sources;
+    lastGoodAt = Date.now();
+    retryAfter = 0;
     return sources;
   } catch (error) {
+    retryAfter = Date.now() + TAIWAN_RETRY_AFTER_FAILURE_MS;
+    const fallback = fallbackSources();
     console.warn(
-      '[CCTV] Taiwan camera download error:',
-      error?.message || error,
+      `[CCTV] Taiwan camera download failed (${error?.message || error}); ` +
+        (fallback.length
+          ? `serving the last good ${fallback.length} cameras`
+          : 'no Taiwan cameras') +
+        ', next attempt in 1 h',
     );
-    return [];
+    return fallback;
   }
 }
