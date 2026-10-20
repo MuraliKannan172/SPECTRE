@@ -3492,3 +3492,34 @@ test('refreshLayerStats reaches presentation through the bare lifecycle', async 
   lifecycle.refreshLayerStats();
   assert.deepEqual(changes, ['status']);
 });
+
+test('periodic polls pause hidden, catch up once when due, and dispose visibility listeners', async (t) => {
+  const listeners = new Set();
+  const doc = {
+    hidden: false,
+    addEventListener: (_name, fn) => listeners.add(fn),
+    removeEventListener: (_name, fn) => listeners.delete(fn),
+  };
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 1000 });
+  const { LayerLifecycle } = await import('./lifecycle.js');
+  const manager = new LayerLifecycle({}, { visibilityTarget: doc });
+  const { module, calls } = makeSlowLayer('hidden-poll');
+  manager.register(module);
+  await manager.setEnabled('hidden-poll', true);
+  assert.equal(calls.update, 1);
+  doc.hidden = true;
+  t.mock.timers.tick(10000);
+  assert.equal(calls.update, 1);
+  assert.equal(await manager.refreshLayer('hidden-poll'), true);
+  assert.equal(calls.update, 2, 'explicit refresh remains allowed');
+  doc.hidden = false;
+  for (const fn of listeners) fn();
+  for (const fn of listeners) fn();
+  assert.equal(calls.update, 3);
+  await Promise.resolve();
+  await Promise.resolve();
+  await manager.destroyAll();
+  assert.equal(listeners.size, 0);
+  t.mock.timers.tick(10000);
+  assert.equal(calls.update, 3);
+});
