@@ -37,7 +37,14 @@ function setup(t) {
       visibleRoadsForAltitude: (roads) => roads,
     },
   };
-  const ctx = { state, services: {}, parts, source: {} };
+  const ctx = {
+    state,
+    services: {
+      render: { holdContinuousRender() {}, releaseContinuousRender() {} },
+    },
+    parts,
+    source: {},
+  };
   parts.style = createStyle(ctx);
   parts.model = createModel(ctx);
   parts.animation = createAnimation(ctx);

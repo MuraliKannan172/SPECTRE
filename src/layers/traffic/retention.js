@@ -125,6 +125,7 @@ export function createRetention({ state, parts }) {
       count++;
     }
     state._count = count;
+    parts.animation.syncRenderDemand?.();
   }
   function reconcile(roads, height, replace) {
     altitude = height;

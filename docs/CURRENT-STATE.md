@@ -1,5 +1,7 @@
 # God's Eye View Current State
 
+Traffic holds continuous rendering only while enabled with animated dots or a pulsing jam heat-line. Empty, failed, and high-altitude views release the hold; population admission reacquires it and resets animation time. Clear, disable, and destroy also release it. Retained fading dots keep animation alive until they are removed.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,
