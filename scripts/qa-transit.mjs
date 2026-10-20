@@ -36,7 +36,7 @@ import {
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import puppeteer from 'puppeteer';
-import { chromeExecutablePath } from './qa-chrome.mjs';
+import { chromeExecutablePath, captureQaScreenshot } from './qa-chrome.mjs';
 import { createTransitHistory } from '../server/providers/transitHistory.js';
 import { DETECTION_THEME_MAP } from '../src/overlays/worldOverlayTokens.js';
 import { transitModeTier } from '../src/data/transitPresetStyle.js';
@@ -294,11 +294,13 @@ page.on('request', (request) => {
 });
 
 const shot = (name, caption) =>
-  page
-    .screenshot({ path: `${SHOTS}/${name}`, type: 'jpeg', quality: 82 })
-    .then(() => {
-      console.log(`  shot ${name} — ${caption}`);
-    });
+  captureQaScreenshot(page, {
+    path: `${SHOTS}/${name}`,
+    type: 'jpeg',
+    quality: 82,
+  }).then(() => {
+    console.log(`  shot ${name} — ${caption}`);
+  });
 
 const view = (city) =>
   `${BASE}/?welcome=0#lat=${city.lat}&lon=${city.lon}&alt=600&heading=${city.heading}&pitch=-45`;
