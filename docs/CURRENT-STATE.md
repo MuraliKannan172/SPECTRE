@@ -1,5 +1,7 @@
 # God's Eye View Current State
 
+Mission hover picking is limited to one drill-pick per 120 ms and suppressed during camera movement, hidden tabs, disabled layers, and pointer-owned tools. Motion, hiding, disable, and destroy clear the cursor. Click selection keeps its full overlap-aware drill-pick behavior.
+
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
 canonical; `greatCircleMeters` is its exact metre conversion. Missing,

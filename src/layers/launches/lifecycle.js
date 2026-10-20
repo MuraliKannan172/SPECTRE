@@ -1,6 +1,75 @@
 import * as Cesium from 'cesium';
 import { isPointerFree } from '../../data/inputOwnership.js';
 
+/** Bound hover picking independently of precise click selection. */
+export function createLaunchHover({
+  viewer,
+  enabled,
+  entityLaunchId,
+  now = () => performance.now(),
+  documentRef = globalThis.document,
+  pointerFree = isPointerFree,
+}) {
+  let moving = false;
+  let lastPick = -Infinity;
+  let ownsCursor = false;
+  const clearCursor = () => {
+    if (ownsCursor && viewer.scene.canvas.style.cursor === 'pointer')
+      viewer.scene.canvas.style.cursor = '';
+    ownsCursor = false;
+  };
+  const reset = () => {
+    clearCursor();
+    lastPick = -Infinity;
+  };
+  const start = () => {
+    moving = true;
+    reset();
+  };
+  const end = () => {
+    moving = false;
+    reset();
+  };
+  const visibility = () => {
+    if (documentRef?.hidden || documentRef?.visibilityState === 'hidden')
+      reset();
+  };
+  const removeStart = viewer.camera?.moveStart?.addEventListener(start);
+  const removeEnd = viewer.camera?.moveEnd?.addEventListener(end);
+  documentRef?.addEventListener?.('visibilitychange', visibility);
+  return {
+    move(movement) {
+      if (
+        !enabled() ||
+        moving ||
+        documentRef?.hidden ||
+        documentRef?.visibilityState === 'hidden' ||
+        !pointerFree()
+      ) {
+        reset();
+        return;
+      }
+      const at = now();
+      if (at - lastPick < 120) return;
+      lastPick = at;
+      const found = viewer.scene
+        .drillPick(movement.endPosition, 12)
+        .some((picked) => entityLaunchId(picked?.id));
+      if (found) {
+        viewer.scene.canvas.style.cursor = 'pointer';
+        ownsCursor = true;
+      } else clearCursor();
+    },
+    reset,
+    destroy() {
+      reset();
+      removeStart?.();
+      removeEnd?.();
+      documentRef?.removeEventListener?.('visibilitychange', visibility);
+    },
+  };
+}
+
 export function createLifecycle({
   state: layerState,
   services,
@@ -8,6 +77,7 @@ export function createLifecycle({
   source,
 }) {
   const { holdContinuousRender, releaseContinuousRender } = services.render;
+  let hover = null;
 
   const methods = {
     init(viewer) {
@@ -45,14 +115,15 @@ export function createLifecycle({
       layerState._moveHandler = new Cesium.ScreenSpaceEventHandler(
         viewer.scene.canvas,
       );
-      layerState._moveHandler.setInputAction((movement) => {
-        if (!layerState._enabled || !layerState._dataSource?.show) return;
-        const missionEntity = viewer.scene
-          .drillPick(movement.endPosition, 12)
-          .map((picked) => picked?.id)
-          .find((candidate) => parts.selection.entityLaunchId(candidate));
-        viewer.scene.canvas.style.cursor = missionEntity ? 'pointer' : '';
-      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+      hover = createLaunchHover({
+        viewer,
+        enabled: () => layerState._enabled && layerState._dataSource?.show,
+        entityLaunchId: parts.selection.entityLaunchId,
+      });
+      layerState._moveHandler.setInputAction(
+        hover.move,
+        Cesium.ScreenSpaceEventType.MOUSE_MOVE,
+      );
       // Apply horizon visibility before Cesium traverses and picks the scene.
       // A postRender write is one frame late and can remain visibly stale when
       // request-on-demand rendering stops after a globe camera move.
@@ -100,6 +171,7 @@ export function createLifecycle({
     },
 
     async disable() {
+      hover?.reset();
       layerState._sourceController.abort();
       layerState._enabled = false;
       releaseContinuousRender('rocket-launches');
@@ -122,6 +194,8 @@ export function createLifecycle({
     },
 
     async destroy(viewer) {
+      hover?.destroy();
+      hover = null;
       layerState._sourceController.abort();
       releaseContinuousRender('rocket-launches'); // direct-destroy path (perf wave 2 fix)
       layerState._enabled = false;
