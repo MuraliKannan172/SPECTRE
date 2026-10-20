@@ -1,14 +1,13 @@
 # God's Eye View Current State
 
-Analyst region queries retain the existing offline lookup for unique Natural
-Earth names without geocoding: Gold Coast and Ivory Coast still name the West
-African natural regions. Duplicate names require a geocoded containment anchor.
-When multiple entries for the same name contain that anchor, the lookup now stays
-unresolved instead of selecting the largest entry. Natural outlines try exact
-names before aliases and broader suffix variants. Follow-ups retain boundary provenance, and
-cancelled lookups preserve the previous analyst cohort and boundary source.
-Navigation keeps main's existing successful-geocode precedence; this change adds
-no search or view-based annotation recovery.
+Analyst region queries resolve unique Natural Earth names offline without
+geocoding, so Gold Coast and Ivory Coast name the West African natural regions.
+Duplicate names require a geocoded containment anchor; when several entries for
+the same name contain that anchor, the lookup stays unresolved rather than
+selecting the largest entry. Natural outlines try exact names before aliases and
+broader suffix variants. Follow-ups retain boundary provenance, and cancelled
+lookups preserve the previous analyst cohort and boundary source. Navigation
+search keeps a successful geocode, with no search or view-based region recovery.
 
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
