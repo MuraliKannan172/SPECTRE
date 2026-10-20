@@ -5,6 +5,7 @@ import { allocateSourceCap, resolveCatalogCap } from './cap.js';
 import { loadGroundHeights, joinGroundHeights } from './groundHeights.js';
 import { cameraRegion, normalizeSourceItem } from './normalize.js';
 import { loadLithuaniaSources } from './lithuania.js';
+import { loadTaiwanSources } from './taiwan.js';
 import {
   loadAustinSourcesFromOpenData,
   loadCaltransSourcesFromOpenData,
@@ -158,6 +159,11 @@ const LIVE_PACKS = [
     name: 'florida',
     enabled: () => envOptIn('CCTV_FLORIDA_ENABLED'),
     load: loadFloridaSourcesFromOpenData,
+  },
+  {
+    name: 'taiwan',
+    enabled: () => envEnabled('CCTV_TAIWAN_ENABLED'),
+    load: loadTaiwanSources,
   },
 ];
 /**
