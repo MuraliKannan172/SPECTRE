@@ -817,7 +817,11 @@ Viewport limits, saturation retry, placement, query caps and controls are retain
 
 Satellite and mission layers expose separate factories through `./layers/satellites`
 and `./layers/launches`. Each owns its catalog, render state, tracking, interaction
-and teardown. Source adapters retain the existing CelesTrak and Launch Library
+and teardown. Satellite core and dense catalogs retain upstream stale-cache
+provenance only for admitted records; duplicate or invalid entries cannot taint
+a fresh winning record. Dense removal clears only its own provenance, and a
+fresh core rebuild or lifecycle reset replaces the corresponding ownership.
+Source adapters retain the existing CelesTrak and Launch Library
 endpoints; standalone entries provide scene services and the satellite dependency.
 The mission factory separates paths, replay, camera, panel, overlays and placement.
 Launch Library pad coordinates retain unknown values: missing fields use the
