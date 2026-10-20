@@ -202,22 +202,6 @@ export function createAnnotationResolver({
       );
       signal?.throwIfAborted();
       if (admin) return bundledAdminTarget(viewer, admin, trace.query);
-
-      // A unique pack name can still name an unrelated modern place. Recover
-      // natural outlines only from a containing view, including unique names.
-      if (
-        center &&
-        entityKind !== 'district' &&
-        intent !== 'around_the_thing'
-      ) {
-        const natural = await lookupNaturalRegionOutline(
-          trace.query,
-          center.lat,
-          center.lon,
-        ).catch(() => null);
-        signal?.throwIfAborted();
-        if (natural) return bundledNaturalTarget(viewer, natural, trace.query);
-      }
     }
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
@@ -852,37 +836,6 @@ export function createAnnotationResolver({
       viewport: {
         low: { latitude: south, longitude: west },
         high: { latitude: north, longitude: east },
-      },
-    };
-  }
-
-  /** A complete annotation target for a natural ring containing the view. */
-  function bundledNaturalTarget(viewer, natural, query) {
-    const ring = closeRing([...natural.ring]);
-    const centroid = ringCentroid(ring);
-    if (!centroid) return null;
-    registerDynamicCredit(viewer, NATURAL_EARTH_CREDIT);
-    const lons = ring.map(([lon]) => lon);
-    const lats = ring.map(([, lat]) => lat);
-    console.log(
-      `[Resolver] "${query}": bundled ${natural.kind} "${natural.name}" ` +
-        '(natural-earth, view-contained) → FINAL source=bundled',
-    );
-    return {
-      lon: centroid.lon,
-      lat: centroid.lat,
-      height: sampleGroundHeight(viewer, centroid.lon, centroid.lat),
-      ring,
-      footprintKind: 'area',
-      buildingHeight: null,
-      label: natural.name,
-      source: 'bundled',
-      synthesized: false,
-      outlineUnavailable: false,
-      naturalRegion: natural.name,
-      viewport: {
-        low: { latitude: Math.min(...lats), longitude: Math.min(...lons) },
-        high: { latitude: Math.max(...lats), longitude: Math.max(...lons) },
       },
     };
   }

@@ -1,1 +1,1 @@
-- Preserve successful place-search matches, require an unambiguous containing natural region for recovery, and retain analyst boundary provenance through follow-ups (manjunath22466, #1235).
+- Require a geocoded containment anchor for ambiguous analyst region names, preserve boundary provenance and cancellation safety, and retain exact-name precedence for natural outlines (manjunath22466, #1235).

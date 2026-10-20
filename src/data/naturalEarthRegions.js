@@ -273,8 +273,10 @@ export function pointInRing(ring, lat, lon) {
 /**
  * Resolve a natural-region OUTLINE ring for the annotation resolver's first
  * rung. Stricter than `findNaturalRegion`: walks ALL entries sharing the
- * matched name (duplicate names included) and returns a ring only when exactly
- * one indexed entry CONTAINS the anchor. Containment is the disambiguator and the
+ * matched name (duplicate names included), trying exact names, aliases and
+ * broader suffix variants in that order. Returns a ring only when exactly one
+ * entry under the matched name CONTAINS the anchor. Containment is the
+ * disambiguator and the
  * wrong-place guard: when no ring contains the anchor this returns null and
  * the resolver's normal ladder continues unchanged.
  *
@@ -293,28 +295,28 @@ export async function lookupNaturalRegionOutline(query, lat, lon) {
     ALIASES[norm],
     ...suffixVariants(ALIASES[norm] || norm),
   ];
-  const seen = new Set();
-  const containingEntries = new Map();
-  for (const key of candidates) {
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+  for (const key of new Set(candidates.filter(Boolean))) {
+    const containing = [];
     for (const entry of index.get(key) || []) {
-      if (containingEntries.has(entry)) continue;
       const ring = entry.polygons.find((candidate) =>
         pointInRing(candidate, lat, lon),
       );
-      if (ring) containingEntries.set(entry, ring);
+      if (ring) containing.push({ entry, ring });
     }
+    // Specific names win over aliases and broader rewrites. Ambiguity belongs
+    // to this name, not the union of every lower-priority candidate name.
+    if (containing.length > 1) return null;
+    if (containing.length === 0) continue;
+    const [{ entry, ring }] = containing;
+    return {
+      name: entry.name,
+      kind: entry.kind,
+      featurecla: entry.featurecla,
+      ring,
+      areaKm2: entry.areaKm2,
+    };
   }
-  if (containingEntries.size !== 1) return null;
-  const [[entry, ring]] = containingEntries;
-  return {
-    name: entry.name,
-    kind: entry.kind,
-    featurecla: entry.featurecla,
-    ring,
-    areaKm2: entry.areaKm2,
-  };
+  return null;
 }
 
 /** Resolve the smallest containing bundled physical region without a network geocoder. */

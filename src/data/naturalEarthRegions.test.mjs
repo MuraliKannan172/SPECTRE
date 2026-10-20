@@ -130,12 +130,16 @@ test('listRegions() enumerates both kinds for diagnostics', async () => {
 });
 
 // ── lookupNaturalRegionOutline (resolver first-rung contract) ──────
-test('outline lookup: Alps ring via containment anchor', async () => {
+test('outline lookup: containing exact names win over broader suffix variants', async () => {
   const r = await lookupNaturalRegionOutline('the Alps', 46.5, 10.0);
   assert.ok(r, 'Alps must resolve with an inside anchor');
   assert.equal(r.name, 'Alps');
   assert.ok(r.ring.length >= 8, 'range-scale ring');
   assert.ok(r.areaKm2 > 100000 && r.areaKm2 < 400000, `sane Alps area, got ${r.areaKm2}`);
+  const range = await lookupNaturalRegionOutline('Alaska Range', 63.14, -148.71);
+  assert.equal(range?.name, 'Alaska Range');
+  assert.ok(pointInRing(range.ring, 63.14, -148.71));
+  assert.equal((await lookupNaturalRegionOutline('Alaska', 63.14, -148.71))?.name, 'Alaska');
 });
 
 test('outline lookup: duplicate names disambiguate by anchor containment', async () => {
