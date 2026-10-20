@@ -2986,6 +2986,13 @@ down | auth-failed` (plus the unchanged `missing-key`/`unsupported`) with
 >   position getter reads only `_trackedDisplayCached`, the same authoritative
 >   Cartesian already consumed by the tracked visual and camera, and never
 >   advances dead reckoning from the host frame.
+> - **Scheduled route plausibility:** Aircraft route labels and selected-route
+>   context reject the distant backwards, forwards and antipodal extensions of
+>   an airport pair's great circle. The existing 130 km endpoint admission and
+>   200 km cross-track tolerance remain; a projected fix outside the finite
+>   origin-to-destination minor arc also has a generous 200 km extension at
+>   either end. Missing coordinates and coincident or antipodal endpoint pairs
+>   retain their loose, unjudgeable behavior; vertical-trend checks are unchanged.
 > - **Aircraft label convention (both flight layers, 2026-08-18):** every civil
 >   and military label surface resolves **callsign → registration → icao24**
 >   (`_contactLabel()` in `flights.js`; the same chain inline in
