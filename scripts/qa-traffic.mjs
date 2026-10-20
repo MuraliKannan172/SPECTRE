@@ -25,8 +25,8 @@
  * Visual proof saved to qa-shots/ (gitignored).
  *
  * Run:  node scripts/qa-traffic.mjs --url http://localhost:4410
- * Add --fixtures for synthetic roads and the recorded flow tile without a key;
- * that mode does not qualify live source access or quota accounting.
+ * Add --fixtures for synthetic road/flow tiles and a flat terrain surface without a key;
+ * that mode does not qualify geographic terrain, live source access or quota accounting.
  * Exits non-zero on any FAIL. Does not commit anything.
  */
 
@@ -44,7 +44,9 @@ const getOpt = (name, dflt) => {
   const i = argv.indexOf(name);
   return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt;
 };
-const APP_URL = getOpt('--url', 'http://localhost:4410');
+const appUrl = new URL(getOpt('--url', 'http://localhost:4410'));
+appUrl.searchParams.set('welcome', '0');
+const APP_URL = appUrl.href;
 const HEADFUL = argv.includes('--headful');
 const FIXTURES = argv.includes('--fixtures');
 const fixtureResponse = FIXTURES ? (await import('./traffic-fixtures.mjs')).trafficFixtureResponse : () => null;
@@ -122,8 +124,8 @@ async function main() {
     return;
   }
 
-  const statusBefore = FIXTURES ? {hasKey:true,dailyCount:0} : await fetch(`${APP_URL}/api/tomtom/status`).then((r) => r.json()).catch(() => null);
-  if (FIXTURES) console.log('Source mode: synthetic roads and recorded flow tiles; live quota is not qualified.');
+  const statusBefore = FIXTURES ? {hasKey:true,dailyCount:0} : await fetch(`${appUrl.origin}/api/tomtom/status`).then((r) => r.json()).catch(() => null);
+  if (FIXTURES) console.log('Source mode: synthetic road/flow tiles and a flat terrain surface; live quota is not qualified.');
   if (!statusBefore?.hasKey) {
     console.error('\x1b[31mServer has no TomTom key — run against the keyed dev server (:4410).\x1b[0m');
     process.exitCode = 2;
@@ -135,7 +137,9 @@ async function main() {
     headless: HEADFUL ? false : 'new',
     ...(findChromeExecutable() ? { executablePath: findChromeExecutable() } : {}),
     args: [
-      '--no-sandbox', '--disable-setuid-sandbox', '--use-gl=angle', '--use-angle=swiftshader',
+      '--no-sandbox', '--disable-setuid-sandbox',
+      ...(!HEADFUL ? ['--use-gl=angle', '--use-angle=swiftshader'] : []),
+      '--disable-backgrounding-occluded-windows',
       '--disable-dev-shm-usage', '--disable-web-security',
       '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
       '--window-size=1440,900',
@@ -236,19 +240,16 @@ async function main() {
     // ── (ii) C4 oblique bounds ───────────────────────────────────────────────
     console.log('\n(ii) C4 — oblique fetch bounds land at the look-at point...');
     trafficLogs.length = 0;
-    await settleTraffic(page, { lon: -97.72, lat: 30.245, height: 2500, heading: 315, pitch: -20 }, { minCount: 100 });
+    const oblique = await settleTraffic(page, { lon: -97.72, lat: 30.245, height: 2500, heading: 315, pitch: -20 }, { minCount: 100 });
     {
-      const fetchLine = trafficLogs.find((t) => t.includes('fetch') && t.includes('['));
-      let ok = false; let detail = 'no fetch log captured';
-      if (fetchLine) {
-        const m = fetchLine.match(/\[(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)\]/);
-        if (m) {
-          const [s, w, n, e] = m.slice(1).map(Number);
-          const cLat = (s + n) / 2; const cLon = (w + e) / 2;
-          const dKm = Math.sqrt(((cLat - 30.245) * 111) ** 2 + ((cLon - (-97.72)) * 111 * Math.cos(30.27 * Math.PI / 180)) ** 2);
-          ok = dKm > 1 && dKm <= 13; // look-at ~6.9 km ahead; clamp allows ≤12 (+margin)
-          detail = `box center (${cLat.toFixed(4)},${cLon.toFixed(4)}) is ${dKm.toFixed(1)} km from camera (want 1–13 km; pre-fix bug: 25+ km)`;
-        }
+      const bounds = oblique?.roadBounds;
+      let ok = false; let detail = 'no road bounds published';
+      if (bounds) {
+        const cLat = (bounds.south + bounds.north) / 2;
+        const cLon = (bounds.west + bounds.east) / 2;
+        const dKm = Math.hypot((cLat - 30.245) * 111, (cLon + 97.72) * 111 * Math.cos(30.27 * Math.PI / 180));
+        ok = dKm > 1 && dKm <= 13;
+        detail = `road box center is ${dKm.toFixed(1)} km from camera (want 1–13 km)`;
       }
       record('C4: oblique fetch box centers on the look-at point', ok, detail);
       if (!ok) exitCode = 1;
@@ -258,7 +259,7 @@ async function main() {
     // ── (iii) budget honesty ─────────────────────────────────────────────────
     console.log('\n(iii) Budget — dailyCount grew by ≤ requests this run...');
     {
-      const statusAfter = FIXTURES ? statusBefore : await fetch(`${APP_URL}/api/tomtom/status`).then((r) => r.json());
+      const statusAfter = FIXTURES ? statusBefore : await fetch(`${appUrl.origin}/api/tomtom/status`).then((r) => r.json());
       const grew = statusAfter.dailyCount - statusBefore.dailyCount;
       const ok = grew >= 0 && grew <= flowRequests.length;
       record('BUDGET: /api/tomtom/status growth ≤ page tile requests', FIXTURES ? null : ok,

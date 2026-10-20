@@ -1,1 +1,2 @@
 - Hold rendering only for animated content (asturksever, #1281).
+- Exercise current vector road sources and published camera bounds in Traffic fixture QA (asturksever, #1281).
