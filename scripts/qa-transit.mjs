@@ -40,6 +40,7 @@ import { chromeExecutablePath } from './qa-chrome.mjs';
 import { createTransitHistory } from '../server/providers/transitHistory.js';
 import { DETECTION_THEME_MAP } from '../src/overlays/worldOverlayTokens.js';
 import { transitModeTier } from '../src/data/transitPresetStyle.js';
+import { TRANSIT_POLL_MS } from '../src/layers/transit/policy.js';
 
 import {
   reduceAnchor,
@@ -1631,6 +1632,7 @@ try {
             m[3] * v[0] + m[7] * v[1] + m[11] * v[2] + m[15] * v[3],
           ];
           const frames = [];
+          const observedPolls = new Set();
           const publicationsBefore = state._cardPublications || 0;
           let headSamples = 0,
             headErrorPx = 0,
@@ -1647,6 +1649,13 @@ try {
                 const proj = scene.camera.frustum.projectionMatrix;
                 const p = entry.marker.position;
                 const clip = mul(proj, mul(view, [p.x, p.y, p.z, 1]));
+                if (
+                  entry.marker.show !== false &&
+                  rect &&
+                  Number.isFinite(entry.pollSeq)
+                ) {
+                  observedPolls.add(entry.pollSeq);
+                }
                 frames.push({
                   t: performance.now() - t0,
                   mx: ((clip[0] / clip[3]) * 0.5 + 0.5) * canvas.clientWidth,
@@ -1692,7 +1701,15 @@ try {
                   headSamples++;
                 }
               }
-              if (performance.now() - t0 >= durationMs) finish();
+              const elapsed = performance.now() - t0;
+              // Keep at least 20 seconds of motion and require an observed poll
+              // transition. A fixed 20s wall-clock window can miss a 15s poll
+              // when an earlier refresh is still settling.
+              if (
+                (elapsed >= 20_000 && observedPolls.size >= 2) ||
+                elapsed >= durationMs
+              )
+                finish();
             };
             let remove;
             const finish = () => {
@@ -1700,6 +1717,7 @@ try {
               remove?.();
               resolve({
                 selected: true,
+                elapsedMs: performance.now() - t0,
                 frames,
                 textPublishes:
                   (state._cardPublications || 0) - publicationsBefore,
@@ -1714,7 +1732,7 @@ try {
           });
         },
         target.key,
-        20_000,
+        3 * TRANSIT_POLL_MS,
       );
     }
     check(
@@ -1735,8 +1753,9 @@ try {
       );
       check(
         'card text publication stays throttled while the anchor runs at frame rate',
-        anchor.textPublishes > 0 && anchor.textPublishes <= 20_000 / 250 + 3,
-        `${anchor.textPublishes} text publications in 20 s`,
+        anchor.textPublishes > 0 &&
+          anchor.textPublishes <= anchor.elapsedMs / 250 + 3,
+        `${anchor.textPublishes} text publications in ${(anchor.elapsedMs / 1000).toFixed(1)} s`,
       );
     } else {
       check(
