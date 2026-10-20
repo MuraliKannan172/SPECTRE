@@ -116,11 +116,8 @@ export class VisualEffects {
     // a post-process cannot tell the sky from far geometry reliably (near
     // plane clamps, keyless terrain above the ellipsoid horizon): fade the
     // glow out with the style instead. Bright stars survive as banded points.
-    if (stage === this.stages.anime) {
-      const sky = this.viewer.scene?.skyBox;
-      if (sky && 'milkyWayVisibility' in sky)
-        sky.milkyWayVisibility = 1 - value;
-    }
+    if (stage === this.stages.anime)
+      this.viewer.scene.skyBox.milkyWayVisibility = 1 - value;
     if (stage.enabled && stage.uniforms.time !== undefined)
       this.startAnimationLoop();
     this.requestRender('style-stage');
@@ -228,7 +225,7 @@ export class VisualEffects {
     this.transitions.clear();
   }
 
-  /** Remove owned stages and restore the borrowed bloom stage and sky after callers release them. */
+  /** Remove owned stages and restore the borrowed bloom stage after callers release it. */
   destroy() {
     if (this.destroyed) return;
     this.stop();
@@ -239,12 +236,6 @@ export class VisualEffects {
     if (this.bloomStage && this.previousBloom) {
       Object.assign(this.bloomStage.uniforms, this.previousBloom.uniforms);
       this.bloomStage.enabled = this.previousBloom.enabled;
-    }
-    // Anime may have faded the Milky Way out; a surviving viewer gets it back.
-    const sky = this.viewer.scene.skyBox;
-    if (sky && 'milkyWayVisibility' in sky) {
-      sky.milkyWayVisibility = 1;
-      this.requestRender('style-stage');
     }
   }
 }

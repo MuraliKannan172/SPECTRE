@@ -109,38 +109,17 @@ export function bvToRgb(bv) {
   return rgb.map((channel) => channel / peak);
 }
 
-/**
- * Decode a catalogue pack into interleaved vertex data, `STAR_VERTEX_FLOATS`
- * per star. Malformed rows are skipped, never thrown on: a damaged pack must
- * not take the globe down with it.
- */
-export function buildStarVertices(pack) {
-  const stars = Array.isArray(pack?.stars) ? pack.stars : [];
-  const count = Math.floor(stars.length / 4);
+/** Decode a catalogue pack into interleaved vertex data, `STAR_VERTEX_FLOATS` per star. */
+export function buildStarVertices({ stars }) {
+  const count = stars.length / 4;
   const vertices = new Float32Array(count * STAR_VERTEX_FLOATS);
-  let written = 0;
   for (let i = 0; i < count; i++) {
     const [raDeg, decDeg, vmag, bv] = stars.slice(i * 4, i * 4 + 4);
-    if (
-      !Number.isFinite(raDeg) ||
-      !Number.isFinite(decDeg) ||
-      !Number.isFinite(vmag)
-    )
-      continue;
-    const [x, y, z] = raDecToUnitVector(raDeg, decDeg);
     const { sigmaPx, alpha } = starAppearance(vmag);
-    const [r, g, b] = bvToRgb(bv);
     vertices.set(
-      [x, y, z, sigmaPx, r, g, b, alpha],
-      written * STAR_VERTEX_FLOATS,
+      [...raDecToUnitVector(raDeg, decDeg), sigmaPx, ...bvToRgb(bv), alpha],
+      i * STAR_VERTEX_FLOATS,
     );
-    written += 1;
   }
-  return {
-    count: written,
-    vertices:
-      written === count
-        ? vertices
-        : vertices.slice(0, written * STAR_VERTEX_FLOATS),
-  };
+  return { count, vertices };
 }

@@ -82,9 +82,9 @@ test('B−V colours run from blue-white to orange with the peak channel at 1', (
   assert.deepEqual(bvToRgb(9), bvToRgb(2));
 });
 
-test('vertex data is interleaved per star and skips malformed rows', () => {
+test('vertex data is interleaved per star', () => {
   const { count, vertices } = buildStarVertices({
-    stars: [0, 0, 1, 0.5, 'bad', 10, 2, 0, 90, 45, 3, null, 10, 20],
+    stars: [0, 0, 1, 0.5, 90, 45, 3, null],
   });
   assert.equal(count, 2);
   assert.equal(vertices.length, 2 * STAR_VERTEX_FLOATS);
@@ -93,10 +93,6 @@ test('vertex data is interleaved per star and skips malformed rows', () => {
   close(vertices[STAR_VERTEX_FLOATS + 2], Math.SQRT1_2, 1e-6);
   close(vertices[3], starAppearance(1).sigmaPx, 1e-6);
   close(vertices[7], starAppearance(1).alpha, 1e-6);
-  assert.deepEqual(buildStarVertices(null), {
-    count: 0,
-    vertices: new Float32Array(0),
-  });
 });
 
 test('the committed catalogue holds the Yale Bright Star Catalogue', () => {

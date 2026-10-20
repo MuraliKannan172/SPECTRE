@@ -276,17 +276,8 @@ wiring (see below).
 
 ### Sky background (`sky/`)
 
-The space behind the globe is drawn from two bundled sources (details, hashes
-and build commands in [`sky/README.md`](src/data/local_data/sky/README.md)):
-
-- **Stars:** the Yale Bright Star Catalogue, 5th Revised Edition (Hoffleit &
-  Warren 1991, CDS catalogue V/50) — public domain; credited as a courtesy.
-- **Milky Way glow:** ESO image eso0932a, "The Milky Way panorama" — **CC BY
-  4.0, credit "ESO/S. Brunier"**. Modified: stars removed, blurred, reprojected
-  to ICRF cube faces and tone-mapped, as the folder README states.
-
-NASA SVS "Deep Star Maps 2020" was not used for the glow: its Milky Way layer
-derives from Gaia DR2, which ESA licenses CC BY-NC 3.0 IGO.
+Sources, licences, the changes CC BY asks to state, hashes and build commands
+are in [`sky/README.md`](src/data/local_data/sky/README.md).
 
 ### DataSF Analysis Neighborhoods (`neighborhoods/`)
 

@@ -4,30 +4,16 @@ import { governorRequestRender } from '../renderGovernor.js';
 import { buildStarVertices, STAR_VERTEX_FLOATS } from './stars.js';
 
 /**
- * Space background: catalogue stars drawn as point sprites over a soft Milky
- * Way cube map, replacing Cesium's default Tycho-2 sky box (six 1024² JPEGs
- * stretched 3–6× on screen, which read as compression blocks around the
- * globe).
- *
- * Narrow, version-tested engine adapter. It takes the `Scene#skyBox` slot:
- * Cesium calls `update(frameState, useHdr)` once per frame and executes the
- * returned command first in the environment pass, before the atmosphere, sun,
- * moon and every globe or tile command — so the sky stays behind everything
- * without depth testing. Only `execute()` and `derivedCommands` of that
- * command are read. An engine upgrade must revalidate this adapter.
- *
- * Both layers share one ICRF→Earth-fixed rotation (IAU 2006 precession,
- * nutation and Earth rotation at the scene clock), so stars and the Milky
- * Way agree with each other and with the real sky over the globe. Until
- * Cesium's ICRF tables load, the TEME approximation the default sky box uses
- * fills in; the arrival renders one frame through the idle governor.
+ * Space background in the `Scene#skyBox` slot: catalogue stars as point
+ * sprites over a soft Milky Way cube map, both turned by one ICRF→fixed
+ * rotation at the scene clock (TEME until Cesium's tables load). Scene runs
+ * the command from `update()` first in the environment pass, so the sky
+ * stays behind everything without depth. Revalidate on engine upgrades.
  */
 export const STARRY_SKY_CESIUM_VERSION = '1.138.0';
 
 /** Opacity of the Milky Way glow over black; the stars carry the sky. */
 export const MILKY_WAY_INTENSITY = 0.4;
-/** Overall star brightness multiplier. */
-export const STAR_INTENSITY = 1;
 /** Clock change, in seconds, below which the sky rotation is reused. */
 export const SKY_ROTATION_EPSILON_SECONDS = 1;
 
@@ -118,14 +104,13 @@ void main()
 `;
 
 const STAR_FS = `
-uniform float u_intensity;
 in vec4 v_color;
 in float v_sigma;
 in float v_radius;
 void main()
 {
     vec2 offset = (gl_PointCoord - 0.5) * (2.0 * v_radius);
-    float alpha = v_color.a * u_intensity *
+    float alpha = v_color.a *
         exp(-0.5 * dot(offset, offset) / (v_sigma * v_sigma));
     if (alpha < 1.0 / 512.0) discard;
     out_FragColor = vec4(czm_gammaCorrect(v_color.rgb) * alpha, alpha);
@@ -133,15 +118,12 @@ void main()
 `;
 
 /** Pick the ICRF→fixed rotation for `time`, or TEME while tables load. */
-export function computeSkyRotation(
-  time,
-  result,
-  transforms = Cesium.Transforms,
-) {
-  const icrf = transforms.computeIcrfToFixedMatrix(time, result);
+export function computeSkyRotation(time, result) {
+  const { Transforms } = Cesium;
+  const icrf = Transforms.computeIcrfToFixedMatrix(time, result);
   if (icrf) return { matrix: icrf, precise: true };
   return {
-    matrix: transforms.computeTemeToPseudoFixedMatrix(time, result),
+    matrix: Transforms.computeTemeToPseudoFixedMatrix(time, result),
     precise: false,
   };
 }
@@ -169,7 +151,6 @@ export class StarrySky {
     this.milkyWayIntensity = MILKY_WAY_INTENSITY;
     /** 0..1 multiplier a style sets to hide the glow (see visualEffects.js). */
     this.milkyWayVisibility = 1;
-    this.starIntensity = STAR_INTENSITY;
     this._requestRender = requestRender;
     this._rotation = Cesium.Matrix3.clone(Cesium.Matrix3.IDENTITY);
     this._rotationTime = undefined;
@@ -197,10 +178,7 @@ export class StarrySky {
       u_milkyWay: () => this._milkyWayCubeMap,
       u_intensity: () => this.milkyWayIntensity * this.milkyWayVisibility,
     };
-    this._starUniforms = {
-      ...uniforms,
-      u_intensity: () => this.starIntensity,
-    };
+    this._starUniforms = uniforms;
     const commands = [];
     this._commands = commands;
     // The environment pass reads `derivedCommands` (log depth, HDR, picking)

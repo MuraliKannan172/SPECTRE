@@ -37,7 +37,9 @@ function fixture() {
     },
   };
   const effects = new VisualEffects({
-    viewer: { scene: { postProcessStages: pipeline } },
+    viewer: {
+      scene: { postProcessStages: pipeline, skyBox: { milkyWayVisibility: 1 } },
+    },
     requestRender: (reason) => requests.push(reason),
     holdRender: (reason) => holds.add(reason),
     releaseRender: (reason) => holds.delete(reason),
@@ -174,30 +176,7 @@ test('the anime stage fades the Milky Way out with its own intensity', () => {
   f.effects.setStageIntensity(f.effects.stages.anime, 0);
   assert.equal(glow(), MILKY_WAY_INTENSITY);
   sky.destroy();
-  // A sky box without the knob (Cesium's own) is left alone.
-  const plain = {};
-  f.effects.viewer.scene.skyBox = plain;
-  f.effects.setStageIntensity(f.effects.stages.anime, 1);
-  assert.deepEqual(plain, {});
   f.effects.destroy();
-});
-
-test('destroying the effects gives a surviving viewer its Milky Way back', () => {
-  const f = fixture();
-  const sky = { milkyWayVisibility: 1 };
-  f.effects.viewer.scene.skyBox = sky;
-  f.effects.initStyles();
-  f.effects.startTransition('anime', 0, 1);
-  f.tick(250);
-  f.effects.stop();
-  const frozen = sky.milkyWayVisibility;
-  assert.ok(
-    frozen > 0 && frozen < 1,
-    'stop keeps the stages, and the fade, as they are',
-  );
-  f.effects.destroy();
-  assert.equal(sky.milkyWayVisibility, 1);
-  assert.equal(f.requests.at(-1), 'style-stage');
 });
 
 test('bloom retains its dead zone, normalized intensity and independent toggle', () => {

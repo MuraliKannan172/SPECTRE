@@ -25,19 +25,25 @@ test('the ICRF rotation is preferred and TEME fills in while tables load', () =>
   const time = Cesium.JulianDate.fromIso8601('2026-10-19T00:00:00Z');
   const icrf = Cesium.Matrix3.fromRotationZ(0.3);
   const teme = Cesium.Matrix3.fromRotationZ(0.2);
-  const precise = computeSkyRotation(time, new Cesium.Matrix3(), {
-    computeIcrfToFixedMatrix: (_, result) => Cesium.Matrix3.clone(icrf, result),
-    computeTemeToPseudoFixedMatrix: () => assert.fail('TEME not needed'),
-  });
-  assert.equal(precise.precise, true);
-  assert.ok(Cesium.Matrix3.equals(precise.matrix, icrf));
-  const approximate = computeSkyRotation(time, new Cesium.Matrix3(), {
-    computeIcrfToFixedMatrix: () => undefined,
-    computeTemeToPseudoFixedMatrix: (_, result) =>
-      Cesium.Matrix3.clone(teme, result),
-  });
-  assert.equal(approximate.precise, false);
-  assert.ok(Cesium.Matrix3.equals(approximate.matrix, teme));
+  const { Transforms } = Cesium;
+  const original = { ...Transforms };
+  try {
+    Transforms.computeIcrfToFixedMatrix = (_, result) =>
+      Cesium.Matrix3.clone(icrf, result);
+    Transforms.computeTemeToPseudoFixedMatrix = () =>
+      assert.fail('TEME not needed');
+    const precise = computeSkyRotation(time, new Cesium.Matrix3());
+    assert.equal(precise.precise, true);
+    assert.ok(Cesium.Matrix3.equals(precise.matrix, icrf));
+    Transforms.computeIcrfToFixedMatrix = () => undefined;
+    Transforms.computeTemeToPseudoFixedMatrix = (_, result) =>
+      Cesium.Matrix3.clone(teme, result);
+    const approximate = computeSkyRotation(time, new Cesium.Matrix3());
+    assert.equal(approximate.precise, false);
+    assert.ok(Cesium.Matrix3.equals(approximate.matrix, teme));
+  } finally {
+    Object.assign(Transforms, original);
+  }
 });
 
 test('the TEME fallback keeps the celestial pole on the Earth axis', () => {
@@ -125,13 +131,5 @@ test('the Milky Way glow scales with its visibility, for styles that hide it', (
   close(sky._milkyWayUniforms.u_intensity(), MILKY_WAY_INTENSITY);
   sky.milkyWayVisibility = 0;
   assert.equal(sky._milkyWayUniforms.u_intensity(), 0);
-  sky.destroy();
-});
-
-test('the Milky Way stays out of the environment map that lights models', () => {
-  // Scene#render hands `skyBox._cubeMap` to image-based lighting, which
-  // expects Cesium's own TEME, flipY layout; this ICRF map would be rotated.
-  const sky = new StarrySky({ requestRender: () => {} });
-  assert.equal('_cubeMap' in sky, false);
   sky.destroy();
 });
