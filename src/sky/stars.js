@@ -13,7 +13,7 @@
  * @module sky/stars
  */
 
-/** Faintest catalogue magnitude; also the reference for brightness. */
+/** Faintest magnitude drawn distinctly (fainter catalogue stars look like it); the brightness reference. */
 export const STAR_LIMIT_MAGNITUDE = 6.5;
 /** Gaussian σ of the faintest star, CSS pixels. */
 export const STAR_MIN_SIGMA_PX = 0.55;

@@ -127,3 +127,11 @@ test('the Milky Way glow scales with its visibility, for styles that hide it', (
   assert.equal(sky._milkyWayUniforms.u_intensity(), 0);
   sky.destroy();
 });
+
+test('the Milky Way stays out of the environment map that lights models', () => {
+  // Scene#render hands `skyBox._cubeMap` to image-based lighting, which
+  // expects Cesium's own TEME, flipY layout; this ICRF map would be rotated.
+  const sky = new StarrySky({ requestRender: () => {} });
+  assert.equal('_cubeMap' in sky, false);
+  sky.destroy();
+});

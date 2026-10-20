@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { VisualEffects } from './visualEffects.js';
+import { MILKY_WAY_INTENSITY, StarrySky } from '../sky/starrySky.js';
 import {
   GLOBAL_POST_DEFAULTS,
   STYLE_PRESET_DEFAULTS,
@@ -160,17 +161,19 @@ test('direct Cockpit intensity writes are reconciled before rendering', () => {
 
 test('the anime stage fades the Milky Way out with its own intensity', () => {
   const f = fixture();
-  const sky = { milkyWayVisibility: 1 };
+  const sky = new StarrySky({ requestRender: () => {} });
+  const glow = () => sky._milkyWayUniforms.u_intensity();
   f.effects.viewer.scene.skyBox = sky;
   f.effects.initStyles();
   f.effects.setStageIntensity(f.effects.stages.thermal, 1);
-  assert.equal(sky.milkyWayVisibility, 1, 'other styles keep the glow');
+  assert.equal(glow(), MILKY_WAY_INTENSITY, 'other styles keep the glow');
   f.effects.setStageIntensity(f.effects.stages.anime, 0.25);
-  assert.equal(sky.milkyWayVisibility, 0.75);
+  assert.equal(glow(), MILKY_WAY_INTENSITY * 0.75);
   f.effects.setStageIntensity(f.effects.stages.anime, 1);
-  assert.equal(sky.milkyWayVisibility, 0);
+  assert.equal(glow(), 0);
   f.effects.setStageIntensity(f.effects.stages.anime, 0);
-  assert.equal(sky.milkyWayVisibility, 1);
+  assert.equal(glow(), MILKY_WAY_INTENSITY);
+  sky.destroy();
   // A sky box without the knob (Cesium's own) is left alone.
   const plain = {};
   f.effects.viewer.scene.skyBox = plain;

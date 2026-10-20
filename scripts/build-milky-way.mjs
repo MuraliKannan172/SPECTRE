@@ -31,7 +31,9 @@
  *      celestial pole — rotating each direction into galactic coordinates
  *      with the IAU J2000 matrix.
  *   6. Map the median sky to black, easing in with a soft knee, and the
- *      brightest 0.01 % to white (on luminance, keeping each pixel's hue),
+ *      brightest 0.01 % to about 97 % white, the knee's offset there (both
+ *      levels taken before the faint-glow blend; on luminance, keeping each
+ *      pixel's hue),
  *      encode with gamma 1/2.2 and ±0.5 LSB dither against banding; WebP.
  *
  * Usage:
@@ -373,6 +375,8 @@ async function main() {
   for (const plane of planes) blurPlane(plane, width, height, sigmaPx);
   for (const plane of wide)
     blurPlane(plane, width, height, (FAINT_BLUR_DEG / 180) * height);
+  // Levels from the fine blur, so the blend weight and the output share
+  // them; the blend moves the median only in the faint sky it smooths.
   const black = luminancePercentile(planes, BLACK_PERCENTILE);
   const white = luminancePercentile(planes, WHITE_PERCENTILE);
   blendByBrightness(planes, wide, (luminance) =>
