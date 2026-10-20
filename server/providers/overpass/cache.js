@@ -1,3 +1,4 @@
+import { coalesceProxyRequest } from '../common/http.js';
 import { isOverpassBoundaryQuery } from './query.js';
 import {
   OVERPASS_BOUNDARY_DISK_TTL_MS,
@@ -87,6 +88,7 @@ function writeOverpassDisk(cacheKey, payload) {
  * @param {Map<string, Promise<object>>} options.inFlight
  * @param {()=>Promise<object|null>} options.readDisk
  * @param {()=>boolean} options.allowUpstream
+ * @param {()=>Promise<object>} options.loadUpstream Fetch and publish the admitted result.
  * @param {number} [options.now]
  * @param {number} [options.cacheMs]
  * @returns {Promise<{source:'HIT'|'INFLIGHT'|'DISK'|'UPSTREAM'|'RATE_LIMITED', payload:object|null}>}
@@ -97,6 +99,7 @@ async function resolveOverpassPreflight({
   inFlight,
   readDisk,
   allowUpstream,
+  loadUpstream = async () => null,
   now = Date.now(),
   cacheMs = OVERPASS_CACHE_MS,
 }) {
@@ -104,15 +107,21 @@ async function resolveOverpassPreflight({
   if (overpassPayloadIsData(cached) && now - cached.cachedAt <= cacheMs)
     return { source: 'HIT', payload: cached };
 
-  const pending = inFlight.get(cacheKey);
-  if (pending) return { source: 'INFLIGHT', payload: await pending };
-
-  const disk = await readDisk();
-  if (overpassPayloadIsData(disk)) return { source: 'DISK', payload: disk };
-
-  return allowUpstream()
-    ? { source: 'UPSTREAM', payload: null }
-    : { source: 'RATE_LIMITED', payload: null };
+  // Reserve synchronously before disk I/O. The owner retains the reservation
+  // through upstream admission, fetch and cache publication.
+  const request = coalesceProxyRequest(inFlight, cacheKey, async () => {
+    const disk = await readDisk();
+    if (overpassPayloadIsData(disk)) {
+      memoryCache.set(cacheKey, disk);
+      return { source: 'DISK', payload: disk };
+    }
+    if (!allowUpstream()) return { source: 'RATE_LIMITED', payload: null };
+    return { source: 'UPSTREAM', payload: await loadUpstream() };
+  });
+  const result = await request.promise;
+  return request.shared && result.source !== 'RATE_LIMITED'
+    ? { ...result, source: 'INFLIGHT' }
+    : result;
 }
 
 /** Return only last-good Overpass data, regardless of its age. */
