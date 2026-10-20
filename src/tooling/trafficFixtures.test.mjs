@@ -90,3 +90,81 @@ test('flat terrain fixture decodes through Cesium and advertises no network chil
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('fixture interception targets provider URLs and leaves app workers alone', async () => {
+  const { installTrafficRoutes } =
+    await import('../../scripts/traffic-fixtures.mjs');
+  const sent = [];
+  let paused;
+  const session = {
+    on: (_, handler) => {
+      paused = handler;
+    },
+    send: async (name, args) => {
+      sent.push({ name, args });
+    },
+  };
+  await installTrafficRoutes(
+    { createCDPSession: async () => session, isClosed: () => false },
+    { origin: 'http://localhost:4173', fixtures: true },
+  );
+  const patterns = sent[0].args.patterns.map((p) => p.urlPattern);
+  assert.deepEqual(patterns, [
+    'http://localhost:4173/api/tomtom/status*',
+    'http://localhost:4173/api/tomtom/flow/*',
+    'https://tiles.openfreemap.org/*',
+    'https://terrain.reearth.land/*',
+  ]);
+  await paused({
+    requestId: 'terrain',
+    request: { url: 'https://terrain.reearth.land/layer.json' },
+  });
+  const reply = sent.at(-1);
+  assert.equal(reply.name, 'Fetch.fulfillRequest');
+  assert.equal(
+    JSON.parse(Buffer.from(reply.args.body, 'base64')).format,
+    'heightmap-1.0',
+  );
+  assert.ok(
+    reply.args.responseHeaders.some(
+      (h) => h.name === 'access-control-allow-origin' && h.value === '*',
+    ),
+  );
+});
+
+test('keyless interception refuses and records unexpected flow requests', async () => {
+  const { installTrafficRoutes } =
+    await import('../../scripts/traffic-fixtures.mjs');
+  const sent = [],
+    flows = [];
+  let paused;
+  const session = {
+    on: (_, handler) => {
+      paused = handler;
+    },
+    send: async (name, args) => {
+      sent.push({ name, args });
+    },
+  };
+  await installTrafficRoutes(
+    { createCDPSession: async () => session, isClosed: () => false },
+    {
+      origin: 'http://localhost:4173',
+      keyless: true,
+      onFlow: (url) => flows.push(url),
+    },
+  );
+  await paused({
+    requestId: 'status',
+    request: { url: 'http://localhost:4173/api/tomtom/status' },
+  });
+  assert.deepEqual(JSON.parse(Buffer.from(sent.at(-1).args.body, 'base64')), {
+    hasKey: false,
+  });
+  await paused({
+    requestId: 'flow',
+    request: { url: 'http://localhost:4173/api/tomtom/flow/12/1/1.pbf' },
+  });
+  assert.equal(sent.at(-1).args.responseCode, 503);
+  assert.equal(flows.length, 1);
+});

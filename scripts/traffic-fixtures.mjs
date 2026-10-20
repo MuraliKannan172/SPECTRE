@@ -117,3 +117,59 @@ export function trafficFixtureResponse(request) {
     body: trafficFixtureTile(Number(road[1])),
   };
 }
+
+/** Intercept provider URLs only; Cesium worker/module loading stays untouched. */
+export async function installTrafficRoutes(
+  page,
+  {
+    origin,
+    fixtures = false,
+    keyless = false,
+    onFlow = () => {},
+    onError = () => {},
+  },
+) {
+  const session = await page.createCDPSession();
+  const patterns = [
+    `${origin}/api/tomtom/status*`,
+    `${origin}/api/tomtom/flow/*`,
+    ...(fixtures
+      ? ['https://tiles.openfreemap.org/*', 'https://terrain.reearth.land/*']
+      : []),
+  ].map((urlPattern) => ({ urlPattern, requestStage: 'Request' }));
+  session.on('Fetch.requestPaused', async ({ requestId, request }) => {
+    try {
+      const url = new URL(request.url);
+      let response;
+      if (keyless && url.pathname === '/api/tomtom/status') {
+        response = json({ hasKey: false });
+      } else if (keyless && url.pathname.startsWith('/api/tomtom/flow/')) {
+        onFlow(request.url);
+        response = { ...json({ error: 'no_key' }), status: 503 };
+      } else if (fixtures) {
+        response = trafficFixtureResponse({ url: () => request.url });
+      }
+      if (!response) {
+        await session.send('Fetch.continueRequest', { requestId });
+        return;
+      }
+      await session.send('Fetch.fulfillRequest', {
+        requestId,
+        responseCode: response.status,
+        responseHeaders: Object.entries({
+          'content-type': response.contentType,
+          ...response.headers,
+        }).map(([name, value]) => ({ name, value })),
+        body: Buffer.from(response.body).toString('base64'),
+      });
+    } catch (error) {
+      if (page.isClosed()) return;
+      onError(error);
+      await session
+        .send('Fetch.failRequest', { requestId, errorReason: 'Failed' })
+        .catch(() => {});
+    }
+  });
+  await session.send('Fetch.enable', { patterns });
+  return session;
+}

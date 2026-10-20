@@ -31,6 +31,7 @@
  */
 
 import puppeteer from 'puppeteer';
+import { captureQaScreenshot } from './qa-chrome.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,7 +50,7 @@ appUrl.searchParams.set('welcome', '0');
 const APP_URL = appUrl.href;
 const HEADFUL = argv.includes('--headful');
 const FIXTURES = argv.includes('--fixtures');
-const fixtureResponse = FIXTURES ? (await import('./traffic-fixtures.mjs')).trafficFixtureResponse : () => null;
+const { installTrafficRoutes } = await import('./traffic-fixtures.mjs');
 
 const CHROME_EXECUTABLE_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -158,11 +159,6 @@ async function main() {
     // Chrome minimized. Use browser focus emulation, not patched DOM getters.
     const focusSession = await page.createCDPSession();
     await focusSession.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-    const onFixture = (request) => {
-      const response = fixtureResponse(request);
-      if (response) void request.respond(response); else void request.continue();
-    };
-    if (FIXTURES) { await page.setCacheEnabled(false); await page.setRequestInterception(true); page.on('request', onFixture); }
     await page.setViewport({ width: 1440, height: 900 });
 
     // Track flow-tile requests + traffic console lines for (ii)/(iii)/(v).
@@ -172,6 +168,7 @@ async function main() {
     });
     const trafficLogs = [];
     const pageErrors = [];
+    if (FIXTURES) await installTrafficRoutes(page, { origin: appUrl.origin, fixtures: true, onError: error => pageErrors.push(error.message) });
     page.on('pageerror', error => { pageErrors.push(error.message); console.error('PAGE ERROR:', error.message); });
     page.on('console', message => { if (message.type() === 'error') console.error('BROWSER ERROR:', message.text()); });
     page.on('console', (msg) => {
@@ -210,7 +207,7 @@ async function main() {
         `coverage=${mumbai.flowCoveragePct}% tiles=${mumbai.tilesFetched}`);
       if (mumbai.mode !== 'live' || !(mumbai.count > 0) || !(colored > 0)) exitCode = 1;
       await sleep(1200);
-      await page.screenshot({ path: path.join(SHOTS_DIR, 'traffic-live-flow.png') });
+      await captureQaScreenshot(page, { path: path.join(SHOTS_DIR, 'traffic-live-flow.png') }, { headful: HEADFUL });
     }
 
     // ── (iv) uncovered-roads param — hide vs sim ─────────────────────────────
@@ -243,7 +240,7 @@ async function main() {
         (hid.flowBuckets?.sim || 0) === 0 && hid.count > 0,
         `count=${hid.count} sim=${hid.flowBuckets?.sim}`);
       if ((hid.flowBuckets?.sim || 0) !== 0) exitCode = 1;
-      await page.screenshot({ path: path.join(SHOTS_DIR, 'traffic-live-hide-mode.png') });
+      await captureQaScreenshot(page, { path: path.join(SHOTS_DIR, 'traffic-live-hide-mode.png') }, { headful: HEADFUL });
     } else {
       record('PARAM: hide mode renders zero sim (white) dots', null,
         'view had 100% coverage (no sim dots to hide) — inconclusive here, covered by unit tests');
@@ -265,7 +262,7 @@ async function main() {
       }
       record('C4: oblique fetch box centers on the look-at point', ok, detail);
       if (!ok) exitCode = 1;
-      await page.screenshot({ path: path.join(SHOTS_DIR, 'traffic-c4-oblique.png') });
+      await captureQaScreenshot(page, { path: path.join(SHOTS_DIR, 'traffic-c4-oblique.png') }, { headful: HEADFUL });
     }
 
     // ── (iii) budget honesty ─────────────────────────────────────────────────
@@ -290,23 +287,11 @@ async function main() {
     await keylessFocus.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     page.on('pageerror', error => { pageErrors.push(error.message); console.error('PAGE ERROR:', error.message); });
     page.on('console', message => { if (message.type() === 'error') console.error('BROWSER ERROR:', message.text()); });
-    await page.setCacheEnabled(false);
-    await page.setRequestInterception(true);
     const keylessFlowReqs = [];
-    page.on('request', (req) => {
-      const url = req.url();
-      if (url.includes('/api/tomtom/status')) {
-        req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ hasKey: false }) });
-        return;
-      }
-      if (url.includes('/api/tomtom/flow/')) {
-        keylessFlowReqs.push(url);
-        req.respond({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'no_key' }) });
-        return;
-      }
-      const response = fixtureResponse(req);
-      if (response) { void req.respond(response); return; }
-      try { req.continue(); } catch { /* already handled */ }
+    await installTrafficRoutes(page, {
+      origin: appUrl.origin, fixtures: FIXTURES, keyless: true,
+      onFlow: url => keylessFlowReqs.push(url),
+      onError: error => pageErrors.push(error.message),
     });
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForFunction(
@@ -338,7 +323,7 @@ async function main() {
         exitCode = 1;
       }
       await sleep(1000);
-      await page.screenshot({ path: path.join(SHOTS_DIR, 'traffic-sim-keyless.png') });
+      await captureQaScreenshot(page, { path: path.join(SHOTS_DIR, 'traffic-sim-keyless.png') }, { headful: HEADFUL });
     }
     record('BROWSER: no uncaught page exceptions', pageErrors.length === 0, pageErrors.join('; '));
   } catch (e) {
