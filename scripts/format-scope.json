@@ -299,6 +299,7 @@
   "src/ui/styles/status.css",
   "src/ui/styles/layers.css",
   "src/ui/styles/controls.css",
+  "src/ui/styles/slider.css",
   "src/ui/styles/cctv.css",
   "src/ui/styles/foundation.css",
   "src/ui/styles/first-run.css",

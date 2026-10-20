@@ -423,16 +423,6 @@ html:not([lang='en']) .recent-imagery-readout .ri-opacity-label {
 }
 .recent-imagery-readout .ri-opacity-value {
   font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-}
-.recent-imagery-readout .ri-opacity {
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-  accent-color: var(--accent);
-}
-.recent-imagery-readout .ri-opacity:disabled {
-  opacity: 0.35;
 }
 .recent-imagery-readout .ri-swap {
   width: 40px;
