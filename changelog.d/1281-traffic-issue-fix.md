@@ -1,0 +1,1 @@
+- Hold rendering only for animated content (asturksever, #1281).
