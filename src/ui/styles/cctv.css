@@ -109,6 +109,10 @@ html:not([lang='en']) .cctv-controls .scene-btn {
   gap: 5px;
 }
 
+.cctv-cal-input {
+  width: 58px;
+}
+
 .cctv-cal-value {
   font-family: var(--font-mono);
   font-size: 9px;
