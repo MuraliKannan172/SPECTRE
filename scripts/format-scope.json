@@ -283,6 +283,7 @@
   "src/ui/scenePresentation.js",
   "src/ui/sceneControls.test.mjs",
   "scripts/qa-scene-controls.mjs",
+  "scripts/qa-action-buttons.mjs",
   "src/ui.js",
   "src/standalone/ui.js",
   "src/ui/applicationShell.js",
@@ -307,6 +308,7 @@
   "src/ui/styles/layers.css",
   "src/ui/styles/controls.css",
   "src/ui/styles/slider.css",
+  "src/ui/styles/action-button.css",
   "src/ui/styles/cctv.css",
   "src/ui/styles/foundation.css",
   "src/ui/styles/first-run.css",
@@ -1069,6 +1071,7 @@
   "scripts/assemble-changelog.mjs",
   "src/tooling/changelogFragments.test.mjs",
   "src/data/gbfsProxyRateLimit.test.mjs",
-  "src/data/routeSegment.test.mjs",
-  "src/terrainHeightsBounds.test.mjs"
+  "src/terrainHeightsBounds.test.mjs",
+  "server/providers/overpass/requestAdmission.test.mjs",
+  "src/tooling/trackArrivalObservation.test.mjs"
 ]

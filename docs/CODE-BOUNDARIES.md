@@ -374,6 +374,15 @@ renderer, persistence or services. The facade retains panel visibility, share
 restore claims and render scheduling. Both controls are destroyed before the
 facade's asynchronous teardown can yield.
 
+## Ordinary action buttons
+
+`src/ui/actionButton.js` is a native, listener-free view helper used by Scene
+presentation and sharing-toolbar owners. It receives translated text and explicit
+presentation/accessibility properties. Feature controllers own action dispatch,
+state, persistence and cleanup. Static Scenes/CCTV templates use the same CSS
+surface and preserve IDs and layout hooks. The helper imports no application,
+renderer, storage or services; it belongs to the consuming package closures.
+
 ## Display controls
 
 `ui/display` owns Display button, selector and slider subscriptions. It receives

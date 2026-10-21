@@ -1233,6 +1233,26 @@ Feature owners retain bounds, steps, formatted values, input/change timing and
 listener cleanup. The radio tuning dial, imagery comparison divider and event
 comparison/progression controls keep their specialized presentation and behavior.
 
+## Ordinary action buttons
+
+Scene panel actions, shot LOAD/DEL actions, the EDIT DETAILS / SHARE SCENE
+bar and one-shot CCTV actions use `ui/actionButton.js` and the shared
+`gev-action-button` surface in `ui/styles/action-button.css`. Static templates
+apply the same classes as generated buttons. The native builder accepts translated
+text, default/danger variants, default/compact sizes and disabled/accessibility
+properties; it installs no listeners and owns no application state. Feature
+controllers retain callbacks, enable/disable rules, confirmation prompts,
+persistence and teardown. The smaller shot actions retain their existing sizing
+and hover treatment. Feature CSS still owns panel layout and translated wrapping.
+
+CCTV enable, coverage, auto-hop, projection and adjustment toggles, editable
+calibration-value chips and the scene authoring dialogs retain their specialized
+controls. Existing `scene-btn` hooks remain compatible with Street Level and
+legacy toggles. The shared CSS, explicit input/action boundary and behavior tests
+can carry to a Vue view while Vue replaces native DOM construction.
+Browser acceptance: `QA_BASE_URL=http://127.0.0.1:4179 node scripts/qa-action-buttons.mjs`;
+`qa-scene-controls.mjs` also covers real Scene authoring/playback with native Space capture.
+
 ## Segmented selectors
 
 Segmented selectors use the controlled DOM adapter in `ui/segmentedControl.js`
@@ -2799,11 +2819,16 @@ down | auth-failed` (plus the unchanged `missing-key`/`unsupported`) with
 >   first later successful fetch. Smaller chunks reduce timeout risk; complete
 >   camera batches still wait for their sequential requests, and unresolved
 >   placement continues to use the existing prior until real heights arrive.
-> - **Overpass cache admission:** `/api/overpass` parses and sanitizes requests,
->   then checks fresh memory, identical in-flight work, and fresh disk entries
->   before invoking its local 90/min limiter. Cache and single-flight responses
->   therefore do not spend quota; upstream-bound misses retain the existing
->   limiter, configured-upstream, stale, and sanitization behavior. An unconfigured transport serves dated stale data or a non-retryable capability error.
+> - **Overpass cache admission:** `/api/overpass` refuses cross-site and forwarded
+>   POSTs through the shared local-request gate, then limits requests to 300/min
+>   per socket peer and 900/min globally before reading or validating bodies.
+>   Tag-filter brackets are scanned once; nested or unmatched brackets return 400.
+>   It then checks fresh memory, identical in-flight work, and fresh disk entries
+>   before invoking its separate local 90/min upstream limiter. Cache and
+>   single-flight responses therefore do not spend upstream quota; upstream-bound
+>   misses retain the existing limiter, configured-upstream, stale, and sanitization
+>   behavior. An unconfigured transport serves dated stale data or a non-retryable
+>   capability error.
 > - **CCTV world-click focus:** clicking an in-world CCTV icon or ambient card
 >   activates it and routes the camera flight through the panel FOCUS policy.
 >   Aircraft/satellite tracking releases outside cockpit; cockpit retains the
@@ -3711,8 +3736,8 @@ lookup asks the photo API for the projection (`SPHERE`/`PLANE`; it ignores
 `fieldOfView`) and upload date and checks each answer the same way (when
 photos are near but none passes, the panel says so), and the cones pass on
 each photo's projection and upload date. The provider declares
-`sinceBasis: 'upload'`, so while it is lit the panel shows "KartaView: by
-upload date" under the SINCE slider (`sinceNote` in the UI state). Tiles come uncompressed and
+`sinceBasis: 'upload'`, so while it is lit the panel shows "(by
+upload date)" beside the SINCE value, as ANY DATE (by upload date) (`sinceNote` in the UI state). Tiles come uncompressed and
 uncacheable, so the last 24 decoded tiles are kept for 10 minutes while
 KartaView is lit (`createTileCache`, dropped when it is switched off); one
 that does not answer in 20 s is asked once more, and one that is not a line
@@ -4619,6 +4644,12 @@ Retry-After; absent delays back off from 30 seconds to five minutes. Empty
 remain. Malformed capability-probe responses remain unknown and are retried after the existing 30-second backoff; valid configured decisions remain memoized.
 Consumer capability misses never schedule automatic retries.
 
+Keyless browser validation also probes the optional Google tiles-token route.
+The token client cancels rejected response bodies before returning unavailable,
+so they do not remain pending in browser network observation. The Overpass gate
+accepts only that same-origin route's expected 404 console diagnostic; other
+HTTP and JavaScript errors still fail acceptance.
+
 Operator-configured Overpass area and focus-footprint queries use body-level
 `out geom` (with `center` for focus), preserving relation member outlines.
 Member geometry is printed only inside a box around the point (6 km for
@@ -5067,7 +5098,7 @@ pins and share links already supply complete boxes.
 - Fleet model eligibility is distance-based with on-screen priority and hard caps (`MODEL_MAX`, `MODEL_MAX_ALL`) to avoid draw-call explosions. Each model owns its own `modelMatrix`; shared scratch matrices are forbidden because they caused stacking/flicker.
 - Tracked aircraft use standalone model primitives driven from the already-settled dead-reckoned display position, while the tracked Cesium entity remains billboard-backed so `viewer.trackedEntity` always has a ready bounding sphere.
 - Flights and military layers mirror the same tracking invariants: no warm-up freeze/jump, altitude-scaled framing, trail head glued to the displayed plane, no pull-out when switching targets, and no cross-layer orphan when switching between commercial and military tracks.
-- Regression surface: `npm run test:track` drives the real app headless with synthetic aircraft feeds and asserts the tracking invariants without depending on live OpenSky/adsb data. `src/data/trackedModelRegime.test.mjs` pins the tracked contact's threshold math, the enter/exit asymmetry, and the default-on / cockpit / TR-3B / deselect wiring in both layers.
+- Regression surface: `npm run test:track` drives the real app headless with synthetic aircraft feeds and asserts the tracking invariants without depending on live OpenSky/adsb data. Arrival-rotation checks observe the first reveal within a bounded wall-clock window before the one-second idle fallback, rather than assuming the 80 ms fleet cadence fits inside four rendered frames; an incorrect first orientation fails immediately. `src/data/trackedModelRegime.test.mjs` pins the tracked contact's threshold math, the enter/exit asymmetry, and the default-on / cockpit / TR-3B / deselect wiring in both layers.
 
 ### TR-3B conversion Easter egg (August 2026)
 
