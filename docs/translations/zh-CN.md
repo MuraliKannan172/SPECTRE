@@ -46,10 +46,11 @@ for the current English and reviewed against both.
 | preset / visual preset                | 预设 / 视觉预设             |
 | Display / HUD layout                  | 显示 / HUD 布局             |
 | Tactical / Operator / Minimal / Cyber | 战术 / 操作员 / 精简 / 赛博 |
-| Scope (circular viewport mask)        | 视域                        |
+| Scope (circular viewport mask) / keyhole | 视域                      |
 | Clean UI                              | 纯净界面                    |
 | cockpit                               | 座舱                        |
 | heading / altitude / ground speed     | 航向 / 高度 / 地速          |
+| map heading / North up                | 方位 / 正北朝上             |
 | Street Level / Street View (Google)   | 街景 / 街景（Google）       |
 | Recent Imagery                        | 近期影像                    |
 | Global Context / Context (panel)      | 全局态势 / 态势             |
@@ -57,3 +58,22 @@ for the current English and reviewed against both.
 | transit / bikeshare                   | 公共交通 / 共享单车         |
 | Previous / Next                       | 上一个 / 下一个             |
 | compass points (N, NNE, …)            | 北, 北东北, …               |
+| weather field / FIELD (selector)       | 气象场 / 要素               |
+| weather model / forecast lead hours   | 模式 / 预报时效             |
+| valid (forecast time)                 | 有效时间                    |
+| scene cloud / mosaic                  | 整景云量 / 镶嵌图           |
+| pin (Recent Imagery)                  | 固定                        |
+| THIS (voice pointer)                  | 所指                        |
+| outline / trace an outline            | 轮廓 / 绘制轮廓             |
+| mark (map annotation)                 | 标注                        |
+| camera badge                          | 摄像头标记                  |
+| provider / embedded provider controls | 服务商 / 平台控件           |
+| share (a view or link)                | 分享                        |
+| AI agent                              | AI 智能体                   |
+| stage (rocket) / downrange            | 子级 / 航程                 |
+| capture shot / camera move            | 保存镜头 / 运镜             |
+| story beat / evidence beat            | 事件节点 / 证据节点         |
+| camera pose                           | 位姿                        |
+| forecast uncertainty cone             | 预报不确定范围              |
+| seed (catalog data)                    | 预置                        |
+| frame (bring into view)               | 将…纳入视野                 |
