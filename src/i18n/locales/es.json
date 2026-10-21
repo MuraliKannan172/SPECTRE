@@ -2941,5 +2941,7 @@
   "hemisphere|N": "N",
   "hemisphere|S": "S",
   "hemisphere|E": "E",
-  "hemisphere|W": "O"
+  "hemisphere|W": "O",
+  "OK": "OK",
+  "{category} ({count})": "{category} ({count})"
 }

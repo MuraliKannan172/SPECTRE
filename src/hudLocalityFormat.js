@@ -15,7 +15,9 @@ export function hudQuantity(value, unit, digits = 0) {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
-  return `${number}${unitLabel(unit).toUpperCase()}`;
+  const label = unitLabel(unit);
+  if (getLocale() === 'zh-CN') return label ? `${number} ${label}` : number;
+  return `${number}${label.toUpperCase()}`;
 }
 
 /** One hemisphere-tagged coordinate, e.g. `21.33N` / `21,33С`. */

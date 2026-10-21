@@ -2807,5 +2807,7 @@
   "Gemini interrupted input exceeded its buffer or wait limit. Start voice again.": "Gemini 被打断的输入超出了缓冲区或等待上限。请重新启动语音。",
   "Gemini Live connection is expiring. Start voice again for a new conversation.": "Gemini Live 连接即将到期。请重新启动语音以开始新对话。",
   "Gemini voice sessions have a time limit. When a session expires, start voice again for a new conversation.": "Gemini 语音会话有时长限制。会话到期后，请重新启动语音以开始新对话。",
-  "Show the street-level view full screen (Esc shrinks it)": "全屏显示街景视图（按 Esc 缩小）"
+  "Show the street-level view full screen (Esc shrinks it)": "全屏显示街景视图（按 Esc 缩小）",
+  "OK": "正常",
+  "{category} ({count})": "{category}（{count}）"
 }

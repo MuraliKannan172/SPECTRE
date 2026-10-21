@@ -3008,5 +3008,7 @@
   "hemisphere|N": "С",
   "hemisphere|S": "Ю",
   "hemisphere|E": "В",
-  "hemisphere|W": "З"
+  "hemisphere|W": "З",
+  "OK": "НОРМА",
+  "{category} ({count})": "{category} ({count})"
 }

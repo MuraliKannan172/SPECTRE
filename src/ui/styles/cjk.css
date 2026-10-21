@@ -27,3 +27,28 @@ html:lang(zh) .panel-layer-toggle {
 html:lang(zh) .pp-mode-btn {
   white-space: nowrap;
 }
+
+/* Keep unit symbols in their catalog case, including the cockpit readouts. */
+html:lang(zh) #intel-hud *,
+html:lang(zh) #cockpit-hud * {
+  text-transform: none;
+}
+
+/* Move short travel modes (步行 / 骑行) to the next line as whole words. */
+html:lang(zh) [data-layer-id='directions'] .data-toggle-meta {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* Leave room for the complete sensor name and resolution on two lines. */
+html:lang(zh) .recent-imagery-readout .ri-strip {
+  height: 131px;
+}
+html:lang(zh) .recent-imagery-readout .ri-card {
+  height: 123px;
+  grid-template-rows: 42px 13px 22px 11px 18px;
+}
+html:lang(zh) .recent-imagery-readout .ri-card-sensor {
+  white-space: normal;
+  text-overflow: clip;
+}
