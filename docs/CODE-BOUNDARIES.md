@@ -738,3 +738,13 @@ sources supply `{records, droppedCount, status, saturated}`; viewport filtering,
 exact-bound retry and rendering stay in the layer. Legacy cache saturation is
 decoded in the source. Source and geometry modules remain independent of Cesium,
 DOM and platform middleware.
+
+### Native form fields
+
+`src/ui/formField.js` constructs native numeric inputs without listeners or
+application state. Static selects and number inputs use the same `gev-field`
+surface, with explicit compact and inline densities. Feature owners retain
+option identity/order, bounds, parsing, draft values, input/change timing and
+teardown. CCTV effective-pose conversion and tuner/device operations remain
+feature responsibilities. A Vue replacement can reuse this contract and CSS;
+it replaces DOM construction, rather than adding a second state owner.

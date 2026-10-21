@@ -153,14 +153,6 @@
 #scene-select {
   flex: 1;
   min-width: 0;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 7px;
-  color: var(--text-primary);
-  padding: 6px 8px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  outline: none;
 }
 
 /* A translated scene name needs the width: the select takes its own row,

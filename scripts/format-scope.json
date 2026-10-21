@@ -2,6 +2,8 @@
   ".prettierrc.json",
   "package.json",
   "scripts/format-scope.json",
+  "src/ui/styles/form-field.css",
+  "scripts/qa-form-fields.mjs",
   "scripts/package-boundaries.json",
   "scripts/format.mjs",
   "scripts/next-layer-state-token.mjs",
