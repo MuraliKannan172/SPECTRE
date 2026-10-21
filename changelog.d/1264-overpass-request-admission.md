@@ -4,3 +4,6 @@
 - Release unread responses from the optional Google-token probe so keyless
   browser validation can settle; the Overpass gate recognizes only that probe's
   expected 404 as an unavailable capability (asturksever, #1264).
+- Make tracking arrival checks respect the aircraft update cadence while checking
+  orientation on the first reveal, avoiding false failures at faster render
+  rates (asturksever, #1264).
