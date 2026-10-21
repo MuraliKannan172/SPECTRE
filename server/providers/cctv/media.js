@@ -1,13 +1,21 @@
 import { Readable } from 'node:stream';
-import { hashSeed, escapeXml } from './normalize.js';
+import { hashSeed, escapeXml, pinnedCameraUrl } from './normalize.js';
 import {
+  CALGARY_IMAGE_ORIGIN,
   CCTV_FRAME_FETCH_TIMEOUT_MS,
   CCTV_FRAME_MAX_BODY_BYTES,
   CCTV_MEDIA_FETCH_TIMEOUT_MS,
   CCTV_MEDIA_IDLE_TIMEOUT_MS,
   CCTV_MEDIA_MAX_BODY_BYTES,
+  HK_IMAGE_ORIGIN,
+  KING_COUNTY_IMAGE_ORIGIN,
   NSW_IMAGE_ORIGIN,
   NSW_IMAGE_USER_AGENT,
+  TALLINN_IMAGE_ORIGIN,
+  TARKTEE_IMAGE_ORIGIN,
+  TFL_IMAGE_ORIGIN,
+  WARENDORF_IMAGE_ORIGINS,
+  WSDOT_IMAGE_ORIGIN,
 } from './constants.js';
 /**
  * Generate a synthetic SVG billboard image for a CCTV camera placeholder.
@@ -505,8 +513,39 @@ export async function fetchTxdotSnapshot(
 const MAX_SAME_HOST_REDIRECTS = 2;
 
 /**
+ * Directories camera catalogs are pinned to, by host. A redirect on one of
+ * these hosts must stay inside the pinned directory too, so a same-origin
+ * redirect cannot leave it (another bucket on a shared storage host).
+ */
+const CCTV_PINNED_PREFIXES_BY_HOST = new Map();
+for (const prefix of [
+  TFL_IMAGE_ORIGIN,
+  TALLINN_IMAGE_ORIGIN,
+  TARKTEE_IMAGE_ORIGIN,
+  ...WARENDORF_IMAGE_ORIGINS,
+  NSW_IMAGE_ORIGIN,
+  CALGARY_IMAGE_ORIGIN,
+  HK_IMAGE_ORIGIN,
+  KING_COUNTY_IMAGE_ORIGIN,
+  WSDOT_IMAGE_ORIGIN,
+]) {
+  const host = new URL(prefix).hostname;
+  CCTV_PINNED_PREFIXES_BY_HOST.set(host, [
+    ...(CCTV_PINNED_PREFIXES_BY_HOST.get(host) || []),
+    prefix,
+  ]);
+}
+
+/** Whether a redirect target stays inside its host's pinned directory. */
+function withinPinnedPrefix(url) {
+  const prefixes = CCTV_PINNED_PREFIXES_BY_HOST.get(url.hostname);
+  return !prefixes || prefixes.some((p) => pinnedCameraUrl(url.href, p));
+}
+
+/**
  * Fetch a registered frame URL following redirects ONLY within the original
- * origin (scheme, host and port; at most MAX_SAME_HOST_REDIRECTS hops).
+ * origin (scheme, host and port; at most MAX_SAME_HOST_REDIRECTS hops) and,
+ * on a pinned camera host, within its pinned directory.
  * Default redirect-following would let an upstream steer a host-pinned
  * request, and its host-specific headers, to any origin, another port, or a
  * plaintext downgrade.
@@ -547,7 +586,7 @@ export async function fetchWithinHost(url, init, fetchImpl = fetch) {
     } catch {
       return null;
     }
-    if (next.origin !== origin) return null;
+    if (next.origin !== origin || !withinPinnedPrefix(next)) return null;
     current = next;
   }
   return null;
