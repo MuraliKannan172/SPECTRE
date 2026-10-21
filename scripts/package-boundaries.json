@@ -22,7 +22,14 @@
   },
   "viewer": {
     "exports": ["./application/viewer"],
-    "modules": ["src/app/viewer.js", "src/app/atmosphereCompat.js"],
+    "modules": [
+      "src/app/viewer.js",
+      "src/app/atmosphereCompat.js",
+      "src/sky/starrySky.js",
+      "src/sky/stars.js",
+      "src/data/bundledJson.js",
+      "src/renderGovernor.js"
+    ],
     "external": ["cesium"]
   },
   "vite-build": {
@@ -1730,6 +1737,8 @@
       "src/app/surfaceServices.js",
       "src/app/tools.js",
       "src/app/viewer.js",
+      "src/sky/starrySky.js",
+      "src/sky/stars.js",
       "src/app/atmosphereCompat.js",
       "src/bloom.js",
       "src/camera.js",

@@ -1179,6 +1179,24 @@ snapshots, lifecycle actions and row descriptors. Remount and teardown remove
 listeners and row subscriptions; obsolete completions do not repaint old rows.
 The clear control presents busy state while its existing action owns the transaction.
 
+## Sky background
+
+`src/sky/starrySky.js` fills Cesium's `Scene#skyBox` slot with 9,096 Yale
+Bright Star Catalogue stars and a soft ESO/S. Brunier Milky Way. Both layers
+rotate from ICRF/J2000 into the Earth-fixed frame at the scene clock, with
+a TEME fallback while Cesium's IAU 2006 tables load. Bundled assets and
+their provenance are documented in `src/data/local_data/sky/README.md`.
+
+Anime fades out the Milky Way with its style intensity to avoid cel-shaded
+bands; the catalogue stars remain. A separate black 1×1 cube map preserves
+model environment lighting independently of the visible sky. The adapter
+is validated against Cesium 1.138.0 and must be revalidated on upgrades.
+
+`scripts/qa-anime-sky.mjs` checks asset readiness, visible Normal sky and
+Anime band coverage against a Vite dev server.
+`scripts/qa-sky-model-lighting.mjs` compares a lit `airplane.glb` against
+black and white environment maps in isolated scenes.
+
 ## Model atmosphere on Apple Metal
 
 Cesium's per-vertex model atmosphere is kept out of the pipeline on devices
