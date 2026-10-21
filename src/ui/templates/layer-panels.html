@@ -31,15 +31,15 @@
       <div id="cctv-meta" data-i18n>Enable CCTV to load camera intersections</div>
       <div class="cctv-controls">
         <button id="cctv-enable-btn" class="scene-btn" data-i18n>CCTV OFF</button>
-        <button id="cctv-nearest-btn" class="scene-btn" data-i18n>NEAREST</button>
+        <button id="cctv-nearest-btn" type="button" class="gev-action-button scene-btn" data-i18n>NEAREST</button>
       </div>
       <div class="cctv-controls">
-        <button id="cctv-prev-btn" class="scene-btn" data-i18n>PREV</button>
+        <button id="cctv-prev-btn" type="button" class="gev-action-button scene-btn" data-i18n>PREV</button>
         <select id="cctv-camera-select" aria-label="CCTV camera" data-i18n-aria-label></select>
-        <button id="cctv-next-btn" class="scene-btn" data-i18n>NEXT</button>
+        <button id="cctv-next-btn" type="button" class="gev-action-button scene-btn" data-i18n>NEXT</button>
       </div>
       <div class="cctv-controls">
-        <button id="cctv-focus-btn" class="scene-btn" data-i18n>FOCUS</button>
+        <button id="cctv-focus-btn" type="button" class="gev-action-button scene-btn" data-i18n>FOCUS</button>
         <button id="cctv-coverage-btn" class="scene-btn" data-i18n>COVERAGE OFF</button>
         <button id="cctv-auto-hop-btn" class="scene-btn" data-i18n>AUTO HOP OFF</button>
       </div>
@@ -62,8 +62,8 @@
           <button class="cctv-cal-value" data-cal-field="east" title="East offset from catalog position (m) — click to type" data-i18n-title>ΔE --</button>
         </div>
         <div class="cctv-controls cctv-calibration-actions">
-          <button id="cctv-calib-save-btn" class="scene-btn" data-i18n>SAVE CAL</button>
-          <button id="cctv-calib-reset-btn" class="scene-btn" data-i18n>RESET CAL</button>
+          <button id="cctv-calib-save-btn" type="button" class="gev-action-button scene-btn" data-i18n>SAVE CAL</button>
+          <button id="cctv-calib-reset-btn" type="button" class="gev-action-button scene-btn" data-i18n>RESET CAL</button>
         </div>
       </div>
       <div class="cctv-summary-label" data-i18n>SCENE SUMMARY</div>
@@ -151,23 +151,23 @@
       </div>
       <div class="scene-controls">
         <select id="scene-select" aria-label="Scene recipe" data-i18n-aria-label></select>
-        <button id="scene-new-btn" class="scene-btn" data-i18n>NEW</button>
-        <button id="scene-delete-btn" class="scene-btn scene-btn-danger" data-i18n>DEL</button>
+        <button id="scene-new-btn" type="button" class="gev-action-button scene-btn" data-i18n>NEW</button>
+        <button id="scene-delete-btn" type="button" class="gev-action-button gev-action-button--danger scene-btn scene-btn-danger" data-i18n>DEL</button>
       </div>
       <div class="scene-controls">
-        <button id="scene-capture-btn" class="scene-btn" data-i18n>CAPTURE SHOT</button>
-        <button id="scene-update-shot-btn" class="scene-btn" data-i18n>UPDATE SHOT</button>
+        <button id="scene-capture-btn" type="button" class="gev-action-button scene-btn" data-i18n>CAPTURE SHOT</button>
+        <button id="scene-update-shot-btn" type="button" class="gev-action-button scene-btn" data-i18n>UPDATE SHOT</button>
       </div>
       <div id="scene-shot-list" class="scene-shot-list"></div>
       <div class="scene-controls">
-        <button id="scene-start-btn" class="scene-btn" data-i18n>START</button>
-        <button id="scene-stop-btn" class="scene-btn scene-btn-danger" data-i18n>STOP</button>
-        <button id="scene-next-btn" class="scene-btn" data-i18n>NEXT</button>
+        <button id="scene-start-btn" type="button" class="gev-action-button scene-btn" data-i18n>START</button>
+        <button id="scene-stop-btn" type="button" class="gev-action-button gev-action-button--danger scene-btn scene-btn-danger" data-i18n>STOP</button>
+        <button id="scene-next-btn" type="button" class="gev-action-button scene-btn" data-i18n>NEXT</button>
       </div>
       <div class="scene-controls">
-        <button id="scene-export-btn" class="scene-btn" data-i18n>EXPORT PRESETS</button>
-        <button id="scene-import-btn" class="scene-btn" data-i18n>IMPORT</button>
-        <button id="scene-download-btn" class="scene-btn" data-i18n>RUN LOG</button>
+        <button id="scene-export-btn" type="button" class="gev-action-button scene-btn" data-i18n>EXPORT PRESETS</button>
+        <button id="scene-import-btn" type="button" class="gev-action-button scene-btn" data-i18n>IMPORT</button>
+        <button id="scene-download-btn" type="button" class="gev-action-button scene-btn" data-i18n>RUN LOG</button>
         <input type="file" id="scene-import-file" accept="application/json,.json" hidden />
       </div>
       <div class="scene-progress">

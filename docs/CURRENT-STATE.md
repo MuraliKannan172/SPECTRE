@@ -1233,6 +1233,26 @@ Feature owners retain bounds, steps, formatted values, input/change timing and
 listener cleanup. The radio tuning dial, imagery comparison divider and event
 comparison/progression controls keep their specialized presentation and behavior.
 
+## Ordinary action buttons
+
+Scene panel actions, shot LOAD/DEL actions, the EDIT DETAILS / SHARE SCENE
+bar and one-shot CCTV actions use `ui/actionButton.js` and the shared
+`gev-action-button` surface in `ui/styles/action-button.css`. Static templates
+apply the same classes as generated buttons. The native builder accepts translated
+text, default/danger variants, default/compact sizes and disabled/accessibility
+properties; it installs no listeners and owns no application state. Feature
+controllers retain callbacks, enable/disable rules, confirmation prompts,
+persistence and teardown. The smaller shot actions retain their existing sizing
+and hover treatment. Feature CSS still owns panel layout and translated wrapping.
+
+CCTV enable, coverage, auto-hop, projection and adjustment toggles, editable
+calibration-value chips and the scene authoring dialogs retain their specialized
+controls. Existing `scene-btn` hooks remain compatible with Street Level and
+legacy toggles. The shared CSS, explicit input/action boundary and behavior tests
+can carry to a Vue view while Vue replaces native DOM construction.
+Browser acceptance: `QA_BASE_URL=http://127.0.0.1:4179 node scripts/qa-action-buttons.mjs`;
+`qa-scene-controls.mjs` also covers real Scene authoring/playback with native Space capture.
+
 ## Segmented selectors
 
 Segmented selectors use the controlled DOM adapter in `ui/segmentedControl.js`
