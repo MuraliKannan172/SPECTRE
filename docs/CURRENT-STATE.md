@@ -828,7 +828,9 @@ fallback. Live media must match its feed kind (`video/mp4`, `video/webm`, or
 `multipart/x-mixed-replace` with a boundary) before health reports it connected,
 and follows redirects only on the camera's origin. Catalog image URLs, and
 redirects on those hosts, are pinned by parsed URL to the agency's image
-directory. Every `/api/cctv` route uses the same-site gate.
+directory. Every `/api/cctv` route refuses cross-site browser requests but
+accepts forwarding headers, so cameras work behind a reverse proxy; a forwarded
+request skips the key-bearing Street View fallback and gets the placeholder.
 
 Traffic owns its rendered-surface observer only while enabled, removes it on disable/destroy, and caches surface identity without allocating on unchanged frames.
 

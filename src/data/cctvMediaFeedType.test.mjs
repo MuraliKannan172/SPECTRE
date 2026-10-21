@@ -337,11 +337,7 @@ test('/media relays each feed kind under its canonical type, including a partial
   let current;
   const app = mount(t, () => current);
   for (const [camera, upstream, expected] of [
-    [
-      VIDEO,
-      { 'content-type': 'Video/MP4; codecs="avc1.42E01E"' },
-      'video/mp4',
-    ],
+    [VIDEO, { 'content-type': 'Video/MP4; codecs="avc1.42E01E"' }, 'video/mp4'],
     [
       VIDEO,
       {
@@ -471,4 +467,61 @@ test('/frame falls back past a non-raster upstream and Street View frame', async
   assert.equal(res.headers['X-CCTV-Source'], 'streetview');
   assert.equal(res.headers['Content-Type'], 'image/jpeg');
   assert.equal(res.body, 'street-view');
+});
+
+test('a forwarded same-origin request reaches every CCTV route but not the Street View fallback', async (t) => {
+  const app = mount(t, ({ url }) => {
+    if (url.startsWith('https://maps.googleapis.com/'))
+      return trackedUpstream({
+        headers: { 'content-type': 'image/jpeg' },
+        body: 'street-view',
+      }).response;
+    return url === VIDEO.url
+      ? upstreamResponse({ headers: { 'content-type': 'video/mp4' } })
+      : upstreamResponse({ status: 503, body: '' });
+  });
+  process.env.GOOGLE_MAPS_SERVER_API_KEY = 'fixture-key';
+  const host = 'localhost:5173';
+  const streetViewCalls = () =>
+    app.requests.filter(({ url }) =>
+      url.startsWith('https://maps.googleapis.com/'),
+    ).length;
+  for (const forwarded of [
+    { 'x-forwarded-for': '203.0.113.9' },
+    { via: '1.1 proxy' },
+    { forwarded: 'for=203.0.113.9' },
+    { 'x-real-ip': '203.0.113.9' },
+  ]) {
+    const headers = { host, 'sec-fetch-site': 'same-origin', ...forwarded };
+    const label = JSON.stringify(forwarded);
+    assert.equal((await app.call('/sources', headers)).statusCode, 200, label);
+    const media = await app.call(`/media/${VIDEO.id}`, headers);
+    assert.equal(media.statusCode, 200, label);
+    assert.equal(media.headers['Content-Type'], 'video/mp4', label);
+    const frame = await app.call(`/frame/${STILL.id}`, headers);
+    assert.equal(frame.statusCode, 200, label);
+    assert.equal(frame.headers['X-CCTV-Source'], 'synthetic', label);
+    assert.equal(frame.headers['Content-Type'], 'image/svg+xml', label);
+    // Cross-site stays refused whatever the forwarding headers say.
+    for (const path of ['/sources', `/frame/${STILL.id}`, `/media/${VIDEO.id}`])
+      assert.equal(
+        (
+          await app.call(path, {
+            ...forwarded,
+            host,
+            'sec-fetch-site': 'cross-site',
+          })
+        ).statusCode,
+        403,
+        `${label} ${path}`,
+      );
+  }
+  assert.equal(streetViewCalls(), 0, 'a forwarded request spent the key');
+  const direct = await app.call(`/frame/${STILL.id}`, {
+    host,
+    'sec-fetch-site': 'same-origin',
+  });
+  assert.equal(direct.headers['X-CCTV-Source'], 'streetview');
+  assert.equal(direct.body, 'street-view');
+  assert.equal(streetViewCalls(), 1);
 });

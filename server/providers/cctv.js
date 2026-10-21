@@ -19,7 +19,8 @@ import {
   CCTV_MAX_SOURCES_CEILING,
 } from './cctv/constants.js';
 import { sanitizeCctvRangeHeader } from './cctv/range.js';
-import { admitSameSite } from './common/same-site.js';
+import { admitSameSiteKeyless } from './common/same-site.js';
+import { hasProxySignals } from '../../src/localRequestGate.mjs';
 import { createHlsPuller } from './cctv/stream.js';
 import { googleServerApiKey } from './places/google-key.js';
 export { CCTV_FRAME_FETCH_TIMEOUT_MS, fetchCctvImageFromUpstream };
@@ -146,8 +147,10 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
     server.middlewares.use('/api/cctv', async (req, res) => {
       try {
         const url = new URL(req.url || '/', 'http://localhost');
-        // Refuse cross-site requests before any catalog or upstream work.
-        if (admitSameSite(req, res)) return;
+        // Refuse cross-site requests before any catalog or upstream work. The
+        // keyless gate keeps the routes reachable behind a reverse proxy; the
+        // key-bearing Street View fallback below has its own check.
+        if (admitSameSiteKeyless(req, res)) return;
         const sources = await getCctvSources();
         const sourceById = new Map(
           sources.map((source) => [source.id, source]),
@@ -546,13 +549,18 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
           return;
         }
 
-        const sv = await streetViewFallback({
-          lat,
-          lon,
-          heading,
-          fov,
-          pitch,
-        });
+        // The Street View fallback spends the Google key, so a forwarded
+        // request (whose client this server cannot see) gets the placeholder,
+        // as if no key were configured.
+        const sv = hasProxySignals(req.headers || {})
+          ? null
+          : await streetViewFallback({
+              lat,
+              lon,
+              heading,
+              fov,
+              pitch,
+            });
         if (sv?.ok) {
           setHealth(cameraId, {
             status: 'degraded',
