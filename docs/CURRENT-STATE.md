@@ -3711,8 +3711,8 @@ lookup asks the photo API for the projection (`SPHERE`/`PLANE`; it ignores
 `fieldOfView`) and upload date and checks each answer the same way (when
 photos are near but none passes, the panel says so), and the cones pass on
 each photo's projection and upload date. The provider declares
-`sinceBasis: 'upload'`, so while it is lit the panel shows "KartaView: by
-upload date" under the SINCE slider (`sinceNote` in the UI state). Tiles come uncompressed and
+`sinceBasis: 'upload'`, so while it is lit the panel shows "(by
+upload date)" beside the SINCE value, as ANY DATE (by upload date) (`sinceNote` in the UI state). Tiles come uncompressed and
 uncacheable, so the last 24 decoded tiles are kept for 10 minutes while
 KartaView is lit (`createTileCache`, dropped when it is switched off); one
 that does not answer in 20 s is asked once more, and one that is not a line
