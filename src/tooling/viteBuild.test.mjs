@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createServer, request } from 'node:http';
 import { BROWSER_CSP, createBrowserViteConfig } from '../../build/vite.js';
 import standaloneConfig, * as compatibility from '../../vite.config.js';
 import * as providers from '../../server/providers/local.js';
+import { apiNotFoundPlugin } from '../../server/standalone/api-not-found.js';
 
 test('explicit build inputs preserve browser-only defines, plugin order and loopback protections', () => {
   const plugin = { name: 'fixture-provider' };
@@ -12,10 +14,13 @@ test('explicit build inputs preserve browser-only defines, plugin order and loop
     googleApiKey: 'browser-fixture',
     cesiumToken: 'ion-fixture',
   });
-  // The Host check runs before every other plugin's middleware.
-  assert.equal(config.plugins[0].name, 'host-check');
+  // API response headers, then the Host check, run before every other
+  // plugin's middleware.
+  assert.equal(config.plugins[0].name, 'api-response-headers');
   assert.equal(config.plugins[0].enforce, 'pre');
-  assert.equal(config.plugins[3], plugin);
+  assert.equal(config.plugins[1].name, 'host-check');
+  assert.equal(config.plugins[1].enforce, 'pre');
+  assert.equal(config.plugins[4], plugin);
   assert.equal(config.server.host, 'localhost');
   assert.equal(config.server.port, 4173);
   assert.deepEqual(config.server.allowedHosts, ['localhost', '127.0.0.1']);
@@ -75,7 +80,7 @@ test('build helper does not discover environment values or construct local provi
       undefined,
     );
     assert.deepEqual(
-      config.plugins.slice(3).map((plugin) => plugin.name),
+      config.plugins.slice(4).map((plugin) => plugin.name),
       ['embed-framing', 'panel-build'],
     );
   } finally {
@@ -89,7 +94,7 @@ test('root config retains existing named exports and standalone provider order',
     assert.equal(compatibility[name], value, name);
   const config = standaloneConfig({ mode: 'test' });
   const standaloneProviders = config.plugins
-    .slice(3, -5)
+    .slice(4, -5)
     .map((plugin) => plugin.name);
   assert.equal(
     standaloneProviders.filter((name) => name === 'gemini-live-proxy').length,
@@ -256,4 +261,138 @@ test('the CSP admits the event media embeds and the Maps JavaScript API, and no 
   }
   // X posts load in X's own frames.
   assert.ok(frames.includes('https://platform.twitter.com'));
+});
+
+/**
+ * Serve plugins' middleware over real HTTP the way Vite's connect stack mounts
+ * it: in plugin order, a route prefix stripped from `req.url`. A request no
+ * middleware answers gets the app document stand-in.
+ */
+async function servePlugins(t, plugins, hook, config) {
+  const stack = [];
+  const server = {
+    config,
+    middlewares: {
+      use(route, handler) {
+        if (typeof route === 'function')
+          stack.push({ route: '', handler: route });
+        else stack.push({ route, handler });
+      },
+    },
+  };
+  for (const plugin of plugins) plugin[hook]?.(server);
+  const http = createServer((req, res) => {
+    const original = req.url;
+    const path = original.split('?')[0];
+    let index = 0;
+    const next = () => {
+      const layer = stack[index++];
+      if (!layer) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('app');
+        return;
+      }
+      if (
+        layer.route &&
+        path !== layer.route &&
+        !path.startsWith(`${layer.route}/`)
+      )
+        return next();
+      req.url = original.slice(layer.route.length) || '/';
+      layer.handler(req, res, next);
+    };
+    next();
+  });
+  await new Promise((resolve) => http.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => http.close(resolve)));
+  const { port } = http.address();
+  return (path, host = `localhost:${port}`) =>
+    new Promise((resolve, reject) => {
+      const req = request(
+        { host: '127.0.0.1', port, path, headers: { host } },
+        (res) => {
+          res.resume();
+          res.on('end', () =>
+            resolve({ status: res.statusCode, headers: res.headers }),
+          );
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+}
+
+test('every API response carries the API policy and nosniff in dev and preview', async (t) => {
+  const policy = "default-src 'none'; sandbox";
+  const install = (server) => {
+    server.middlewares.use('/api/fixture', (req, res) => {
+      const route = req.url.split('?')[0];
+      if (route === '/ok') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{}');
+      } else if (route === '/error') {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end('{"error":"fixture"}');
+      } else if (route === '/partial') {
+        res.writeHead(206, { 'Content-Range': 'bytes 0-0/2' });
+        res.end('x');
+      } else if (route === '/own-policy') {
+        res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+        res.end('{}');
+      } else {
+        res.writeHead(200, { 'Content-Security-Policy': 'default-src *' });
+        res.end('{}');
+      }
+    });
+  };
+  const fixture = {
+    name: 'fixture-provider',
+    configureServer: install,
+    configurePreviewServer: install,
+  };
+  const built = createBrowserViteConfig({ plugins: [fixture] });
+  const plugins = [
+    ...built.plugins.filter(
+      (plugin) =>
+        plugin === fixture ||
+        ['api-response-headers', 'host-check'].includes(plugin.name),
+    ),
+    apiNotFoundPlugin(),
+  ];
+  const config = {
+    server: {
+      allowedHosts: built.server.allowedHosts,
+      host: built.server.host,
+    },
+    preview: { allowedHosts: built.server.allowedHosts },
+  };
+  for (const hook of ['configureServer', 'configurePreviewServer']) {
+    const get = await servePlugins(t, plugins, hook, config);
+    for (const [path, status, csp = policy, host] of [
+      ['/api/fixture/ok', 200],
+      ['/api/fixture/error', 500],
+      ['/api/fixture/partial', 206],
+      ['/api/nope', 404],
+      ['/api', 404],
+      ['/api/fixture/ok?x=1', 200],
+      ['/api/fixture/ok', 403, policy, 'elsewhere.example'],
+      // A route's own policy is added to the API policy, never replaces it.
+      ['/api/fixture/own-policy', 200, `${policy}, frame-ancestors 'none'`],
+      ['/api/fixture/own-policy-head', 200, `${policy}, default-src *`],
+    ]) {
+      const res = await get(path, host);
+      const label = `${hook} ${path} ${host || ''}`;
+      assert.equal(res.status, status, label);
+      assert.equal(res.headers['content-security-policy'], csp, label);
+      assert.equal(res.headers['x-content-type-options'], 'nosniff', label);
+    }
+    // The app document and other paths are left to the server's own headers.
+    for (const path of ['/', '/apiary', '/src/api/x.js'])
+      assert.equal(
+        (await get(path)).headers['content-security-policy'],
+        undefined,
+        `${hook} ${path}`,
+      );
+  }
 });

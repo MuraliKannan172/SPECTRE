@@ -47,6 +47,56 @@ export const BROWSER_HEADERS = Object.freeze({
   'X-Content-Type-Options': 'nosniff',
 });
 
+/**
+ * Content-Security-Policy for every `/api` response. API routes return data,
+ * never a document, so a response opened directly in a tab gets no origin and
+ * can load nothing.
+ */
+export const API_CSP = "default-src 'none'; sandbox";
+
+/** Response headers every `/api` response carries. */
+export const API_HEADERS = Object.freeze({
+  'Content-Security-Policy': API_CSP,
+  'X-Content-Type-Options': 'nosniff',
+});
+
+/** Whether a request path is an API route (`/api` or `/api/...`). */
+function isApiPath(url) {
+  const path = String(url || '/').split(/[?#]/, 1)[0];
+  return path === '/api' || path.startsWith('/api/');
+}
+
+/**
+ * Vite plugin that sets API_HEADERS on every API response before any other
+ * middleware runs, so success, error, partial, refused and unknown-route
+ * answers all carry them. Vite's `server.headers` and `preview.headers` only
+ * reach the documents and assets Vite serves itself. A route may still add
+ * headers; a route's own Content-Security-Policy is sent as an additional
+ * policy, which can only restrict further, never replace this one.
+ */
+export function apiResponseHeadersPlugin() {
+  const install = (server) => {
+    server.middlewares.use((req, res, next) => {
+      if (!isApiPath(req.url)) return next();
+      for (const [name, value] of Object.entries(API_HEADERS))
+        res.setHeader(name, value);
+      const setHeader = res.setHeader.bind(res);
+      res.setHeader = (name, value) =>
+        String(name).toLowerCase() === 'content-security-policy' &&
+        String(value) !== API_CSP
+          ? setHeader(name, `${API_CSP}, ${value}`)
+          : setHeader(name, value);
+      next();
+    });
+  };
+  return {
+    name: 'api-response-headers',
+    enforce: 'pre',
+    configureServer: install,
+    configurePreviewServer: install,
+  };
+}
+
 /** Build browser assets with explicit inputs; never load environment or providers. */
 export function createBrowserViteConfig({
   plugins = [],
@@ -61,7 +111,9 @@ export function createBrowserViteConfig({
 } = {}) {
   return {
     plugins: [
-      // First, so no provider route answers a Host the server does not allow.
+      // First, so every API response, including a Host refusal, carries them.
+      apiResponseHeadersPlugin(),
+      // Next, so no provider route answers a Host the server does not allow.
       hostCheckPlugin(),
       cesium(),
       applicationHtmlPlugin(),
