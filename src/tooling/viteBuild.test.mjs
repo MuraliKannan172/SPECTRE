@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createServer, request } from 'node:http';
+import { rm, writeFile } from 'node:fs/promises';
+import { request } from 'node:http';
+import path from 'node:path';
+import { build, createServer, preview } from 'vite';
 import { BROWSER_CSP, createBrowserViteConfig } from '../../build/vite.js';
 import standaloneConfig, * as compatibility from '../../vite.config.js';
 import * as providers from '../../server/providers/local.js';
 import { apiNotFoundPlugin } from '../../server/standalone/api-not-found.js';
+import { makeFixtureRoot } from './fixtureRoot.mjs';
 
 test('explicit build inputs preserve browser-only defines, plugin order and loopback protections', () => {
   const plugin = { name: 'fixture-provider' };
@@ -263,70 +267,39 @@ test('the CSP admits the event media embeds and the Maps JavaScript API, and no 
   assert.ok(frames.includes('https://platform.twitter.com'));
 });
 
-/**
- * Serve plugins' middleware over real HTTP the way Vite's connect stack mounts
- * it: in plugin order, a route prefix stripped from `req.url`. A request no
- * middleware answers gets the app document stand-in.
- */
-async function servePlugins(t, plugins, hook, config) {
-  const stack = [];
-  const server = {
-    config,
-    middlewares: {
-      use(route, handler) {
-        if (typeof route === 'function')
-          stack.push({ route: '', handler: route });
-        else stack.push({ route, handler });
+/** A raw GET, so the Host header and an absolute-form target are sent as given. */
+function rawGet(port, target, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        host: '127.0.0.1',
+        port,
+        path: target,
+        headers: { host: `localhost:${port}`, ...headers },
       },
-    },
-  };
-  for (const plugin of plugins) plugin[hook]?.(server);
-  const http = createServer((req, res) => {
-    const original = req.url;
-    const path = original.split('?')[0];
-    let index = 0;
-    const next = () => {
-      const layer = stack[index++];
-      if (!layer) {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end('app');
-        return;
-      }
-      if (
-        layer.route &&
-        path !== layer.route &&
-        !path.startsWith(`${layer.route}/`)
-      )
-        return next();
-      req.url = original.slice(layer.route.length) || '/';
-      layer.handler(req, res, next);
-    };
-    next();
+      (res) => {
+        res.resume();
+        res.on('end', () =>
+          resolve({ status: res.statusCode, headers: res.headers }),
+        );
+      },
+    );
+    req.on('error', reject);
+    req.end();
   });
-  await new Promise((resolve) => http.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise((resolve) => http.close(resolve)));
-  const { port } = http.address();
-  return (path, host = `localhost:${port}`) =>
-    new Promise((resolve, reject) => {
-      const req = request(
-        { host: '127.0.0.1', port, path, headers: { host } },
-        (res) => {
-          res.resume();
-          res.on('end', () =>
-            resolve({ status: res.statusCode, headers: res.headers }),
-          );
-        },
-      );
-      req.on('error', reject);
-      req.end();
-    });
 }
 
-test('every API response carries the API policy and nosniff in dev and preview', async (t) => {
+test('every API response carries the API policy and nosniff on real dev and preview servers', async (t) => {
   const policy = "default-src 'none'; sandbox";
+  const root = await makeFixtureRoot('gev-api-headers-');
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(
+    path.join(root, 'index.html'),
+    '<!doctype html><title>Fixture</title><p>x</p>',
+  );
   const install = (server) => {
     server.middlewares.use('/api/fixture', (req, res) => {
-      const route = req.url.split('?')[0];
+      const route = new URL(req.url, 'http://localhost').pathname;
       if (route === '/ok') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end('{}');
@@ -352,47 +325,67 @@ test('every API response carries the API policy and nosniff in dev and preview',
     configurePreviewServer: install,
   };
   const built = createBrowserViteConfig({ plugins: [fixture] });
-  const plugins = [
-    ...built.plugins.filter(
-      (plugin) =>
-        plugin === fixture ||
-        ['api-response-headers', 'host-check'].includes(plugin.name),
-    ),
-    apiNotFoundPlugin(),
-  ];
-  const config = {
-    server: {
-      allowedHosts: built.server.allowedHosts,
-      host: built.server.host,
-    },
-    preview: { allowedHosts: built.server.allowedHosts },
+  const base = {
+    root,
+    configFile: false,
+    envFile: false,
+    publicDir: false,
+    logLevel: 'silent',
   };
-  for (const hook of ['configureServer', 'configurePreviewServer']) {
-    const get = await servePlugins(t, plugins, hook, config);
-    for (const [path, status, csp = policy, host] of [
-      ['/api/fixture/ok', 200],
-      ['/api/fixture/error', 500],
-      ['/api/fixture/partial', 206],
-      ['/api/nope', 404],
-      ['/api', 404],
-      ['/api/fixture/ok?x=1', 200],
-      ['/api/fixture/ok', 403, policy, 'elsewhere.example'],
-      // A route's own policy is added to the API policy, never replaces it.
-      ['/api/fixture/own-policy', 200, `${policy}, frame-ancestors 'none'`],
-      ['/api/fixture/own-policy-head', 200, `${policy}, default-src *`],
-    ]) {
-      const res = await get(path, host);
-      const label = `${hook} ${path} ${host || ''}`;
-      assert.equal(res.status, status, label);
-      assert.equal(res.headers['content-security-policy'], csp, label);
-      assert.equal(res.headers['x-content-type-options'], 'nosniff', label);
+  await build(base);
+  for (const isPreview of [false, true]) {
+    const server = await (isPreview ? preview : createServer)({
+      ...base,
+      plugins: [
+        ...built.plugins.filter(
+          (plugin) =>
+            plugin === fixture ||
+            ['api-response-headers', 'host-check'].includes(plugin.name),
+        ),
+        apiNotFoundPlugin(),
+      ],
+      server: { host: '127.0.0.1', port: 0, hmr: false },
+      preview: { host: '127.0.0.1', port: 0 },
+    });
+    if (!isPreview) await server.listen();
+    const { port } = server.httpServer.address();
+    const mode = isPreview ? 'preview' : 'dev';
+    try {
+      for (const [target, status, csp = policy, headers] of [
+        ['/api/fixture/ok', 200],
+        ['/api/fixture/error', 500],
+        ['/api/fixture/partial', 206],
+        ['/api/nope', 404],
+        ['/api', 404],
+        ['/api/fixture/ok?x=1', 200],
+        // Spellings the router mounts as the same routes.
+        ['/API/fixture/ok', 200],
+        ['/Api/fixture/error', 500],
+        ['/aPi/nope', 404],
+        ['/API', 404],
+        ['/api.x', 404],
+        [`http://localhost:${port}/api/fixture/ok`, 200],
+        [`http://localhost:${port}/API/nope`, 404],
+        ['/api/fixture/ok', 403, policy, { host: 'elsewhere.example' }],
+        // A route's own policy is added to the API policy, never replaces it.
+        ['/api/fixture/own-policy', 200, `${policy}, frame-ancestors 'none'`],
+        ['/api/fixture/own-policy-head', 200, `${policy}, default-src *`],
+      ]) {
+        const res = await rawGet(port, target, headers);
+        const label = `${mode} ${target} ${JSON.stringify(headers || {})}`;
+        assert.equal(res.status, status, label);
+        assert.equal(res.headers['content-security-policy'], csp, label);
+        assert.equal(res.headers['x-content-type-options'], 'nosniff', label);
+      }
+      // The app document and other paths keep the server's own headers.
+      for (const target of ['/', '/apiary', '/src/api/x.js'])
+        assert.notEqual(
+          (await rawGet(port, target)).headers['content-security-policy'],
+          policy,
+          `${mode} ${target}`,
+        );
+    } finally {
+      await server.close();
     }
-    // The app document and other paths are left to the server's own headers.
-    for (const path of ['/', '/apiary', '/src/api/x.js'])
-      assert.equal(
-        (await get(path)).headers['content-security-policy'],
-        undefined,
-        `${hook} ${path}`,
-      );
   }
 });

@@ -33,11 +33,12 @@ existing recovery behavior.
 Every `/api` response on the dev and preview servers carries
 `Content-Security-Policy: default-src 'none'; sandbox` and
 `X-Content-Type-Options: nosniff`. `apiResponseHeadersPlugin` sets them ahead of
-the Host check, so errors, partial responses, Host refusals and unknown routes
-are covered too; a route's own policy is sent as an additional policy, never in
-place of it. The app document's policy is unchanged. The GBFS proxy relays only
-bodies that parse as JSON, re-serialized as `application/json; charset=utf-8`;
-anything else answers 502.
+the Host check and matches `/api` the way the router mounts it (any letter case, a
+`/` or `.` boundary, absolute-form targets), so errors, partial responses, Host
+refusals and unknown routes are covered too; a route's own policy is sent as an
+additional policy, never in place of it. The app document's policy is unchanged.
+The GBFS proxy relays only bodies that parse as JSON, re-serialized as
+`application/json; charset=utf-8`; anything else answers 502.
 
 Catalog source contracts and their consuming layers are declared in
 `src/app/sourceComposition.js`. Omitted or null acquisition sources preserve layer
