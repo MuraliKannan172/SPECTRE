@@ -12,6 +12,7 @@ import { formatNumber, msg, t, tn, translateKnown } from '../i18n/index.js';
 import { createRailCardBlocks } from './railCardBlocks.js';
 import { createRailCards } from './railCards.js';
 import { createImagerySplit } from './imagerySplit.js';
+import { createSegmentedControl } from './segmentedControl.js';
 import {
   PRODUCTS,
   hhmm,
@@ -286,13 +287,13 @@ export function createRecentImageryPanel({
   const selection = el('section', 'ri-block ri-selection', root);
   selection.id = 'ri-selection';
   selection.setAttribute('aria-label', t('On the map'));
-  const modeGroup = el('div', 'ri-mode', selection);
+  const modeGroup = el('div', 'gev-segmented ri-mode', selection);
   modeGroup.id = 'ri-mode';
   modeGroup.setAttribute('role', 'radiogroup');
   modeGroup.setAttribute('aria-label', t('Mode'));
   const modeButtons = new Map(
     MODE_LABELS.map(([mode, label]) => {
-      const node = el('button', 'data-toggle-chip ri-mode-btn', modeGroup);
+      const node = el('button', 'gev-segment ri-mode-btn', modeGroup);
       node.type = 'button';
       node.textContent = t(label);
       node.dataset.mode = mode;
@@ -300,6 +301,15 @@ export function createRecentImageryPanel({
       return [mode, node];
     }),
   );
+  const modeControl = createSegmentedControl({
+    buttons: modeButtons.values(),
+    valueOf: (button) => button.dataset.mode,
+    onChange: (mode) => layer.setMode(mode),
+    keyboard: 'arrows',
+    keyTarget: modeGroup,
+    readValue: () => snapshot.mode,
+    listen,
+  });
   const slotRows = {};
   for (const slotId of ['a', 'b']) {
     const row = el('div', 'ri-slot', selection);
@@ -668,12 +678,7 @@ export function createRecentImageryPanel({
   function renderSelection() {
     const { mode } = snapshot;
     set(selection.dataset, 'mode', mode);
-    for (const [id, node] of modeButtons) {
-      const on = id === mode;
-      attribute(node, 'aria-checked', String(on));
-      toggle(node, 'active', on);
-      set(node, 'tabIndex', on ? 0 : -1);
-    }
+    modeControl.update(mode, { rovingFocus: true });
     const ab = mode === 'ab';
     for (const slotId of ['a', 'b']) {
       const { row, tag, value, unpin } = slotRows[slotId];
@@ -1065,11 +1070,6 @@ export function createRecentImageryPanel({
       strip.focus({ preventScroll: true });
       return;
     }
-    const mode = target?.closest?.('.ri-mode-btn');
-    if (mode) {
-      layer.setMode(mode.dataset.mode);
-      return;
-    }
     if (target?.closest?.('.ri-swap') && !swap.disabled) {
       layer.swapSides?.();
       return;
@@ -1084,21 +1084,6 @@ export function createRecentImageryPanel({
 
   listen(root, 'input', (event) => {
     if (event.target === opacity) layer.setAlpha(Number(opacity.value) / 100);
-  });
-
-  listen(modeGroup, 'keydown', (event) => {
-    const order = MODE_LABELS.map(([mode]) => mode);
-    const step =
-      { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[event.key] ||
-      0;
-    if (!step) return;
-    event.preventDefault();
-    const next =
-      order[
-        (order.indexOf(snapshot.mode) + step + order.length) % order.length
-      ];
-    layer.setMode(next);
-    modeButtons.get(next)?.focus?.();
   });
 
   listen(strip, 'keydown', (event) => {

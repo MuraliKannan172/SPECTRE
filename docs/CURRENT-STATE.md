@@ -1224,6 +1224,21 @@ The application supplies actions and retains effect settings, restore claims and
 rendering. Native keyboard editing, model modes and current defaults are preserved.
 Destroying the UI removes these listeners before asynchronous teardown.
 
+## Segmented selectors
+
+Segmented selectors use the controlled DOM adapter in `ui/segmentedControl.js`
+and the shared `gev-segmented` / `gev-segment` surface. Model coverage, label
+allocation, drawing shape, Street View fit/panorama filters and imagery mode keep
+their feature-owned values, actions and persistence. Painting a restored value
+does not emit a change or move focus. Existing keyboard policies remain explicit:
+Street View uses arrows/Home/End with one tab stop, imagery mode uses arrows from
+its controlled selection, and Display keeps its existing native button behavior.
+Pure value navigation is separate from DOM rendering for reuse by a future view.
+Segments keep their word minimum width: compact inline groups such as FIT/FILL
+and ALL/360°/FLAT must not break short labels mid-word. Collapsed Weather follows
+the same exclusive-rail hiding rule as the other readouts.
+Browser acceptance: `QA_BASE_URL=http://127.0.0.1:4173 node scripts/qa-segmented-controls.mjs`.
+
 ## Application shortcuts and shader parameter controls
 
 `ui/input` supplies the bubbling application shortcut listener and generated

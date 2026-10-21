@@ -321,7 +321,6 @@ html:not([lang='en'])
 .recent-imagery-readout .ri-mode {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
 }
 .recent-imagery-readout .ri-selection .data-toggle-chip {
   height: 20px;
