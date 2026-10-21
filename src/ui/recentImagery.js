@@ -12,6 +12,7 @@ import { formatNumber, msg, t, tn, translateKnown } from '../i18n/index.js';
 import { createRailCardBlocks } from './railCardBlocks.js';
 import { createRailCards } from './railCards.js';
 import { createImagerySplit } from './imagerySplit.js';
+import { createSlider } from './slider.js';
 import { createSegmentedControl } from './segmentedControl.js';
 import {
   PRODUCTS,
@@ -328,16 +329,17 @@ export function createRecentImageryPanel({
   const opacityLabel = el('label', 'ri-opacity-label', controls);
   el('span', '', opacityLabel, t('OPACITY'));
   const opacityValue = el('span', 'ri-opacity-value', opacityLabel, '100%');
-  const opacity = el('input', 'ri-opacity', controls);
-  opacity.id = 'ri-opacity';
-  Object.assign(opacity, {
-    type: 'range',
+  const opacity = createSlider({
+    documentRef: document,
+    className: 'ri-opacity',
     min: '0',
     max: '100',
     step: '1',
     value: '100',
+    ariaLabel: t('Imagery opacity'),
   });
-  opacity.setAttribute('aria-label', t('Imagery opacity'));
+  opacity.id = 'ri-opacity';
+  controls.appendChild(opacity);
   opacityLabel.htmlFor = 'ri-opacity';
   // Its slot is always there; it is only usable while a swipe is live.
   const swap = el('button', 'data-toggle-chip ri-swap', controls, t('SWAP'));

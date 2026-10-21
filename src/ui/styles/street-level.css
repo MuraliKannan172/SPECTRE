@@ -236,19 +236,6 @@ html:not([lang='en']) .sl-meta-row .sl-nearest-btn {
   gap: 4px 10px;
 }
 
-.sl-range {
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-  accent-color: var(--sl-green);
-  cursor: pointer;
-}
-
-.sl-range:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 3px;
-}
-
 .sl-since-note {
   grid-column: 2;
   font-family: var(--font-mono);
