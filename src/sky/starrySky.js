@@ -161,9 +161,9 @@ export class StarrySky {
     this._loading = false;
     this._starData = undefined;
     this._faceImages = undefined;
-    // Not `_cubeMap`: Scene reads `skyBox._cubeMap` as the environment map
-    // that lights models, in the TEME, flipY layout of its own sky box. This
-    // ICRF map would light them rotated, so models keep Cesium's default.
+    // Scene reads `_cubeMap` for model lighting. Keep it dark as on main;
+    // Cesium's fallback is white, and the ICRF glow is only a background.
+    this._cubeMap = undefined;
     this._milkyWayCubeMap = undefined;
     this._milkyWayCommand = undefined;
     this._milkyWayAttributes = undefined;
@@ -391,6 +391,25 @@ export class StarrySky {
     const { mode, passes, context } = frameState;
     if (mode !== Cesium.SceneMode.SCENE3D) return undefined;
     if (!passes.render) return undefined;
+    if (!this._cubeMap) {
+      const face = {
+        width: 1,
+        height: 1,
+        arrayBufferView: new Uint8Array([0, 0, 0, 255]),
+      };
+      this._cubeMap = new Cesium.CubeMap({
+        context,
+        source: {
+          positiveX: face,
+          negativeX: face,
+          positiveY: face,
+          negativeY: face,
+          positiveZ: face,
+          negativeZ: face,
+        },
+        flipY: false,
+      });
+    }
     this._load();
     let rebuilt = false;
     if (this._faceImages && !this._milkyWayCommand) {
@@ -422,6 +441,7 @@ export class StarrySky {
       command.shaderProgram?.destroy();
     }
     this._milkyWayCubeMap = this._milkyWayCubeMap?.destroy();
+    this._cubeMap = this._cubeMap?.destroy();
     this._milkyWayCommand = undefined;
     this._starCommand = undefined;
     this._commands.length = 0;

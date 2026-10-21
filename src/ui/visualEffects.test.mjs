@@ -179,6 +179,20 @@ test('the anime stage fades the Milky Way out with its own intensity', () => {
   f.effects.destroy();
 });
 
+for (const skyBox of [undefined, null, {}]) {
+  test(`anime works without StarrySky (${JSON.stringify(skyBox)})`, () => {
+    const f = fixture();
+    f.effects.viewer.scene.skyBox = skyBox;
+    f.effects.initStyles();
+    f.effects.setStageIntensity(f.effects.stages.anime, 1);
+    assert.equal(f.effects.stages.anime.enabled, true);
+    f.effects.setStageIntensity(f.effects.stages.anime, 0);
+    assert.equal(f.effects.stages.anime.enabled, false);
+    if (skyBox) assert.equal('milkyWayVisibility' in skyBox, false);
+    f.effects.destroy();
+  });
+}
+
 test('bloom retains its dead zone, normalized intensity and independent toggle', () => {
   const f = fixture();
   f.effects.initPostProcess();

@@ -92,6 +92,7 @@ test('the sky draws nothing when hidden, outside 3D, or in a pick pass', () => {
     undefined,
   );
   // Nothing has loaded yet, so even a render pass has no command.
+  sky._cubeMap = { destroy() {} }; // no WebGL context in this unit test
   assert.equal(sky.update(frameState()), undefined);
   assert.equal(sky.isDestroyed(), false);
   assert.equal(sky.destroy(), undefined);
@@ -132,4 +133,68 @@ test('the Milky Way glow scales with its visibility, for styles that hide it', (
   sky.milkyWayVisibility = 0;
   assert.equal(sky._milkyWayUniforms.u_intensity(), 0);
   sky.destroy();
+});
+
+test('destroy releases both the background and model environment maps', () => {
+  const sky = new StarrySky({ requestRender: () => {} });
+  let destroyed = 0;
+  sky._cubeMap = {
+    destroy: () => {
+      destroyed++;
+    },
+  };
+  sky._milkyWayCubeMap = {
+    destroy: () => {
+      destroyed++;
+    },
+  };
+  sky.destroy();
+  assert.equal(destroyed, 2);
+  assert.equal(sky._cubeMap, undefined);
+  assert.equal(sky._milkyWayCubeMap, undefined);
+  sky.destroy();
+  assert.equal(destroyed, 2);
+});
+
+test('a render update uploads six opaque black environment faces only once', () => {
+  const uploads = [];
+  const gl = {
+    ...Cesium.WebGLConstants,
+    createTexture: () => ({}),
+    activeTexture() {},
+    bindTexture() {},
+    texParameteri() {},
+    pixelStorei() {},
+    texImage2D: (...args) => uploads.push(args),
+    deleteTexture() {},
+  };
+  const previous = Cesium.ContextLimits._maximumCubeMapSize;
+  Cesium.ContextLimits._maximumCubeMapSize = 16;
+  const sky = new StarrySky({ requestRender: () => {} });
+  sky._loading = true;
+  const state = {
+    context: { _gl: gl },
+    mode: Cesium.SceneMode.SCENE3D,
+    passes: { render: true },
+  };
+  try {
+    sky.update(state);
+    const environment = sky._cubeMap;
+    assert.ok(environment instanceof Cesium.CubeMap);
+    assert.equal(uploads.length, 6);
+    assert.equal(new Set(uploads.map((args) => args[0])).size, 6);
+    for (const args of uploads) {
+      assert.equal(args[3], 1);
+      assert.equal(args[4], 1);
+      assert.deepEqual([...args[8]], [0, 0, 0, 255]);
+    }
+    sky.update(state);
+    assert.equal(sky._cubeMap, environment);
+    assert.equal(uploads.length, 6);
+    sky.destroy();
+    assert.equal(environment.isDestroyed(), true);
+  } finally {
+    if (!sky.isDestroyed()) sky.destroy();
+    Cesium.ContextLimits._maximumCubeMapSize = previous;
+  }
 });

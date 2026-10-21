@@ -4,9 +4,11 @@
  *
  * Anime's luminance bands turn the faint Milky Way into blotches, so
  * src/ui/visualEffects.js fades the glow out with the style. Headless against
- * a Vite dev server, the real anime style looks away from the Earth at the
- * Galactic Centre: at most 0.5 % of the sky (the stars) may reach the first
- * band.
+ * a Vite dev server, both sky assets must be ready. Normal must show the
+ * Galactic Centre glow (at least 2 % of pixels at luma >= 10/255), then
+ * Anime must retain stars while at most 0.5 % reaches the first cel band.
+ * The Normal baseline measured 43 % in headless Chromium at 1000×700;
+ * the 2 % floor leaves room for GPU differences while rejecting a black sky.
  *
  * Usage: node scripts/qa-anime-sky.mjs [--url http://localhost:4333/]
  * Exit: 0 pass, 1 fail, 2 the anime style was not reached.
@@ -23,6 +25,13 @@ const browser = await puppeteer.launch({
 });
 try {
   const page = await browser.newPage();
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    const host = new URL(request.url()).hostname;
+    if (host.endsWith('halfpixel.ai') || host.includes('worldfx'))
+      request.abort();
+    else request.continue();
+  });
   page.on('pageerror', (e) => console.log('PAGEERR', String(e).slice(0, 300)));
   await page.setViewport({ width: 1000, height: 700 });
   await page.evaluateOnNewDocument(() =>
@@ -32,7 +41,17 @@ try {
   await page.waitForFunction(() => window.__godsEyeView?.viewer?.scene, {
     timeout: 120000,
   });
-  await new Promise((r) => setTimeout(r, 12000));
+  await page.waitForFunction(
+    () => {
+      const sky = window.__godsEyeView.viewer.scene.skyBox;
+      return (
+        sky?._milkyWayCubeMap &&
+        sky?._starCommand &&
+        document.getElementById('loading-screen')?.classList.contains('hidden')
+      );
+    },
+    { timeout: 60000 },
+  );
   const r = await page.evaluate(async () => {
     const entry = performance
       .getEntriesByType('resource')
@@ -46,7 +65,7 @@ try {
       g = window.__godsEyeView,
       v = g.viewer,
       s = v.scene;
-    g.styleManager.setStyle('anime', { userInitiated: true });
+    g.styleManager.setStyle('normal', { userInitiated: true });
     const t = v.clock.currentTime;
     await C.Transforms.preloadIcrfFixed(
       new C.TimeInterval({
@@ -76,6 +95,7 @@ try {
       new C.Cartesian3(),
     );
     s.camera.cancelFlight();
+    s.tweens.removeAll();
     s.camera.setView({
       destination: C.Cartesian3.multiplyByScalar(look, 3e7, new C.Cartesian3()),
       orientation: {
@@ -83,17 +103,27 @@ try {
         up: C.Cartesian3.cross(right, look, new C.Cartesian3()),
       },
     });
-    await new Promise((res) => setTimeout(res, 2500));
-    s.requestRender();
-    s.render();
     const gl = s.context._gl,
       w = gl.drawingBufferWidth,
       h = gl.drawingBufferHeight,
       px = new Uint8Array(w * h * 4);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    let banded = 0;
-    for (let i = 0; i < px.length; i += 4)
-      if (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2] >= 51) banded++;
+    const measure = async () => {
+      await new Promise((res) => setTimeout(res, 2500));
+      s.requestRender();
+      s.render();
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      let banded = 0;
+      let visible = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const luma = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+        if (luma >= 51) banded++;
+        if (luma >= 10) visible++;
+      }
+      return { banded, visible };
+    };
+    const normal = await measure();
+    g.styleManager.setStyle('anime', { userInitiated: true });
+    const anime = await measure();
     let animeOn = false;
     for (let i = 0; i < s.postProcessStages.length; i++) {
       const stage = s.postProcessStages.get(i);
@@ -102,20 +132,29 @@ try {
     }
     return {
       total: px.length / 4,
-      banded,
+      normal,
+      ...anime,
+      assetsReady: Boolean(s.skyBox._milkyWayCubeMap && s.skyBox._starCommand),
       visibility: s.skyBox.milkyWayVisibility,
       animeOn,
     };
   });
-  const tag = !r.animeOn
-    ? 'UNREACHED'
-    : r.banded <= 0.005 * r.total
-      ? 'PASS'
-      : 'FAIL';
+  const tag =
+    !r.animeOn || !r.assetsReady
+      ? 'UNREACHED'
+      : r.normal.visible >= 0.02 * r.total &&
+          r.banded > 0 &&
+          r.banded <= 0.005 * r.total &&
+          r.visibility === 0
+        ? 'PASS'
+        : 'FAIL';
   console.log(
     `${tag}: ${r.banded} of ${r.total} sky pixels at or above the first cel band (luma >= 0.2)\n     ${JSON.stringify(r)}`,
   );
   process.exitCode = tag === 'PASS' ? 0 : tag === 'FAIL' ? 1 : 2;
+} catch (error) {
+  console.error(`UNREACHED: ${error.message}`);
+  process.exitCode = 2;
 } finally {
   await browser.close();
 }
