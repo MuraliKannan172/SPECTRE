@@ -1233,6 +1233,17 @@ Feature owners retain bounds, steps, formatted values, input/change timing and
 listener cleanup. The radio tuning dial, imagery comparison divider and event
 comparison/progression controls keep their specialized presentation and behavior.
 
+## Shared control CSS ownership
+
+Shared styles own ordinary control surfaces and interaction states; feature CSS
+owns surrounding layout and context-specific sizing. CCTV's calibration editor
+width lives in `ui/styles/cctv.css`, while the shared inline field variant owns
+only density and spinner treatment. Radio supplies its field palette and disabled
+opacity through the `--gev-field-*` variables, retaining compact typography and
+arrow space locally. Cyber supplies shared-field palette variables explicitly;
+its legacy native-field palette rules exclude `.gev-field`. These ownership
+boundaries preserve the current Tactical/Cyber appearance and native behavior.
+
 ## Ordinary status badges
 
 CCTV source/frame labels, calibration provenance and Weather coverage labels use
