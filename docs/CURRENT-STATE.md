@@ -1251,6 +1251,58 @@ Feature owners retain bounds, steps, formatted values, input/change timing and
 listener cleanup. The radio tuning dial, imagery comparison divider and event
 comparison/progression controls keep their specialized presentation and behavior.
 
+## Shared control CSS ownership
+
+Shared styles own ordinary control surfaces and interaction states; feature CSS
+owns surrounding layout and context-specific sizing. CCTV's calibration editor
+width lives in `ui/styles/cctv.css`, while the shared inline field variant owns
+only density and spinner treatment. Radio supplies its field palette and disabled
+opacity through the `--gev-field-*` variables, retaining compact typography and
+arrow space locally. Cyber supplies shared-field palette variables explicitly;
+its legacy native-field palette rules exclude `.gev-field`. These ownership
+boundaries preserve the current Tactical/Cyber appearance and native behavior.
+
+## Ordinary status badges
+
+CCTV source/frame labels, calibration provenance and Weather coverage labels use
+`ui/statusBadge.js` and the `gev-status-badge` CSS surface. The listener-free
+adapter accepts already-translated `label` and `hidden` values; pill, box and plain
+appearances describe shape/density only. Static CCTV markup uses the same classes
+as generated rail-card badges. Repeated identical updates do not rewrite text or
+replace nodes. Empty coverage remains hidden.
+
+Feature owners retain the status rules, machine-state attributes, translations
+and announcement policy. CCTV frame acquisition (`idle/loading/error/ready`)
+remains separate from provider status: retained pixels do not imply a healthy
+feed. Calibration still distinguishes manually saved, catalog-curated and raw
+prior poses; unsaved edits override the label until save/reset. Coverage labels
+remain geographic scope, not health claims. Existing colors and the source
+badge's polite live region are preserved; coverage and calibration do not gain
+live regions. Interactive layer toggles, progress indicators and world overlays
+retain their specialized ownership. Vue can reuse the view contract and CSS while
+replacing DOM construction. Browser acceptance:
+`QA_BASE_URL=http://127.0.0.1:4189 node scripts/qa-status-badges.mjs`.
+
+## Ordinary action buttons
+
+Scene panel actions, shot LOAD/DEL actions, the EDIT DETAILS / SHARE SCENE
+bar and one-shot CCTV actions use `ui/actionButton.js` and the shared
+`gev-action-button` surface in `ui/styles/action-button.css`. Static templates
+apply the same classes as generated buttons. The native builder accepts translated
+text, default/danger variants, default/compact sizes and disabled/accessibility
+properties; it installs no listeners and owns no application state. Feature
+controllers retain callbacks, enable/disable rules, confirmation prompts,
+persistence and teardown. The smaller shot actions retain their existing sizing
+and hover treatment. Feature CSS still owns panel layout and translated wrapping.
+
+CCTV enable, coverage, auto-hop, projection and adjustment toggles, editable
+calibration-value chips and the scene authoring dialogs retain their specialized
+controls. Existing `scene-btn` hooks remain compatible with Street Level and
+legacy toggles. The shared CSS, explicit input/action boundary and behavior tests
+can carry to a Vue view while Vue replaces native DOM construction.
+Browser acceptance: `QA_BASE_URL=http://127.0.0.1:4179 node scripts/qa-action-buttons.mjs`;
+`qa-scene-controls.mjs` also covers real Scene authoring/playback with native Space capture.
+
 ## Segmented selectors
 
 Segmented selectors use the controlled DOM adapter in `ui/segmentedControl.js`
@@ -2817,11 +2869,16 @@ down | auth-failed` (plus the unchanged `missing-key`/`unsupported`) with
 >   first later successful fetch. Smaller chunks reduce timeout risk; complete
 >   camera batches still wait for their sequential requests, and unresolved
 >   placement continues to use the existing prior until real heights arrive.
-> - **Overpass cache admission:** `/api/overpass` parses and sanitizes requests,
->   then checks fresh memory, identical in-flight work, and fresh disk entries
->   before invoking its local 90/min limiter. Cache and single-flight responses
->   therefore do not spend quota; upstream-bound misses retain the existing
->   limiter, configured-upstream, stale, and sanitization behavior. An unconfigured transport serves dated stale data or a non-retryable capability error.
+> - **Overpass cache admission:** `/api/overpass` refuses cross-site and forwarded
+>   POSTs through the shared local-request gate, then limits requests to 300/min
+>   per socket peer and 900/min globally before reading or validating bodies.
+>   Tag-filter brackets are scanned once; nested or unmatched brackets return 400.
+>   It then checks fresh memory, identical in-flight work, and fresh disk entries
+>   before invoking its separate local 90/min upstream limiter. Cache and
+>   single-flight responses therefore do not spend upstream quota; upstream-bound
+>   misses retain the existing limiter, configured-upstream, stale, and sanitization
+>   behavior. An unconfigured transport serves dated stale data or a non-retryable
+>   capability error.
 > - **CCTV world-click focus:** clicking an in-world CCTV icon or ambient card
 >   activates it and routes the camera flight through the panel FOCUS policy.
 >   Aircraft/satellite tracking releases outside cockpit; cockpit retains the
@@ -4637,6 +4694,12 @@ Retry-After; absent delays back off from 30 seconds to five minutes. Empty
 remain. Malformed capability-probe responses remain unknown and are retried after the existing 30-second backoff; valid configured decisions remain memoized.
 Consumer capability misses never schedule automatic retries.
 
+Keyless browser validation also probes the optional Google tiles-token route.
+The token client cancels rejected response bodies before returning unavailable,
+so they do not remain pending in browser network observation. The Overpass gate
+accepts only that same-origin route's expected 404 console diagnostic; other
+HTTP and JavaScript errors still fail acceptance.
+
 Operator-configured Overpass area and focus-footprint queries use body-level
 `out geom` (with `center` for focus), preserving relation member outlines.
 Member geometry is printed only inside a box around the point (6 km for
@@ -5085,7 +5148,7 @@ pins and share links already supply complete boxes.
 - Fleet model eligibility is distance-based with on-screen priority and hard caps (`MODEL_MAX`, `MODEL_MAX_ALL`) to avoid draw-call explosions. Each model owns its own `modelMatrix`; shared scratch matrices are forbidden because they caused stacking/flicker.
 - Tracked aircraft use standalone model primitives driven from the already-settled dead-reckoned display position, while the tracked Cesium entity remains billboard-backed so `viewer.trackedEntity` always has a ready bounding sphere.
 - Flights and military layers mirror the same tracking invariants: no warm-up freeze/jump, altitude-scaled framing, trail head glued to the displayed plane, no pull-out when switching targets, and no cross-layer orphan when switching between commercial and military tracks.
-- Regression surface: `npm run test:track` drives the real app headless with synthetic aircraft feeds and asserts the tracking invariants without depending on live OpenSky/adsb data. `src/data/trackedModelRegime.test.mjs` pins the tracked contact's threshold math, the enter/exit asymmetry, and the default-on / cockpit / TR-3B / deselect wiring in both layers.
+- Regression surface: `npm run test:track` drives the real app headless with synthetic aircraft feeds and asserts the tracking invariants without depending on live OpenSky/adsb data. Arrival-rotation checks observe the first reveal within a bounded wall-clock window before the one-second idle fallback, rather than assuming the 80 ms fleet cadence fits inside four rendered frames; an incorrect first orientation fails immediately. `src/data/trackedModelRegime.test.mjs` pins the tracked contact's threshold math, the enter/exit asymmetry, and the default-on / cockpit / TR-3B / deselect wiring in both layers.
 
 ### TR-3B conversion Easter egg (August 2026)
 
@@ -5956,3 +6019,20 @@ datacenters, dams and the Nepal locator retain that shared credit while displaye
 
 Military fragments stitch by source identity. Different mapped parcels merge only
 when their footprints touch or contain one another, never across a seam tolerance gap.
+
+### Shared native dropdowns and numeric fields
+
+- Scene and CCTV selects share the default `gev-field` surface. HUD layout and
+  draw colour retain compact density. Radio filter, tuner gain and FM frequency
+  use the same base while retaining their feature-specific skins and layout.
+- The CCTV inline number editor uses `createNumberInput` with its existing
+  precision and inline density. Enter/blur commit, Escape cancellation, frozen
+  camera base, camera-switch guards and disposal remain with CCTV controls.
+- Options, values, native keyboard/typeahead, disabled attributes and browser
+  validity remain native. Frequency bounds, tuner commit timing and calibration
+  parsing are unchanged. Specialized tuner graphics and calibration chips
+  retain their own controls. Provider settings and scene-authoring dialogs are
+  outside this change.
+- `scripts/qa-form-fields.mjs` exercises native selections, number validity,
+  calibration commit/cancel and stale-camera/disposal guards against an installed
+  controller with fixture ports, plus default/Cyber and narrow translated layouts.

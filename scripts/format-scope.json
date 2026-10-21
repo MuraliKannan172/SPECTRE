@@ -2,6 +2,8 @@
   ".prettierrc.json",
   "package.json",
   "scripts/format-scope.json",
+  "src/ui/styles/form-field.css",
+  "scripts/qa-form-fields.mjs",
   "scripts/package-boundaries.json",
   "scripts/format.mjs",
   "scripts/next-layer-state-token.mjs",
@@ -281,6 +283,7 @@
   "src/ui/scenePresentation.js",
   "src/ui/sceneControls.test.mjs",
   "scripts/qa-scene-controls.mjs",
+  "scripts/qa-action-buttons.mjs",
   "src/ui.js",
   "src/standalone/ui.js",
   "src/ui/applicationShell.js",
@@ -305,6 +308,7 @@
   "src/ui/styles/layers.css",
   "src/ui/styles/controls.css",
   "src/ui/styles/slider.css",
+  "src/ui/styles/action-button.css",
   "src/ui/styles/cctv.css",
   "src/ui/styles/foundation.css",
   "src/ui/styles/first-run.css",
@@ -1076,5 +1080,11 @@
   "src/tooling/skyAssets.test.mjs",
   "src/tooling/skyAssets.paintOut.test.mjs",
   "scripts/qa-anime-sky.mjs",
-  "scripts/qa-sky-model-lighting.mjs"
+  "scripts/qa-sky-model-lighting.mjs",
+  "server/providers/overpass/requestAdmission.test.mjs",
+  "src/tooling/trackArrivalObservation.test.mjs",
+  "src/ui/styles/status-badge.css",
+  "src/ui/statusBadge.test.mjs",
+  "src/ui/cctvBadges.test.mjs",
+  "scripts/qa-status-badges.mjs"
 ]
