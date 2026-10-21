@@ -1,0 +1,29 @@
+/* Chinese text. The UI sets Latin capitals with wide tracking; Chinese set
+   that way falls apart into single glyphs, so its tracking stays tight. The
+   intel HUD readouts (codes, coordinates) and text kept in English on purpose
+   (translate="no", and whatever holds it) keep the Latin look. */
+html:lang(zh)
+  body
+  :not(
+    #intel-hud,
+    #intel-hud *,
+    [translate='no'],
+    [translate='no'] *,
+    :has([translate='no'])
+  ) {
+  letter-spacing: 0.02em !important;
+}
+
+/* Below about 9px a Chinese glyph blurs: lift the dock's voice labels and the
+   panel layer buttons to that floor. */
+html:lang(zh) #command-dock .gev-mic-label,
+html:lang(zh) #command-dock #gev-voice-detail,
+html:lang(zh) .gev-voice-tier-btn,
+html:lang(zh) .panel-layer-toggle {
+  font-size: 9px;
+}
+
+/* A two-glyph button label must not break between its glyphs. */
+html:lang(zh) .pp-mode-btn {
+  white-space: nowrap;
+}

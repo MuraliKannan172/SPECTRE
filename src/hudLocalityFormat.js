@@ -35,7 +35,16 @@ export const LOCALIZED_LOCALITY = Object.freeze({
     }),
   sector: ({ latDeg, lonDeg }) =>
     t('SECTOR {lat} {lon}', {
-      lat: hudCoordinate(latDeg, t('N'), t('S')),
-      lon: hudCoordinate(lonDeg, t('E'), t('W')),
+      // Hemisphere letters, not compass words: 21.33N, never 21.33北.
+      lat: hudCoordinate(
+        latDeg,
+        t('N', { context: 'hemisphere' }),
+        t('S', { context: 'hemisphere' }),
+      ),
+      lon: hudCoordinate(
+        lonDeg,
+        t('E', { context: 'hemisphere' }),
+        t('W', { context: 'hemisphere' }),
+      ),
     }),
 });
