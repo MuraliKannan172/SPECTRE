@@ -1078,6 +1078,5 @@
   "src/ui/statusBadge.test.mjs",
   "src/ui/cctvBadges.test.mjs",
   "scripts/qa-status-badges.mjs",
-  "src/data/routeSegment.test.mjs",
   "src/dockerTrustedPeers.test.mjs"
 ]
