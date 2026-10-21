@@ -5938,3 +5938,20 @@ datacenters, dams and the Nepal locator retain that shared credit while displaye
 
 Military fragments stitch by source identity. Different mapped parcels merge only
 when their footprints touch or contain one another, never across a seam tolerance gap.
+
+### Shared native dropdowns and numeric fields
+
+- Scene and CCTV selects share the default `gev-field` surface. HUD layout and
+  draw colour retain compact density. Radio filter, tuner gain and FM frequency
+  use the same base while retaining their feature-specific skins and layout.
+- The CCTV inline number editor uses `createNumberInput` with its existing
+  precision and inline density. Enter/blur commit, Escape cancellation, frozen
+  camera base, camera-switch guards and disposal remain with CCTV controls.
+- Options, values, native keyboard/typeahead, disabled attributes and browser
+  validity remain native. Frequency bounds, tuner commit timing and calibration
+  parsing are unchanged. Specialized tuner graphics and calibration chips
+  retain their own controls. Provider settings and scene-authoring dialogs are
+  outside this change.
+- `scripts/qa-form-fields.mjs` exercises native selections, number validity,
+  calibration commit/cancel and stale-camera/disposal guards against an installed
+  controller with fixture ports, plus default/Cyber and narrow translated layouts.
