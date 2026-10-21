@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadTflSourcesFromOpenData } from '../../server/providers/cctv/sources.js';
 import { fetchWithinHost } from '../../server/providers/cctv/media.js';
+import { pinnedCameraUrl } from '../../server/providers/cctv/normalize.js';
 
 const BUCKET = 'https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/';
 
@@ -103,4 +104,11 @@ test('a redirect on a pinned camera host stays inside the pinned directory', asy
         : new Response('frame'),
   );
   assert.equal(await unpinned.text(), 'frame');
+});
+
+test('a pin prefix without a trailing slash still names a directory', () => {
+  assert.equal(
+    pinnedCameraUrl('https://h.example/camsX/a.jpg', 'https://h.example/cams'),
+    null,
+  );
 });

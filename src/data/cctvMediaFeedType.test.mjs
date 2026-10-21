@@ -491,6 +491,9 @@ test('a forwarded same-origin request reaches every CCTV route but not the Stree
     { via: '1.1 proxy' },
     { forwarded: 'for=203.0.113.9' },
     { 'x-real-ip': '203.0.113.9' },
+    { 'x-forwarded-for': '' },
+    { 'x-forwarded-for': '  ' },
+    { 'cf-connecting-ip': '' },
   ]) {
     const headers = { host, 'sec-fetch-site': 'same-origin', ...forwarded };
     const label = JSON.stringify(forwarded);

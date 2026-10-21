@@ -366,6 +366,9 @@ test('every API response carries the API policy and nosniff on real dev and prev
         ['/api.x', 404],
         [`http://localhost:${port}/api/fixture/ok`, 200],
         [`http://localhost:${port}/API/nope`, 404],
+        // The router keeps dot segments in an absolute-form target's path.
+        ['http://elsewhere.example/api/../x', 404],
+        ['http://elsewhere.example/API/%2e%2e/x', 404],
         ['/api/fixture/ok', 403, policy, { host: 'elsewhere.example' }],
         // A route's own policy is added to the API policy, never replaces it.
         ['/api/fixture/own-policy', 200, `${policy}, frame-ancestors 'none'`],

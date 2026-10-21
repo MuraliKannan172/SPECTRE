@@ -62,19 +62,25 @@ export const API_HEADERS = Object.freeze({
 
 /**
  * Whether a request reaches an `/api` mount, by the router's own rule: the
- * prefix compared without case and followed by the end, `/` or `.`. Both the
- * raw path and the parsed one (which also covers an absolute-form target) are
- * checked, so no spelling the router mounts can miss the headers.
+ * prefix compared without case and followed by the end, `/` or `.`. The router
+ * reads an absolute-form target's path without resolving dot segments, so the
+ * path is taken here the same way (scheme and authority dropped, backslashes as
+ * slashes), alongside the raw and the fully parsed path; any match counts.
  */
 function isApiPath(url) {
   const raw = String(url || '/');
+  const target = raw
+    .trim()
+    .split(/[?#]/, 1)[0]
+    .replace(/\\/g, '/')
+    .replace(/^[a-z][a-z0-9+.-]*:(?:\/\/[^/]*)?/i, '');
   let parsed = '';
   try {
     parsed = new URL(raw, 'http://localhost').pathname;
   } catch {
-    /* the raw path still decides */
+    /* the unparsed paths still decide */
   }
-  return [raw.split(/[?#]/, 1)[0], parsed].some((path) =>
+  return [raw.split(/[?#]/, 1)[0], target, parsed].some((path) =>
     /^\/api(?:$|[/.])/i.test(path),
   );
 }
