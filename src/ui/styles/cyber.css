@@ -171,6 +171,7 @@
     .dock-tray-toggle,
     .dock-popover,
     .scene-btn,
+    .gev-action-button:not(.gev-action-button--compact),
     .context-mode-button,
     .map-stack-chip,
     .key-setup-chip,
