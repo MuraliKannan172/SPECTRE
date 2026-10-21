@@ -274,6 +274,42 @@ try {
     cyber.consistent,
     JSON.stringify(cyber),
   );
+  await page.evaluate(async () => {
+    const { dataManager, styleManager } = window.__godsEyeView;
+    await dataManager.setEnabled('recent-imagery', true);
+    styleManager.setPanelCollapsed('recent-imagery-panel', false, {
+      persist: false,
+      syncShare: false,
+    });
+  });
+  for (const width of [1440, 620, 390]) {
+    await page.setViewport({ width, height: 900 });
+    await page.focus('.ri-mode-btn[aria-checked="true"]');
+    const modeLayout = await page.evaluate(() => {
+      const group = document.getElementById('ri-mode');
+      const bounds = group.getBoundingClientRect();
+      const style = getComputedStyle(group);
+      const top = bounds.top + parseFloat(style.borderTopWidth);
+      const bottom = bounds.bottom - parseFloat(style.borderBottomWidth);
+      const buttons = [...group.querySelectorAll('[role="radio"]')];
+      return {
+        visible: bounds.width > 0 && bounds.height > 0,
+        contained: buttons.every((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.top >= top - 0.5 && rect.bottom <= bottom + 0.5;
+        }),
+        groupHeight: bounds.height,
+        buttonHeights: buttons.map(
+          (button) => button.getBoundingClientRect().height,
+        ),
+      };
+    });
+    check(
+      `imagery mode buttons and focus outline fit their row at ${width}px`,
+      modeLayout.visible && modeLayout.contained,
+      JSON.stringify(modeLayout),
+    );
+  }
   check('no uncaught browser errors', errors.length === 0, errors.join(' | '));
 } catch (error) {
   console.error('Browser errors:', errors);

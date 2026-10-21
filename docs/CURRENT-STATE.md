@@ -1237,6 +1237,8 @@ Pure value navigation is separate from DOM rendering for reuse by a future view.
 Segments keep their word minimum width: compact inline groups such as FIT/FILL
 and ALL/360°/FLAT must not break short labels mid-word. Collapsed Weather follows
 the same exclusive-rail hiding rule as the other readouts.
+The imagery mode row reserves 26px for the 24px buttons and group borders so
+the complete button and inset keyboard-focus outline remain visible.
 Browser acceptance: `QA_BASE_URL=http://127.0.0.1:4173 node scripts/qa-segmented-controls.mjs`.
 
 ## Application shortcuts and shader parameter controls
