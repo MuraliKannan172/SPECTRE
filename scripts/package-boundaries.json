@@ -191,6 +191,7 @@
       "server/providers/cctv/groundHeights.js",
       "server/providers/cctv/catalog.js",
       "server/providers/cctv/lithuania.js",
+      "server/providers/cctv/taiwan.js",
       "server/providers/cctv/constants.js",
       "server/providers/cctv/media.js",
       "server/providers/cctv/normalize.js",
@@ -431,7 +432,7 @@
   },
   "display-controls": {
     "exports": ["./ui/display"],
-    "modules": ["src/ui/displayControls.js"],
+    "modules": ["src/ui/displayControls.js", "src/ui/segmentedControl.js"],
     "external": []
   },
   "visual-effects": {
@@ -702,6 +703,7 @@
       "src/ui/contextSubscriptions.js",
       "src/ui/contextTransactions.js",
       "src/ui/displayControls.js",
+      "src/ui/segmentedControl.js",
       "src/ui/effects.js",
       "src/ui/frameRateMonitor.js",
       "src/ui/layerPanel.js",
@@ -2178,6 +2180,7 @@
       "src/ui/contextSubscriptions.js",
       "src/ui/contextTransactions.js",
       "src/ui/displayControls.js",
+      "src/ui/segmentedControl.js",
       "src/ui/effects.js",
       "src/ui/frameRateMonitor.js",
       "src/ui/layerPanel.js",
@@ -3216,6 +3219,7 @@
       "src/ui/visualInput.js",
       "src/ui/visualPresets.js",
       "src/ui/visualSettings.js",
+      "src/ui/segmentedControl.js",
       "src/i18n/index.js",
       "src/i18n/locale.js",
       "src/i18n/locales/es.json",

@@ -574,11 +574,6 @@ html:not([lang='en']) .pp-slider-row > .pp-slider-mini-label {
   padding: 5px 8px 6px;
 }
 
-.detection-allocation-seg .pp-mode-btn {
-  font-size: 8px;
-  letter-spacing: 0.35px;
-}
-
 #hud-layout-row {
   min-width: 200px;
 }
@@ -596,7 +591,7 @@ html:not([lang='en']) .pp-slider-row > .pp-slider-mini-label {
   min-width: 200px;
 }
 
-.cyber-sonar-toggle-row .pp-mode-btn {
+.cyber-sonar-toggle-row .pp-mode-btn:not(.gev-segment) {
   margin-left: auto;
   min-width: 48px;
 }
@@ -748,11 +743,6 @@ html:not([lang='en']) .pp-slider-row > .pp-slider-mini-label {
 #draw-mode-row {
   min-width: 184px;
 }
-/* Equal thirds with room around the label, so a long translated shape name
-   never runs edge to edge in its segment. */
-html:not([lang='en']) #draw-mode-row .pp-mode-btn {
-  padding: 0 4px;
-}
 #draw-label-row {
   flex-wrap: wrap;
   row-gap: 6px;
@@ -881,11 +871,8 @@ body.gev-geo-import-drag #cesiumContainer {
 .pp-mode-seg {
   display: flex;
   flex: 1;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
-  overflow: hidden;
 }
-.pp-mode-btn {
+.pp-mode-btn:not(.gev-segment) {
   flex: 1;
   height: 22px;
   background: rgba(255, 255, 255, 0.04);
@@ -900,14 +887,11 @@ body.gev-geo-import-drag #cesiumContainer {
     background-color var(--transition-fast),
     color var(--transition-fast);
 }
-.pp-mode-btn + .pp-mode-btn {
-  border-left: 1px solid rgba(255, 255, 255, 0.14);
-}
-.pp-mode-btn:hover {
+.pp-mode-btn:not(.gev-segment):hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
 }
-.pp-mode-btn.active {
+.pp-mode-btn:not(.gev-segment).active {
   background: var(--accent);
   color: #000;
 }
