@@ -6,6 +6,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import * as providers from '../../server/providers/live.js';
 import * as portable from '../../src/data/adsbLolFallback.js';
 
+// These pin the OpenSky paths, which SKYNET runs only after the owner turns on
+// non-commercial sources; nonCommercialSources.test.mjs pins the default.
+process.env.SKYNET_NONCOMMERCIAL_SOURCES = '1';
+
 function install(plugin, preview = false) {
   const routes = new Map();
   plugin[preview ? 'configurePreviewServer' : 'configureServer']({

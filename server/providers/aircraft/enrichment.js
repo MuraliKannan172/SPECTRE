@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
 import { readResponseJsonCapped } from '../common/http.js';
+import {
+  NON_COMMERCIAL_SOURCES_OFF_REASON,
+  nonCommercialSourcesEnabled,
+} from '../common/non-commercial.js';
 
 /** Route and aircraft lookups are a few hundred bytes; 1 MiB is a hard bound. */
 const ADSBDB_MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -11,6 +15,10 @@ const ADSBDB_MAX_RESPONSE_BYTES = 1024 * 1024;
  * persisted to disk so restarts don't re-hammer it; other failures are not
  * cached. Adapted from skylight
  * (MIT) server/src/enrich/routes.ts.
+ *
+ * SKYNET: adsbdb's route data may not be copied into other databases, so
+ * routes stay in memory only and are looked up only when the owner turned on
+ * non-commercial sources. Aircraft type/registration lookups are unchanged.
  */
 export function adsbdbProxy() {
   const TTL_MS = 24 * 3600_000;
@@ -25,7 +33,7 @@ export function adsbdbProxy() {
     loaded = true;
     try {
       const parsed = JSON.parse(await fsp.readFile(CACHE_PATH, 'utf8'));
-      cache = { routes: parsed.routes ?? {}, aircraft: parsed.aircraft ?? {} };
+      cache = { routes: {}, aircraft: parsed.aircraft ?? {} };
     } catch {
       /* first run */
     }
@@ -34,7 +42,11 @@ export function adsbdbProxy() {
       dirty = false;
       try {
         await fsp.mkdir(path.dirname(CACHE_PATH), { recursive: true });
-        await fsp.writeFile(CACHE_PATH, JSON.stringify(cache), 'utf8');
+        await fsp.writeFile(
+          CACHE_PATH,
+          JSON.stringify({ aircraft: cache.aircraft }),
+          'utf8',
+        );
       } catch {
         dirty = true;
       } // retry next tick
@@ -131,6 +143,12 @@ export function adsbdbProxy() {
           const cs = String(rawKey || '').toUpperCase();
           if (!/^[A-Z0-9]{2,8}$/.test(cs))
             return send(400, { error: 'invalid callsign' });
+          if (!nonCommercialSourcesEnabled())
+            return send(200, {
+              found: false,
+              disabled: true,
+              reason: NON_COMMERCIAL_SOURCES_OFF_REASON,
+            });
           const data = await lookup('route', cs);
           return send(200, data ? { found: true, ...data } : { found: false });
         }

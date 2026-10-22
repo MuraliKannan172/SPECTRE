@@ -4,6 +4,10 @@ import { fetchRegionalWeather } from './weather.js';
 import { fetchRegionalNews } from './news.js';
 import { validRegionalPoint } from './query.js';
 import { coalesceProxyRequest } from '../common/http.js';
+import {
+  NON_COMMERCIAL_SOURCES_OFF_REASON,
+  nonCommercialSourcesEnabled,
+} from '../common/non-commercial.js';
 
 // ---------------------------------------------------------------------------
 // Regional cockpit briefing proxy
@@ -38,27 +42,37 @@ function regionalBriefProxy({ placeProvider = fetchRegionalPlace } = {}) {
     }
   }
 
-  async function refresh(point, key) {
+  async function refresh(point, key, nonCommercial) {
+    // SKYNET: Open-Meteo's free API and Google News RSS are non-commercial.
     const [placeResult, weatherResult] = await Promise.allSettled([
       placeProvider(point),
-      fetchRegionalWeather(point),
+      nonCommercial ? fetchRegionalWeather(point) : null,
     ]);
     const place = placeResult.status === 'fulfilled' ? placeResult.value : null;
     const weather =
       weatherResult.status === 'fulfilled' ? weatherResult.value : null;
-    const news = await fetchRegionalNews(place);
+    const news = await fetchRegionalNews(place, { nonCommercial });
     if (!regionalBriefHasAnySource({ place, weather, news })) {
       throw new Error('All regional briefing sources unavailable');
     }
     const payload = {
       status:
-        place && weather && news.status !== 'unavailable' ? 'ready' : 'partial',
+        place && (weather || !nonCommercial) && news.status !== 'unavailable'
+          ? 'ready'
+          : 'partial',
       retrievedAt: new Date().toISOString(),
       coordinates: point,
       place,
       placeStatus: place ? 'ready' : 'unavailable',
       weather,
-      weatherStatus: weather ? 'ready' : 'unavailable',
+      weatherStatus: weather
+        ? 'ready'
+        : nonCommercial
+          ? 'unavailable'
+          : 'disabled',
+      ...(nonCommercial
+        ? {}
+        : { weatherReason: NON_COMMERCIAL_SOURCES_OFF_REASON }),
       newsStatus: news.status,
       newsQuery: news.query,
       newsSource: news.source,
@@ -95,7 +109,10 @@ function regionalBriefProxy({ placeProvider = fetchRegionalPlace } = {}) {
         );
         return;
       }
-      const key = `${(Math.round(point.latitude * 10) / 10).toFixed(1)},${(Math.round(point.longitude * 10) / 10).toFixed(1)}`;
+      const nonCommercial = nonCommercialSourcesEnabled();
+      // The switch is part of the key, so flipping it never serves a brief
+      // cached under the other setting.
+      const key = `${nonCommercial ? 'nc:' : ''}${(Math.round(point.latitude * 10) / 10).toFixed(1)},${(Math.round(point.longitude * 10) / 10).toFixed(1)}`;
       const now = Date.now();
       const cached = _regionalBriefCache.get(key);
       if (cached && now - cached.cachedAt <= REGIONAL_BRIEF_CACHE_MS) {
@@ -108,7 +125,7 @@ function regionalBriefProxy({ placeProvider = fetchRegionalPlace } = {}) {
         return;
       }
       const request = coalesceProxyRequest(_regionalBriefInFlight, key, () =>
-        refresh(point, key),
+        refresh(point, key, nonCommercial),
       );
       try {
         const payload = await request.promise;

@@ -135,6 +135,20 @@ export const KEY_SETUP_KEYS = Object.freeze([
     envVars: Object.freeze(['LL2_API_TOKEN']),
     tier: 'paid',
   }),
+  // SKYNET: one on/off switch, not a key, for free APIs whose terms allow only
+  // personal, non-commercial use (server/providers/common/non-commercial.js).
+  // Switches stay out of the missing-key count.
+  Object.freeze({
+    id: 'non-commercial-sources',
+    title: msg('NON-COMMERCIAL SOURCES'),
+    unlocks: msg(
+      'Personal use only: worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines and adsbdb flight routes. Their free terms forbid commercial use, so they stay off until you turn them on.',
+    ),
+    getUrl: '',
+    envVars: Object.freeze(['SKYNET_NONCOMMERCIAL_SOURCES']),
+    tier: 'free',
+    kind: 'switch',
+  }),
 ]);
 
 /** Hostnames a Provider Settings request may arrive under or originate from. */
@@ -483,13 +497,15 @@ export function keySetupStatus(env = {}) {
       envVars: [...entry.envVars],
       tier: entry.tier,
       clientExposed: Boolean(entry.clientExposed),
+      kind: entry.kind || 'key',
       set,
     };
   });
+  const credentials = keys.filter((key) => key.kind === 'key');
   return {
     keys,
-    setCount: keys.filter((key) => key.set).length,
-    total: keys.length,
+    setCount: credentials.filter((key) => key.set).length,
+    total: credentials.length,
   };
 }
 

@@ -237,8 +237,49 @@ function updateCloudVoiceAuthControl(auth, busy = false) {
   toggle.setAttribute('aria-disabled', String(busy));
 }
 
+/** Build one on/off row (SKYNET); saving writes 1 or removes the variable. */
+function buildSwitchRow(documentRef, key) {
+  const row = documentRef.createElement('section');
+  row.className = 'key-setup-row key-setup-switch-row';
+  row.dataset.keyId = key.id;
+  row.dataset.set = String(Boolean(key.set));
+  if (key.managed) row.dataset.managed = key.managed;
+  const external = key.managed === 'external';
+
+  const head = documentRef.createElement('div');
+  head.className = 'key-setup-row-head';
+  const label = documentRef.createElement('label');
+  label.className = 'key-setup-switch';
+  const input = documentRef.createElement('input');
+  input.type = 'checkbox';
+  input.setAttribute('role', 'switch');
+  input.checked = Boolean(key.set);
+  input.disabled = external;
+  input.dataset.keySetupSwitch = key.envVars[0];
+  const title = documentRef.createElement('strong');
+  title.textContent = t(key.title);
+  label.append(input, title);
+  head.append(label);
+  if (external) {
+    const badge = documentRef.createElement('span');
+    badge.className = 'key-setup-external';
+    badge.textContent = t('configured externally');
+    badge.title = t(
+      'Supplied by your environment, Keychain, or launcher — change it where it was set',
+    );
+    head.append(badge);
+  }
+
+  const unlocks = documentRef.createElement('p');
+  unlocks.className = 'key-setup-unlocks';
+  unlocks.textContent = t(key.unlocks);
+  row.append(head, unlocks);
+  return row;
+}
+
 /** Build one key row. All content is our own registry text, set via textContent. */
 function buildRow(documentRef, key) {
+  if (key.kind === 'switch') return buildSwitchRow(documentRef, key);
   const row = documentRef.createElement('section');
   row.className = 'key-setup-row';
   row.dataset.keyId = key.id;
@@ -591,6 +632,23 @@ export async function initKeySetup({
   chip.addEventListener('click', openDialog);
   closeButton?.addEventListener('click', close);
   applyButton?.addEventListener('click', onApply);
+  // Switch rows save on change; delegate so re-renders stay wired.
+  rowsHost?.addEventListener('change', (event) => {
+    const input = event.target?.closest?.('input[data-key-setup-switch]');
+    if (!input || disposed) return;
+    if (busy) {
+      input.checked = !input.checked;
+      return;
+    }
+    void submitUpdates(
+      { [input.dataset.keySetupSwitch]: input.checked ? '1' : null },
+      input.checked
+        ? msg(
+            'Turned on and saved to {store}. Restarting — this page reloads itself.',
+          )
+        : msg('Turned off in {store}. Restarting — this page reloads itself.'),
+    );
+  });
   // Remove buttons are rendered per row; delegate so re-renders stay wired.
   rowsHost?.addEventListener('click', (event) => {
     const authButton = event.target?.closest?.(

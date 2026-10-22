@@ -2,6 +2,10 @@ import { makeRateLimiter, clientKey } from '../common/rate-limit.js';
 import { fetchRegionalWeather } from './weather.js';
 import { validRegionalPoint } from './query.js';
 import { coalesceProxyRequest } from '../common/http.js';
+import {
+  NON_COMMERCIAL_SOURCES_OFF_REASON,
+  nonCommercialSourcesEnabled,
+} from '../common/non-commercial.js';
 
 const WEATHER_EFFECTS_CACHE_MS = 5 * 60_000;
 
@@ -64,6 +68,22 @@ function weatherEffectsProxy() {
         res.end(
           JSON.stringify({
             error: 'Valid latitude and longitude are required',
+          }),
+        );
+        return;
+      }
+      if (!nonCommercialSourcesEnabled()) {
+        // SKYNET: Open-Meteo's free API is non-commercial only.
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        });
+        res.end(
+          JSON.stringify({
+            status: 'disabled',
+            reason: NON_COMMERCIAL_SOURCES_OFF_REASON,
+            coordinates: point,
+            weather: null,
           }),
         );
         return;

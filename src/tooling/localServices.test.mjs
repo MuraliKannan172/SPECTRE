@@ -122,6 +122,13 @@ test('standalone service guards run in development and preview without upstream 
 });
 
 test('weather-only requests share upstream work and retain fresh and stale responses', async (t) => {
+  // Open-Meteo's free API is behind SKYNET's non-commercial sources switch.
+  const before = process.env.SKYNET_NONCOMMERCIAL_SOURCES;
+  process.env.SKYNET_NONCOMMERCIAL_SOURCES = '1';
+  t.after(() => {
+    if (before === undefined) delete process.env.SKYNET_NONCOMMERCIAL_SOURCES;
+    else process.env.SKYNET_NONCOMMERCIAL_SOURCES = before;
+  });
   let now = Date.now();
   t.mock.method(Date, 'now', () => now);
   let calls = 0;

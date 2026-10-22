@@ -221,7 +221,10 @@ test('doctor reports keyless anonymous OpenSky access for explicit anon mode', (
     OPENSKY_CLIENT_SECRET: { configured: true },
   };
   assert.equal(
-    buildCapabilitySummary(credentials, { openSkyAuthMode: 'anon' }).flights,
+    buildCapabilitySummary(credentials, {
+      openSkyAuthMode: 'anon',
+      nonCommercialSources: true,
+    }).flights,
     'OpenSky keyless anonymous access (rate-limited)',
   );
 });
@@ -232,7 +235,10 @@ test('doctor retains OAuth capability wording for a complete client pair', () =>
     OPENSKY_CLIENT_SECRET: { configured: true },
   };
   assert.equal(
-    buildCapabilitySummary(credentials, { openSkyAuthMode: 'oauth' }).flights,
+    buildCapabilitySummary(credentials, {
+      openSkyAuthMode: 'oauth',
+      nonCommercialSources: true,
+    }).flights,
     'OpenSky OAuth credentials present (runtime mode and validity not verified)',
   );
 });
@@ -244,7 +250,10 @@ test('doctor reports Basic mode without inferring runtime auth from OAuth creden
   };
   for (const credentials of [{}, oauthCredentials]) {
     assert.equal(
-      buildCapabilitySummary(credentials, { openSkyAuthMode: 'basic' }).flights,
+      buildCapabilitySummary(credentials, {
+      openSkyAuthMode: 'basic',
+      nonCommercialSources: true,
+    }).flights,
       'OpenSky Basic mode selected (credential presence and validity not verified)',
     );
   }
@@ -257,7 +266,10 @@ test('doctor reports auto mode without assuming its eventual credential choice',
   };
   for (const credentials of [{}, oauthCredentials]) {
     assert.equal(
-      buildCapabilitySummary(credentials, { openSkyAuthMode: 'auto' }).flights,
+      buildCapabilitySummary(credentials, {
+      openSkyAuthMode: 'auto',
+      nonCommercialSources: true,
+    }).flights,
       'OpenSky auto mode selected (runtime credential choice and validity not verified)',
     );
   }
@@ -292,10 +304,9 @@ test('doctor describes the credential ladder without exposing values', () => {
     'off until an OpenAI key is added, or a Codex ChatGPT sign-in is selected in Provider Settings (experimental)',
   );
   assert.match(capabilities.missions, /token allowance/);
-  assert.equal(
-    capabilities.flights,
-    'OpenSky keyless anonymous access (rate-limited)',
-  );
+  // SKYNET: OpenSky and Open-Meteo are off until non-commercial sources are on.
+  assert.match(capabilities.flights, /^adsb\.lol within 250 nm of the view/);
+  assert.match(capabilities.weather, /^off: Open-Meteo free API is non-commercial/);
 
   const report = formatSetupReport({
     ready: true,
@@ -349,7 +360,9 @@ test('doctor sends Keychain-backed reports to dev-fresh and describes OpenSky as
     configured: true,
     source: 'environment',
   };
-  const capabilities = buildCapabilitySummary(credentials);
+  const capabilities = buildCapabilitySummary(credentials, {
+    nonCommercialSources: true,
+  });
   const output = formatSetupReport({
     ready: true,
     node: { level: 'ok', version: '24.14.0', summary: 'supported' },

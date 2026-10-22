@@ -2789,5 +2789,11 @@
   "Gemini access was refused. Check the API key and model access.": "Se denegó el acceso a Gemini. Comprueba la clave de API y el acceso al modelo.",
   "Gemini Live is unavailable for the configured model.": "Gemini Live no está disponible para el modelo configurado.",
   "Token request is too large": "La solicitud de credencial es demasiado grande",
-  "Use an empty JSON token request": "Usa una solicitud de credencial con un objeto JSON vacío"
+  "Use an empty JSON token request": "Usa una solicitud de credencial con un objeto JSON vacío",
+  "Turned on and saved to {store}. Restarting — this page reloads itself.": "Activado y guardado en {store}. Reiniciando: esta página se recargará sola.",
+  "Turned off in {store}. Restarting — this page reloads itself.": "Desactivado en {store}. Reiniciando: esta página se recargará sola.",
+  "NON-COMMERCIAL SOURCES": "FUENTES NO COMERCIALES",
+  "Personal use only: worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines and adsbdb flight routes. Their free terms forbid commercial use, so they stay off until you turn them on.": "Solo para uso personal: vuelos mundiales de OpenSky, tiempo de cabina de Open-Meteo, titulares de Google News y rutas de vuelo de adsbdb. Sus condiciones gratuitas prohíben el uso comercial, así que permanecen desactivadas hasta que las actives.",
+  "WEATHER OFF · PERSONAL-USE SOURCE": "TIEMPO DESACTIVADO · FUENTE DE USO PERSONAL",
+  "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "La API gratuita de Open-Meteo solo permite uso personal y no comercial. Activa Fuentes no comerciales en la configuración de proveedores para mostrar el tiempo."
 }

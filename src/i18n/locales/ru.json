@@ -2854,5 +2854,11 @@
   "Gemini access was refused. Check the API key and model access.": "Доступ к Gemini запрещён. Проверьте ключ API и доступ к модели.",
   "Gemini Live is unavailable for the configured model.": "Gemini Live недоступен для выбранной модели.",
   "Token request is too large": "Запрос токена слишком велик",
-  "Use an empty JSON token request": "Используйте запрос токена с пустым объектом JSON"
+  "Use an empty JSON token request": "Используйте запрос токена с пустым объектом JSON",
+  "Turned on and saved to {store}. Restarting — this page reloads itself.": "Включено и сохранено в {store}. Перезапуск — страница перезагрузится сама.",
+  "Turned off in {store}. Restarting — this page reloads itself.": "Выключено в {store}. Перезапуск — страница перезагрузится сама.",
+  "NON-COMMERCIAL SOURCES": "НЕКОММЕРЧЕСКИЕ ИСТОЧНИКИ",
+  "Personal use only: worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines and adsbdb flight routes. Their free terms forbid commercial use, so they stay off until you turn them on.": "Только для личного использования: рейсы OpenSky по всему миру, погода Open-Meteo в кабине, заголовки Google News и маршруты рейсов adsbdb. Их бесплатные условия запрещают коммерческое использование, поэтому они выключены, пока вы их не включите.",
+  "WEATHER OFF · PERSONAL-USE SOURCE": "ПОГОДА ВЫКЛ. · ИСТОЧНИК ДЛЯ ЛИЧНОГО ИСПОЛЬЗОВАНИЯ",
+  "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "Бесплатный API Open-Meteo разрешает только личное некоммерческое использование. Чтобы показывать погоду, включите «Некоммерческие источники» в настройках провайдеров."
 }

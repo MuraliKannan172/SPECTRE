@@ -397,6 +397,11 @@ export class CockpitCloudEffectsController {
     }
     const point = this.cameraPoint();
     if (!point) return null;
+    // A source the owner has not enabled stays off until the next refresh
+    // window rather than being asked again on every call.
+    if (this.disabledAt && Date.now() - this.disabledAt < WEATHER_REFRESH_MS) {
+      return null;
+    }
     if (
       this.weather &&
       Date.now() - this.fetchedAt < WEATHER_REFRESH_MS &&
@@ -417,6 +422,15 @@ export class CockpitCloudEffectsController {
     this.pending = pending
       .then(async (payload) => {
         if (this.abort !== request || request.signal.aborted) return null;
+        if (payload?.status === 'disabled') {
+          // SKYNET: Open-Meteo's free API stays off until the owner turns on
+          // non-commercial sources in Provider Settings.
+          this.disabledAt = Date.now();
+          this.targetStrength = 0;
+          this.canvas.dataset.sourceStatus = 'disabled';
+          return null;
+        }
+        this.disabledAt = 0;
         if (!payload?.weather)
           throw new Error('Cloud weather observation unavailable');
         this.weather = payload.weather;

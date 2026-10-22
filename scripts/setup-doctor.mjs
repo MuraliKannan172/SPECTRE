@@ -6,6 +6,10 @@ import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { projectRoot } from './project-root.mjs';
 import { selectMapStartupRoute } from '../src/mapStartup.js';
+import {
+  NON_COMMERCIAL_SOURCES_ENV,
+  nonCommercialSourcesEnabled,
+} from '../server/providers/common/non-commercial.js';
 
 const ROOT = projectRoot(import.meta.url);
 const OPENSKY_AUTH_MODE_DEFAULT = 'oauth';
@@ -151,9 +155,31 @@ export function resolveCredential(spec, {
   return { configured: false, source: null };
 }
 
+/**
+ * SKYNET: whether the owner turned on personal-use-only sources, read like
+ * OPENSKY_AUTH_MODE (environment first, then the dotenv ladder).
+ */
+export function resolveNonCommercialSources({
+  authoritativeEnvironment = false,
+  environment = process.env,
+  rootDir = ROOT,
+} = {}) {
+  const name = NON_COMMERCIAL_SOURCES_ENV;
+  const defined = Object.prototype.hasOwnProperty.call(environment, name);
+  const value =
+    String(environment[name] || '').trim() ||
+    (authoritativeEnvironment && defined
+      ? ''
+      : readDoctorDotenvValue(name, rootDir));
+  return nonCommercialSourcesEnabled({ [name]: value });
+}
+
 export function buildCapabilitySummary(
   credentials,
-  { openSkyAuthMode = OPENSKY_AUTH_MODE_DEFAULT } = {},
+  {
+    openSkyAuthMode = OPENSKY_AUTH_MODE_DEFAULT,
+    nonCommercialSources = false,
+  } = {},
 ) {
   const configured = (name) => credentials[name]?.configured === true;
   const hasOAuthCredentials = configured('OPENSKY_CLIENT_ID') && configured('OPENSKY_CLIENT_SECRET');
@@ -161,7 +187,9 @@ export function buildCapabilitySummary(
   const openSkyMode = OPENSKY_AUTH_MODES.has(requestedOpenSkyMode)
     ? requestedOpenSkyMode
     : OPENSKY_AUTH_MODE_DEFAULT;
-  const flights = openSkyMode === 'anon'
+  const flights = !nonCommercialSources
+    ? 'adsb.lol within 250 nm of the view (worldwide OpenSky needs Non-commercial sources in Provider Settings)'
+    : openSkyMode === 'anon'
     ? 'OpenSky keyless anonymous access (rate-limited)'
     : openSkyMode === 'basic'
       ? 'OpenSky Basic mode selected (credential presence and validity not verified)'
@@ -181,6 +209,9 @@ export function buildCapabilitySummary(
         ? 'Google Photorealistic 3D Tiles through Cesium ion; Bing and world-terrain stacks available'
         : 'Esri World Imagery (keyless satellite basemap) with keyless terrain',
     flights,
+    weather: nonCommercialSources
+      ? 'Open-Meteo cockpit weather (personal, non-commercial use)'
+      : 'off: Open-Meteo free API is non-commercial (turn on Non-commercial sources in Provider Settings)',
     voice: configured('OPENAI_API_KEY')
       ? 'available'
       : 'off until an OpenAI key is added, or a Codex ChatGPT sign-in is selected in Provider Settings (experimental)',
@@ -215,6 +246,10 @@ export function inspectSetup({ includeKeychain = true, authoritativeEnvironment 
     credentials,
     capabilities: buildCapabilitySummary(credentials, {
       openSkyAuthMode: resolveOpenSkyAuthMode({ authoritativeEnvironment, rootDir }),
+      nonCommercialSources: resolveNonCommercialSources({
+        authoritativeEnvironment,
+        rootDir,
+      }),
     }),
   };
 }
@@ -240,6 +275,7 @@ export function formatSetupReport(report, { readyMessage } = {}) {
     '',
     `Map:     ${report.capabilities.map}`,
     `Flights: ${report.capabilities.flights}`,
+    `Weather: ${report.capabilities.weather}`,
     `Voice:   ${report.capabilities.voice}`,
     `Vessels: ${report.capabilities.vessels}`,
     `Fires:   ${report.capabilities.fires}`,
