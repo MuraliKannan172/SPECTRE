@@ -9,12 +9,10 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-Global OpenSky and adsb.lol military snapshot refreshes are single-flight through
-body reading and cache publication. Each caller retains its own response and
-viewport-specific regional fallback. OpenSky 5xx responses cancel their bodies,
-start a 15-second cooldown and serve dated last-good data with the upstream status
-in the stale reason. Cold failures use the existing regional fallback or a JSON
-upstream error; no error HTML is relayed as JSON.
+Share links and structured views accept only own keys in their style registries.
+Inherited names such as `constructor` and `__proto__` fall back to the existing
+normal/null defaults without interrupting other restored fields. Programmatic
+visual-style calls ignore unknown or non-string values before mutating state.
 
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
