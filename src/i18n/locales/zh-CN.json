@@ -1024,7 +1024,7 @@
   "Panoramax is busy": "Panoramax 繁忙",
   "Panoramax sent an unreadable answer": "Panoramax 返回的响应无法读取",
   "No street-level imagery providers configured": "未配置街景影像服务商",
-  "{names}: by upload date": "{names}：按上传日期",
+  "(by upload date)": "（按上传日期）",
   "Open the Street Level panel to view imagery": "打开街景面板以查看影像",
   "Image could not be opened": "图像无法打开",
   "TeleGeography load failed": "TeleGeography 加载失败",
