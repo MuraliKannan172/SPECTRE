@@ -1,0 +1,217 @@
+[
+  {
+    "model": "qwen3.5-9b-64k-gpu:latest",
+    "rows": [
+      {
+        "label": "globe: fly",
+        "pass": true,
+        "calls": [
+          {
+            "name": "fly_to",
+            "arguments": {
+              "lat": 35.6762,
+              "lon": 139.6503
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 47.65,
+        "load_s": 35.35,
+        "tok_per_s": 18.9
+      },
+      {
+        "label": "globe: 2 toggles",
+        "pass": true,
+        "calls": [
+          {
+            "name": "toggle_layer",
+            "arguments": {
+              "layer": "earthquakes",
+              "enabled": true
+            }
+          },
+          {
+            "name": "toggle_layer",
+            "arguments": {
+              "layer": "flights",
+              "enabled": false
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 3.15,
+        "load_s": 0.02,
+        "tok_per_s": 31.7
+      },
+      {
+        "label": "news store",
+        "pass": true,
+        "calls": [
+          {
+            "name": "news_search",
+            "arguments": {
+              "query": "Sudan",
+              "since": "24h"
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 1.86,
+        "load_s": 0.02,
+        "tok_per_s": 32.6
+      },
+      {
+        "label": "web freshness",
+        "pass": true,
+        "calls": [
+          {
+            "name": "web_search",
+            "arguments": {
+              "query": "ISS crew members current",
+              "recency": "day",
+              "limit": 5
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 2.33,
+        "load_s": 0.02,
+        "tok_per_s": 30.5
+      },
+      {
+        "label": "fetch page",
+        "pass": true,
+        "calls": [
+          {
+            "name": "fetch_page",
+            "arguments": {
+              "url": "https://example.com"
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 1.45,
+        "load_s": 0.03,
+        "tok_per_s": 32.3
+      },
+      {
+        "label": "control: no tool",
+        "pass": true,
+        "calls": [],
+        "content": "51",
+        "wall_s": 0.63,
+        "load_s": 0.02,
+        "tok_per_s": 40.2
+      }
+    ],
+    "ollama_ps": "NAME                         ID              SIZE      PROCESSOR          CONTEXT    RUNNER      UNTIL              \nqwen3.5-9b-64k-gpu:latest    45478ef59ea2    6.4 GB    15%/85% CPU/GPU    8192       llamacpp    4 minutes from now",
+    "tool_pass": 5
+  },
+  {
+    "model": "bonsai-2:9b",
+    "rows": [
+      {
+        "label": "globe: fly",
+        "pass": true,
+        "calls": [
+          {
+            "name": "fly_to",
+            "arguments": {
+              "lat": 35.6762,
+              "lon": 139.6503
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 18.93,
+        "load_s": 7.42,
+        "tok_per_s": 60.8
+      },
+      {
+        "label": "globe: 2 toggles",
+        "pass": true,
+        "calls": [
+          {
+            "name": "toggle_layer",
+            "arguments": {
+              "layer": "earthquakes",
+              "enabled": true
+            }
+          },
+          {
+            "name": "toggle_layer",
+            "arguments": {
+              "layer": "flights",
+              "enabled": false
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 1.94,
+        "load_s": 0.03,
+        "tok_per_s": 61.0
+      },
+      {
+        "label": "news store",
+        "pass": true,
+        "calls": [
+          {
+            "name": "news_search",
+            "arguments": {
+              "query": "Sudan",
+              "since": "24h"
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 1.31,
+        "load_s": 0.02,
+        "tok_per_s": 60.5
+      },
+      {
+        "label": "web freshness",
+        "pass": true,
+        "calls": [
+          {
+            "name": "web_search",
+            "arguments": {
+              "query": "ISS crew members current",
+              "recency": "day"
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 1.33,
+        "load_s": 0.03,
+        "tok_per_s": 59.5
+      },
+      {
+        "label": "fetch page",
+        "pass": true,
+        "calls": [
+          {
+            "name": "fetch_page",
+            "arguments": {
+              "url": "https://example.com"
+            }
+          }
+        ],
+        "content": "",
+        "wall_s": 1.11,
+        "load_s": 0.03,
+        "tok_per_s": 60.3
+      },
+      {
+        "label": "control: no tool",
+        "pass": true,
+        "calls": [],
+        "content": "17 multiplied by 3 is 51.",
+        "wall_s": 0.83,
+        "load_s": 0.03,
+        "tok_per_s": 63.3
+      }
+    ],
+    "ollama_ps": "NAME           ID              SIZE      PROCESSOR    CONTEXT    RUNNER      UNTIL              \nbonsai-2:9b    c8b5462f8688    3.1 GB    100% GPU     8192       llamacpp    4 minutes from now",
+    "tool_pass": 5
+  }
+]
