@@ -62,7 +62,6 @@ export const MODEL_VISUAL_CENTER_NATIVE = Object.freeze({
 export const MODEL_TRAIL_ANCHOR_NATIVE = Object.freeze({
   '/models/airplane.glb': Object.freeze([24.0879, -2.2163, 0]),
   '/models/jet.glb': Object.freeze([18.9103, 0.1266, 0]),
-  '/models/bell206.glb': Object.freeze([5.2077, -0.0005, 0]),
   '/models/c172.glb': Object.freeze([3.6816, -0.2425, 0]),
   '/models/citation2.glb': Object.freeze([6.8804, -0.6136, 0]),
   '/models/mq9.glb': Object.freeze([5.1951, -1.1516, 0]),

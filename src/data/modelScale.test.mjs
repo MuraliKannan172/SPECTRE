@@ -857,7 +857,8 @@ test('the trail anchor rides the rendered longitudinal axis at every heading', (
 // arbitrary heading still puts it aft of the hull.
 test('a hovering rotorcraft anchors aft of its own hull, whatever its heading', () => {
   const position = Cesium.Cartesian3.fromDegrees(-97.7, 30.2, 300);
-  const anchor = MODEL_TRAIL_ANCHOR_NATIVE['/models/bell206.glb'];
+  // Helicopters render the shared airplane.glb in SKYNET (bell206.glb removed).
+  const anchor = MODEL_TRAIL_ANCHOR_NATIVE['/models/airplane.glb'];
   for (const headingDeg of [0, 137.5, 271.9]) {
     const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(headingDeg), 0, 0);
     const model = {
@@ -882,7 +883,7 @@ test('a hovering rotorcraft anchors aft of its own hull, whatever its heading', 
     const side = Cesium.Cartesian3.dot(
       Cesium.Cartesian3.subtract(world, origin, new Cesium.Cartesian3()), lateral);
     assert.ok(Math.abs(side) < 1e-4,
-      `bell206 @ heading ${headingDeg}: hovering rotorcraft anchor drifted sideways by ${side.toFixed(4)} m`);
+      `rotorcraft @ heading ${headingDeg}: hovering rotorcraft anchor drifted sideways by ${side.toFixed(4)} m`);
   }
 });
 

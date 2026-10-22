@@ -4,7 +4,7 @@ import { tilesForBounds } from '../src/data/tomtomTiles.js';
 
 const tile = readFileSync(
   new URL(
-    '../src/data/fixtures/tomtom-flow-austin-12-935-1686.pbf',
+    '../src/data/fixtures/synthetic-flow-austin-12-935-1686.pbf',
     import.meta.url,
   ),
 );
@@ -14,7 +14,7 @@ const json = (body) => ({
   body: JSON.stringify(body),
 });
 
-/** Reuse the recorded flow tile for an explicitly synthetic browser exercise. */
+/** Reuse the synthetic flow tile for an explicitly synthetic browser exercise. */
 export function trafficFixtureResponse(request) {
   const url = new URL(request.url());
   if (url.pathname === '/api/tomtom/status')

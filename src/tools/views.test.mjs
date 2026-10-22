@@ -67,24 +67,7 @@ test('answers carry the view that shows them', async () => {
   assert.deepEqual(found.data.view.layers, ['flights']);
 });
 
-test('the flood and the brief frame what they describe', async () => {
-  const { readFile } = await import('node:fs/promises');
-  const bundled = JSON.parse(
-    await readFile(
-      new URL(
-        '../../public/events/bhote-koshi-2026/event.json',
-        import.meta.url,
-      ),
-      'utf8',
-    ),
-  );
-  const flood = await composeCatalog({
-    tools: coreTools,
-    services: { app, events: { getEvent: async () => bundled } },
-  }).call('get_bhote_koshi_flood', {});
-  assert.deepEqual(flood.data.view.layers, ['bhote-koshi-2026']);
-  assert.ok(Math.abs(flood.data.view.camera.lat - 28.13) < 0.2);
-  assert.ok(Math.abs(flood.data.view.camera.lon - 85.32) < 0.2);
+test('the brief frames what it describes', async () => {
   const brief = await composeCatalog({
     tools: coreTools,
     services: {

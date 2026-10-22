@@ -6,6 +6,10 @@ import {
 } from './geometry.js';
 import * as Cesium from 'cesium';
 
+// Matches OPTIONAL_DATA_MISSING in bundledSource.js. Not imported: that module
+// belongs to a different package boundary (scripts/package-boundaries.json).
+const OPTIONAL_DATA_MISSING = 'optional-data-missing';
+
 export function createIngestion({ state, parts, source }) {
   async function load(viewer) {
     if (state._loading || state._loaded) return;
@@ -190,7 +194,12 @@ export function createIngestion({ state, parts, source }) {
       // A stale or aborted load reports nothing: its failure belongs to a
       // lifecycle the user already left.
       if (owns() && error?.name !== 'AbortError') {
-        state._error = error?.message || msg('TeleGeography load failed');
+        state._error =
+          error?.code === OPTIONAL_DATA_MISSING
+            ? msg(
+                'Not installed: TeleGeography data is CC BY-NC-SA. Run scripts/fetch-optional-data.ps1 for personal use.',
+              )
+            : error?.message || msg('TeleGeography load failed');
         console.warn(
           '[Data:telegeography-submarine-cables]',
           state._error,

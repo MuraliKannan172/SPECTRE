@@ -531,10 +531,12 @@ test('the DISPLAY 3D toggle gives local aircraft magenta class models', async (t
   const [model] = loads;
   assert.equal(
     model.url,
-    '/models/bell206.glb',
+    // SKYNET removed bell206.glb; helicopters share the airplane model.
+    '/models/airplane.glb',
     'the Flights helicopter model',
   );
-  assert.equal(model.scale, 1);
+  // The shared mesh renders at CLASS_SCALE_3D.helicopter, not real-world scale.
+  assert.equal(model.scale, 0.8);
   assert.equal(model.id, 'local-adsb:a0b702');
   assert.ok(
     Cesium.Color.equals(

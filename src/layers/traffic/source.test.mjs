@@ -14,7 +14,7 @@ import { clampBoundsAroundCenter } from '../../data/trafficBounds.js';
 const bounds = { south: 30.267, west: -97.744, north: 30.268, east: -97.743 };
 const fixture = readFileSync(
   new URL(
-    '../../data/fixtures/tomtom-flow-austin-12-935-1686.pbf',
+    '../../data/fixtures/synthetic-flow-austin-12-935-1686.pbf',
     import.meta.url,
   ),
 );

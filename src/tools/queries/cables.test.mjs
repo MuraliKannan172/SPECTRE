@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { composeCatalog, coreTools } from '../index.js';
 import { createApiFetch } from '../../../server/mcp/services.js';
-import { createBundledCableSource } from '../../layers/submarineCables/bundledSource.js';
 
 const cables = {
   async fetch() {
@@ -94,11 +93,13 @@ test('the local fetch serves bundled data files and nothing outside them', async
     apiBase: 'http://127.0.0.1:1',
     fetchImpl: async () => assert.fail('no network'),
   });
-  const { cables: collection, landingPoints } = await createBundledCableSource({
-    fetchImpl,
-  }).fetch();
-  assert.ok(collection.features.length > 500);
-  assert.ok(landingPoints.features.length > 1000);
+  // SKYNET does not ship the CC BY-NC-SA cable data, so check the local fetch
+  // against a dataset that always ships.
+  const bundled = await fetchImpl(
+    new URL('../../data/local_data/dams/dams.geojson', import.meta.url).href,
+  );
+  assert.equal(bundled.status, 200);
+  assert.ok((await bundled.json()).features.length > 100);
   const outside = await fetchImpl(
     new URL('../../../package.json', import.meta.url).href,
   );
