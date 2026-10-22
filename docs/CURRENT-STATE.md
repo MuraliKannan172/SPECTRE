@@ -9,7 +9,10 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-Wind and weather parameter changes may supersede a first-load request without rejecting the layer’s enable transaction. Obsolete responses cannot publish data; a replacement request remains visible through the loading state. Explicit caller cancellation, disable, and destroy still reject the obsolete update. Source failures continue to report their existing unavailable state.
+Terrain height requests accept at most 64 points, matching the browser service's
+existing batch size and one bounded upstream chunk. Larger requests return HTTP
+413 before disk-cache loading or upstream work; malformed coordinates remain 400.
+The browser continues to split larger workloads into sequential 64-point requests.
 
 Shared distance checks use `src/geoDistance.js` with `{ lat, lon }` points and
 the IUGG mean spherical Earth radius, 6371.0088 km. `greatCircleKm` is
