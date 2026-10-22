@@ -5,6 +5,10 @@ import {
   readResponseTextCapped,
 } from '../common/http.js';
 import { requiredFiniteQueryNumber } from '../common/query.js';
+import {
+  NON_COMMERCIAL_SOURCES_OFF_REASON,
+  nonCommercialSourcesEnabled,
+} from '../common/non-commercial.js';
 // ---------------------------------------------------------------------------
 // OpenSky OAuth2 token + response cache state
 // ---------------------------------------------------------------------------
@@ -423,10 +427,35 @@ export function openSkyProxy() {
         // This mount also matches its /track route, served by its own handler.
         if (new URL(req.url || '/', 'http://localhost').pathname !== '/')
           return next();
-        res.setHeader('X-Feed-Source', 'OpenSky Network');
         const requestedMode = normalizeOpenSkyAuthMode(
           process.env.OPENSKY_AUTH_MODE,
         );
+        if (!nonCommercialSourcesEnabled()) {
+          // SKYNET: OpenSky's API is for research and non-commercial use, so
+          // flights default to adsb.lol's regional snapshot around the view.
+          res.setHeader('X-Feed-Source', 'adsb.lol');
+          if (
+            await serveAdsbLolPointFallback(
+              req,
+              res,
+              requestedMode,
+              'non_commercial_sources_off',
+            )
+          )
+            return;
+          res.writeHead(503, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          });
+          res.end(
+            JSON.stringify({
+              error: 'adsb.lol regional flights are unavailable',
+              reason: NON_COMMERCIAL_SOURCES_OFF_REASON,
+            }),
+          );
+          return;
+        }
+        res.setHeader('X-Feed-Source', 'OpenSky Network');
         const now = Date.now();
         const inCooldown = now < _openskyCooldownUntil;
         // Fresh-enough cache (adaptive TTL) OR any cache during a 429

@@ -64,7 +64,11 @@ test('the status payload reports presence without any credential material', () =
     // Secret missing: the OpenSky pair must read as NOT set.
   };
   const status = keySetupStatus(env);
-  assert.equal(status.total, KEY_SETUP_KEYS.filter((key) => !key.hidden).length);
+  // Switch rows (SKYNET's non-commercial sources) are not credentials.
+  assert.equal(
+    status.total,
+    KEY_SETUP_KEYS.filter((key) => !key.hidden && key.kind !== 'switch').length,
+  );
   const google = status.keys.find((key) => key.id === 'google-maps');
   assert.equal(google.set, true);
   const opensky = status.keys.find((key) => key.id === 'opensky');
@@ -76,6 +80,19 @@ test('the status payload reports presence without any credential material', () =
   assert.ok(!serialized.includes('abcdef'), 'a credential suffix leaked into status');
   assert.ok(!serialized.includes('tails'), 'status must not expose a credential-tail field');
   assert.equal(status.setCount, 1);
+});
+
+test('the non-commercial sources switch shows its state but never counts as a key', () => {
+  const off = keySetupStatus({});
+  const on = keySetupStatus({ SKYNET_NONCOMMERCIAL_SOURCES: '1' });
+  const row = (status) =>
+    status.keys.find((key) => key.id === 'non-commercial-sources');
+  assert.equal(row(off).kind, 'switch');
+  assert.equal(row(off).set, false);
+  assert.equal(row(on).set, true);
+  assert.equal(on.setCount, off.setCount);
+  assert.equal(on.total, off.total);
+  assert.ok(knownKeySetupEnvVars().has('SKYNET_NONCOMMERCIAL_SOURCES'));
 });
 
 test('whitespace-only env values do not count as configured', () => {

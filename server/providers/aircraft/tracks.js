@@ -1,5 +1,9 @@
 import { getOpenSkyToken } from './opensky.js';
 import { readCappedResponseText } from '../common/http.js';
+import {
+  NON_COMMERCIAL_SOURCES_OFF_REASON,
+  nonCommercialSourcesEnabled,
+} from '../common/non-commercial.js';
 /**
  * Vite plugin: aircraft track-history backfill proxies (PRD WS-F F1/F2).
  *
@@ -76,6 +80,18 @@ export function trackBackfillProxies() {
           res.setHeader('Content-Type', 'application/json');
           res.end(
             JSON.stringify({ error: 'icao24 must be a 6-char hex string' }),
+          );
+          return;
+        }
+        if (!nonCommercialSourcesEnabled()) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(
+            JSON.stringify({
+              error: 'OpenSky track history is off',
+              reason: NON_COMMERCIAL_SOURCES_OFF_REASON,
+            }),
           );
           return;
         }
