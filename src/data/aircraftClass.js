@@ -511,7 +511,8 @@ export const CLASS_MODEL_URL = {
  *  pinned by modelScale.test.mjs. Classes NOT listed (airliner, quadjet,
  *  glider, fastjet) still render the shared airplane.glb via CLASS_MODEL_URL. */
 export const CLASS_MODEL_REAL = {
-  helicopter: { url: '/models/bell206.glb', bellyM: 1.66, radiusM: 8.24 },
+  // SKYNET removed bell206.glb: its source listing is gone, so its licence can
+  // no longer be verified. Helicopters render the shared airplane.glb.
   light: { url: '/models/c172.glb', bellyM: 1.36, radiusM: 7.0 },
   bizjet: { url: '/models/citation2.glb', bellyM: 2.86, radiusM: 11.24 },
   uav: { url: '/models/mq9.glb', bellyM: 2.02, radiusM: 12.0 },

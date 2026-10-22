@@ -1,6 +1,6 @@
-// This dataset is CC BY-NC-SA 3.0, not the project's MIT license.
-// Commercial users must remove it or obtain a TeleGeography license.
-// See DATA_SOURCES.md and the bundled dataset's source.json.
+// This dataset is CC BY-NC-SA 3.0, not the project's MIT license, so SKYNET
+// does not ship it. scripts/fetch-optional-data.ps1 downloads it into this
+// gitignored folder for personal, non-commercial use. See DATA_SOURCES.md.
 // Resolved when read, so importing this module never needs a module URL.
 function cableUrl() {
   return new URL(
@@ -15,6 +15,14 @@ function landingPointUrl() {
   ).href;
 }
 
+export const OPTIONAL_DATA_MISSING = 'optional-data-missing';
+
+function optionalDataMissing() {
+  const error = new Error('TeleGeography optional dataset is not installed');
+  error.code = OPTIONAL_DATA_MISSING;
+  return error;
+}
+
 /** Supply GeoJSON collections without coupling the renderer to asset URLs. */
 export function createBundledCableSource({
   fetchImpl = (...args) => fetch(...args),
@@ -22,12 +30,17 @@ export function createBundledCableSource({
   async function read(url, signal) {
     signal?.throwIfAborted();
     const response = await fetchImpl(url, { signal, cache: 'force-cache' });
-    if (!response.ok) {
+    // A missing optional file is a 404, or the dev server's HTML fallback.
+    const contentType = response.headers?.get?.('content-type') || '';
+    const missing =
+      response.status === 404 || (response.ok && contentType.includes('html'));
+    if (!response.ok || missing) {
       try {
         await response.body?.cancel();
       } catch {
         /* best effort */
       }
+      if (missing) throw optionalDataMissing();
       throw new Error(`HTTP ${response.status} for ${url}`);
     }
     const json = await response.json();

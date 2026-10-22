@@ -26,5 +26,9 @@ qa-artifacts/
 pinokio/ENVIRONMENT
 pinokio/.installed
 
+# SKYNET: optional non-commercial datasets fetched by
+# scripts/fetch-optional-data.ps1. Never commit or ship them in the default build.
+src/data/local_data/telegeography_submarine_cables/
+
 # Transient: a release interrupted mid-assembly (npm run changelog recovers it)
 changelog.d/.assembling/

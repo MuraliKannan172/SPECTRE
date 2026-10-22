@@ -11,7 +11,7 @@ import {
 
 // Layers whose module name is a proper name and stays as it is in every
 // language: the Bhote Koshi pair belong to a scripted scene.
-const UNTRANSLATED_NAMES = new Set(['bhote-koshi-2026', 'bhote-koshi-locator']);
+const UNTRANSLATED_NAMES = new Set();
 
 const catalogIds = APPLICATION_LAYER_METADATA.map((layer) => layer.id);
 

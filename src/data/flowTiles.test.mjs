@@ -13,8 +13,9 @@ import {
 } from './flowTiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Real TomTom flow tile, downtown Austin z12 x935 y1686 (probed live 2026-07-16).
-const FIXTURE = path.join(__dirname, 'fixtures', 'tomtom-flow-austin-12-935-1686.pbf');
+// Synthetic tile in TomTom's flow schema, downtown Austin z12 x935 y1686
+// (scripts/make-synthetic-flow-tile.mjs; no TomTom data is redistributed).
+const FIXTURE = path.join(__dirname, 'fixtures', 'synthetic-flow-austin-12-935-1686.pbf');
 const FIXTURE_TILE = { z: 12, x: 935, y: 1686 };
 
 function loadFixture() {
@@ -58,7 +59,7 @@ test('fixture decode: segment shape is {coords, trafficLevel, roadType, closure}
     assert.equal(typeof s.roadType, 'string');
     assert.equal(typeof s.closure, 'boolean');
   }
-  // The fixture carries real closures — closure decoding is exercised, not vacuous.
+  // The fixture carries closures — closure decoding is exercised, not vacuous.
   assert.ok(segments.some((s) => s.closure === true), 'expected at least one closure in fixture');
 });
 

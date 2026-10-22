@@ -31,8 +31,6 @@ import { createApplicationCables } from './layers/submarineCables.js';
 import { createApplicationStreetLevel } from './layers/streetLevel.js';
 import { createInfrastructureLayers } from '../data/infrastructure.js';
 import { localGeoJsonServices } from './localGeojsonServices.js';
-import { createBhoteKoshiEventLayer } from '../data/bhoteKoshiEvent.js';
-import { createBhoteKoshiLocatorLayer } from '../data/bhoteKoshiLocator.js';
 
 /**
  * Hardware-local layers are registered like any other but never enter share
@@ -59,7 +57,6 @@ export function createApplicationCatalog({
   metadata = APPLICATION_LAYER_METADATA,
   vesselOptions,
   resolveAsset,
-  nepalBoundaryResolver,
   streetLevelProviders,
 }) {
   if (!signal?.addEventListener)
@@ -106,10 +103,6 @@ export function createApplicationCatalog({
     });
     const catalog = createLayerCatalog(
       [
-        createBhoteKoshiEventLayer(),
-        createBhoteKoshiLocatorLayer({
-          boundaryResolver: nepalBoundaryResolver,
-        }),
         flights,
         military,
         createApplicationLocalAdsb({

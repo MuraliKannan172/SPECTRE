@@ -202,8 +202,8 @@ function encode(state) {
 
 test('production registry is exact, canonical, and rejects incomplete contracts', async () => {
   assert.equal(validateLayerStateRegistry(), true);
-  assert.equal(REGISTERED_LAYER_IDS.length, 31);
-  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 31);
+  assert.equal(REGISTERED_LAYER_IDS.length, 29);
+  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 29);
   assert.ok(REGISTERED_LAYER_IDS.includes('transit'));
   assert.deepEqual(REGISTERED_LAYER_IDS, [...REGISTERED_LAYER_IDS].sort());
   assert.deepEqual(LEGACY_LAYER_STATE_TOKENS, {
@@ -520,13 +520,16 @@ test('malformed enabled-layer lists reject the entire payload', () => {
   }
 });
 
-test('Nepal event and locator have distinct enabled-only share tokens', () => {
-  const decoded = decodeLayerStateParams(new URLSearchParams('v=2&l=h.z'));
-  assert.deepEqual(decoded.enabledLayerIds, [
-    'bhote-koshi-2026',
-    'bhote-koshi-locator',
-  ]);
-  assert.ok(encode(decoded).includes('l=h.z'));
+test('retired Nepal event tokens stay reserved and are rejected like unknown tokens', () => {
+  // SKYNET removed the Bhote Koshi layers with their CC BY-NC data. A link
+  // that still names them has unreadable layer state, and the tokens must
+  // never be reallocated to another layer.
+  assert.equal(
+    decodeLayerStateParams(new URLSearchParams('v=2&l=h.e')),
+    null,
+  );
+  assert.equal(LEGACY_LAYER_STATE_TOKENS['bhote-koshi-2026'], 'h');
+  assert.equal(LEGACY_LAYER_STATE_TOKENS['bhote-koshi-locator'], 'z');
 });
 
 test('unknown and forbidden option fields are ignored while missing options use codec defaults', () => {
