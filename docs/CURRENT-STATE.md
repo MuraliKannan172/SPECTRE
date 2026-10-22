@@ -39,6 +39,16 @@ time. This clears obsolete contacts and settles startup without manufacturing
 position timestamps. Stale, incomplete and malformed empty results retain the
 existing recovery behavior.
 
+Every `/api` response on the dev and preview servers carries
+`Content-Security-Policy: default-src 'none'; sandbox` and
+`X-Content-Type-Options: nosniff`. `apiResponseHeadersPlugin` sets them ahead of
+the Host check and matches `/api` the way the router mounts it (any letter case, a
+`/` or `.` boundary, absolute-form targets), so errors, partial responses, Host
+refusals and unknown routes are covered too; a route's own policy is sent as an
+additional policy, never in place of it. The app document's policy is unchanged.
+The GBFS proxy relays only bodies that parse as JSON, re-serialized as
+`application/json; charset=utf-8`; anything else answers 502.
+
 Catalog source contracts and their consuming layers are declared in
 `src/app/sourceComposition.js`. Omitted or null acquisition sources preserve layer
 registration and serialization, report unavailable, and are refused by the existing
@@ -821,6 +831,15 @@ standalone entry supplies application-owned scene, ground and activation service
 Each layer owns its state and visibility listener; destruction cancels source
 reads and pending initialization. Malformed health responses retain prior health.
 Existing catalog fallback, camera poses, frame pacing and coverage controls remain.
+CCTV frames and the Street View fallback accept only JPEG, PNG, GIF, WebP and
+AVIF, sent under the canonical type; any other type falls through to the next
+fallback. Live media must match its feed kind (`video/mp4`, `video/webm`, or
+`multipart/x-mixed-replace` with a boundary) before health reports it connected,
+and follows redirects only on the camera's origin. Catalog image URLs, and
+redirects on those hosts, are pinned by parsed URL to the agency's image
+directory. Every `/api/cctv` route refuses cross-site browser requests but
+accepts forwarding headers, so cameras work behind a reverse proxy; a forwarded
+request skips the key-bearing Street View fallback and gets the placeholder.
 
 Traffic owns its rendered-surface observer only while enabled, removes it on disable/destroy, and caches surface identity without allocating on unchanged frames.
 
@@ -1188,6 +1207,24 @@ snapshots, lifecycle actions and row descriptors. Remount and teardown remove
 listeners and row subscriptions; obsolete completions do not repaint old rows.
 The clear control presents busy state while its existing action owns the transaction.
 
+## Sky background
+
+`src/sky/starrySky.js` fills Cesium's `Scene#skyBox` slot with 9,096 Yale
+Bright Star Catalogue stars and a soft ESO/S. Brunier Milky Way. Both layers
+rotate from ICRF/J2000 into the Earth-fixed frame at the scene clock, with
+a TEME fallback while Cesium's IAU 2006 tables load. Bundled assets and
+their provenance are documented in `src/data/local_data/sky/README.md`.
+
+Anime fades out the Milky Way with its style intensity to avoid cel-shaded
+bands; the catalogue stars remain. A separate black 1×1 cube map preserves
+model environment lighting independently of the visible sky. The adapter
+is validated against Cesium 1.138.0 and must be revalidated on upgrades.
+
+`scripts/qa-anime-sky.mjs` checks asset readiness, visible Normal sky and
+Anime band coverage against a Vite dev server.
+`scripts/qa-sky-model-lighting.mjs` compares a lit `airplane.glb` against
+black and white environment maps in isolated scenes.
+
 ## Model atmosphere on Apple Metal
 
 Cesium's per-vertex model atmosphere is kept out of the pipeline on devices
@@ -1241,6 +1278,17 @@ Generated controls use `createSlider`; static templates apply the same class.
 Feature owners retain bounds, steps, formatted values, input/change timing and
 listener cleanup. The radio tuning dial, imagery comparison divider and event
 comparison/progression controls keep their specialized presentation and behavior.
+
+## Shared control CSS ownership
+
+Shared styles own ordinary control surfaces and interaction states; feature CSS
+owns surrounding layout and context-specific sizing. CCTV's calibration editor
+width lives in `ui/styles/cctv.css`, while the shared inline field variant owns
+only density and spinner treatment. Radio supplies its field palette and disabled
+opacity through the `--gev-field-*` variables, retaining compact typography and
+arrow space locally. Cyber supplies shared-field palette variables explicitly;
+its legacy native-field palette rules exclude `.gev-field`. These ownership
+boundaries preserve the current Tactical/Cyber appearance and native behavior.
 
 ## Ordinary status badges
 
@@ -3499,7 +3547,7 @@ test:track` 43 tracking invariants · headless QA harnesses under
 
 ### Interface localization (October 2026)
 
-Shipped locales: **en** (source and fallback), **es** and **ru**. The code lives in
+Shipped locales: **en** (source and fallback), **es**, **ru** and **zh-CN**. The code lives in
 `src/i18n/`. How to mark UI text: [`docs/I18N.md`](./I18N.md); translator workflow:
 [`docs/TRANSLATORS.md`](./TRANSLATORS.md).
 
@@ -3510,7 +3558,8 @@ Shipped locales: **en** (source and fallback), **es** and **ru**. The code lives
   value). English has no catalog; every other locale is
   `src/i18n/locales/<code>.json`, and a missing entry falls back to English.
 - **Locale choice.** `?lang=` → stored choice (`gev:locale:v1`) →
-  `navigator.languages` → English. `?lang=` is not stored, and share links drop
+  `navigator.languages` → English. Chinese tags map to `zh-CN`; tags containing
+  `Hant`, `TW`, `HK` or `MO` are skipped. `?lang=` is not stored, and share links drop
   it, so a recipient keeps their own language. The globe picker in the
   bottom-right corner (`src/ui/localePicker.js`) stores the choice, drops
   `?lang=` (keeps it only when storage is blocked) and reloads. It asks first

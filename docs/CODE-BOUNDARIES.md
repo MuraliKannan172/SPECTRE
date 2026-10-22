@@ -749,6 +749,14 @@ teardown. CCTV effective-pose conversion and tuner/device operations remain
 feature responsibilities. A Vue replacement can reuse this contract and CSS;
 it replaces DOM construction, rather than adding a second state owner.
 
+The shared stylesheet owns field surfaces and disabled opacity; feature and theme
+palettes use `--gev-field-background`, `--gev-field-border-color`,
+`--gev-field-color` and `--gev-field-disabled-opacity`. Radio retains its own
+compact density and arrow space. CCTV owns calibration editor width in
+`cctv.css`; the shared inline density does not impose a feature-specific width.
+Cyber supplies a shared-field palette explicitly and keeps its legacy native
+field rules separate, so Radio's palette remains an intentional exception.
+
 ### Read-only status badges
 
 `src/ui/statusBadge.js` constructs/updates ordinary badges without listeners,
