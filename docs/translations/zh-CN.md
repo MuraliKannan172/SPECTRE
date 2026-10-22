@@ -2,9 +2,7 @@
 
 Catalog: `src/i18n/locales/zh-CN.json`. General rules: [TRANSLATORS.md](../TRANSLATORS.md).
 
-The catalog started from the Chinese locale by abiyeenzo (#914) and the
-Simplified Chinese localization by EDIT-Aeterna (#979); the rest was translated
-for the current English and reviewed against both.
+Translation sources: abiyeenzo (#914) and EDIT-Aeterna (#979).
 
 ## Style
 

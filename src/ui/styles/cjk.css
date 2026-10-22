@@ -1,7 +1,5 @@
-/* Chinese text. The UI sets Latin capitals with wide tracking; Chinese set
-   that way falls apart into single glyphs, so its tracking stays tight. The
-   intel HUD readouts (codes, coordinates) and text kept in English on purpose
-   (translate="no", and whatever holds it) keep the Latin look. */
+/* Tight tracking keeps Chinese labels readable; preserve Latin tracking for
+   intel HUD readouts and content marked translate="no", including its containers. */
 html:lang(zh)
   body
   :not(
@@ -14,8 +12,7 @@ html:lang(zh)
   letter-spacing: 0.02em !important;
 }
 
-/* Below about 9px a Chinese glyph blurs: lift the dock's voice labels and the
-   panel layer buttons to that floor. */
+/* Keep small Chinese labels legible at a minimum of 9px. */
 html:lang(zh) #command-dock .gev-mic-label,
 html:lang(zh) #command-dock #gev-voice-detail,
 html:lang(zh) .gev-voice-tier-btn,
