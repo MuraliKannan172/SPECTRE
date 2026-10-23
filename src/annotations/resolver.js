@@ -29,7 +29,7 @@ import { unavailablePlaceSearch } from '../search/placeSearch.js';
 import { isPickedWorldPosition } from '../data/scenePick.js';
 
 /** Ms the analyst region lookup waits on geocode + admin boundary. */
-export const REGION_FALLBACK_BUDGET_MS = 3_000;
+const REGION_FALLBACK_BUDGET_MS = 3_000;
 
 /** Entity facts that rule out a state/county reading of the ask. */
 const NON_ADMIN_ENTITY_KINDS = new Set([

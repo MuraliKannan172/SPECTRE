@@ -14,7 +14,7 @@ import { BHOTE_KOSHI_FLOOD_PATH } from './bhoteKoshiFloodPath.js';
 import { INCIDENT_OVERVIEW_PLACES } from './bhoteKoshiIncidentPlaces.js';
 import { t, msg, getLocale } from '../i18n/index.js';
 
-export const BHOTE_KOSHI_LOCATOR_LAYER_ID = 'bhote-koshi-locator';
+const BHOTE_KOSHI_LOCATOR_LAYER_ID = 'bhote-koshi-locator';
 export const BHOTE_KOSHI_LOCATOR_OVERLAY_SOURCE_ID =
   'bhote-koshi-locator-callout';
 export const NEPAL_CONTEXT_PRESENTATION = 'nepal-context';
@@ -1247,6 +1247,3 @@ export function createBhoteKoshiLocatorLayer({
     },
   };
 }
-
-const bhoteKoshiLocatorLayer = createBhoteKoshiLocatorLayer();
-export default bhoteKoshiLocatorLayer;
