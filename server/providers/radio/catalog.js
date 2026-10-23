@@ -25,6 +25,7 @@ import {
   RADIO_USER_AGENT,
   RADIO_UUID_RE,
   RADIO_FALLBACK_MIRRORS,
+  RADIO_REJECTED_STATION_COUNT_MAX,
 } from './constants.js';
 async function mapRadioConcurrent(values, concurrency, mapper) {
   const results = new Array(values.length);
@@ -177,17 +178,22 @@ export function createRadioProxyMiddleware({
           const rows = await fetchPath(`/json/stations/search?${params}`);
           if (!Array.isArray(rows))
             throw new Error('Radio Browser catalog payload was not an array');
-          const stations = rows
-            .filter(
-              (row) =>
-                row &&
-                typeof row === 'object' &&
-                !Array.isArray(row) &&
-                typeof row.stationuuid === 'string' &&
-                typeof row.name === 'string' &&
-                (typeof row.url_resolved === 'string' ||
-                  typeof row.url === 'string'),
-            )
+          const structuralRows = rows.filter(
+            (row) =>
+              row &&
+              typeof row === 'object' &&
+              !Array.isArray(row) &&
+              typeof row.stationuuid === 'string' &&
+              typeof row.name === 'string' &&
+              (typeof row.url_resolved === 'string' ||
+                typeof row.url === 'string'),
+          );
+          // Malformed rows are skipped individually, but counted so the
+          // catalog keeps a diagnostic for upstream schema drift. Policy
+          // rejections in normalization (offline, non-HTTPS, codec) are normal
+          // filtering and are not counted.
+          const rejectedRows = rows.length - structuralRows.length;
+          const stations = structuralRows
             .map(normalizeRadioBrowserStation)
             .filter(Boolean);
           const requestedTag = normalizeRadioTag(tag);
@@ -206,9 +212,10 @@ export function createRadioProxyMiddleware({
             // also contain an accepted station tagged for the requested category.
             succeeded: stations.length > 0 && requestedTagCovered,
             stations,
+            rejectedRows,
           };
         } catch {
-          return { succeeded: false, stations: [] };
+          return { succeeded: false, stations: [], rejectedRows: 0 };
         }
       },
     );
@@ -248,6 +255,10 @@ export function createRadioProxyMiddleware({
     if (selected.length < RADIO_CATALOG_HEALTHY_MIN_STATIONS)
       healthReasons.push('station-coverage-below-policy');
     const degraded = healthReasons.length > 0;
+    const rejectedStationCount = Math.min(
+      RADIO_REJECTED_STATION_COUNT_MAX,
+      outcomes.reduce((total, outcome) => total + outcome.rejectedRows, 0),
+    );
     const coverage = {
       successfulQueries,
       totalQueries: queries.length,
@@ -262,6 +273,9 @@ export function createRadioProxyMiddleware({
       degraded,
       degradedReason: degraded ? healthReasons.join(',') : null,
       coverage,
+      // Diagnostic only: it never fails health policy, so a usable generation
+      // with a few skipped rows is still admitted. The client reports it.
+      rejectedStationCount,
     };
     if (degraded && catalogCache) {
       const error = new Error(
@@ -351,6 +365,7 @@ export function createRadioProxyMiddleware({
           coverage: catalog.coverage || null,
           acceptedGeneration: catalog.acceptedGeneration ?? null,
           catalogInstance,
+          rejectedStationCount: catalog.rejectedStationCount ?? 0,
         });
       } catch (error) {
         sendJson(res, 503, {

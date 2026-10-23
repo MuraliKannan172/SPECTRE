@@ -11,10 +11,16 @@ search keeps a successful geocode, with no search or view-based region recovery.
 
 Radio tags are lowercased and whitespace-normalized before the final 80-character
 cap, including requested-tag coverage matching. Malformed station rows are skipped
-individually; valid rows retain their accepted catalog generation. The UI snapshot
-reports a bounded `rejectedStationCount` and degraded coverage when rows were
-skipped. Malformed envelope/freshness/generation metadata and all-invalid responses
-still preserve the previous usable catalog.
+individually on the server and the client; valid rows retain their accepted
+catalog generation. The server's `/stations` envelope carries
+`rejectedStationCount`, the structurally malformed upstream rows it skipped
+(capped at 10,000; policy-filtered rows such as offline or non-HTTPS streams are
+not counted). It is diagnostic only and never fails catalog health. The client
+adds its own rejected rows after admission, so the UI snapshot reports the
+combined, capped `rejectedStationCount` and degraded coverage when either side
+skipped rows. Destroy resets the count. Malformed envelope, freshness, generation
+or rejection-count metadata and all-invalid responses still preserve the previous
+usable catalog.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP
