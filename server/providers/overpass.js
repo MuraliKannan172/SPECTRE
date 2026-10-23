@@ -204,10 +204,8 @@ function overpassProxy({ routing = {} } = {}) {
             return;
           }
         }
-        if (preflight.source === 'DISK') {
-          _overpassCache.set(cacheKey, preflight.payload);
-          trimOverpassCache();
-        }
+        // Preflight already published the disk hit to memory; only trim.
+        if (preflight.source === 'DISK') trimOverpassCache();
         sendOverpassResponse(
           res,
           preflight.payload,

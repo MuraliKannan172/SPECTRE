@@ -249,3 +249,34 @@ test('cold disk lookup is single-flight through upstream publication and quota a
   await resolveOverpassPreflight({ ...options, readDisk: async () => null });
   assert.equal(upstreams, 2, 'a rejected reservation does not poison the next retry');
 });
+
+test('a joined client retries admission with its own quota after another client is rate limited', async () => {
+  const inFlight = new Map();
+  let release;
+  const disk = new Promise((resolve) => { release = resolve; });
+  let reads = 0, upstreams = 0;
+  const admissions = { a: 0, b: 0, c: 0 };
+  const quota = { a: false, b: true, c: false };
+  const payload = { status: 200, body: '{"elements":[]}' };
+  const client = (name) => resolveOverpassPreflight({
+    cacheKey: 'quota', memoryCache: new Map(), inFlight,
+    readDisk: () => { reads++; return reads === 1 ? disk : null; },
+    allowUpstream: () => { admissions[name]++; return quota[name]; },
+    loadUpstream: async () => { upstreams++; return payload; },
+  });
+  // A (quota exhausted) owns the cold reservation; B (quota available) and
+  // C (quota exhausted) join it while the disk lookup is pending.
+  const pending = [client('a'), client('b'), client('c')];
+  await Promise.resolve();
+  assert.equal(inFlight.size, 1);
+  release(null);
+  const [a, b, c] = await Promise.all(pending);
+  assert.equal(a.source, 'RATE_LIMITED', "A's own quota still rejects A");
+  assert.equal(b.source, 'UPSTREAM', 'B is admitted on its own quota');
+  assert.equal(b.payload, payload);
+  assert.equal(c.source, 'INFLIGHT', "C coalesces onto B's admitted fetch");
+  assert.equal(c.payload, payload);
+  assert.deepEqual(admissions, { a: 1, b: 1, c: 0 });
+  assert.equal(upstreams, 1);
+  assert.equal(inFlight.size, 0);
+});
