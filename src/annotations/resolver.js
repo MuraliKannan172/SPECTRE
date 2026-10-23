@@ -103,18 +103,6 @@ export function createAnnotationResolver({
     cacheWrite(cache, key, null);
   }
 
-  /** Wire an external AbortSignal to a local controller; returns a detach fn. */
-  function linkAbort(controller, externalSignal) {
-    if (!externalSignal) return () => {};
-    if (externalSignal.aborted) {
-      controller.abort();
-      return () => {};
-    }
-    const onAbort = () => controller.abort();
-    externalSignal.addEventListener('abort', onAbort, { once: true });
-    return () => externalSignal.removeEventListener('abort', onAbort);
-  }
-
   /**
    * Resolve a single annotation target to a normalized world anchor.
    *

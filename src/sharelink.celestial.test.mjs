@@ -7,7 +7,6 @@ import { _claimContextVisualAuthority, setContextMode } from './ui/contextAction
 import { _initGlobalContextPanel } from './ui/contextBindings.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { ShareLinkManager, decodeShareCreatedAtMs } from './sharelink.js';
 import { createDefaultLayerState } from './data/layerState.js';
 

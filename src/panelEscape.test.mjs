@@ -6,7 +6,6 @@ const radioPresentation = readRadioSource(new URL('./ui/radioPresentation.js', i
 const radioControlsSource = readRadioSource(new URL('./ui/radioControls.js', import.meta.url), 'utf8');
 import { bindPanelDisclosure, collapsePanelOnEscape } from './ui/panelDisclosure.js';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import test from 'node:test';
 
 const source = readShellSource();

@@ -3,16 +3,12 @@ import * as Cesium from 'cesium';
 import {
   LAYER_ID,
   REQUEST_DEBOUNCE_MS,
-  QUERY_LIMIT,
-  MAX_RENDERED,
-  QUERY_SNAP_DEGREES,
   QUERY_REUSE_MS,
   ALPR_COLOR,
 } from './policy.js';
 import {
   snapAlprBox,
   boxContains,
-  destinationPointDeg,
   alprRetryDelayMs,
   validateAlprSnapshot,
   alprCreditMarkup,

@@ -133,7 +133,6 @@ import {
   fallbackHeadingFromId,
   isLikelyFinlandCoordinate,
   fintrafficCameraName,
-  hashSeed,
   isPlausibleLatLon,
   isLikelyBcCoordinate,
   isLikelyTexasCoordinate,

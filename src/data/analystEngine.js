@@ -167,28 +167,6 @@ export function applyScope(records, scope, resolved) {
   return records;
 }
 
-/** Numeric summary for the narration layer. */
-function summarize(items, sortField) {
-  const summary = { count: items.length };
-  if (sortField && items.length) {
-    // A loop, not Math.min(...vals): a full FIRMS day is ~160k values, past
-    // the engine's argument limit.
-    let min = Infinity;
-    let max = -Infinity;
-    for (const item of items) {
-      const value = Number(item[sortField]);
-      if (!Number.isFinite(value)) continue;
-      if (value < min) min = value;
-      if (value > max) max = value;
-    }
-    if (Number.isFinite(min)) {
-      summary[`${sortField}Min`] = min;
-      summary[`${sortField}Max`] = max;
-    }
-  }
-  return summary;
-}
-
 const OPS_BY_TYPE = Object.freeze({
   number: ['gt', 'gte', 'lt', 'lte', 'eq', 'neq'],
   time: ['gt', 'gte', 'lt', 'lte', 'eq', 'neq'],

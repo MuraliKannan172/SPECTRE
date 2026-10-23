@@ -12,7 +12,6 @@ import { readShellSource } from '../testSupport/readShellSource.mjs';
 // cancellable — an AbortSignal for the data manager, a liveness predicate for
 // the visual commit. Several of these assert exactly that plumbing.
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import test from 'node:test';
 
 import { SceneDirector } from './director.js';

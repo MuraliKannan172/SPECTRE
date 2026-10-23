@@ -21,8 +21,6 @@ const radioControlsSource = readRadioSource(new URL('./ui/radioControls.js', imp
 //  - the right-rail entry ignored the activation result entirely.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 const src = readShellSource();
 
