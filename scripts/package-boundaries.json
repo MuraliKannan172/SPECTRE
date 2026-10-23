@@ -103,6 +103,9 @@
     "modules": [
       "server/providers/space.js",
       "server/providers/space/celestrak.js",
+      "server/providers/common/same-site.js",
+      "src/localRequestGate.mjs",
+      "server/providers/space/cooldown.js",
       "server/providers/space/launch-library.js",
       "server/providers/common/http.js",
       "src/data/spaceProviderRequests.js",
