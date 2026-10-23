@@ -161,20 +161,15 @@ async function main() {
     await focusSession.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await page.setViewport({ width: 1440, height: 900 });
 
-    // Track flow-tile requests + traffic console lines for (ii)/(iii)/(v).
+    // Track flow-tile requests for the (iii) budget check.
     const flowRequests = [];
     page.on('request', (req) => {
       if (req.url().includes('/api/tomtom/flow/')) flowRequests.push(req.url());
     });
-    const trafficLogs = [];
     const pageErrors = [];
     if (FIXTURES) await installTrafficRoutes(page, { origin: appUrl.origin, fixtures: true, onError: error => pageErrors.push(error.message) });
     page.on('pageerror', error => { pageErrors.push(error.message); console.error('PAGE ERROR:', error.message); });
     page.on('console', message => { if (message.type() === 'error') console.error('BROWSER ERROR:', message.text()); });
-    page.on('console', (msg) => {
-      const t = msg.text();
-      if (t.includes('[Data:Traffic]')) trafficLogs.push(t);
-    });
 
     console.log('Loading app...');
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -248,7 +243,6 @@ async function main() {
 
     // ── (ii) C4 oblique bounds ───────────────────────────────────────────────
     console.log('\n(ii) C4 — oblique fetch bounds land at the look-at point...');
-    trafficLogs.length = 0;
     const oblique = await settleTraffic(page, { lon: -97.72, lat: 30.245, height: 2500, heading: 315, pitch: -20 }, { minCount: 100 });
     {
       const bounds = oblique?.roadBounds;
