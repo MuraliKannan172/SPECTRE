@@ -10,10 +10,15 @@ lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
 KML namespace repair locates the opening token once and scans its quoted tag
-delimiter once. Malformed or unterminated tags fail before DOM parsing, so a file
-of repeated incomplete `<kml` prefixes cannot trigger quadratic regex rescans.
-Duplicate namespace repair and missing xsi declarations remain supported; GPX
-continues through its existing XML parsing path.
+delimiter once, skipping prolog and DOCTYPE comments and processing
+instructions whole. The scanner is a boundary check only: an opening KML tag
+that never closes, or one with raw markup starting inside it, fails before DOM
+parsing, so a file of repeated incomplete `<kml` prefixes cannot trigger
+quadratic regex rescans. All other XML grammar, including attribute syntax
+inside a complete root tag, is left to DOMParser. Namespace declarations are
+recognized only as whole root attributes, never inside quoted values; duplicate
+namespace repair and missing xsi declarations remain supported. GPX continues
+through its existing XML parsing path.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP

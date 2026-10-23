@@ -1058,7 +1058,17 @@ export function repairKmlRootNamespaces(value, what = 'KML') {
         if (quote) {
           if (char === quote) quote = null;
         } else if (char === '"' || char === "'") quote = char;
-        else if (char === '[') subsetDepth++;
+        else if (char === '<' && text.startsWith('<!--', end)) {
+          // Comments and processing instructions inside the internal subset
+          // carry no declaration syntax; jump past them as a whole.
+          const skip = text.indexOf('-->', end + 4);
+          if (skip < 0) return text;
+          end = skip + 2;
+        } else if (char === '<' && text.startsWith('<?', end)) {
+          const skip = text.indexOf('?>', end + 2);
+          if (skip < 0) return text;
+          end = skip + 1;
+        } else if (char === '[') subsetDepth++;
         else if (char === ']') subsetDepth--;
         else if (char === '>' && subsetDepth === 0) break;
       }
@@ -1098,17 +1108,24 @@ export function repairKmlRootNamespaces(value, what = 'KML') {
       msg('That {format} file is not valid XML.'),
       { format: what },
     );
+  // Walk the root's attributes in order so quoted values are never read as
+  // declarations. Anything the walk cannot tokenize is kept verbatim for the
+  // XML parser to judge.
   const seen = new Set();
-  let root = text
-    .slice(start, end)
-    .replace(
-      /\sxmlns:([\w.-]+)\s*=\s*(["'])[^"']*\2/g,
-      (declaration, prefix) => {
-        if (seen.has(prefix)) return '';
-        seen.add(prefix);
-        return declaration;
-      },
-    );
+  const attribute = /(\s+)([^\s=/>"']+)\s*=\s*("[^"]*"|'[^']*')/y;
+  let position = start + match[0].length;
+  let root = text.slice(start, position);
+  for (;;) {
+    attribute.lastIndex = position;
+    const found = attribute.exec(text);
+    if (!found || attribute.lastIndex > end) break;
+    position = attribute.lastIndex;
+    const prefix = /^xmlns:([\w.-]+)$/.exec(found[2])?.[1];
+    if (prefix && seen.has(prefix)) continue;
+    if (prefix) seen.add(prefix);
+    root += found[0];
+  }
+  root += text.slice(position, end);
   if (!seen.has('xsi') && /[<\s]xsi:/.test(text))
     root = root.replace(
       /(\/?)>$/,

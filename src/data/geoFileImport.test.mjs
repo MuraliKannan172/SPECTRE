@@ -1197,7 +1197,11 @@ test('KML root namespace repair respects quoted delimiters and preserves the doc
 test('repeated incomplete KML roots finish within an isolated process deadline', () => {
   const source = `import { repairKmlRootNamespaces } from ${JSON.stringify(new URL('./geoFileImport.js', import.meta.url).href)};
     try { repairKmlRootNamespaces('<kml '.repeat(1000000)); process.exit(1); }
-    catch (error) { if (error.name !== 'GeoImportError') throw error; }`;
+    catch (error) { if (error.name !== 'GeoImportError') throw error; }
+    try { repairKmlRootNamespaces('<!DOCTYPE kml [' + ${JSON.stringify("<!-- ' --><?pi ' ?>")}.repeat(100000) + ']><kml '); process.exit(1); }
+    catch (error) { if (error.name !== 'GeoImportError') throw error; }
+    const wide = '<kml' + ${JSON.stringify(` xmlns:gx="a" note='xmlns:gx="b"'`)}.repeat(20000) + '/>';
+    if (repairKmlRootNamespaces(wide).split('xmlns:gx="a"').length !== 2) process.exit(1);`;
   const child = spawnSync(
     process.execPath,
     ['--input-type=module', '-e', source],
@@ -1222,5 +1226,39 @@ test('KML namespace repair follows a doctype with a quoted root-like entity', ()
   assert.equal(
     repairKmlRootNamespaces(input),
     input.replace(' xmlns:gx="b"', ''),
+  );
+});
+
+test('KML namespace repair skips doctype comments and processing instructions whole', () => {
+  for (const prolog of [
+    "<!DOCTYPE kml [<!-- don't count this quote -->]>",
+    '<!DOCTYPE kml [<!-- a ] or > here --><!ENTITY x "y">]>',
+    "<!DOCTYPE kml [<?note it's ] > fine?>]>",
+    '<!DOCTYPE kml [<!ENTITY x "<!-- \' -->">]>',
+  ]) {
+    const input = `${prolog}<kml xmlns:gx="a" xmlns:gx="b"><Placemark xsi:type="t"/></kml>`;
+    assert.equal(
+      repairKmlRootNamespaces(input),
+      input.replace(
+        ' xmlns:gx="b">',
+        ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
+      ),
+      prolog,
+    );
+  }
+  const unterminated = '<!DOCTYPE kml [<!-- open <kml xmlns:gx="a">';
+  assert.equal(repairKmlRootNamespaces(unterminated), unterminated);
+});
+
+test('KML namespace repair ignores declaration text inside quoted attribute values', () => {
+  const input =
+    '<kml note=\'a > b xmlns:gx="fake"\' xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:gx="dup"><gx:Track/></kml>';
+  const result = repairKmlRootNamespaces(input);
+  assert.equal(result, input.replace(' xmlns:gx="dup"', ''));
+  assert.match(result, /\sxmlns:gx="http:\/\/www.google.com\/kml\/ext\/2.2"/);
+  const xsi = '<kml note="xmlns:xsi=\'x\'"><Placemark xsi:type="t"/></kml>';
+  assert.match(
+    repairKmlRootNamespaces(xsi),
+    /note="xmlns:xsi='x'" xmlns:xsi="http:\/\/www.w3.org\/2001\/XMLSchema-instance">/,
   );
 });
