@@ -3,4 +3,4 @@
   and locals nothing reads, a duplicate copy of the bundled dams data and an
   unused ship model. The app no longer builds an unused default wind layer
   and Bhote Koshi locator layer when it loads. Package exports are unchanged
-  (Sameh Khamis, #1321).
+  (samehkhamis, #1321).
