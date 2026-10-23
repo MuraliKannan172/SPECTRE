@@ -2,7 +2,7 @@ import path from 'node:path';
 import { promises as fsp } from 'node:fs';
 import { celestrakTleUrl } from '../../../src/data/spaceProviderRequests.js';
 import { providerCooldownMs } from './cooldown.js';
-import { admitSameSite } from '../common/same-site.js';
+import { admitSameSiteKeyless } from '../common/same-site.js';
 import { readResponseTextCapped } from '../common/http.js';
 
 /**
@@ -34,6 +34,8 @@ export function celestrakProxy() {
     'galileo',
     'geo',
     'starlink',
+    // Space Missions (`getActiveTle`) reads the full active catalog.
+    'active',
   ]);
   let cooldownUntil = 0;
   const mem = new Map(); // group -> { at: epochMs, body: string }
@@ -77,7 +79,12 @@ export function celestrakProxy() {
       },
     });
     if (!res.ok) {
-      cooldownUntil = Date.now() + providerCooldownMs(res);
+      // Group refreshes run in parallel: a later failure without Retry-After
+      // must never shorten a longer deadline an earlier one already set.
+      cooldownUntil = Math.max(
+        cooldownUntil,
+        Date.now() + providerCooldownMs(res),
+      );
       void res.body?.cancel().catch(() => {});
       throw new Error(`HTTP ${res.status}`);
     }
@@ -96,7 +103,9 @@ export function celestrakProxy() {
       const group = String(req.url || '')
         .replace(/^\//, '')
         .split('?')[0];
-      if (admitSameSite(req, res)) return;
+      // Keyless and needed to render the satellites layer: refuse cross-site
+      // browsers but keep the documented reverse-proxy deployment working.
+      if (admitSameSiteKeyless(req, res)) return;
       if (req.method !== 'GET') {
         res.writeHead(405);
         res.end();

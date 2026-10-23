@@ -9,12 +9,15 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-CelesTrak accepts only the seven satellite groups used by the app and gates
-requests before provider work. CelesTrak and Launch Library failures start a
-provider-wide cooldown: Retry-After seconds or HTTP dates are bounded to 5 seconds
-through 30 minutes, with a 60-second fallback. During cooldown dated last-good
-data is served with stale provenance, otherwise the proxy returns a bounded
-error without another upstream attempt. Error bodies are cancelled before reading.
+CelesTrak accepts only the eight satellite groups used by the app (the seven
+satellite-layer groups plus `active` for Space Missions) and gates cross-site
+requests before provider work with the keyless same-site policy, so the
+documented reverse proxy still works. CelesTrak and Launch Library failures
+start a provider-wide cooldown that a later failure never shortens: Retry-After
+seconds or HTTP dates are bounded to 5 seconds through 30 minutes, with a
+60-second fallback. During cooldown dated last-good data is served with stale
+provenance, otherwise the proxy returns a bounded error without another upstream
+attempt. Error bodies are cancelled before reading.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP

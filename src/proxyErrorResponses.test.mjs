@@ -25,7 +25,6 @@ function fixture(name, overrides = {}, preview = false) {
   const logs = [];
   const deps = {
     readResponseTextCapped, coalesceProxyRequest, providerCooldownMs,
-    admitSameSite: () => false,
     // The rate-limited proxies reach for these; give them the real ones so a
     // fixture request is throttled exactly as production would be.
     makeRateLimiter, clientKey,

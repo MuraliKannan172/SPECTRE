@@ -90,8 +90,12 @@ export function rocketLaunchesProxy() {
       headers: launchLibraryRequestHeaders(),
     });
     if (!upstream.ok) {
-      cooldownUntil = Date.now() + providerCooldownMs(upstream);
-      cooldownStatus = upstream.status;
+      const deadline = Date.now() + providerCooldownMs(upstream);
+      // Never shorten a longer cooldown that is already in force.
+      if (deadline >= cooldownUntil) {
+        cooldownUntil = deadline;
+        cooldownStatus = upstream.status;
+      }
       void upstream.body?.cancel().catch(() => {});
       const error = new Error(`upstream HTTP ${upstream.status}`);
       error.upstreamStatus = upstream.status;
