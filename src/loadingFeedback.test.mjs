@@ -628,7 +628,7 @@ test('the loading ticker never runs hidden and stops after loading and notices s
   // safety-net poll, so its `if (document.hidden) return;` is correct there
   // and must not be confused with this self-stopping ticker's leak.
   const armBody = ui.slice(ui.indexOf('_armLoadingFeedbackTicker() {'));
-  assert.ok(armBody.startsWith('_armLoadingFeedbackTicker() {'), 'ticker function not found in ui.js');
+  assert.ok(armBody.startsWith('_armLoadingFeedbackTicker() {'), 'ticker function not found in the UI shell source');
   const arm = armBody.slice(0, armBody.indexOf('\n  }\n') + 5);
 
   // 1. The ARM guard itself refuses while hidden. Previously the only hidden

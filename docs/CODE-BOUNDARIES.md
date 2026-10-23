@@ -235,7 +235,7 @@ DOM elements and callbacks; importing it creates no browser state. `destroy()`
 removes owned listeners and cancels pending work without changing saved state
 or moving focus. Call it before removing or replacing the controls.
 
-`src/ui/composition.js` retains panel layout, persistence, share restoration and application
+`src/ui/applicationShell.js` retains panel layout, persistence, share restoration and application
 reactions to state changes. Map Source selection and Location draft cleanup are
 provided through callbacks. The component imports no globe, data, application
 or server modules. Package checks and scoped formatting cover this entry.
