@@ -1,7 +1,13 @@
 import * as Cesium from 'cesium';
 import { isPointerFree } from '../../data/inputOwnership.js';
 
-/** Bound hover picking independently of precise click selection. */
+const HOVER_PICK_INTERVAL_MS = 120;
+
+/**
+ * Bound hover picking independently of precise click selection. A move inside
+ * the throttle window is not dropped: its position is kept and one trailing
+ * check runs when the window ends, so a pointer that stops is still resolved.
+ */
 export function createLaunchHover({
   viewer,
   enabled,
@@ -9,16 +15,26 @@ export function createLaunchHover({
   now = () => performance.now(),
   documentRef = globalThis.document,
   pointerFree = isPointerFree,
+  setTimer = globalThis.setTimeout,
+  clearTimer = globalThis.clearTimeout,
 }) {
   let moving = false;
   let lastPick = -Infinity;
   let ownsCursor = false;
+  let pendingPosition = null;
+  let trailingTimer = null;
   const clearCursor = () => {
     if (ownsCursor && viewer.scene.canvas.style.cursor === 'pointer')
       viewer.scene.canvas.style.cursor = '';
     ownsCursor = false;
   };
+  const cancelTrailing = () => {
+    if (trailingTimer !== null) clearTimer(trailingTimer);
+    trailingTimer = null;
+    pendingPosition = null;
+  };
   const reset = () => {
+    cancelTrailing();
     clearCursor();
     lastPick = -Infinity;
   };
@@ -34,31 +50,56 @@ export function createLaunchHover({
     if (documentRef?.hidden || documentRef?.visibilityState === 'hidden')
       reset();
   };
+  const eligible = () =>
+    enabled() &&
+    !moving &&
+    !documentRef?.hidden &&
+    documentRef?.visibilityState !== 'hidden' &&
+    pointerFree();
+  const pick = (position, at) => {
+    lastPick = at;
+    const found = viewer.scene
+      .drillPick(position, 12)
+      .some((picked) => entityLaunchId(picked?.id));
+    if (found) {
+      viewer.scene.canvas.style.cursor = 'pointer';
+      ownsCursor = true;
+    } else clearCursor();
+  };
+  const trailing = () => {
+    trailingTimer = null;
+    const position = pendingPosition;
+    pendingPosition = null;
+    if (!position) return;
+    // Eligibility may have changed while the check waited.
+    if (!eligible()) {
+      reset();
+      return;
+    }
+    pick(position, now());
+  };
   const removeStart = viewer.camera?.moveStart?.addEventListener(start);
   const removeEnd = viewer.camera?.moveEnd?.addEventListener(end);
   documentRef?.addEventListener?.('visibilitychange', visibility);
   return {
     move(movement) {
-      if (
-        !enabled() ||
-        moving ||
-        documentRef?.hidden ||
-        documentRef?.visibilityState === 'hidden' ||
-        !pointerFree()
-      ) {
+      if (!eligible()) {
         reset();
         return;
       }
       const at = now();
-      if (at - lastPick < 120) return;
-      lastPick = at;
-      const found = viewer.scene
-        .drillPick(movement.endPosition, 12)
-        .some((picked) => entityLaunchId(picked?.id));
-      if (found) {
-        viewer.scene.canvas.style.cursor = 'pointer';
-        ownsCursor = true;
-      } else clearCursor();
+      const wait = HOVER_PICK_INTERVAL_MS - (at - lastPick);
+      if (wait > 0) {
+        // Cesium reuses the movement object, so keep a copy of the position.
+        pendingPosition = Cesium.Cartesian2.clone(
+          movement.endPosition,
+          pendingPosition ?? undefined,
+        );
+        if (trailingTimer === null) trailingTimer = setTimer(trailing, wait);
+        return;
+      }
+      cancelTrailing();
+      pick(movement.endPosition, at);
     },
     reset,
     destroy() {

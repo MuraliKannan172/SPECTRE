@@ -9,7 +9,7 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-Mission hover picking is limited to one drill-pick per 120 ms and suppressed during camera movement, hidden tabs, disabled layers, and pointer-owned tools. Motion, hiding, disable, and destroy clear the cursor. Click selection keeps its full overlap-aware drill-pick behavior.
+Mission hover picking is limited to one drill-pick per 120 ms and suppressed during camera movement, hidden tabs, disabled layers, and pointer-owned tools. A move inside the 120 ms window keeps a copy of its position and runs one trailing check when the window ends, so a pointer that stops is still resolved; the trailing check rechecks eligibility and is cancelled by reset, disable, camera motion, and destroy. Motion, hiding, disable, and destroy clear the cursor. Click selection keeps its full overlap-aware drill-pick behavior.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP
