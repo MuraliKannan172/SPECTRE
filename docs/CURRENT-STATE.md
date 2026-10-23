@@ -9,7 +9,16 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-The standalone military source no longer requests the unavailable, undocumented ADSB.lol trace endpoint. Tracking retains its locally accumulated trail, and custom sources may still supply optional getTrack history. The old HTTP route validates the identifier then reports 503 history_unavailable without any upstream request, rather than forwarding a misleading 403. The `get_aircraft_track` tool reports `unsupported` for a military feed without `getTrack` instead of a retry-later failure. This does not restore historical coverage or download bulk daily archives.
+KML namespace repair locates the opening token once and scans its quoted tag
+delimiter once, skipping prolog and DOCTYPE comments and processing
+instructions whole. The scanner is a boundary check only: an opening KML tag
+that never closes, or one with raw markup starting inside it, fails before DOM
+parsing, so a file of repeated incomplete `<kml` prefixes cannot trigger
+quadratic regex rescans. All other XML grammar, including attribute syntax
+inside a complete root tag, is left to DOMParser. Namespace declarations are
+recognized only as whole root attributes, never inside quoted values; duplicate
+namespace repair and missing xsi declarations remain supported. GPX continues
+through its existing XML parsing path.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP
