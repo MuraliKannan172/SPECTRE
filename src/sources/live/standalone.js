@@ -1,5 +1,4 @@
 import {
-  epoch,
   finite,
   httpError,
   LiveSourceError,
