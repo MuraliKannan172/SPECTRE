@@ -8,7 +8,6 @@ import { setContextMode as contextModeAction } from './ui/contextActions.js';
 import { ContextControls } from './ui/contextControls.js';
 import { readFileSync as readRadioSource } from 'node:fs';
 const radioBindings = readRadioSource(new URL('./ui/radioBindings.js', import.meta.url), 'utf8');
-const radioPresentation = readRadioSource(new URL('./ui/radioPresentation.js', import.meta.url), 'utf8');
 const radioControlsSource = readRadioSource(new URL('./ui/radioControls.js', import.meta.url), 'utf8');
 // Source-contract pins read the actual Context owners and root disposal wiring. Each pin guards a bug that shipped or nearly shipped:
 //  - session bookkeeping ran AFTER the exit early-return, so the compensating

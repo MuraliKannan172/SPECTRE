@@ -1406,7 +1406,6 @@ test('the selected card lands where the vehicle stopped, not short of it', async
   // segment ends left it a few metres behind, and then the render hold was
   // released with no frame scheduled to close the gap.
   const app = harness(t);
-  const start = Date.now();
   app.serve('mbta', () => ({
     status: 200,
     body: snapshot('mbta', 'MBTA', [vehicle('b', 42.36, -71.06, reported())], {
