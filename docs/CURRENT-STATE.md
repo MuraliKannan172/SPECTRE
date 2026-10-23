@@ -9,7 +9,7 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-Manager-owned periodic network updates pause while the document is hidden. Returning to a visible tab runs one overdue update per enabled layer without overlapping an active refresh; explicit refresh requests remain available. Transit also defers camera-driven feed admission while hidden and rechecks coverage on return. Visibility listeners are released with their polling intervals.
+Manager-owned periodic network updates pause while the document is hidden. Returning to a visible tab runs one overdue update per enabled layer without overlapping an active refresh and restarts that layer's polling schedule from the return, so the next poll follows one interval later whether or not the catch-up update succeeds; explicit refresh requests remain available. Transit also defers camera-driven feed admission while hidden and rechecks coverage on return. Visibility listeners are released with their polling intervals.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP

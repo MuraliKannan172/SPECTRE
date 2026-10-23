@@ -553,24 +553,44 @@ export class LayerLifecycle {
           : 0;
     if (refreshInterval > 0) {
       const visibilityDocument = this._visibilityTarget;
-      let dueAt = Date.now() + refreshInterval;
-      const tick = () => {
-        if (
-          visibilityDocument?.hidden ||
-          visibilityDocument?.visibilityState === 'hidden' ||
-          !entry.enabled ||
-          entry.destroying ||
-          entry.refreshing ||
-          Date.now() < dueAt
-        )
-          return;
+      let intervalId = null;
+      let dueAt = 0;
+      const canPoll = () =>
+        !visibilityDocument?.hidden &&
+        visibilityDocument?.visibilityState !== 'hidden' &&
+        entry.enabled &&
+        !entry.destroying &&
+        !entry.refreshing &&
+        entry.intervalId === intervalId;
+      // dueAt and the interval phase share one origin, so every interval tick
+      // is a due poll. A visibility catch-up re-arms the interval at the new
+      // deadline; otherwise the old phase would skip its next tick.
+      const schedule = () => {
+        clearInterval(intervalId);
+        dueAt = Date.now() + refreshInterval;
+        intervalId = setInterval(onInterval, refreshInterval);
+        entry.intervalId = intervalId;
+      };
+      const onInterval = () => {
+        if (!canPoll()) return;
         dueAt = Date.now() + refreshInterval;
         void this._runPeriodicUpdate(layerId, entry);
       };
-      entry.intervalId = setInterval(tick, refreshInterval);
-      visibilityDocument?.addEventListener?.('visibilitychange', tick);
+      const onVisibilityChange = () => {
+        if (!canPoll() || Date.now() < dueAt) return;
+        schedule();
+        void this._runPeriodicUpdate(layerId, entry);
+      };
+      schedule();
+      visibilityDocument?.addEventListener?.(
+        'visibilitychange',
+        onVisibilityChange,
+      );
       entry.removeVisibilityListener = () =>
-        visibilityDocument?.removeEventListener?.('visibilitychange', tick);
+        visibilityDocument?.removeEventListener?.(
+          'visibilitychange',
+          onVisibilityChange,
+        );
     } else if (updateInterval === 0) {
       entry.intervalId = setInterval(() => {
         if (!entry.enabled) return;
