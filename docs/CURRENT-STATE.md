@@ -9,18 +9,15 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-Radio tags are lowercased and whitespace-normalized before the final 80-character
-cap, including requested-tag coverage matching. Malformed station rows are skipped
-individually on the server and the client; valid rows retain their accepted
-catalog generation. The server's `/stations` envelope carries
-`rejectedStationCount`, the structurally malformed upstream rows it skipped
-(capped at 10,000; policy-filtered rows such as offline or non-HTTPS streams are
-not counted). It is diagnostic only and never fails catalog health. The client
-adds its own rejected rows after admission, so the UI snapshot reports the
-combined, capped `rejectedStationCount` and degraded coverage when either side
-skipped rows. Destroy resets the count. Malformed envelope, freshness, generation
-or rejection-count metadata and all-invalid responses still preserve the previous
-usable catalog.
+CelesTrak accepts only the eight satellite groups used by the app (the seven
+satellite-layer groups plus `active` for Space Missions) and gates cross-site
+requests before provider work with the keyless same-site policy, so the
+documented reverse proxy still works. CelesTrak and Launch Library failures
+start a provider-wide cooldown that a later failure never shortens: Retry-After
+seconds or HTTP dates are bounded to 5 seconds through 30 minutes, with a
+60-second fallback. During cooldown dated last-good data is served with stale
+provenance, otherwise the proxy returns a bounded error without another upstream
+attempt. Error bodies are cancelled before reading.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP
