@@ -25,6 +25,9 @@ export function createAnimation({
       layerState._enabled &&
       (layerState._dots.length || layerState._heatJamPrim),
     );
+    // Height easing only runs in a held frame. Settle it before releasing, so
+    // a population emptied mid-correction cannot report loading forever.
+    if (!needed && layerState._heightPending) parts.retention.finishHeights();
     if (needed === Boolean(layerState._renderHeld)) return;
     layerState._renderHeld = needed;
     if (needed) {
