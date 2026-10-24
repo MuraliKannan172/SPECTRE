@@ -58,8 +58,16 @@ The same database was used with `HTTPS_PROXY=HTTP_PROXY=http://127.0.0.1:9` (a d
 ## 5. Geoparser quality
 
 - **Fixture:** `intel/scripts/geo_eval.py` on 39 hand-labelled headlines gives precision **1.0** (33 of 33 placed are correct) and recall **0.917**. The same fixture was used for tuning, so it is not independent.
-- **Held-out check:** 30 placed stories were sampled at random (seed 7) from the live run and judged by hand. Nine of them carry the feed's own coordinates (USGS).
-  - **First pass:** 22 at the event or subject location, 2 at the issuing government's country, 5 debatable (press-release datelines and "UK" resolving to England), 1 wrong.
-  - **Fixes:** the "UK" alias went only to England's constituent-country entry instead of the United Kingdom, and a place followed by a comma and a date is now treated as a dateline. The same 30 were re-scored.
-  - **After the fixes, 26 are still placed:** 22 at the event or subject, 2 at the issuing government's country (United Kingdom), 1 debatable (a UK–France exercise placed in the UK) and 1 wrong (a UK statement on trafficking placed in the UK, its speaker).
+- **Held-out check:** 30 placed stories were sampled at random (seed 7) from the live run and judged by hand. Nine of them are USGS items that carry the feed's own coordinates, so they do not test the geoparser. The figures below cover only the **21 text-geoparsed items**.
+  - **First pass, all 21 placed:** 13 at the event or subject, 2 at the issuing government's country, 5 debatable (three press-release datelines and two "UK" items resolved to England) and 1 wrong.
+  - **Fixes:** the "UK" alias had gone to England's constituent-country entry instead of the United Kingdom, and a place followed by a comma and a date is now treated as a dateline. The same 21 were re-scored.
+  - **After the fixes, 17 are still placed:** 13 at the event or subject, 2 at the issuing government's country (United Kingdom), 1 debatable (a UK–France exercise placed in the UK) and 1 wrong (a UK statement on trafficking placed in the UK, its speaker).
   - **Withheld (4):** the three Brussels datelines, correctly, and one Prague speech whose dateline was also the venue (a recall loss).
+
+## 6. GDELT and the app's existing headline path
+
+The app's Phase 1 regional brief also uses GDELT for headlines when Non-commercial sources is off. That is the default, with User-Agent `SKYNET-regional-news/0.1`.
+
+One normal request, `GET /api/regional-brief?latitude=51.507&longitude=-0.128` on the dev server, returned `newsStatus: "unavailable"` with no articles. The provider swallows the upstream error, so the status code was not logged.
+
+What was observed: on 2026-10-24, GDELT requests from this machine failed for both SKYNET components. The cause is not established.
