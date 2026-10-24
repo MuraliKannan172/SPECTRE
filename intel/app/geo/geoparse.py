@@ -239,6 +239,9 @@ _GIVEN_NAMES = frozenset(
     "lima santiago salvador cordoba valencia regina".split()
 )
 _CAPITALISED_RUN = re.compile(r"[A-Z][\w.\-’']*(?:\s+[A-Z][\w.\-’']*)*")
+# A place, a comma, then a date: "Brussels, 23 Oct 2026", "LONDON, Oct 24".
+_MONTH = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?"
+_DATELINE = re.compile(rf"^\s*,\s*(?:\d{{1,2}}\s+{_MONTH}|{_MONTH}\s+\d{{1,2}})\b")
 _POSSESSIVE = re.compile(r"(?:'s|’s|'|’)$")
 
 
@@ -262,6 +265,7 @@ class _Mention:
     speaker: bool
     weak: bool  # from a PERSON label or the title scan, not a place label
     candidates: tuple[Place, ...]
+    dateline: bool = False  # "Brussels, 23 Oct 2026": where it was issued, not where it happened
 
 
 def _km(a: Place, b: Place) -> float:
@@ -345,7 +349,8 @@ class GeoParser:
             following = doc[ent.end].text.lower() if ent.end < len(doc) else ""
             if following in ("'s", "’s") and ent.end + 1 < len(doc):
                 following = doc[ent.end + 1].text.lower()
-            mentions.append(_Mention(in_title, following in _SPEECH_VERBS, weak, tuple(candidates)))
+            dateline = bool(_DATELINE.match(doc.text[ent.end_char : ent.end_char + 24]))
+            mentions.append(_Mention(in_title, following in _SPEECH_VERBS, weak, tuple(candidates), dateline))
         return mentions, demonyms
 
     def _title_scan(self, title: str, people: list[tuple[int, int]]) -> list[_Mention]:
@@ -475,7 +480,11 @@ class GeoParser:
             context = {
                 place.country_code
                 for other, (score, place) in enumerate(first_pass)
-                if other != index and score >= 0.55 and place.country_code and not mentions[other].speaker
+                if other != index
+                and score >= 0.55
+                and place.country_code
+                and not mentions[other].speaker
+                and not mentions[other].dateline
             }
             neighbours = [
                 place
@@ -496,6 +505,8 @@ class GeoParser:
             if rivals:
                 top_score -= max(0.0, 0.15 - (top_score - rivals[0]))
             if mention.speaker and (top.kind == "country" or "capital" in top.flags):
+                top_score = min(top_score, 0.35)
+            if mention.dateline:
                 top_score = min(top_score, 0.35)
             ranked_score = top_score + _KIND_BONUS.get(top.kind, 0.0)
             if best is None or ranked_score > best[0] + 1e-9:

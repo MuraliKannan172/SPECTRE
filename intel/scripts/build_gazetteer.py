@@ -265,7 +265,10 @@ def build(cache: Path) -> dict:
         decimals = feature.get("d", countries["meta"].get("decimals", 3))
         lat, lon = representative_point(feature["polygons"], decimals)
         keys = [feature["name"], feature.get("country") or feature["name"], *feature.get("alt", [])]
-        keys += COUNTRY_ALIASES.get(cc, [])
+        # Aliases ("UK", "Britain") name the sovereign state, not England,
+        # Scotland, Wales or Northern Ireland, which share its ISO code.
+        if feature.get("type") == "Country":
+            keys += COUNTRY_ALIASES.get(cc, [])
         add("country", feature["name"], lat, lon, cc, 0, keys, flags=continent.get(cc, ""))
 
     states = json.loads((NE_DIR / "states_provinces.json").read_text(encoding="utf-8"))

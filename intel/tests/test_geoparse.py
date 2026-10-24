@@ -65,6 +65,26 @@ def test_a_speaking_capital_is_not_an_event_location(parser: GeoParser) -> None:
     assert result is None or result.confidence < ON_GLOBE_CONFIDENCE
 
 
+def test_a_press_release_dateline_is_not_the_event_location(parser: GeoParser) -> None:
+    result = parser.parse(
+        "Commission proposes stronger recognition of heritage sites",
+        "European Commission Press release Brussels, 23 Oct 2026 The Commission has proposed new rules.",
+    )
+    assert result is None or not result.on_globe
+    # A real place later in the text still wins over the dateline.
+    result = parser.parse(
+        "Flood relief convoy reaches stricken towns",
+        "GENEVA, Oct 24 - Aid trucks reached Derna in eastern Libya on Friday.",
+    )
+    assert result is not None and result.country_code == "LY"
+
+
+def test_uk_means_the_united_kingdom_not_england(parser: GeoParser) -> None:
+    result = parser.parse("UK publishes annual defence export figures")
+    assert result is not None and result.country_code == "GB"
+    assert result.place_name == "United Kingdom"
+
+
 def test_people_are_never_places(parser: GeoParser) -> None:
     for title in (
         "Jordan Peterson says new book is coming",
