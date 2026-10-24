@@ -63,6 +63,16 @@ def test_an_edited_applied_migration_is_refused(tmp_path: Path) -> None:
         migrate(conn, migrations)
 
 
+def test_line_endings_do_not_count_as_an_edit(tmp_path: Path) -> None:
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    (migrations / "0001_a.sql").write_bytes(b"CREATE TABLE a (x INTEGER);\n")
+    conn = connect(tmp_path / "m.db")
+    migrate(conn, migrations)
+    (migrations / "0001_a.sql").write_bytes(b"CREATE TABLE a (x INTEGER);\r\n")
+    assert migrate(conn, migrations) == []
+
+
 def test_a_failing_migration_rolls_back_whole(tmp_path: Path) -> None:
     migrations = tmp_path / "migrations"
     migrations.mkdir()

@@ -223,7 +223,7 @@ _KEYWORDS: dict[str, tuple[str, ...]] = {
 
 _ALERT = (
     r"red alert",
-    r"tsunami warnings?",
+    r"tsunami (?:warnings?|alerts?)",
     r"mass casualt\w+",
     r"state of emergency",
     r"magnitude (?:[7-9])(?:\.\d)?",
