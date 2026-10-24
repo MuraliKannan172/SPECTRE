@@ -64,3 +64,20 @@ those texts with the font files.
 
 SIL Open Font License 1.1 text: <https://openfontlicense.org/open-font-license-official-text/>.
 Apache License 2.0 text: <https://www.apache.org/licenses/LICENSE-2.0>.
+
+## Intel service (Python, `intel/`)
+
+The intel service's dependencies are installed by uv from `intel/uv.lock` into
+a local, gitignored virtual environment. They are not committed or bundled.
+The direct dependencies, at the locked versions (licences as declared in each
+package's metadata):
+
+- **FastAPI** 0.162.0: MIT; **Starlette** 1.10.0: BSD-3-Clause; **Pydantic** 2.14.1: MIT
+- **Uvicorn** 0.54.0: BSD-3-Clause
+- **HTTPX** 0.28.1: BSD-3-Clause
+- **feedparser** 6.0.14: BSD-2-Clause
+- **RapidFuzz** 3.14.6: MIT
+- **PyYAML** 6.0.3: MIT
+- **spaCy** 3.8.16: MIT; **en_core_web_sm** 3.8.0 (Explosion AI): MIT
+
+A packaged release that ships these must carry their licence texts.
