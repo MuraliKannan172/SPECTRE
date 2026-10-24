@@ -1,0 +1,41 @@
+[project]
+name = "skynet-intel"
+version = "0.1.0"
+description = "SKYNET intel service: real-time news ingest, dedupe, geoparse and search behind /api/intel."
+license = "MIT"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.32",
+  "httpx>=0.28",
+  "feedparser>=6.0.11",
+  "rapidfuzz>=3.10",
+  "pyyaml>=6.0.2",
+  "spacy>=3.8,<3.9",
+  "en_core_web_sm",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.8"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = ["S101", "S311"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
+"scripts/*" = ["S310"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+en_core_web_sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"

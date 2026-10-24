@@ -136,6 +136,9 @@ test('directories the server writes while it runs are kept out of the dev watche
   assert.deepEqual(plugin.config().server.watch.ignored, [
     '**/.gev-cache/**',
     '**/.gev-logs/**',
+    '**/intel/data/**',
+    '**/intel/.venv/**',
+    '**/.skynet-logs/**',
   ]);
 });
 
