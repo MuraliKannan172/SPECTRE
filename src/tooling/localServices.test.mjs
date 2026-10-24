@@ -707,6 +707,37 @@ test('key setup writes only the supplied application root, retains request guard
   assert.equal(existsSync(path.join(untouched, '.env')), false);
 });
 
+test('the non-commercial sources switch saves 1 and removes it through key setup', async (t) => {
+  // SKYNET's Provider Settings switch row posts 1 to turn on, null to turn off.
+  const sourceRoot = root(t);
+  env(t, 'SKYNET_NONCOMMERCIAL_SOURCES', undefined);
+  const handler = install(keySetupEndpoint({ sourceRoot })).get(
+    '/api/setup/keys',
+  );
+  const dotenv = () => readFileSync(path.join(sourceRoot, '.env'), 'utf8');
+  const row = (response) =>
+    response
+      .json()
+      .status.keys.find((key) => key.id === 'non-commercial-sources');
+
+  const on = await request(handler, {
+    method: 'POST',
+    body: JSON.stringify({ SKYNET_NONCOMMERCIAL_SOURCES: '1' }),
+  });
+  assert.equal(on.status, 200);
+  assert.match(dotenv(), /^SKYNET_NONCOMMERCIAL_SOURCES=1$/m);
+  assert.equal(row(on).kind, 'switch');
+  assert.equal(row(on).set, true);
+
+  const off = await request(handler, {
+    method: 'POST',
+    body: JSON.stringify({ SKYNET_NONCOMMERCIAL_SOURCES: null }),
+  });
+  assert.equal(off.status, 200);
+  assert.doesNotMatch(dotenv(), /^SKYNET_NONCOMMERCIAL_SOURCES=1$/m);
+  assert.equal(row(off).set, false);
+});
+
 test('Realtime service configuration selects compatible endpoint/model without forwarding request model IDs or keys', async () => {
   const handler = install(
     openAiRealtimeProxy({
