@@ -98,22 +98,85 @@ export const NYC_DOT_DISCLAIMER =
   'NYC DOT and the City of New York make no representation as to the accuracy or usefulness of the information provided by this application or the information&#39;s suitability for any purpose and disclaim any liability for omissions or errors that may be contained therein. ' +
   'The public is advised to observe posted signage for compliance with applicable laws and regulations.';
 
+/**
+ * CC BY 4.0 requires credit, a licence link and a change notice for each
+ * bundled 3D model. Provenance and the exact changes are in
+ * public/models/README.md; creators re-checked on Sketchfab on 2026-10-22.
+ */
+const MODEL_CREDITS = [
+  [
+    'boeing 747',
+    'zairiq-123',
+    'zairiq-123',
+    'boeing-747-9b16672038ba48f98e6d80a159044ed9',
+  ],
+  [
+    'Private Jet',
+    'bacelM',
+    'BACEL_M',
+    'private-jet-cbdd1de6ced9461e950eafaa302cc82b',
+  ],
+  [
+    'Low Poly Cargo Ship',
+    'Javier_Fernandez',
+    'Javier.Fernandez',
+    'low-poly-cargo-ship-4c22cbaf01c1427f8ab60b3a07b1b32c',
+  ],
+  [
+    'Cessna 172',
+    'Nobilis the Palaeovespa',
+    'nobilishornet',
+    'cessna-172-64cddaee5aff470682659a8c08525046',
+  ],
+  [
+    '1990 Cessna Citation',
+    'BlenderCommunityHead',
+    'maximgad',
+    '1990-cessna-citation-texture-detailed-exterior-a78839624fe64900a8352cb23462350a',
+  ],
+  ['MQ-9', 'IProZenoN', 'IProZenoN', 'mq-9-fabe963feb354c5584b51f9c470c3f7e'],
+  [
+    'Boeing 787-9',
+    'Nobilis 2',
+    'nobilishornet2',
+    'boeing-787-9-b6711e2e698e4e469675c1154a50b7a3',
+  ],
+  [
+    'ATR 72 - 600',
+    'Sofyan Kurniawan',
+    'sofyankurniawan',
+    'atr-72-600-1e1a7186f7444d288675262fcee44744',
+  ],
+];
+
+export const MODEL_CREDIT = {
+  key: 'sketchfab-models',
+  html:
+    '3D aircraft and ship models (modified: simplified, rescaled and reoriented): ' +
+    MODEL_CREDITS.map(
+      ([title, creator, profile, slug]) =>
+        `<a href="https://sketchfab.com/3d-models/${slug}" target="_blank" rel="noopener">“${title}”</a> by ` +
+        `<a href="https://sketchfab.com/${profile}" target="_blank" rel="noopener">${creator}</a>`,
+    ).join(', ') +
+    ' · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>',
+};
+
 export const DATA_CREDITS = [
   // ── Live sources ────────────────────────────────────────────────
   {
+    key: 'adsblol',
+    html:
+      'Flights within 250 nm of the view, military flights, aircraft traces &amp; GNSS navigation integrity: ' +
+      '<a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> contributors ' +
+      '(ODbL 1.0)',
+  },
+  {
     key: 'opensky',
     html:
-      'Flights: OpenSky Network — Schäfer et al., ' +
+      'Worldwide flights when Non-commercial sources is on: OpenSky Network — Schäfer et al., ' +
       '“Bringing Up OpenSky”, IPSN 2014 · ' +
       '<a href="https://opensky-network.org" target="_blank" rel="noopener">opensky-network.org</a> ' +
       '(non-commercial)',
-  },
-  {
-    key: 'adsblol',
-    html:
-      'Military flights, aircraft traces, bounded regional flight fallback &amp; GNSS navigation integrity: ' +
-      '<a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> ' +
-      '(ODbL 1.0)',
   },
   {
     key: 'adsbdb',
@@ -187,23 +250,23 @@ export const DATA_CREDITS = [
   {
     key: 'open-meteo',
     html:
-      'Cockpit current conditions: ' +
+      'Cockpit current conditions when Non-commercial sources is on: ' +
       '<a href="https://open-meteo.com/en/licence" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> ' +
-      '(CC BY 4.0)',
-  },
-  {
-    key: 'google-news-rss',
-    html:
-      'Cockpit regional headlines: ' +
-      '<a href="https://policies.google.com/terms" target="_blank" rel="noopener">Google News RSS</a> ' +
-      '(location-matched article links; publisher terms apply)',
+      '(CC BY 4.0; free API for non-commercial use)',
   },
   {
     key: 'gdelt',
     html:
       'Cockpit regional headlines: ' +
-      '<a href="https://www.gdeltproject.org/about.html" target="_blank" rel="noopener">GDELT Project</a> ' +
+      '<a href="https://www.gdeltproject.org/" target="_blank" rel="noopener">The GDELT Project</a> ' +
       '(location-matched article links; publisher terms apply)',
+  },
+  {
+    key: 'google-news-rss',
+    html:
+      'Cockpit regional headlines when Non-commercial sources is on: ' +
+      '<a href="https://policies.google.com/terms" target="_blank" rel="noopener">Google News RSS</a> ' +
+      '(personal use; location-matched article links; publisher terms apply)',
   },
   {
     key: 'austin-cctv',
@@ -493,10 +556,11 @@ export const DATA_CREDITS = [
   {
     key: 'telegeography',
     html:
-      'Submarine cables: © TeleGeography — ' +
+      'Submarine cables, only when you install the optional personal-use dataset: © TeleGeography — ' +
       '<a href="https://www.submarinecablemap.com" target="_blank" rel="noopener">submarinecablemap.com</a> ' +
-      '(CC BY-NC-SA 3.0 — NonCommercial)',
+      '(CC BY-NC-SA 3.0 — NonCommercial; not shipped with SKYNET)',
   },
+  MODEL_CREDIT,
 ];
 
 /**

@@ -66,10 +66,12 @@ export async function loadPhotorealisticTileset(
 export function createGoogleDirectTileset(Cesium, key) {
   key = clean(key);
   if (!key) throw new Error('Google 3D requires an explicit browser key');
-  // Tiles keep drawing their own texture while draped weather loads.
+  // Tiles keep drawing their own texture while draped weather loads. Google's
+  // Map Tiles policy requires its attributions on screen (Cesium's default
+  // keeps tileset credits in the popover).
   return Cesium.createGooglePhotorealistic3DTileset(
     { key, onlyUsingWithGoogleGeocoder: true },
-    { asynchronouslyLoadImagery: true },
+    { asynchronouslyLoadImagery: true, showCreditsOnScreen: true },
   );
 }
 
@@ -103,6 +105,8 @@ export async function createGoogleTokenTileset(Cesium, tokens) {
     enableCollision: true,
     // Tiles keep drawing their own texture while draped weather loads.
     asynchronouslyLoadImagery: true,
+    // Google's Map Tiles policy requires its attributions on screen.
+    showCreditsOnScreen: true,
   });
 }
 
@@ -126,5 +130,7 @@ export async function createGoogleIonTileset(
     enableCollision: true,
     // Tiles keep drawing their own texture while draped weather loads.
     asynchronouslyLoadImagery: true,
+    // Google's Map Tiles policy requires its attributions on screen.
+    showCreditsOnScreen: true,
   });
 }
