@@ -63,4 +63,11 @@ code.
 `npm test` has one known environmental failure on this machine:
 `src/tooling/skyAssets.paintOut.test.mjs` (the space in the Windows user path
 becomes `%20`). `src/sdr/decoderDiagnostics.test.mjs` can flake under
-full-suite load and passes alone. Anything else failing is a regression.
+full-suite load and passes alone. `src/terrainHeightsBounds.test.mjs` fails
+("1 !== 2") once a dev server has written `.gev-cache/terrain-heights.json`,
+because the test reads the real cache; it passes with that file moved aside.
+Anything else failing is a regression.
+
+`npm run test:track` (needs `npm run dev` on port 4173) fails the "arrival:
+moveEnd + first reveal" check at its 500 ms deadline under headless software
+GL on this machine; upstream fails it the same way.
