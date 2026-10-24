@@ -151,7 +151,7 @@ A Server-Sent Events stream.
 
 - **Interval:** every source has its own clock, polled every `SKYNET_INTEL_POLL_SECONDS` (default 300, minimum 30) with ±10% jitter. GDELT queries run every 15 minutes at most and are spaced at least 5.5 s apart.
 - **Conditional requests:** feeds are fetched with `If-None-Match` / `If-Modified-Since`, and responses are capped at 5 MB.
-- **Failures:** retries back off exponentially (1×, 2×, 4× … the interval, ±20%, capped at 1 hour), and `Retry-After` is honoured.
+- **Failures:** retries back off exponentially from the source's own interval (1×, 2×, 4× …, ±20%, capped at 1 hour), and `Retry-After` is honoured. A failing GDELT query therefore waits at least 15 minutes.
 
 ## Configuration (environment or `.env`)
 

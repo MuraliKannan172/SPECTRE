@@ -227,8 +227,11 @@ def test_backoff_grows_and_respects_retry_after(tmp_path: Path, parser: GeoParse
     assert (alpha["last_error"], alpha["next_poll_at"] - NOW) == ("http_503", 3600)  # capped at 1 h
     assert beta["last_error"] == "parse_error"
     assert gdelt_feed["last_error"] == "too_large"
+    # A failing GDELT query backs off from its own 15-minute interval, never sooner.
+    assert gdelt_feed["next_poll_at"] - NOW == 900
     # Second consecutive failure doubles the wait (jitter fixed at 1.0x).
-    assert scheduler._next_failure(NOW, 1, None) - NOW == 600
+    assert scheduler._next_failure(NOW, {**beta, "consecutive_errors": 1}, None) - NOW == 600
+    assert scheduler._next_failure(NOW, {**gdelt_feed, "consecutive_errors": 1}, None) - NOW == 1800
 
 
 def test_personal_use_feeds_follow_the_noncommercial_switch(tmp_path: Path, parser: GeoParser) -> None:

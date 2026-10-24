@@ -28,6 +28,8 @@ Needs [uv](https://docs.astral.sh/uv/) (`winget install --id=astral-sh.uv -e`). 
 
 It polls the news sources and serves them on http://127.0.0.1:8100/api/intel/health and `/api/intel/news` ([docs/API.md](docs/API.md)). The first run sets up its Python environment.
 
+If PowerShell says running scripts is disabled (the Windows default policy is Restricted), run it as `powershell -ExecutionPolicy Bypass -File .\scripts\skynet.ps1` instead. The same applies to the other `.ps1` scripts below.
+
 ## Data you have to opt in to
 
 Some free sources allow only personal, non-commercial use, so SKYNET leaves them off:

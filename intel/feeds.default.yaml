@@ -10,9 +10,11 @@
 #                  been checked ("not checked" in terms_note).
 #
 # Only headline, short summary, source, link and time are stored; never
-# article bodies. Every URL here passed intel/scripts/verify_feeds.py (HTTP
-# 200, parses, at least one item, newest item under 90 days old); see
-# docs/phase2/feed-verification.md. Add or disable feeds in a gitignored
+# article bodies. Every feed URL here passed intel/scripts/verify_feeds.py
+# (HTTP 200, parses, at least one item, newest item under 90 days old); see
+# docs/phase2/feed-verification.md. The GDELT queries below did not: GDELT
+# answered HTTP 429 at verification time (see the note there). The GOV.UK and
+# European Commission terms were read on 2026-10-25. Add or disable feeds in a gitignored
 # intel/feeds.local.yaml (same shape; entries merge by id).
 
 feeds:
@@ -295,8 +297,11 @@ feeds:
     terms: personal
     terms_note: Not checked.
 
-# GDELT DOC 2.0: worldwide coverage by keyword. On by default; switch it off
-# with `gdelt: {enabled: false}` in feeds.local.yaml or SKYNET_INTEL_GDELT=0.
+# GDELT DOC 2.0: worldwide coverage by keyword. On by default (ADR Q5);
+# switch it off with `gdelt: {enabled: false}` in feeds.local.yaml or
+# SKYNET_INTEL_GDELT=0. On 2026-10-24 it answered HTTP 429 to this service
+# from the development machine; while that lasts, health shows http_429 and
+# each query backs off to at most one request an hour.
 gdelt:
   enabled: true
   terms_note: >-

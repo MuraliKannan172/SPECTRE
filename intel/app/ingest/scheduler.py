@@ -112,8 +112,10 @@ class Scheduler:
     def _next_success(self, now: int, feed: dict[str, Any]) -> int:
         return now + int(self._interval(feed) * (0.9 + 0.2 * self._jitter()))
 
-    def _next_failure(self, now: int, errors_before: int, retry_after: int | None) -> int:
-        delay = min(MAX_BACKOFF_SECONDS, self.settings.poll_seconds * 2 ** min(errors_before, 6))
+    def _next_failure(self, now: int, feed: dict[str, Any], retry_after: int | None) -> int:
+        """Back off from the feed's own interval: 1x, 2x, 4x ... capped at 1 h."""
+        errors_before = feed["consecutive_errors"]
+        delay = min(MAX_BACKOFF_SECONDS, self._interval(feed) * 2 ** min(errors_before, 6))
         delay = delay * (0.8 + 0.4 * self._jitter())
         if retry_after:
             delay = max(delay, min(retry_after, MAX_BACKOFF_SECONDS))
@@ -199,7 +201,7 @@ class Scheduler:
             ok=False,
             status=status,
             error=error,
-            next_poll_at=self._next_failure(now, feed["consecutive_errors"], retry_after),
+            next_poll_at=self._next_failure(now, feed, retry_after),
         )
 
 
