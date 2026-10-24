@@ -1,0 +1,18 @@
+/* SKYNET bundles its fonts so the app never calls Google Fonts at runtime and
+   works offline. JetBrains Mono (data/HUD), Inter (body) and Rajdhani
+   (headings/wordmark) are OFL-1.1; Material Symbols is Apache-2.0. Each
+   @fontsource sheet carries Latin, Latin Extended and Cyrillic subsets as
+   unicode-ranges, so the browser fetches only what a page uses. */
+@import '@fontsource/jetbrains-mono/300.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+@import '@fontsource/jetbrains-mono/700.css';
+@import '@fontsource/inter/300.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/rajdhani/500.css';
+@import '@fontsource/rajdhani/600.css';
+@import '@fontsource/rajdhani/700.css';
+@import 'material-symbols/outlined.css';
