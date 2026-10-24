@@ -1,0 +1,397 @@
+# SKYNET intel: shipped news sources.
+#
+# terms: open      polled by default. Only sources whose reuse terms were
+#                  checked and allow it: US federal works (public domain),
+#                  GOV.UK (Open Government Licence v3.0), European Commission
+#                  (reuse policy, CC BY 4.0), GDELT (open, citation required).
+# terms: personal  polled only while "Non-commercial sources" is on in
+#                  Provider Settings (SKYNET_NONCOMMERCIAL_SOURCES=1): terms
+#                  that say personal or non-commercial use, or that have not
+#                  been checked ("not checked" in terms_note).
+#
+# Only headline, short summary, source, link and time are stored; never
+# article bodies. Every URL here passed intel/scripts/verify_feeds.py (HTTP
+# 200, parses, at least one item, newest item under 90 days old); see
+# docs/phase2/feed-verification.md. Add or disable feeds in a gitignored
+# intel/feeds.local.yaml (same shape; entries merge by id).
+
+feeds:
+  # -- disasters ---------------------------------------------------------------
+  - id: usgs-quakes-significant
+    name: USGS significant earthquakes
+    url: https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_month.atom
+    category: disaster
+    region: world
+    terms: open
+    terms_note: US federal government work (USGS), public domain in the US.
+  - id: nhc-atlantic
+    name: NOAA National Hurricane Center (Atlantic)
+    url: https://www.nhc.noaa.gov/index-at.xml
+    category: disaster
+    region: americas
+    terms: open
+    terms_note: US federal government work (NOAA), public domain in the US.
+  - id: nhc-east-pacific
+    name: NOAA National Hurricane Center (East Pacific)
+    url: https://www.nhc.noaa.gov/index-ep.xml
+    category: disaster
+    region: americas
+    terms: open
+    terms_note: US federal government work (NOAA), public domain in the US.
+  - id: gdacs
+    name: GDACS disaster alerts
+    url: https://www.gdacs.org/xml/rss.xml
+    category: disaster
+    region: world
+    terms: personal
+    terms_note: Not checked (terms page not reachable when this list was made).
+  # -- space and science -------------------------------------------------------
+  - id: nasa-news
+    name: NASA news releases
+    url: https://www.nasa.gov/news-release/feed/
+    category: space
+    region: world
+    terms: open
+    terms_note: US federal government work (NASA), public domain in the US.
+  - id: nsf-news
+    name: US National Science Foundation news
+    url: https://www.nsf.gov/rss/rss_www_news.xml
+    category: science
+    region: world
+    terms: open
+    terms_note: US federal government work (NSF), public domain in the US.
+  - id: esa-top
+    name: ESA top news
+    url: https://www.esa.int/rssfeed/TopNews
+    category: space
+    region: europe
+    terms: personal
+    terms_note: Not checked.
+
+  # -- cyber -------------------------------------------------------------------
+  - id: ncsc-news
+    name: UK NCSC news
+    url: https://www.ncsc.gov.uk/api/1/services/v1/news-rss-feed.xml
+    category: cyber
+    region: europe
+    terms: personal
+    terms_note: Not checked.
+  - id: krebs
+    name: Krebs on Security
+    url: https://krebsonsecurity.com/feed/
+    category: cyber
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: bleepingcomputer
+    name: BleepingComputer
+    url: https://www.bleepingcomputer.com/feed/
+    category: cyber
+    region: world
+    terms: personal
+    terms_note: Not checked.
+
+  # -- health ------------------------------------------------------------------
+  - id: who-news
+    name: World Health Organization news
+    url: https://www.who.int/rss-feeds/news-english.xml
+    category: health
+    region: world
+    terms: personal
+    terms_note: Not checked.
+
+  # -- defence and diplomacy ---------------------------------------------------
+  - id: dod-news
+    name: US Department of Defense news
+    url: https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=10
+    category: conflict
+    region: world
+    terms: open
+    terms_note: US federal government work (DoD), public domain in the US.
+  - id: govuk-mod
+    name: UK Ministry of Defence (GOV.UK)
+    url: https://www.gov.uk/government/organisations/ministry-of-defence.atom
+    category: conflict
+    region: europe
+    terms: open
+    terms_note: GOV.UK content, Open Government Licence v3.0; attribution required.
+  - id: govuk-fcdo
+    name: UK Foreign, Commonwealth & Development Office (GOV.UK)
+    url: https://www.gov.uk/government/organisations/foreign-commonwealth-development-office.atom
+    category: politics
+    region: world
+    terms: open
+    terms_note: GOV.UK content, Open Government Licence v3.0; attribution required.
+  - id: ec-press
+    name: European Commission press corner
+    url: https://ec.europa.eu/commission/presscorner/api/rss?language=en
+    category: politics
+    region: europe
+    terms: open
+    terms_note: European Commission reuse policy (Decision 2011/833/EU), CC BY 4.0; attribution required.
+
+  # -- economy -----------------------------------------------------------------
+  - id: fed-press
+    name: US Federal Reserve press releases
+    url: https://www.federalreserve.gov/feeds/press_all.xml
+    category: economy
+    region: americas
+    terms: open
+    terms_note: US federal government work (Federal Reserve Board), public domain in the US.
+  - id: bls-latest
+    name: US Bureau of Labor Statistics releases
+    url: https://www.bls.gov/feed/bls_latest.rss
+    category: economy
+    region: americas
+    terms: open
+    terms_note: US federal government work (BLS), public domain in the US.
+
+  # -- world news (personal-use terms or not checked) -------------------------
+  - id: un-news
+    name: UN News
+    url: https://news.un.org/feed/subscribe/en/news/all/rss.xml
+    category: world
+    region: world
+    terms: personal
+    terms_note: un.org terms of use allow personal, non-commercial use only.
+  - id: un-news-africa
+    name: UN News (Africa)
+    url: https://news.un.org/feed/subscribe/en/news/region/africa/feed/rss.xml
+    category: world
+    region: africa
+    terms: personal
+    terms_note: un.org terms of use allow personal, non-commercial use only.
+  - id: un-news-middle-east
+    name: UN News (Middle East)
+    url: https://news.un.org/feed/subscribe/en/news/region/middle-east/feed/rss.xml
+    category: world
+    region: middle-east
+    terms: personal
+    terms_note: un.org terms of use allow personal, non-commercial use only.
+  - id: un-news-asia-pacific
+    name: UN News (Asia Pacific)
+    url: https://news.un.org/feed/subscribe/en/news/region/asia-pacific/feed/rss.xml
+    category: world
+    region: asia-pacific
+    terms: personal
+    terms_note: un.org terms of use allow personal, non-commercial use only.
+  - id: un-news-europe
+    name: UN News (Europe)
+    url: https://news.un.org/feed/subscribe/en/news/region/europe/feed/rss.xml
+    category: world
+    region: europe
+    terms: personal
+    terms_note: un.org terms of use allow personal, non-commercial use only.
+  - id: un-news-americas
+    name: UN News (Americas)
+    url: https://news.un.org/feed/subscribe/en/news/region/americas/feed/rss.xml
+    category: world
+    region: americas
+    terms: personal
+    terms_note: un.org terms of use allow personal, non-commercial use only.
+  - id: bbc-world
+    name: BBC News (World)
+    url: https://feeds.bbci.co.uk/news/world/rss.xml
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: bbc-africa
+    name: BBC News (Africa)
+    url: https://feeds.bbci.co.uk/news/world/africa/rss.xml
+    category: world
+    region: africa
+    terms: personal
+    terms_note: Not checked.
+  - id: bbc-asia
+    name: BBC News (Asia)
+    url: https://feeds.bbci.co.uk/news/world/asia/rss.xml
+    category: world
+    region: asia-pacific
+    terms: personal
+    terms_note: Not checked.
+  - id: bbc-europe
+    name: BBC News (Europe)
+    url: https://feeds.bbci.co.uk/news/world/europe/rss.xml
+    category: world
+    region: europe
+    terms: personal
+    terms_note: Not checked.
+  - id: bbc-middle-east
+    name: BBC News (Middle East)
+    url: https://feeds.bbci.co.uk/news/world/middle_east/rss.xml
+    category: world
+    region: middle-east
+    terms: personal
+    terms_note: Not checked.
+  - id: bbc-latin-america
+    name: BBC News (Latin America)
+    url: https://feeds.bbci.co.uk/news/world/latin_america/rss.xml
+    category: world
+    region: americas
+    terms: personal
+    terms_note: Not checked.
+  - id: aljazeera
+    name: Al Jazeera
+    url: https://www.aljazeera.com/xml/rss/all.xml
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: guardian-world
+    name: The Guardian (World)
+    url: https://www.theguardian.com/world/rss
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: npr-world
+    name: NPR (World)
+    url: https://feeds.npr.org/1004/rss.xml
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: dw-world
+    name: DW (World)
+    url: https://rss.dw.com/rdf/rss-en-world
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: france24
+    name: France 24
+    url: https://www.france24.com/en/rss
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: cbc-world
+    name: CBC News (World)
+    url: https://www.cbc.ca/webfeed/rss/rss-world
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: abc-au-world
+    name: ABC News Australia (World)
+    url: https://www.abc.net.au/news/feed/2942460/rss.xml
+    category: world
+    region: asia-pacific
+    terms: personal
+    terms_note: Not checked.
+  - id: defense-news
+    name: Defense News
+    url: https://www.defensenews.com/arc/outboundfeeds/rss/
+    category: conflict
+    region: world
+    terms: personal
+    terms_note: Not checked.
+  - id: spacenews
+    name: SpaceNews
+    url: https://spacenews.com/feed/
+    category: space
+    region: world
+    terms: personal
+    terms_note: Not checked.
+
+# GDELT DOC 2.0: worldwide coverage by keyword. On by default; switch it off
+# with `gdelt: {enabled: false}` in feeds.local.yaml or SKYNET_INTEL_GDELT=0.
+gdelt:
+  enabled: true
+  terms_note: >-
+    GDELT Project data is free and open for any use; any use or redistribution
+    must cite the GDELT Project and link to https://www.gdeltproject.org/.
+  queries:
+    - id: gdelt-disasters
+      name: GDELT · disasters
+      category: disaster
+      query: '(earthquake OR flood OR wildfire OR hurricane OR cyclone OR typhoon OR tsunami OR landslide) sourcelang:english'
+    - id: gdelt-conflict
+      name: GDELT · conflict
+      category: conflict
+      query: '(airstrike OR "missile strike" OR shelling OR ceasefire OR insurgents OR "armed clashes") sourcelang:english'
+    - id: gdelt-cyber
+      name: GDELT · cyber
+      category: cyber
+      query: '(ransomware OR cyberattack OR "data breach" OR "zero-day") sourcelang:english'
+    - id: gdelt-health
+      name: GDELT · outbreaks
+      category: health
+      query: '(outbreak OR epidemic OR cholera OR mpox OR ebola OR "bird flu") sourcelang:english'
+
+# Candidates that failed verify_feeds.py on 2026-10-24. Not polled; the
+# verifier re-checks them so a recovered feed can be moved back up.
+dropped:
+  - id: tsunami-ptwc
+    name: NOAA Pacific Tsunami Warning Center
+    url: https://www.tsunami.gov/events/xml/PHEBAtom.xml
+    category: disaster
+    region: world
+    terms: open
+    terms_note: US federal government work (NOAA), public domain in the US.
+    reason: no items (the feed only lists active events)
+  - id: reliefweb-disasters
+    name: ReliefWeb disasters
+    url: https://reliefweb.int/disasters/rss.xml
+    category: disaster
+    region: world
+    terms: personal
+    terms_note: Not checked (terms page refused automated access).
+    reason: HTTP 202 bot challenge
+  - id: reliefweb-updates
+    name: ReliefWeb updates
+    url: https://reliefweb.int/updates/rss.xml
+    category: world
+    region: world
+    terms: personal
+    terms_note: Not checked (terms page refused automated access).
+    reason: HTTP 202 bot challenge
+  - id: jpl-news
+    name: NASA JPL news
+    url: https://www.jpl.nasa.gov/feeds/news/
+    category: space
+    region: world
+    terms: open
+    terms_note: NASA/JPL; JPL is run by Caltech, so not checked as public domain. Headlines and links only.
+    reason: HTTP 403 to a non-browser User-Agent
+  - id: nasa-earth-observatory
+    name: NASA Earth Observatory
+    url: https://earthobservatory.nasa.gov/feeds/earth-observatory.rss
+    category: science
+    region: world
+    terms: open
+    terms_note: US federal government work (NASA), public domain in the US.
+    reason: does not parse (site moved)
+  - id: cisa-advisories
+    name: CISA cybersecurity advisories
+    url: https://www.cisa.gov/cybersecurity-advisories/all.xml
+    category: cyber
+    region: world
+    terms: open
+    terms_note: US federal government work (CISA), public domain in the US.
+    reason: HTTP 403 to a non-browser User-Agent
+  - id: cisa-news
+    name: CISA news
+    url: https://www.cisa.gov/news.xml
+    category: cyber
+    region: americas
+    terms: open
+    terms_note: US federal government work (CISA), public domain in the US.
+    reason: HTTP 403 to a non-browser User-Agent
+  - id: nih-news
+    name: US National Institutes of Health news
+    url: https://www.nih.gov/news-releases/feed.xml
+    category: health
+    region: world
+    terms: open
+    terms_note: US federal government work (NIH), public domain in the US.
+    reason: HTTP 403 to a non-browser User-Agent
+  - id: state-dept-press
+    name: US State Department press releases
+    url: https://www.state.gov/rss-feed/press-releases/feed/
+    category: politics
+    region: world
+    terms: open
+    terms_note: US federal government work (State Department), public domain in the US.
+    reason: HTTP 403 to a non-browser User-Agent

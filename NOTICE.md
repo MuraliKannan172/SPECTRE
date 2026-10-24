@@ -31,6 +31,14 @@ Every change below is in the git history; the design is in
 - Google 3D Tiles show their attributions on screen; the Esri credit uses the
   service's live copyright line; every 3D model is credited in the app.
 
+**News intelligence (`intel/`, new)**
+- A local Python service (FastAPI, 127.0.0.1 only) that polls news feeds and
+  GDELT, clusters reports of one event, places them with a gazetteer built from
+  GeoNames (CC BY 4.0) and Natural Earth, and serves them over REST and SSE.
+  It keeps headline, short summary, source, link and time only. Feeds whose
+  terms are personal-use or unchecked are polled only while Non-commercial
+  sources is on.
+
 **Branding and theme**
 - All product naming lives in `src/branding.js`; a new logo and icons; SKYNET
   User-Agents toward upstream services.
@@ -43,6 +51,8 @@ Every change below is in the git history; the design is in
 | --- | --- |
 | @fontsource/jetbrains-mono, @fontsource/inter, @fontsource/rajdhani (JetBrains Mono, Inter, Rajdhani fonts) | SIL Open Font License 1.1 |
 | material-symbols (Material Symbols Outlined font) | Apache License 2.0 |
+| Intel service Python packages (installed by uv from `intel/uv.lock`, not committed): FastAPI, Starlette, Pydantic, Uvicorn, HTTPX, feedparser, RapidFuzz, PyYAML, spaCy and its `en_core_web_sm` model | See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
+| GeoNames `cities15000` and `countryInfo`, in `intel/app/geo/data/gazetteer.json.gz` | CC BY 4.0, "GeoNames, https://www.geonames.org/" |
 
 Data sources, their terms and required attribution are listed in
 [DATA_SOURCES.md](DATA_SOURCES.md).

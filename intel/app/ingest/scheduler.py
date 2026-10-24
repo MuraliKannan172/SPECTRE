@@ -26,6 +26,8 @@ log = logging.getLogger("skynet.intel.scheduler")
 TICK_SECONDS = 5.0
 MAX_BACKOFF_SECONDS = 3600
 GDELT_SPACING_SECONDS = 5.5  # GDELT DOC asks for at most one request every five seconds
+GDELT_INTERVAL_SECONDS = 900  # GDELT queries are broad: poll them every 15 min at most
+GDELT_MAX_RECORDS = 25
 PURGE_EVERY_SECONDS = 6 * 3600
 
 
@@ -102,8 +104,13 @@ class Scheduler:
         while self._running:
             await asyncio.gather(*list(self._running.values()), return_exceptions=True)
 
-    def _next_success(self, now: int) -> int:
-        return now + int(self.settings.poll_seconds * (0.9 + 0.2 * self._jitter()))
+    def _interval(self, feed: dict[str, Any]) -> int:
+        if feed["kind"] == "gdelt":
+            return max(self.settings.poll_seconds, GDELT_INTERVAL_SECONDS)
+        return self.settings.poll_seconds
+
+    def _next_success(self, now: int, feed: dict[str, Any]) -> int:
+        return now + int(self._interval(feed) * (0.9 + 0.2 * self._jitter()))
 
     def _next_failure(self, now: int, errors_before: int, retry_after: int | None) -> int:
         delay = min(MAX_BACKOFF_SECONDS, self.settings.poll_seconds * 2 ** min(errors_before, 6))
@@ -119,11 +126,12 @@ class Scheduler:
                 if query is None:
                     return
                 async with self._gdelt_lock:
-                    timespan = math.ceil(2 * self.settings.poll_seconds / 60)
+                    # Look back two intervals so a late or failed poll leaves no gap.
+                    timespan = math.ceil(2 * self._interval(feed) / 60)
                     result = await fetch(
                         self._client,
                         feed["url"],
-                        params=gdelt_params(query.query, timespan),
+                        params=gdelt_params(query.query, timespan, GDELT_MAX_RECORDS),
                         max_bytes=self.settings.max_feed_bytes,
                     )
                     await asyncio.sleep(self._gdelt_spacing)
@@ -146,7 +154,7 @@ class Scheduler:
                 attempted_at=now,
                 ok=True,
                 status=result.status,
-                next_poll_at=self._next_success(now),
+                next_poll_at=self._next_success(now, feed),
             )
             return
 
@@ -169,7 +177,7 @@ class Scheduler:
             attempted_at=now,
             ok=True,
             status=result.status,
-            next_poll_at=self._next_success(now),
+            next_poll_at=self._next_success(now, feed),
             etag=result.etag,
             last_modified=result.last_modified,
             item_count=len(items),

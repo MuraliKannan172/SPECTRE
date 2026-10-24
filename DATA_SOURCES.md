@@ -39,6 +39,28 @@ Hosts the app contacts that upstream did not list:
 | US bikeshare GBFS hosts (`gbfs.lyft.com`, `gbfs.bluebikes.com`, `gbfs.biketownpdx.com`, `gbfs.bcycle.com`, `*.publicbikesystem.net`, `reddybikeshare.socialbicycles.com`) | Bike Share layer | Each operator's GBFS licence; Lyft-operated feeds carry their own data licence |
 | `s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk` | TfL JamCam frames | TfL open data terms (credited with TfL) |
 
+### SKYNET intel service: news (`intel/`)
+
+The intel service polls news sources and keeps, per item, only the **headline, a summary of at most 400 characters, the source name, the link and the time**. It never stores article bodies. Items are deleted after 30 days by default.
+
+The full source list is `intel/feeds.default.yaml`, with a `terms_note` on every entry. The verification run is in [docs/phase2/feed-verification.md](docs/phase2/feed-verification.md).
+
+| Source | Default | Terms / attribution |
+| --- | --- | --- |
+| [GDELT DOC 2.0 API](https://www.gdeltproject.org/) (`api.gdeltproject.org`), keyword queries for disasters, conflict, cyber and outbreaks | On | Free and open for any use. Any use or redistribution must **cite the GDELT Project and link to https://www.gdeltproject.org/**. GDELT supplies headlines and links to third-party outlets, not their text. At most one request per 5 s is allowed; SKYNET spaces requests by 5.5 s and polls each query every 15 min at most. |
+| US federal feeds: USGS earthquakes, NOAA NHC, NASA, NSF, DoD, Federal Reserve, BLS | On | US federal government works are in the public domain in the US. |
+| GOV.UK organisation feeds (Ministry of Defence, FCDO) | On | Open Government Licence v3.0. Attribution: "Contains public sector information licensed under the Open Government Licence v3.0." |
+| European Commission press corner | On | Commission reuse policy (Decision 2011/833/EU), CC BY 4.0. Attribution: "© European Union". |
+| UN News, BBC, Al Jazeera, The Guardian, NPR, DW, France 24, CBC, ABC Australia, GDACS, WHO, ESA, UK NCSC, Krebs on Security, BleepingComputer, Defense News, SpaceNews | Off: polled only while **Non-commercial sources** is on | un.org allows personal, non-commercial use only. The other terms were not checked, so these sources are treated the same way. |
+
+Bundled with the intel service:
+
+| Item | Licence / attribution |
+| --- | --- |
+| `intel/app/geo/data/gazetteer.json.gz`: cities from GeoNames `cities15000`, with continents from `countryInfo` | CC BY 4.0. Attribution: "GeoNames, https://www.geonames.org/". Source URLs, SHA-256 and fetch time are recorded in the file's `meta`; it is rebuilt by `intel/scripts/build_gazetteer.py`. |
+| The same gazetteer's countries, provinces, seas and regions, from the Natural Earth packs above | Public domain |
+| spaCy `en_core_web_sm` 3.8.0 (installed by uv, not committed) | MIT |
+
 ---
 
 ## Live sources (fetched at runtime — not stored in this repo)

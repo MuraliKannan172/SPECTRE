@@ -102,6 +102,20 @@ def test_feed_config_validates_and_local_overrides_merge(tmp_path: Path) -> None
             load_feed_config(default)
 
 
+def test_shipped_feed_list_is_valid_and_honest_about_terms() -> None:
+    shipped = Path(__file__).resolve().parents[1] / "feeds.default.yaml"
+    config = load_feed_config(shipped)
+    feeds = config.all_defs()
+    assert len({feed.id for feed in feeds}) == len(feeds)
+    assert any(feed.kind == "gdelt" for feed in feeds) and config.gdelt_enabled
+    for feed in feeds:
+        assert feed.terms_note, f"{feed.id} has no terms_note"
+        # Polled by default only when its terms were actually checked.
+        if feed.terms == "open":
+            assert "not checked" not in feed.terms_note.lower(), feed.id
+    assert "cite the gdelt project" in config.gdelt_terms_note.lower()
+
+
 # -- parsing ----------------------------------------------------------------------
 
 
@@ -161,7 +175,9 @@ def test_first_poll_stores_items_then_etag_gives_304(tmp_path: Path, parser: Geo
     assert (feed["last_status"], feed["consecutive_errors"], feed["item_count"]) == (304, 0, 1)
     assert store.stats()["stories"] == 1
     gdelt_request = next(r for r in routes.requests if r.url.host == "api.gdeltproject.org")
-    assert gdelt_request.url.params["mode"] == "artlist" and gdelt_request.url.params["timespan"] == "15min"
+    assert gdelt_request.url.params["mode"] == "artlist"
+    assert (gdelt_request.url.params["timespan"], gdelt_request.url.params["maxrecords"]) == ("30min", "25")
+    assert store.feed("gdelt-disasters")["next_poll_at"] - NOW == 900  # GDELT runs every 15 min
 
 
 def test_network_off_serves_cache_and_reports_offline_then_stale(tmp_path: Path, parser: GeoParser) -> None:
@@ -171,8 +187,9 @@ def test_network_off_serves_cache_and_reports_offline_then_stale(tmp_path: Path,
         httpx.Response(200, content=rss(("Volcano erupts in Iceland", "https://alpha.example/v", ""))),
     )
     routes.on("beta.example", httpx.Response(200, content=rss()))
-    routes.on("api.gdeltproject.org", httpx.Response(200, content=gdelt()))
-    scheduler, store, _hub, clock, client = build(tmp_path, parser, routes)
+    # RSS feeds only: GDELT's 15-minute clock would not be retried within this test's interval.
+    rss_only = FEEDS_YAML.split("gdelt:")[0]
+    scheduler, store, _hub, clock, client = build(tmp_path, parser, routes, rss_only)
     started_at = NOW
 
     async def scenario() -> None:
