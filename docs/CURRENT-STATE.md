@@ -9,13 +9,7 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-Overpass reserves each normalized query before its disk-cache lookup. The
-initial disk lookup, upstream quota admission, fetching and memory publication
-are coalesced under that reservation. A caller that joined a reservation
-rejected by another client's quota retries admission with its own quota.
-Stale fallback runs per response after the reservation is released, and disk
-writes finish asynchronously. Settled and rejected reservations are removed
-only while they still own their map entry.
+Manager-owned periodic network updates pause while the document is hidden. Returning to a visible tab runs one overdue update per enabled layer without overlapping an active refresh and restarts that layer's polling schedule from the return, so the next poll follows one interval later whether or not the catch-up update succeeds; explicit refresh requests remain available. Transit also defers camera-driven feed admission while hidden and rechecks coverage on return. Visibility listeners are released with their polling intervals.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP
@@ -4220,6 +4214,8 @@ frame. The transit render hold exists only for visible positional or orientation
 animation. Polls, surface completions and trail fades request individual renders.
 Disable clears vehicles, detection references, requests, timers and holds;
 destruction also releases collections and registrations.
+
+The `scripts/qa-layer-visibility.mjs` gate uses the development-only registration seam and real browser tab visibility to prove periodic work pauses while hidden, explicit refresh still works, resume performs one overdue refresh, and disabled layers stay stopped.
 
 **Acceptance harness.** Run against an already running development server:
 
