@@ -215,13 +215,17 @@ class NewsStore:
             ).fetchone()
         return row["story_id"] if row else None
 
-    def recent_titles(self, since: int) -> list[tuple[int, str]]:
+    def recent_for_dedupe(self, since: int) -> list[dict[str, Any]]:
+        """Stories first seen since `since`, with the feeds that reported each."""
         with self._lock:
             rows = self._conn.execute(
-                "SELECT id, title FROM stories WHERE first_seen_at >= ? ORDER BY id",
+                "SELECT s.id, s.title, s.first_seen_at, s.country_code, s.lat, s.lon,"
+                " s.geo_confidence, group_concat(ss.feed_id, ' ') AS feed_ids"
+                " FROM stories s JOIN story_sources ss ON ss.story_id = s.id"
+                " WHERE s.first_seen_at >= ? GROUP BY s.id ORDER BY s.id",
                 (since,),
             ).fetchall()
-        return [(row["id"], row["title"]) for row in rows]
+        return [dict(row) for row in rows]
 
     def insert_story(self, story: StoryRow, source: SourceRow) -> int:
         with self._lock, self._transaction():

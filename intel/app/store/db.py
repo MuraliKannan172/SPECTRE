@@ -61,7 +61,9 @@ def migrate(conn: sqlite3.Connection, directory: Path = MIGRATIONS_DIR) -> list[
     }
     ran = []
     for version, path in _migration_files(directory):
-        sql = path.read_text(encoding="utf-8")
+        # Line endings do not change a migration: a CRLF checkout must not
+        # look like an edit to one already applied.
+        sql = path.read_text(encoding="utf-8").replace("\r\n", "\n")
         checksum = hashlib.sha256(sql.encode("utf-8")).hexdigest()
         if version in applied:
             if applied[version] != checksum:
