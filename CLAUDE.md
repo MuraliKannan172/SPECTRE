@@ -57,6 +57,14 @@ code.
 - **Commit flow:** conventional commits; before committing code run
   `npm test`, `npm run check:boundaries`, `npm run format:check` and, for
   build-affecting changes, `npm run build`.
+- **Intel service** (`intel/`, Python 3.12 via uv): before committing run
+  `uv run --project intel pytest intel/tests` and, from `intel/`,
+  `uv run ruff check .` and `uv run ruff format --check .`. Tests never touch
+  the network (a conftest guard fails any non-loopback connection) or
+  `intel/data/`. Schema changes are new numbered files in
+  `intel/app/store/migrations/`; never edit an applied one. A new feed goes in
+  `intel/feeds.default.yaml` only after `intel/scripts/verify_feeds.py` passes
+  it, and only as `terms: open` when its reuse terms were actually checked.
 
 ## Test baseline
 
