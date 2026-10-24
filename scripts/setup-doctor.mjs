@@ -6,6 +6,7 @@ import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { projectRoot } from './project-root.mjs';
 import { selectMapStartupRoute } from '../src/mapStartup.js';
+import { BRANDING } from '../src/branding.js';
 import {
   NON_COMMERCIAL_SOURCES_ENV,
   nonCommercialSourcesEnabled,
@@ -267,7 +268,7 @@ export function formatSetupReport(report, { readyMessage } = {}) {
     ? 'Ready. Run ./scripts/dev-fresh.sh, then open http://localhost:4173.'
     : 'Ready. Run npm run dev, then open http://localhost:4173.');
   const lines = [
-    "God's Eye View setup doctor",
+    `${BRANDING.name} setup doctor`,
     '',
     `[${symbol(report.node.level)}] Node ${report.node.version}: ${report.node.summary}`,
     report.npm.available ? `[OK] npm ${report.npm.version}` : '[ERROR] npm was not found',
