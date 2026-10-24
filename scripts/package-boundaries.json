@@ -36,6 +36,9 @@
     "runtime": "node",
     "exports": ["./build/vite", "./build/html"],
     "modules": [
+      "build/branding-html.js",
+      "src/branding.js",
+      "src/i18n/marker.js",
       "build/vite.js",
       "build/application-html.js",
       "build/allowedHosts.js",
@@ -48,6 +51,7 @@
     "runtime": "node",
     "exports": ["./server/providers/live"],
     "modules": [
+      "src/branding.js",
       "server/providers/live.js",
       "server/providers/common/http.js",
       "server/providers/common/query.js",
@@ -102,6 +106,7 @@
     "runtime": "node",
     "exports": ["./server/providers/space"],
     "modules": [
+      "src/branding.js",
       "server/providers/space.js",
       "server/providers/space/celestrak.js",
       "server/providers/space/launch-library.js",
@@ -175,6 +180,7 @@
     "runtime": "node",
     "exports": ["./server/providers/gbfs"],
     "modules": [
+      "src/branding.js",
       "server/providers/gbfs.js",
       "server/providers/common/http.js",
       "server/providers/common/rate-limit.js",
@@ -187,13 +193,18 @@
   },
   "gbfs-source": {
     "exports": ["./sources/gbfs"],
-    "modules": ["src/data/gbfsSource.js"],
+    "modules": [
+      "src/data/gbfsSource.js",
+      "src/i18n/marker.js",
+      "src/branding.js"
+    ],
     "external": []
   },
   "cctv-provider": {
     "runtime": "node",
     "exports": ["./server/providers/cctv"],
     "modules": [
+      "src/branding.js",
       "server/providers/cctv.js",
       "server/providers/common/same-site.js",
       "src/localRequestGate.mjs",
@@ -241,6 +252,7 @@
     "runtime": "node",
     "exports": ["./server/providers/radio"],
     "modules": [
+      "src/branding.js",
       "server/providers/radio.js",
       "server/providers/radio/catalog.js",
       "server/providers/radio/constants.js",
@@ -304,6 +316,7 @@
     "runtime": "node",
     "exports": ["./server/providers/regional"],
     "modules": [
+      "src/branding.js",
       "server/providers/common/http.js",
       "server/providers/common/query.js",
       "server/providers/common/rate-limit.js",
@@ -334,6 +347,7 @@
     "runtime": "node",
     "exports": ["./server/providers/openai"],
     "modules": [
+      "src/branding.js",
       "src/i18n/marker.js",
       "src/hudLayoutPolicy.js",
       "server/providers/common/rate-limit.js",
@@ -1601,6 +1615,7 @@
       "./voice/realtime-session"
     ],
     "modules": [
+      "src/branding.js",
       "src/voice/realtimeController.js",
       "src/voice/realtimeBackend.js",
       "src/voice/cloudVoiceAuth.js",
@@ -1675,6 +1690,7 @@
       "./standalone/catalog"
     ],
     "modules": [
+      "src/branding.js",
       "src/ui/placeNames.js",
       "src/cyberSonarScene.js",
       "src/cyberSonar.js",
@@ -2536,6 +2552,7 @@
   "application-layer-construction": {
     "exports": ["./application/layers"],
     "modules": [
+      "src/branding.js",
       "src/cyberSonar.js",
       "src/data/approxDistance.js",
       "src/ui/imagerySplit.js",
@@ -3375,6 +3392,8 @@
   "voice-session-controls": {
     "exports": ["./voice/session-controls"],
     "modules": [
+      "src/branding.js",
+      "src/i18n/marker.js",
       "src/ui/placeNames.js",
       "src/voice/sessionCommands.js",
       "src/voice/session.js",
@@ -3553,6 +3572,7 @@
     "runtime": "node",
     "exports": ["./server/providers/transit"],
     "modules": [
+      "src/branding.js",
       "server/providers/common/http.js",
       "server/providers/common/rate-limit.js",
       "server/providers/transit.js",
@@ -3573,6 +3593,8 @@
   "transit-source": {
     "exports": ["./sources/transit"],
     "modules": [
+      "src/branding.js",
+      "src/i18n/marker.js",
       "src/data/gtfsRealtime.js",
       "src/data/transitFeeds.js",
       "src/geoDistance.js",
@@ -3584,6 +3606,8 @@
   "transit-standalone": {
     "exports": ["./layers/transit/standalone"],
     "modules": [
+      "src/branding.js",
+      "src/i18n/marker.js",
       "src/cyberSonar.js",
       "src/app/sourceSlot.js",
       "src/celestialRing.js",
@@ -3652,6 +3676,8 @@
   "transit-layer": {
     "exports": ["./layers/transit"],
     "modules": [
+      "src/branding.js",
+      "src/i18n/marker.js",
       "src/data/iconOrientation.js",
       "src/data/inputOwnership.js",
       "src/data/transitFeeds.js",
@@ -3702,6 +3728,7 @@
   "transit-service": {
     "exports": ["./sources/transit-service"],
     "modules": [
+      "src/branding.js",
       "src/data/transitFeeds.js",
       "src/geoDistance.js",
       "src/data/transitProxy.js",
@@ -3782,6 +3809,7 @@
   "tools": {
     "exports": ["./tools"],
     "modules": [
+      "src/branding.js",
       "src/tools/index.js",
       "src/tools/catalog.js",
       "src/tools/schema.js",
@@ -3846,6 +3874,8 @@
   "tools-panel": {
     "exports": ["./tools/panel"],
     "modules": [
+      "src/branding.js",
+      "src/i18n/marker.js",
       "src/tools/panel.js",
       "src/tools/globePanel.js",
       "src/app/globePanelRuntime.js"

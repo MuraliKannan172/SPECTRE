@@ -14,6 +14,7 @@ import { parseErrorResponse } from '../../src/tools/mcp/index.js';
 import { sharedPanelKey } from './panelKey.js';
 import { createLocalMcpServer } from './server.js';
 import { DEFAULT_API_BASE } from './services.js';
+import { BRANDING } from '../../src/branding.js';
 
 /**
  * A one-line description of a request for the diagnostic log: its method,
@@ -96,7 +97,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     const options = parseArgs(process.argv.slice(2));
     console.error(
-      `God's Eye View MCP server reading ${options.apiBase || DEFAULT_API_BASE}`,
+      `${BRANDING.name} MCP server reading ${options.apiBase || DEFAULT_API_BASE}`,
     );
     // A client may start several of these for one connection; they share
     // the install's panel key so the panel works whichever one it reaches.

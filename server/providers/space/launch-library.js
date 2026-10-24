@@ -5,6 +5,7 @@ import {
   coalesceProxyRequest,
 } from '../common/http.js';
 import { launchLibraryRecentUrl } from '../../../src/data/spaceProviderRequests.js';
+import { brandUserAgent } from '../../../src/branding.js';
 
 export const LL2_CACHE_TTL_MS = 15 * 60_000;
 
@@ -13,8 +14,7 @@ export function launchLibraryRequestHeaders(token = process.env.LL2_API_TOKEN) {
   const normalized = String(token || '').trim();
   return {
     Accept: 'application/json',
-    'User-Agent':
-      'gods-eye-view-launch-library-proxy/1.0 (+https://github.com/bilawalsidhu/gods-eye-view)',
+    'User-Agent': brandUserAgent('launch-library-proxy'),
     ...(normalized ? { Authorization: `Token ${normalized}` } : {}),
   };
 }

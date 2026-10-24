@@ -348,7 +348,7 @@ export class RealtimeViewport {
     if (hasStructuredViewIdentity(result)) return false;
     return this.sendRetainedImage(
       () => this.capture(),
-      "Current God's Eye View viewport screenshot. Read any clearly visible street, building, and place labels in the image and combine them with the structured nearbyPlaces, streetLabels, and scene context. Do not invent labels that are not legible.",
+      'Current globe viewport screenshot. Read any clearly visible street, building, and place labels in the image and combine them with the structured nearbyPlaces, streetLabels, and scene context. Do not invent labels that are not legible.',
       'client.viewport_context',
       { kind: 'viewport' },
     );

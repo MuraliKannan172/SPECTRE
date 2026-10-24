@@ -542,8 +542,8 @@ export function panelRuntime(config) {
         notice.id = 'status';
         notice.textContent =
           // i18n-ignore: host-panel script, no app catalogs
-          "This panel lost its 3D graphics, likely because other God's Eye " +
-          "View panels in this conversation hold them. Use Open in God's " +
+          `This panel lost its 3D graphics, likely because other ${config.appName} ` +
+          `panels in this conversation hold them. Use Open in ${config.appName} ` +
           'Eye View above, or show it in a new conversation.';
         document.body.appendChild(notice);
       },
@@ -570,18 +570,18 @@ export function panelRuntime(config) {
     if (started) return;
     started = true;
     // i18n-ignore: host-panel script, no app catalogs
-    say("Loading God's Eye View…");
+    say(`Loading ${config.appName}…`);
     startApp(url, view).catch((error) =>
       // i18n-ignore: host-panel script, no app catalogs
-      say(`God's Eye View could not load here: ${error?.message || error}.`),
+      say(`${config.appName} could not load here: ${error?.message || error}.`),
     );
     setTimeout(() => {
       if (!ready)
         say(
           // i18n-ignore: see above
-          "God's Eye View did not load here" +
+          `${config.appName} did not load here` +
             (blocked ? ` (${blocked})` : '') +
-            ". Use Open in God's Eye View above.",
+            `. Use Open in ${config.appName} above.`,
         );
     }, config.loadTimeoutMs);
   }
@@ -646,7 +646,7 @@ export function panelRuntime(config) {
     appInfo: {
       name: 'gods-eye-view',
       // i18n-ignore: product name sent to the MCP host
-      title: "God's Eye View",
+      title: config.appName,
       version: '1.0.0',
     },
     protocolVersion: config.protocolVersion,
@@ -662,7 +662,7 @@ export function panelRuntime(config) {
     (error) =>
       say(
         // i18n-ignore: host-panel script, no app catalogs
-        "This client did not accept the God's Eye View panel" +
+        `This client did not accept the ${config.appName} panel` +
           (error?.message ? `: ${error.message}` : '.'),
       ),
   );

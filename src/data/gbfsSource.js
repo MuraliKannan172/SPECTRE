@@ -1,3 +1,4 @@
+import { BRANDING } from '../branding.js';
 /** Allowlisted GBFS hostnames; wildcard *.publicbikesystem.net also accepted. */
 const GBFS_ALLOWED_HOSTS = new Set([
   'gbfs.lyft.com',
@@ -32,7 +33,9 @@ const GBFS_HOST_PATH_PREFIXES = new Map([
 const GBFS_HOST_HEADERS = new Map([
   [
     'api.entur.io',
-    Object.freeze({ 'ET-Client-Name': 'gods-eye-view-bikeshare' }),
+    Object.freeze({
+      'ET-Client-Name': `${BRANDING.name.toLowerCase()}-bikeshare`,
+    }),
   ],
 ]);
 

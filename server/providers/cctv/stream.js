@@ -1,5 +1,6 @@
 /** Bounded, demand-owned HLS sessions. No subprocess, disk cache or idle sweep. */
 import { randomUUID } from 'node:crypto';
+import { brandUserAgent } from '../../../src/branding.js';
 
 export const HLS_LIMITS = Object.freeze({
   sessions: 2,
@@ -36,7 +37,7 @@ export async function fetchHlsBytes(
     response = await fetchImpl(url, {
       redirect: 'error',
       signal: controller.signal,
-      headers: { 'User-Agent': 'gods-eye-view-cctv-proxy/1.0' },
+      headers: { 'User-Agent': brandUserAgent('cctv-proxy') },
     });
     if (
       !response.ok ||

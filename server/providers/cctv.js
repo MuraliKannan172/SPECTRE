@@ -23,6 +23,7 @@ import { admitSameSiteKeyless } from './common/same-site.js';
 import { PROXY_SIGNALS } from '../../src/localRequestGate.mjs';
 import { createHlsPuller } from './cctv/stream.js';
 import { googleServerApiKey } from './places/google-key.js';
+import { brandUserAgent } from '../../src/branding.js';
 export { CCTV_FRAME_FETCH_TIMEOUT_MS, fetchCctvImageFromUpstream };
 /**
  * Vite plugin: CCTV camera proxy with source registry, frame/media serving,
@@ -117,7 +118,7 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
       sv.searchParams.set('key', streetViewKey);
 
       const svResp = await fetch(sv.toString(), {
-        headers: { 'User-Agent': 'gods-eye-view-cctv-proxy/1.0' },
+        headers: { 'User-Agent': brandUserAgent('cctv-proxy') },
         signal: AbortSignal.timeout(CCTV_FRAME_FETCH_TIMEOUT_MS),
       });
       const svType = cctvRasterImageType(svResp.headers.get('content-type'));
@@ -378,7 +379,7 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
           const downstream = watchDownstreamClose(res);
           try {
             const upstreamHeaders = {
-              'User-Agent': 'gods-eye-view-cctv-proxy/1.0',
+              'User-Agent': brandUserAgent('cctv-proxy'),
             };
             // Never forward the client's own string: a Range this proxy does
             // not accept is dropped and the request proceeds without one.

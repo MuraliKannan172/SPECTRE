@@ -1,4 +1,5 @@
 import { readResponseTextCapped } from './common/http.js';
+import { brandUserAgent } from '../../src/branding.js';
 
 const STATUS_URL = 'https://www.nhc.noaa.gov/CurrentStorms.json';
 const GIS =
@@ -268,7 +269,10 @@ export function cycloneProxy({
       redirect: 'error',
       headers: {
         Accept: 'application/geo+json,application/json',
-        'User-Agent': 'Gods Eye View (public NOAA weather context)',
+        'User-Agent': brandUserAgent(
+          'noaa-weather',
+          'public NOAA weather context',
+        ),
       },
     });
     if (!response.ok) {

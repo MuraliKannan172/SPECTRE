@@ -1,4 +1,5 @@
 import { readResponseTextCapped } from '../common/http.js';
+import { brandUserAgent } from '../../../src/branding.js';
 
 /**
  * Vite plugin: adsb.lol military aircraft proxy with 12 s response cache.
@@ -106,7 +107,7 @@ export function adsbLolProxy() {
         }
         const signal = AbortSignal.timeout(UPSTREAM_TIMEOUT_MS);
         const upstream = await fetch('https://api.adsb.lol/v2/mil', {
-          headers: { 'User-Agent': 'gods-eye-view-adsblol-proxy/1.0' },
+          headers: { 'User-Agent': brandUserAgent('adsblol-proxy') },
           signal,
         });
         if (upstream.ok) {

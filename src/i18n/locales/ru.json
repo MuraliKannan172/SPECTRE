@@ -822,10 +822,8 @@
   "Reset camera and return to full globe view": "Сбросить камеру и вернуть полный вид глобуса",
   "Visible map targets": "Видимые цели на карте",
   "Globe actions": "Действия с глобусом",
-  "NO PLACE LEFT BEHIND": "НИ ОДНА ТОЧКА НЕ ОСТАНЕТСЯ ПОЗАДИ",
   "ACTIVE STYLE": "АКТИВНЫЙ СТИЛЬ",
   "Choose your first view": "Выберите первый вид",
-  "Tip: the GEV MIC button in the dock lets you talk to the map.": "Совет: кнопка «МИК» в доке позволяет говорить с картой.",
   "Aircraft, vessels and nearby intelligence": "Самолёты, суда и разведданные поблизости",
   "Launches, spacecraft and orbital context": "Пуски, космические аппараты и орбитальный контекст",
   "Begin with a clean globe": "Начните с чистого глобуса",
@@ -2860,5 +2858,7 @@
   "NON-COMMERCIAL SOURCES": "НЕКОММЕРЧЕСКИЕ ИСТОЧНИКИ",
   "Personal use only: worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines and adsbdb flight routes. Their free terms forbid commercial use, so they stay off until you turn them on.": "Только для личного использования: рейсы OpenSky по всему миру, погода Open-Meteo в кабине, заголовки Google News и маршруты рейсов adsbdb. Их бесплатные условия запрещают коммерческое использование, поэтому они выключены, пока вы их не включите.",
   "WEATHER OFF · PERSONAL-USE SOURCE": "ПОГОДА ВЫКЛ. · ИСТОЧНИК ДЛЯ ЛИЧНОГО ИСПОЛЬЗОВАНИЯ",
-  "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "Бесплатный API Open-Meteo разрешает только личное некоммерческое использование. Чтобы показывать погоду, включите «Некоммерческие источники» в настройках провайдеров."
+  "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "Бесплатный API Open-Meteo разрешает только личное некоммерческое использование. Чтобы показывать погоду, включите «Некоммерческие источники» в настройках провайдеров.",
+  "Tip: the MIC button in the dock lets you talk to the map.": "Совет: кнопка «МИК» в доке позволяет говорить с картой.",
+  "GLOBAL INTELLIGENCE GLOBE": "ГЛОБУС ГЛОБАЛЬНОЙ РАЗВЕДКИ"
 }

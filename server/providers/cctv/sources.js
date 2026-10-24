@@ -157,6 +157,7 @@ import {
   readResponseJsonCapped,
   readResponseTextCapped,
 } from '../common/http.js';
+import { brandUserAgent } from '../../../src/branding.js';
 /**
  * Fetch and parse Austin traffic camera records from the city Open Data portal.
  *
@@ -1045,7 +1046,7 @@ export async function loadTxdotSourcesFromOpenData() {
       const resp = await fetch(TXDOT_CCTV_STATUS_URL(district), {
         headers: {
           Accept: 'application/json',
-          'User-Agent': 'gods-eye-view-cctv-proxy/1.0',
+          'User-Agent': brandUserAgent('cctv-proxy'),
         },
         signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
       });
@@ -1536,7 +1537,7 @@ export async function loadNswSourcesFromOpenData() {
     const resp = await fetch(NSW_CAMERAS_URL, {
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'gods-eye-view-cctv-proxy/1.0',
+        'User-Agent': brandUserAgent('cctv-proxy'),
       },
       signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });

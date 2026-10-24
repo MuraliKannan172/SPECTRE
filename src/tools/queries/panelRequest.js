@@ -16,6 +16,7 @@
 
 import { defineTool, ToolError } from '../catalog.js';
 import { PANEL_REQUEST_TOOL } from '../globePanel.js';
+import { BRANDING } from '../../branding.js';
 
 /** Bytes of response body per call, before base64. */
 export const PANEL_PART_BYTES = 512 * 1024;
@@ -237,9 +238,9 @@ function checkedPath(path, baseUrl) {
 
 export const panelRequest = defineTool({
   name: PANEL_REQUEST_TOOL,
-  title: "God's Eye View panel request",
+  title: `${BRANDING.name} panel request`,
   description:
-    "Loads a file or data for the God's Eye View panel from the app's " +
+    `Loads a file or data for the ${BRANDING.name} panel from the app's ` +
     'server. Only the panel calls this; it does not answer questions.',
   inputSchema: {
     type: 'object',
@@ -272,7 +273,7 @@ export const panelRequest = defineTool({
     if (!isPanelKey(args.key, services.app.panelKey))
       throw new ToolError(
         'invalid_arguments',
-        "Only the God's Eye View panel may make this request",
+        `Only the ${BRANDING.name} panel may make this request`,
       );
     const state = panelState(services.app);
     forgetExpired(state);

@@ -1,3 +1,4 @@
+import { brandUserAgent } from '../../../src/branding.js';
 export const DEFAULT_CCTV_SOURCE_FILE = 'config/cctv_sources.austin.json';
 /** Austin Open Data portal endpoint for traffic camera records. */
 export const DEFAULT_AUSTIN_ROWS_URL =
@@ -411,7 +412,7 @@ export const KARTVERKET_MAX_RESPONSE_BYTES = 256 * 1024;
  * camera sits above ~1,500 m. Anything outside is treated as no height. */
 export const KARTVERKET_HEIGHT_RANGE_M = Object.freeze({ min: -20, max: 2500 });
 /** Same identity the other CCTV upstream requests send. */
-export const KARTVERKET_USER_AGENT = 'gods-eye-view-cctv-proxy/1.0';
+export const KARTVERKET_USER_AGENT = brandUserAgent('cctv-proxy');
 
 /** NYC DOT Traffic Management Center cameras: one keyless JSON list for the
  * five boroughs (~980 cameras). Frames are stills synthesized from each

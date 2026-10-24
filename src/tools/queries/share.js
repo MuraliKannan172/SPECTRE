@@ -5,6 +5,7 @@ import { defineTool, ToolError } from '../catalog.js';
 import { GLOBE_PANEL_URI } from '../globePanel.js';
 import { AREA_SCHEMA, resolveArea } from '../area.js';
 import { cameraForArea, cameraLookingAt } from '../views.js';
+import { BRANDING } from '../../branding.js';
 
 /** Tool arguments that describe a view: an area to frame, or a camera. */
 export const VIEW_ARGUMENTS = Object.freeze({
@@ -106,10 +107,10 @@ function appBase(services) {
 
 export const showInGodsEyeView = defineTool({
   name: 'show_in_gods_eye_view',
-  title: "Show in God's Eye View",
+  title: `Show in ${BRANDING.name}`,
   description:
-    "Shows a view in God's Eye View: in clients that display apps, the live " +
-    "God's Eye View globe in the conversation; everywhere, a link that opens " +
+    `Shows a view in ${BRANDING.name}: in clients that display apps, the live ` +
+    `${BRANDING.name} globe in the conversation; everywhere, a link that opens ` +
     'it. Pass the view another answer returned, or describe one: an area ' +
     'framed from above or a camera position, with chosen data layers, visual ' +
     'style and map, optionally following an aircraft (or riding in its ' +
@@ -130,7 +131,7 @@ export const showInGodsEyeView = defineTool({
     });
     const url = viewUrl(base, view);
     return {
-      summary: `Open ${label} in God's Eye View: ${url}`,
+      summary: `Open ${label} in ${BRANDING.name}: ${url}`,
       data: { url, view },
     };
   },

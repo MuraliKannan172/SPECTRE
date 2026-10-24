@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { composeCatalog, coreTools } from '../index.js';
+import { BRANDING } from '../../branding.js';
 
 test('links open the app looking straight down on the area', async () => {
   const catalog = composeCatalog({
@@ -26,7 +27,7 @@ test('links open the app looking straight down on the area', async () => {
   });
   assert.equal(
     result.summary,
-    `Open 5 km around 30.267, -97.743 in God's Eye View: ${url.href}`,
+    `Open 5 km around 30.267, -97.743 in ${BRANDING.name}: ${url.href}`,
   );
 });
 
@@ -107,7 +108,10 @@ test('links carry a camera, style, map and an entity to follow', async () => {
     camera: { lat: 48.8584, lon: 2.2945, altitude_m: 1200, pitch_deg: -30 },
   });
   assert.equal(camera.data.view.camera.altitude_m, 1200);
-  assert.match(camera.summary, /^Open 48\.858, 2\.295 in God's Eye View: /);
+  assert.match(
+    camera.summary,
+    new RegExp(`^Open 48\\.858, 2\\.295 in ${BRANDING.name}: `),
+  );
   await assert.rejects(
     catalog.call('show_in_gods_eye_view', { layers: ['flights'] }),
     /Give a view, an area, or a camera with lat and lon/,

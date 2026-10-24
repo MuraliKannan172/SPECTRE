@@ -1,4 +1,5 @@
 import { greatCircleKm } from '../geoDistance.js';
+import { BRANDING } from '../branding.js';
 
 /**
  * @module transitFeeds
@@ -499,7 +500,9 @@ export const TRANSIT_FEED_REGISTRY = Object.freeze([
     center: Object.freeze({ lat: 64.0, lon: 11.5 }),
     loadRadiusKm: 720,
     url: 'https://api.entur.io/realtime/v1/gtfs-rt/vehicle-positions',
-    headers: Object.freeze({ 'ET-Client-Name': 'gods-eye-view-transit' }),
+    headers: Object.freeze({
+      'ET-Client-Name': `${BRANDING.name.toLowerCase()}-transit`,
+    }),
     license: 'Norwegian Licence for Open Government Data (NLOD)',
     licenseUrl: 'https://developer.entur.org/pages-intro-authentication',
     attribution: 'Entur — data under NLOD',
