@@ -24,7 +24,9 @@ test('explicit build inputs preserve browser-only defines, plugin order and loop
   assert.equal(config.plugins[0].enforce, 'pre');
   assert.equal(config.plugins[1].name, 'host-check');
   assert.equal(config.plugins[1].enforce, 'pre');
-  assert.equal(config.plugins[4], plugin);
+  // SKYNET fills the page head from src/branding.js after the templates.
+  assert.equal(config.plugins[4].name, 'skynet-branding-html');
+  assert.equal(config.plugins[5], plugin);
   assert.equal(config.server.host, 'localhost');
   assert.equal(config.server.port, 4173);
   assert.deepEqual(config.server.allowedHosts, ['localhost', '127.0.0.1']);
@@ -85,7 +87,7 @@ test('build helper does not discover environment values or construct local provi
     );
     assert.deepEqual(
       config.plugins.slice(4).map((plugin) => plugin.name),
-      ['embed-framing', 'panel-build'],
+      ['skynet-branding-html', 'embed-framing', 'panel-build'],
     );
   } finally {
     if (before === undefined) delete process.env.GOOGLE_MAPS_API_KEY;
@@ -98,7 +100,7 @@ test('root config retains existing named exports and standalone provider order',
     assert.equal(compatibility[name], value, name);
   const config = standaloneConfig({ mode: 'test' });
   const standaloneProviders = config.plugins
-    .slice(4, -5)
+    .slice(5, -5)
     .map((plugin) => plugin.name);
   assert.equal(
     standaloneProviders.filter((name) => name === 'gemini-live-proxy').length,

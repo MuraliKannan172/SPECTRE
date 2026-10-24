@@ -11,6 +11,7 @@ import createViteConfig, {
   validMilitaryInstallationBox,
   validRegionalPoint,
 } from '../../vite.config.js';
+import { brandUserAgent } from '../branding.js';
 
 test('missing Google place context is a quiet keyless capability, not a 503', () => {
   assert.deepEqual(keylessGooglePlacesResponse(undefined), {
@@ -61,7 +62,7 @@ test('Launch Library uses a 15-minute cache and optional server-side token heade
   assert.equal(LL2_CACHE_TTL_MS, 15 * 60_000);
   const headers = {
     Accept: 'application/json',
-    'User-Agent': 'gods-eye-view-launch-library-proxy/1.0 (+https://github.com/bilawalsidhu/gods-eye-view)',
+    'User-Agent': brandUserAgent('launch-library-proxy'),
   };
   assert.deepEqual(launchLibraryRequestHeaders(''), headers);
   assert.deepEqual(launchLibraryRequestHeaders(' secret '), {

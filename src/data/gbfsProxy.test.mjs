@@ -5,6 +5,7 @@ import {
   GBFS_MAX_BODY_BYTES,
   fetchGbfsUpstream,
 } from '../../server/providers/gbfs.js';
+import { BRANDING } from '../branding.js';
 
 const STATION_URL = 'https://gbfs.lyft.com/gbfs/2.3/bay/en/station_status.json';
 const STATION_BODY = '{"data":{"stations":[]}}';
@@ -68,7 +69,7 @@ test('GBFS upstream fetch names the app in the Client-Identifier header', async 
       },
     },
   );
-  assert.equal(GBFS_CLIENT_IDENTIFIER, 'gods-eye-view');
+  assert.equal(GBFS_CLIENT_IDENTIFIER, BRANDING.name.toLowerCase());
   assert.equal(observedHeaders['Client-Identifier'], GBFS_CLIENT_IDENTIFIER);
 });
 
@@ -86,7 +87,7 @@ test('GBFS upstream fetch adds ET-Client-Name for Entur and only for Entur', asy
   const entur = await headersFor(
     'https://api.entur.io/mobility/v2/gbfs/v2/kolumbusbysykkel/station_status',
   );
-  assert.equal(entur['ET-Client-Name'], 'gods-eye-view-bikeshare');
+  assert.equal(entur['ET-Client-Name'], `${BRANDING.name.toLowerCase()}-bikeshare`);
   assert.equal(entur['Client-Identifier'], GBFS_CLIENT_IDENTIFIER);
   const lyft = await headersFor(STATION_URL);
   assert.equal(lyft['ET-Client-Name'], undefined);

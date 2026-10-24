@@ -1694,7 +1694,7 @@ export class GeminiSessionController {
         error:
           error?.name === 'AbortError'
             ? 'Action cancelled by a newer request'
-            : error?.message || 'GEV command failed',
+            : error?.message || 'Voice command failed',
       };
     } finally {
       deadline.removeEventListener('abort', expire);

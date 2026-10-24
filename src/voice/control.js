@@ -1,7 +1,8 @@
 import { t } from '../i18n/index.js';
+import { BRANDING } from '../branding.js';
 
-// The assistant's name on its card. i18n-ignore: product name
-const ASSISTANT_NAME = 'GEV';
+// The assistant's name on its card (product name, src/branding.js).
+const ASSISTANT_NAME = BRANDING.assistantName;
 
 /**
  * Short state label for the narrow voice heading. The `voice` context lets

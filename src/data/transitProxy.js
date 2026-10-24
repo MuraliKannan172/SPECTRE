@@ -19,6 +19,7 @@ import {
   decodeVehiclePositions,
 } from './gtfsRealtime.js';
 import { getTransitFeed } from './transitFeeds.js';
+import { brandUserAgent } from '../branding.js';
 
 /** Fresh window: a snapshot younger than this is served without refetching. */
 export const TRANSIT_PROXY_TTL_MS = 15_000;
@@ -112,8 +113,7 @@ export function resolveTransitRoute(url) {
  */
 export function transitUpstreamHeaders(feed, validators = null) {
   return {
-    'User-Agent':
-      'gods-eye-view-transit-proxy/1.0 (+https://github.com/bilawalsidhu/gods-eye-view)',
+    'User-Agent': brandUserAgent('transit-proxy'),
     Accept: 'application/x-protobuf, application/octet-stream;q=0.9, */*;q=0.1',
     'Accept-Encoding': 'gzip',
     ...(validators?.etag ? { 'If-None-Match': validators.etag } : {}),

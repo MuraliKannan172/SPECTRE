@@ -1,5 +1,6 @@
 import { fetchRegionalText, fetchRegionalJson } from './http.js';
 import { normalizeRegionalArticles } from '../../../src/data/regionalModel.js';
+import { brandUserAgent } from '../../../src/branding.js';
 
 function decodeRssText(value) {
   return String(value || '')
@@ -78,7 +79,7 @@ async function fetchRegionalNews(place, { nonCommercial = false } = {}) {
       const xml = await fetchRegionalText(
         `https://news.google.com/rss/search?${rssParams}`,
         {
-          headers: { 'User-Agent': 'GodsEyeView/0.1' },
+          headers: { 'User-Agent': brandUserAgent('regional-news') },
           timeoutMs: 12_000,
         },
       );
@@ -101,7 +102,7 @@ async function fetchRegionalNews(place, { nonCommercial = false } = {}) {
     const payload = await fetchRegionalJson(
       `https://api.gdeltproject.org/api/v2/doc/doc?${params}`,
       {
-        headers: { 'User-Agent': 'GodsEyeView/0.1' },
+        headers: { 'User-Agent': brandUserAgent('regional-news') },
         timeoutMs: 12_000,
       },
     );

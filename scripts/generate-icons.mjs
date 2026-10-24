@@ -8,6 +8,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { BRANDING } from '../src/branding.js';
 
 const REPO_ROOT = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -16,8 +17,8 @@ const REPO_ROOT = path.resolve(
 const LOGO = path.join(REPO_ROOT, 'public', 'logo.svg');
 const OUT_DIR = path.join(REPO_ROOT, 'public', 'icons');
 
-/** `--bg-dark` from src/ui/styles/foundation.css, so the tile matches the app. */
-const BACKGROUND = '#0a0a0f';
+/** The brand background (src/branding.js), so the tile matches the app. */
+const BACKGROUND = BRANDING.colors.background;
 
 /**
  * Fraction of the canvas the mark is allowed to occupy.

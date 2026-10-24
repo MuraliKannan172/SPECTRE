@@ -1,3 +1,4 @@
+import { brandUserAgent } from '../../../src/branding.js';
 export const RADIO_DIRECTORY_CACHE_MS = 45 * 60 * 1000;
 export const RADIO_DIRECTORY_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 export const RADIO_MIRROR_CACHE_MS = 6 * 60 * 60 * 1000;
@@ -8,8 +9,10 @@ export const RADIO_CATALOG_MIN_SUCCESSFUL_QUERIES = 5;
 export const RADIO_CATALOG_HEALTHY_MIN_STATIONS = Math.ceil(
   RADIO_DIRECTORY_LIMIT / 2,
 );
-export const RADIO_USER_AGENT =
-  'GodsEyeView/1.0 (Radio Browser directory client)';
+export const RADIO_USER_AGENT = brandUserAgent(
+  'radio',
+  'Radio Browser directory client',
+);
 export { RADIO_UUID_RE } from '../../../src/sources/radioBrowser.js';
 export const RADIO_FALLBACK_MIRRORS = Object.freeze([
   'https://de1.api.radio-browser.info',

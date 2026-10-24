@@ -1,4 +1,5 @@
 import { applicationHtmlPlugin } from './application-html.js';
+import { brandingHtmlPlugin } from './branding-html.js';
 import cesium from 'vite-plugin-cesium';
 import { DEFAULT_ALLOWED_HOSTS, hostCheckPlugin } from './allowedHosts.js';
 import { embedFramingPlugin } from './embed-framing.js';
@@ -134,6 +135,7 @@ export function createBrowserViteConfig({
       hostCheckPlugin(),
       cesium(),
       applicationHtmlPlugin(),
+      brandingHtmlPlugin(),
       ...plugins,
       embedFramingPlugin(),
       panelBuildPlugin(),

@@ -38,7 +38,8 @@ test('the complete Realtime tool payload pins the manifest-generated layer relea
     // requested radius and center authority in descriptions only.
     // Street Level and GNSS extend the manifest; tracked and analyst aircraft describe broadcasts.
     // Air quality (ECCC AQHI) extends the manifest.
-    '775ba323384b4c1b62fb8415bac52aecc3fc668e20bedcfa57e426dcd1da3969',
+    // SKYNET: three descriptions name "the globe" instead of the product.
+    'e1fe592c34c415f36803d610231606728351a8243f4937e7e27f7f7eea9c725c',
   );
 });
 

@@ -9,6 +9,7 @@ import {
   NON_COMMERCIAL_SOURCES_OFF_REASON,
   nonCommercialSourcesEnabled,
 } from '../common/non-commercial.js';
+import { brandUserAgent } from '../../../src/branding.js';
 // ---------------------------------------------------------------------------
 // OpenSky OAuth2 token + response cache state
 // ---------------------------------------------------------------------------
@@ -333,7 +334,7 @@ async function fetchAdsbLolPointFallback(req) {
           {
             headers: {
               Accept: 'application/json',
-              'User-Agent': 'gods-eye-view-adsblol-regional-fallback/1.0',
+              'User-Agent': brandUserAgent('adsblol-regional-fallback'),
             },
             signal: controller.signal,
           },

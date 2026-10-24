@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { sharedPanelKey } from '../../server/mcp/panelKey.js';
 import { createLocalMcpServer } from '../../server/mcp/server.js';
+import { BRANDING } from '../branding.js';
 
 const PANEL_KEY_MODULE = new URL(
   '../../server/mcp/panelKey.js',
@@ -52,7 +53,7 @@ test('a panel page from one server process is refused by another without a share
   assert.equal(refused.result.isError, true);
   assert.match(
     refused.result.content[0].text,
-    /Only the God's Eye View panel may make this request/,
+    new RegExp(`Only the ${BRANDING.name} panel may make this request`),
   );
 });
 

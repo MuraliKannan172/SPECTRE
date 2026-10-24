@@ -13,6 +13,7 @@ import {
   NSW_CAMERAS_URL,
   NSW_IMAGE_USER_AGENT,
 } from '../../server/providers/cctv/constants.js';
+import { brandUserAgent } from '../branding.js';
 
 const feature = (overrides = {}, props = {}) => ({
   type: 'Feature',
@@ -100,17 +101,17 @@ test('the browser User-Agent applies to the NSW image host only', async () => {
     cctvUpstreamUserAgent(
       'https://webcams.transport.nsw.gov.au.evil.test/x.jpeg',
     ),
-    'gods-eye-view-cctv-proxy/1.0',
+    brandUserAgent('cctv-proxy'),
   );
   assert.equal(
     cctvUpstreamUserAgent(
       'https://example.test/webcams.transport.nsw.gov.au/x.jpeg',
     ),
-    'gods-eye-view-cctv-proxy/1.0',
+    brandUserAgent('cctv-proxy'),
   );
   assert.equal(
     cctvUpstreamUserAgent('not a url'),
-    'gods-eye-view-cctv-proxy/1.0',
+    brandUserAgent('cctv-proxy'),
   );
 
   const seen = [];
@@ -126,7 +127,7 @@ test('the browser User-Agent applies to the NSW image host only', async () => {
       },
     },
   );
-  assert.deepEqual(seen, ['gods-eye-view-cctv-proxy/1.0']);
+  assert.deepEqual(seen, [brandUserAgent('cctv-proxy')]);
 });
 
 test('the frame path follows redirects within the host only', async () => {

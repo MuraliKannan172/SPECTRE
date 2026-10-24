@@ -6,6 +6,7 @@ import {
 import { adsbLolFallbackAnchor } from './aircraft/opensky.js';
 import { coalesceProxyRequest, readResponseJsonCapped } from './common/http.js';
 import { makeRateLimiter, clientKey } from './common/rate-limit.js';
+import { brandUserAgent } from '../../src/branding.js';
 
 // adsb.lol regional snapshot (keyless, ODbL). Only the integrity fields the
 // GNSS layer needs leave this proxy, so the browser never sees the full feed.
@@ -78,7 +79,7 @@ export function gnssIntegrityProxy({
           redirect: 'error',
           headers: {
             Accept: 'application/json',
-            'User-Agent': 'gods-eye-view-gnss-integrity/1.0',
+            'User-Agent': brandUserAgent('gnss-integrity'),
           },
         },
       );

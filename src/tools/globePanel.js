@@ -6,6 +6,8 @@
  * see docs/TOOLS.md.
  */
 
+import { BRANDING } from '../branding.js';
+
 export const GLOBE_PANEL_URI = 'ui://gods-eye-view/globe';
 /** Where the app's server serves its panel build (see build/panel.js). */
 export const PANEL_BASE = '/panel/';
@@ -80,6 +82,7 @@ export const PANEL_REQUEST_TOOL = 'panel_request';
 function panelHtml(runtime, panelKey) {
   const config = {
     appBaseUrl: PANEL_APP_BASE_URL,
+    appName: BRANDING.name,
     loadTimeoutMs: LOAD_TIMEOUT_MS,
     panelBase: PANEL_BASE,
     panelHeight: PANEL_HEIGHT_PX,
@@ -96,7 +99,7 @@ function panelHtml(runtime, panelKey) {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>God's Eye View</title>
+<title>${BRANDING.name}</title>
 <style>
   html, body { margin: 0; height: 100%; min-height: ${PANEL_HEIGHT_PX}px; background: #05070a;
     color: #b8c4cc; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
@@ -112,7 +115,7 @@ function panelHtml(runtime, panelKey) {
 <div id="status">Waiting for a view…</div>
 <div id="actions">
 <button id="expand" type="button" hidden>Expand</button>
-<button id="open" type="button" hidden>Open in God's Eye View</button>
+<button id="open" type="button" hidden>Open in ${BRANDING.name}</button>
 </div>
 <script>${script}</script>
 </body>
@@ -137,8 +140,8 @@ export function createGlobePanelResource({ runtime, panelKey }) {
   return Object.freeze({
     uri: GLOBE_PANEL_URI,
     name: 'globe',
-    title: "God's Eye View globe",
-    description: "Live God's Eye View, showing the view a tool returns.",
+    title: `${BRANDING.name} globe`,
+    description: `Live ${BRANDING.name}, showing the view a tool returns.`,
     mimeType: MCP_APP_MIME_TYPE,
     text: panelHtml(runtime, panelKey),
     _meta: {
