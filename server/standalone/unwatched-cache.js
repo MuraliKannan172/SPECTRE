@@ -5,6 +5,10 @@
 const RUNTIME_WRITE_GLOBS = Object.freeze([
   '**/.gev-cache/**',
   '**/.gev-logs/**',
+  // SKYNET intel service: its SQLite database, logs and Python virtualenv.
+  '**/intel/data/**',
+  '**/intel/.venv/**',
+  '**/.skynet-logs/**',
 ]);
 
 /**

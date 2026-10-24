@@ -30,5 +30,13 @@ pinokio/.installed
 # scripts/fetch-optional-data.ps1. Never commit or ship them in the default build.
 src/data/local_data/telegeography_submarine_cables/
 
+# SKYNET intel service: virtualenv, local database, the user's own feed
+# overrides and tool/fetch logs stay on this machine.
+intel/.venv/
+intel/data/
+intel/feeds.local.yaml
+__pycache__/
+.skynet-logs/
+
 # Transient: a release interrupted mid-assembly (npm run changelog recovers it)
 changelog.d/.assembling/
