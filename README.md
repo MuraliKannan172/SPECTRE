@@ -2,7 +2,7 @@
 
 **A local-first global intelligence globe.** Live flights, satellites, weather, cameras and public data on a photorealistic 3D Earth, running on your own machine with no required paid keys.
 
-SKYNET is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © Bilawal Sidhu). It keeps every God's Eye View feature, rebranded in a Vanta-black and Ferrari-red theme, and is adding real-time news intelligence and a local Ollama analyst. See [NOTICE.md](NOTICE.md) for what changed from upstream.
+SKYNET is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © Bilawal Sidhu), rebranded in a Vanta-black and Ferrari-red theme, and is adding real-time news intelligence and a local Ollama analyst. It keeps God's Eye View's layers and tools except where their data could not be redistributed: the Bhote Koshi flood event and its tool are gone, submarine cables are an opt-in download, and helicopters use the generic aircraft model. See [NOTICE.md](NOTICE.md) for every change from upstream.
 
 > **Status: Phase 1 of 6** ([docs/ADR-001.md](docs/ADR-001.md)). Done: the fork, licence hygiene, rebrand and theme. Not built yet: the news intelligence service, the news layer and the Neural Core chat panel (Phases 2 to 4). This README is interim; Phase 6 replaces it.
 
