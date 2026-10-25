@@ -383,17 +383,20 @@ export function createRendering({
    *    null or still-loading tracked model from claiming a visual it is not
    *    drawing yet.
    * @param {string} icao24
+   * @param {Cesium.Model|null} [model] Resolved fleet model; null means absent.
    * @returns {boolean}
    */
 
-  function _modelOwnsVisual(icao24) {
+  function _modelOwnsVisual(icao24, model) {
     if (icao24 === flightState._trackedIcao) {
       return (
         parts.tracking._trackedModelRegimeActive() &&
         _modelIsRendering(flightState._trackedModel)
       );
     }
-    return _modelIsRendering(flightState._models.get(icao24));
+    return _modelIsRendering(
+      model === undefined ? flightState._models.get(icao24) : model,
+    );
   }
 
   /** A model is the visual only once it actually draws — loaded AND shown.

@@ -1,5 +1,10 @@
 # God's Eye View Current State
 
+Aircraft detection candidates reuse normalized display text until callsign or
+registration changes, including in-place enrichment. Each candidate resolves its
+fleet model once per collection. Positions, model ownership and tracked-aircraft
+anchors remain live on every collection; contact admission is unchanged.
+
 Civil aircraft share one delayed render timestamp per fleet update. Extrapolated
 fixes reuse their local coordinate frame until their coordinates change, including
 in-place ground-height corrections. Update cadence, contact counts, interpolation,
