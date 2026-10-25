@@ -2795,5 +2795,15 @@
   "WEATHER OFF · PERSONAL-USE SOURCE": "TIEMPO DESACTIVADO · FUENTE DE USO PERSONAL",
   "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "La API gratuita de Open-Meteo solo permite uso personal y no comercial. Activa Fuentes no comerciales en la configuración de proveedores para mostrar el tiempo.",
   "Tip: the MIC button in the dock lets you talk to the map.": "Consejo: el botón MIC del dock te permite hablar con el mapa.",
-  "GLOBAL INTELLIGENCE GLOBE": "GLOBO DE INTELIGENCIA GLOBAL"
+  "GLOBAL INTELLIGENCE GLOBE": "GLOBO DE INTELIGENCIA GLOBAL",
+  "hemisphere|N": "N",
+  "hemisphere|S": "S",
+  "hemisphere|E": "E",
+  "hemisphere|W": "O",
+  "OK": "OK",
+  "{category} ({count})": "{category} ({count})",
+  "Layers": "Capas",
+  "Search": "Buscar",
+  "More": "Más",
+  "Panels": "Paneles"
 }

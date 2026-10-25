@@ -2860,5 +2860,15 @@
   "WEATHER OFF · PERSONAL-USE SOURCE": "ПОГОДА ВЫКЛ. · ИСТОЧНИК ДЛЯ ЛИЧНОГО ИСПОЛЬЗОВАНИЯ",
   "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "Бесплатный API Open-Meteo разрешает только личное некоммерческое использование. Чтобы показывать погоду, включите «Некоммерческие источники» в настройках провайдеров.",
   "Tip: the MIC button in the dock lets you talk to the map.": "Совет: кнопка «МИК» в доке позволяет говорить с картой.",
-  "GLOBAL INTELLIGENCE GLOBE": "ГЛОБУС ГЛОБАЛЬНОЙ РАЗВЕДКИ"
+  "GLOBAL INTELLIGENCE GLOBE": "ГЛОБУС ГЛОБАЛЬНОЙ РАЗВЕДКИ",
+  "hemisphere|N": "С",
+  "hemisphere|S": "Ю",
+  "hemisphere|E": "В",
+  "hemisphere|W": "З",
+  "OK": "НОРМА",
+  "{category} ({count})": "{category} ({count})",
+  "Layers": "Слои",
+  "Search": "Поиск",
+  "More": "Ещё",
+  "Panels": "Панели"
 }

@@ -384,7 +384,7 @@ const PUBLIC_SCENE_RECIPES = [
 ];
 
 /** Build the recipe list without mutating stored user-authored projects. */
-export function createSceneRecipes({ localDemoRecipes = EVENT_RECIPES } = {}) {
+function createSceneRecipes({ localDemoRecipes = EVENT_RECIPES } = {}) {
   return [...localDemoRecipes, ...PUBLIC_SCENE_RECIPES];
 }
 
@@ -392,7 +392,7 @@ export const SCENE_RECIPES = createSceneRecipes();
 
 export const SCENE_APPEND_RECIPES = [];
 
-export function getSceneRecipeById(id) {
+function getSceneRecipeById(id) {
   return SCENE_RECIPES.find((recipe) => recipe.id === id) || null;
 }
 

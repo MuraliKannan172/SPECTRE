@@ -25,11 +25,11 @@ import * as Cesium from 'cesium';
  * follows DATA_SOURCES.md (live sources, then bundled snapshots).
  * @type {{ key: string, html: string }[]}
  */
-export const OSM_CREDIT = {
+const OSM_CREDIT = {
   key: 'openstreetmap',
   html: 'Map and place data <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> (<a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a>)',
 };
-export const OPENMAPTILES_CREDIT = {
+const OPENMAPTILES_CREDIT = {
   key: 'openfreemap',
   html: 'Vector tiles: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://openmaptiles.org" target="_blank" rel="noopener">OpenMapTiles</a>',
 };
@@ -115,12 +115,6 @@ const MODEL_CREDITS = [
     'bacelM',
     'BACEL_M',
     'private-jet-cbdd1de6ced9461e950eafaa302cc82b',
-  ],
-  [
-    'Low Poly Cargo Ship',
-    'Javier_Fernandez',
-    'Javier.Fernandez',
-    'low-poly-cargo-ship-4c22cbaf01c1427f8ab60b3a07b1b32c',
   ],
   [
     'Cessna 172',
