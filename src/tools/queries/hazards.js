@@ -1,5 +1,6 @@
 /** Natural hazard queries: earthquakes and active fires. */
 
+import { acquisitionMsUtc } from '../../data/firmsCsv.js';
 import { suggestView } from '../views.js';
 import { defineTool, ToolError } from '../catalog.js';
 import { AREA_SCHEMA, areaContains, resolveArea } from '../area.js';
@@ -114,8 +115,7 @@ export const getActiveFires = defineTool({
           lon: fire.lon,
           frp_mw: fire.frp ?? null,
           confidence: fire.confidence ?? null,
-          acquired:
-            [fire.acqDate, fire.acqTime].filter(Boolean).join(' ') || null,
+          acquired: isoTime(acquisitionMsUtc(fire.acqDate, fire.acqTime)),
           satellite: fire.satellite ?? null,
           day_night: fire.daynight ?? null,
         })),
