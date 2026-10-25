@@ -491,8 +491,19 @@ export function createQueries({
         object.position = pos;
         object.skipLabel = isTracked;
         // Card text only — declutter/cohort identity is `object.sourceId` (icao24).
-        const id = _contactLabel(icao24, info);
-        if (object.id !== id) object.id = id;
+        const callsign = info?.callsign;
+        const registration = info?.registration;
+        // Records and enrichment may change in place. Cache by field values,
+        // while keeping the live visual anchor above independent of text.
+        if (
+          object.id === undefined ||
+          object._labelCallsign !== callsign ||
+          object._labelRegistration !== registration
+        ) {
+          object.id = _contactLabel(icao24, info);
+          object._labelCallsign = callsign;
+          object._labelRegistration = registration;
+        }
         const altitude = info?.altitude;
         if (object._altitude !== altitude) {
           object._altitude = altitude;
