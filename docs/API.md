@@ -147,6 +147,8 @@ A Server-Sent Events stream.
 
 `disabled_noncommercial` means the source's terms allow only personal use, or have not been checked. It is polled only while **Non-commercial sources** is on in Provider Settings (`SKYNET_NONCOMMERCIAL_SOURCES=1` in `.env`). The switch is re-read on every poll cycle, so no restart is needed.
 
+While the switch is off, the API also stops serving what such sources reported, including stories collected while it was on. `/news`, `/news/{id}` and the stream serve only stories whose first (primary) source is an open feed, and list only the open sources in `sources`. A hidden story answers `404`. Turning the switch back on shows them again; nothing is deleted.
+
 ## Polling
 
 - **Interval:** every source has its own clock, polled every `SKYNET_INTEL_POLL_SECONDS` (default 300, minimum 30) with ±10% jitter. GDELT queries run every 15 minutes at most and are spaced at least 5.5 s apart.

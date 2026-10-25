@@ -194,6 +194,30 @@ def test_filters_and_keyset_pagination(store: NewsStore) -> None:
         store.query(NewsQuery(cursor="not-a-cursor"))
 
 
+def test_open_only_follows_the_primary_source_and_trims_the_rest(store: NewsStore) -> None:
+    store.sync_feeds(
+        [
+            FeedDef(id="feed-a", name="Open", url="https://a", category="world", terms="open"),
+            FeedDef(id="feed-p", name="Personal", url="https://p", category="world", terms="personal"),
+        ]
+    )
+    open_first = store.insert_story(*_story(1, url_hash="o1"))
+    store.add_source(
+        open_first, SourceRow("feed-p", "Personal", "https://p/1", "p1", "Same", 1_001, 2_002), now=3_000
+    )
+    personal_first = store.insert_story(*_story(2, url_hash="p2", feed_id="feed-p"))
+    store.add_source(
+        personal_first, SourceRow("feed-a", "Open", "https://a/2", "a2", "Same", 1_002, 2_003), now=3_000
+    )
+
+    rows, _ = store.query(NewsQuery(open_only=True))
+    assert [row["id"] for row in rows] == [open_first]
+    assert [source["feed_id"] for source in rows[0]["sources"]] == ["feed-a"]
+    assert store.get_story(personal_first, open_only=True) is None
+    assert [row["id"] for row in store.stories_after(0, open_only=True)] == [open_first]
+    assert len(store.query(NewsQuery())[0]) == 2  # switch on: everything
+
+
 def test_bbox_across_the_antimeridian(store: NewsStore) -> None:
     store.insert_story(*_story(1, lat=-17.7, lon=178.0, url_hash="fiji"))
     store.insert_story(*_story(2, lat=-14.3, lon=-170.7, url_hash="samoa"))
