@@ -14,9 +14,13 @@ function acquiredMsUtc(acqDate, acqTime) {
   const hours = Number(hhmm.slice(0, 2));
   const minutes = Number(hhmm.slice(2, 4));
   if (hours > 23 || minutes > 59) return NaN;
-  return Date.parse(
+  const timestamp = Date.parse(
     `${acqDate}T${hhmm.slice(0, 2)}:${hhmm.slice(2, 4)}:00.000Z`,
   );
+  return Number.isFinite(timestamp) &&
+    new Date(timestamp).toISOString().slice(0, 10) === acqDate
+    ? timestamp
+    : NaN;
 }
 
 export const getEarthquakes = defineTool({
