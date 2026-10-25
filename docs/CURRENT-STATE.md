@@ -417,6 +417,8 @@ than relabeling older geometry. The cone represents forecast center uncertainty,
 not storm size or the full hazard area. Successful empty and unavailable states
 are distinct. One owned native Cesium data source preserves polygon holes and
 geographic seams and releases on disable; forecast animation is not implied.
+NHC movement speed is converted from miles per hour to rounded knots by the
+proxy; advisory wind intensity is already in knots and is passed through.
 Cyclone markers, labels, tracks and cones are hidden beyond the horizon on every map source.
 Consult the linked official advisory for safety decisions.
 
