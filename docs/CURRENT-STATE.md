@@ -5997,6 +5997,8 @@ callsign, class and category, adsbdb operator/type and a plausible route when
 known, altitude, ground speed, track, vertical rate, position age, message
 count, "Heard by your receiver"); markers are not camera-followed. Positioned
 aircraft join detection boxes, labelled only with a decoded callsign.
+The card's `TRK` label wraps after rounding to whole degrees, so a track of
+359.5° displays as `TRK 0°` rather than `TRK 360°`.
 
 Receivers publish one record shape from `src/sources/adsbRecords.js`
 (`icao`, `callsign`, `category`, `onGround`, `lat`, `lon`, `altitudeFt`,
