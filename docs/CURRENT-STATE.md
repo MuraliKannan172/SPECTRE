@@ -455,6 +455,14 @@ than a reading. Heading keeps its existing separate check for its own sentinel.
 Genuine readings are unchanged, including a stopped vessel's zero and the
 highest speed and course the fields can encode.
 
+For an already tracked vessel, AISStream static messages update name, type,
+destination and IMO without changing its position, motion, fix timestamps,
+position freshness or trail. Non-empty static values replace earlier values;
+omitted, empty or unavailable fields retain known metadata across Class B's
+separate reports and in the cache used by the next position update. Position
+reports still prefer their own metadata name. Invalid Class B parts are ignored;
+absent fields prefer the latest live value over the static cache.
+
 Native `<select>` controls declare a dark colour scheme and explicit option
 colours, so the browser-painted option list matches the panel it drops out of.
 The scheme is declared on the controls rather than on the document root, so
