@@ -4081,6 +4081,10 @@ routing it shows `Routing…`, and a router miss reads
 The layer holds continuous render only while a route is drawn (the dashes
 animate). Disable clears all state.
 
+At the metre/kilometre boundary, route distance labels use the rounded
+ten-metre value to select the unit, switching to kilometres at 995 metres;
+a 996-metre leg displays as `1.0 km` rather than `1000 m`.
+
 **Keys needed: none.** Directions works on a keyless boot, and the layer is off
 until the operator turns it on.
 
@@ -4132,6 +4136,9 @@ road name into one plain-English sentence per decision, folding
 and as the last line of the list, because the arrival step is among the ones
 dropped. A route of exactly 200 is complete, and a roundabout exit after the
 200th keeps folding into it.
+
+Route duration labels select their unit after rounding seconds, switching to
+minutes at 59.5 seconds; a 59.6-second leg displays as `1 min`, rather than `60 s`.
 
 A step's card opens from its dot on the globe or from its line in the list, and
 the list covers every step including departure and arrival, which have no dot.
