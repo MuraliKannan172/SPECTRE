@@ -1984,6 +1984,9 @@ accessible name remains "Don't show this again". Control behavior is unchanged.
 ## FIRMS source status
 
 The FIRMS CSV parser rejects impossible acquisition calendar dates before the proxy filters records to the trailing 24 hours, while retaining valid UTC acquisition times.
+The `get_active_fires` tool reports acquisition times as UTC ISO timestamps,
+including zero-padded hours and minutes; missing or invalid dates and times
+remain `null`, including impossible calendar dates from a custom source.
 
 The FIRMS proxy records source success after appending its rows. If aggregation
 throws, that source reports failure without a contradictory success entry.
