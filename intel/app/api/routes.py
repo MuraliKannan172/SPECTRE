@@ -50,6 +50,12 @@ def _list(value: str | None) -> tuple[str, ...]:
     return tuple(part.strip() for part in (value or "").split(",") if part.strip())[:20]
 
 
+def _open_only(request: Request) -> bool:
+    """With Non-commercial sources off, serve only stories first reported by an
+    open feed, even ones collected while the switch was on. Re-read per request."""
+    return not request.app.state.settings.noncommercial_enabled()
+
+
 def _freshness(request: Request) -> dict[str, Any]:
     state = request.app.state
     return freshness(
@@ -91,6 +97,7 @@ def list_news(
         min_geo_confidence=ON_GLOBE_CONFIDENCE if (located or box) else None,
         limit=limit,
         cursor=cursor,
+        open_only=_open_only(request),
     )
     try:
         rows, next_cursor = request.app.state.store.query(query)
@@ -135,8 +142,9 @@ async def news_events(request: Request, after: int | None) -> AsyncIterator[str]
         yield "retry: 5000\n\n"
         high_water = after if after is not None else state.store.latest_story_id()
         if after is not None:
-            for row in state.store.stories_after(after, REPLAY_LIMIT):
-                full = state.store.get_story(row["id"])
+            open_only = _open_only(request)
+            for row in state.store.stories_after(after, REPLAY_LIMIT, open_only=open_only):
+                full = state.store.get_story(row["id"], open_only=open_only)
                 if full:
                     yield _sse("story", story(full), full["id"])
                     high_water = full["id"]
@@ -151,20 +159,27 @@ async def news_events(request: Request, after: int | None) -> AsyncIterator[str]
                 continue
             if event is LAGGED:
                 return
+            payload = event["story"]
+            if _open_only(request):
+                # The switch may have gone off after this story was collected.
+                full = state.store.get_story(event["id"], open_only=True)
+                if full is None:
+                    continue
+                payload = story(full)
             if event["type"] == "story":
                 if event["id"] <= high_water:
                     continue
                 high_water = event["id"]
-                yield _sse("story", event["story"], event["id"])
+                yield _sse("story", payload, event["id"])
             else:
-                yield _sse(event["type"], event["story"])
+                yield _sse(event["type"], payload)
     finally:
         state.hub.unsubscribe(queue)
 
 
 @router.get("/news/{story_id}")
 def get_news(request: Request, story_id: int) -> dict[str, Any]:
-    row = request.app.state.store.get_story(story_id)
+    row = request.app.state.store.get_story(story_id, open_only=_open_only(request))
     if row is None:
         raise HTTPException(404, {"code": "not_found"})
     return story(row)

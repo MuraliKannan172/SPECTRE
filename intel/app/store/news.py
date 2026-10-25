@@ -70,6 +70,18 @@ class NewsQuery:
     min_geo_confidence: float | None = None
     limit: int = 50
     cursor: str | None = None
+    # Non-commercial sources off: only stories first reported by an open feed.
+    open_only: bool = False
+
+
+# A story's primary source is its earliest outlet; its headline and summary
+# came from there. With personal-use sources switched off, a story is served
+# only if that outlet is a configured open feed.
+_OPEN_PRIMARY = (
+    "EXISTS (SELECT 1 FROM story_sources p JOIN feeds f ON f.id = p.feed_id"
+    " WHERE p.id = (SELECT min(id) FROM story_sources WHERE story_id = s.id)"
+    " AND f.terms = 'open')"
+)
 
 
 class CursorError(ValueError):
@@ -284,25 +296,24 @@ class NewsStore:
             ),
         )
 
-    def get_story(self, story_id: int) -> dict[str, Any] | None:
+    def get_story(self, story_id: int, *, open_only: bool = False) -> dict[str, Any] | None:
+        where = "s.id = ?" + (f" AND {_OPEN_PRIMARY}" if open_only else "")
         with self._lock:
-            row = self._conn.execute("SELECT * FROM stories WHERE id = ?", (story_id,)).fetchone()
+            row = self._conn.execute(f"SELECT s.* FROM stories s WHERE {where}", (story_id,)).fetchone()  # noqa: S608
             if not row:
                 return None
-            sources = self._conn.execute(
-                "SELECT feed_id, source_name, url, title, published_at FROM story_sources"
-                " WHERE story_id = ? ORDER BY published_at, id",
-                (story_id,),
-            ).fetchall()
-        story = dict(row)
-        story["sources"] = [dict(source) for source in sources]
+            story = dict(row)
+            self._attach_sources([story], open_only=open_only, with_title=True)
         return story
 
-    def stories_after(self, story_id: int, limit: int = 100) -> list[dict[str, Any]]:
+    def stories_after(
+        self, story_id: int, limit: int = 100, *, open_only: bool = False
+    ) -> list[dict[str, Any]]:
         """Stories added after `story_id`, oldest first (SSE replay)."""
+        where = "s.id > ?" + (f" AND {_OPEN_PRIMARY}" if open_only else "")
         with self._lock:
             rows = self._conn.execute(
-                "SELECT * FROM stories WHERE id > ? ORDER BY id LIMIT ?",
+                f"SELECT s.* FROM stories s WHERE {where} ORDER BY s.id LIMIT ?",  # noqa: S608
                 (story_id, limit),
             ).fetchall()
         return [dict(row) for row in rows]
@@ -375,7 +386,7 @@ class NewsStore:
             rows = [dict(row) for row in self._conn.execute(sql, args).fetchall()]
             has_more = len(rows) > limit
             rows = rows[:limit]
-            self._attach_sources(rows)
+            self._attach_sources(rows, open_only=query.open_only)
         if not has_more:
             return rows, None
         if next_payload is None:
@@ -421,15 +432,24 @@ class NewsStore:
         if query.min_geo_confidence is not None:
             where.append("s.geo_confidence >= ?")
             params.append(query.min_geo_confidence)
+        if query.open_only:
+            where.append(_OPEN_PRIMARY)
         return where, params
 
-    def _attach_sources(self, rows: list[dict[str, Any]]) -> None:
+    def _attach_sources(
+        self, rows: list[dict[str, Any]], *, open_only: bool = False, with_title: bool = False
+    ) -> None:
+        """Each row gets its outlets; with open_only, only the open feeds among them."""
         if not rows:
             return
         ids = [row["id"] for row in rows]
+        title = ", ss.title" if with_title else ""
+        gate = " AND f.terms = 'open'" if open_only else ""
         sources = self._conn.execute(
-            "SELECT story_id, feed_id, source_name, url, published_at FROM story_sources"  # noqa: S608
-            f" WHERE story_id IN ({','.join('?' * len(ids))}) ORDER BY published_at, id",
+            f"SELECT ss.story_id, ss.feed_id, ss.source_name, ss.url, ss.published_at{title}"  # noqa: S608
+            " FROM story_sources ss LEFT JOIN feeds f ON f.id = ss.feed_id"
+            f" WHERE ss.story_id IN ({','.join('?' * len(ids))}){gate}"
+            " ORDER BY ss.published_at, ss.id",
             ids,
         ).fetchall()
         by_story: dict[int, list[dict[str, Any]]] = {}

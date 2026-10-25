@@ -14,7 +14,7 @@ from app.geo.gazetteer import Gazetteer
 from app.geo.geoparse import GeoParser
 from app.hub import LAGGED, EventHub
 from app.main import create_app
-from app.store.news import NewsStore, SourceRow, StoryRow
+from app.store.news import FeedDef, NewsStore, SourceRow, StoryRow
 
 
 @pytest.fixture(scope="module")
@@ -121,6 +121,38 @@ def test_health_reports_every_feed_and_the_switch(served) -> None:
     assert alpha["last_status"] == 200 and alpha["item_count"] == 2 and alpha["last_error"] is None
 
 
+def test_personal_use_stories_are_hidden_while_the_switch_is_off(tmp_path: Path, parser: GeoParser) -> None:
+    routes = Routes()
+    routes.on("alpha.example", httpx.Response(200, content=rss()))
+    routes.on("beta.example", httpx.Response(200, content=rss()))
+    routes.on(
+        "gamma.example",
+        httpx.Response(200, content=rss(("Volcano erupts in Iceland", "https://gamma.example/v", ""))),
+    )
+    routes.on("api.gdeltproject.org", httpx.Response(200, content=gdelt()))
+    settings = make_settings(tmp_path, FEEDS_YAML)
+    settings.env_file.write_text("SKYNET_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
+    app = create_app(settings, transport=routes.transport(), geoparser=parser, start_scheduler=False)
+    with TestClient(app, base_url="http://127.0.0.1:8100") as client:
+        scheduler = app.state.scheduler
+
+        async def poll_all() -> None:
+            scheduler.tick()
+            await scheduler.drain()
+
+        client.portal.call(poll_all)  # collected while the switch is on
+        items = client.get("/api/intel/news").json()["items"]
+        assert [item["title"] for item in items] == ["Volcano erupts in Iceland"]
+        story_id = items[0]["id"]
+
+        settings.env_file.write_text("", encoding="utf-8")  # switch turned off
+        assert client.get("/api/intel/news").json()["items"] == []
+        assert client.get(f"/api/intel/news/{story_id}").status_code == 404
+
+        settings.env_file.write_text("SKYNET_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
+        assert client.get(f"/api/intel/news/{story_id}").status_code == 200
+
+
 def test_requests_for_other_hosts_are_refused(served) -> None:
     client, _app = served
     assert client.get("/api/intel/health", headers={"Host": "attacker.example"}).status_code == 400
@@ -150,6 +182,9 @@ def _seed(store: NewsStore, n: int) -> int:
 
 def test_stream_replays_after_last_event_id_then_goes_live(tmp_path: Path) -> None:
     store = NewsStore(str(tmp_path / "s.db"))
+    store.sync_feeds(
+        [FeedDef(id="alpha", name="Alpha Wire", url="https://alpha.example", category="world", terms="open")]
+    )
     for n in range(1, 4):
         _seed(store, n)
     hub = EventHub()
