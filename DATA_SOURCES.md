@@ -61,6 +61,13 @@ Bundled with the intel service:
 | The same gazetteer's countries, provinces, seas and regions, from the Natural Earth packs above | Public domain |
 | spaCy `en_core_web_sm` 3.8.0 (installed by uv, not committed) | MIT |
 
+### SKYNET layers
+
+| Host | Used for | Terms / attribution |
+| --- | --- | --- |
+| `eonet.gsfc.nasa.gov` | **Natural Events (EONET)** layer: open events from the last 30 days, through `/api/eonet` (cached 10 min) | NASA Earth Observatory Natural Event Tracker, a NASA service; US federal government work, public domain in the US. Each event links to the sources EONET lists (for example IRWIN, InciWeb, GDACS); SKYNET stores no copy of their pages. |
+| `127.0.0.1:8100` (your machine) | **News** layer, ticker and panel, through `/api/intel/*` | The intel service above; each story keeps its own outlets' links. GDELT items carry the required GDELT citation and link in the app. |
+
 ---
 
 ## Live sources (fetched at runtime — not stored in this repo)

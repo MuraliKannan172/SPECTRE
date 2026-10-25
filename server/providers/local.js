@@ -28,6 +28,8 @@ import { firePerimetersProxy } from './firePerimeters.js';
 import { gnssIntegrityProxy } from './gnssIntegrity.js';
 import { cycloneProxy } from './cyclones.js';
 import { windProxy } from './wind.js';
+import { intelProxy } from './intel.js';
+import { eonetProxy } from './eonet.js';
 
 /**
  * Construct the local provider plugins in their established order.
@@ -64,6 +66,9 @@ function localProviderPlugins({ realtime, gemini } = {}) {
     mapillaryProxy(),
     firePerimetersProxy(),
     gnssIntegrityProxy(),
+    // SKYNET: the local intel service (news) and NASA EONET natural events.
+    intelProxy(),
+    eonetProxy(),
     keySetupEndpoint(),
   ];
 }
