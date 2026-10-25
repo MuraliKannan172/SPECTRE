@@ -4133,8 +4133,8 @@ and as the last line of the list, because the arrival step is among the ones
 dropped. A route of exactly 200 is complete, and a roundabout exit after the
 200th keeps folding into it.
 
-Route duration labels select their unit after rounding seconds: a leg of
-59.5 seconds or more displays as `1 min`, rather than `60 s`.
+Route duration labels select their unit after rounding seconds, switching to
+minutes at 59.5 seconds; a 59.6-second leg displays as `1 min`, rather than `60 s`.
 
 A step's card opens from its dot on the globe or from its line in the list, and
 the list covers every step including departure and arrival, which have no dot.
