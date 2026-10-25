@@ -4081,6 +4081,9 @@ routing it shows `Routing…`, and a router miss reads
 The layer holds continuous render only while a route is drawn (the dashes
 animate). Disable clears all state.
 
+Route distance labels round to the nearest ten metres before selecting the
+unit, so 995 metres and above display as `1.0 km` rather than `1000 m`.
+
 **Keys needed: none.** Directions works on a keyless boot, and the layer is off
 until the operator turns it on.
 
