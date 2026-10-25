@@ -80,3 +80,70 @@ test('unchanged candidate text is normalized once across paints', (t) => {
   assert.equal(calls, 1);
 });
 
+test('candidate collection resolves models once and keeps handoffs live', (t) => {
+  const f = fixture();
+  const get = t.mock.method(f.flightState._models, 'get');
+  const [candidate] = f.queries.getDetectableObjects();
+  assert.equal(get.mock.callCount(), 1);
+  const model = {
+    ready: false,
+    show: true,
+    modelMatrix: Cesium.Matrix4.fromTranslation(
+      new Cesium.Cartesian3(10, 20, 30),
+    ),
+  };
+  f.parts.rendering._modelSpec = () => ({
+    visualCenterNative: Cesium.Cartesian3.ZERO,
+    scale: 1,
+  });
+  f.flightState._models.set('abc123', model);
+  f.bb.show = false;
+  assert.deepEqual(f.queries.getDetectableObjects(), []);
+  model.ready = true;
+  assert.equal(f.queries.getDetectableObjects()[0], candidate);
+  assert.deepEqual(candidate.position, new Cesium.Cartesian3(10, 20, 30));
+  Cesium.Matrix4.setTranslation(
+    model.modelMatrix,
+    new Cesium.Cartesian3(40, 50, 60),
+    model.modelMatrix,
+  );
+  f.queries.getDetectableObjects();
+  assert.deepEqual(candidate.position, new Cesium.Cartesian3(40, 50, 60));
+  model.show = false;
+  assert.deepEqual(f.queries.getDetectableObjects(), []);
+  f.bb.show = true;
+  assert.equal(f.queries.getDetectableObjects()[0].position, f.bb.position);
+  assert.equal(get.mock.callCount(), 6);
+  model.show = true;
+  assert.equal(f.parts.rendering._modelOwnsVisual('abc123'), true);
+  assert.equal(get.mock.callCount(), 7);
+});
+
+test('tracked ownership and live anchors remain independent of fleet models', () => {
+  const f = fixture();
+  f.flightState._trackedIcao = 'abc123';
+  f.flightState._trackedModel = { ready: true, show: true };
+  f.parts.rendering._modelSpec = () => ({});
+  let anchor = new Cesium.Cartesian3(10, 20, 30);
+  f.parts.motion._trackedVisualCached = () => anchor;
+  const [candidate] = f.queries.getDetectableObjects();
+  assert.equal(candidate.position, anchor);
+  assert.equal(candidate.skipLabel, true);
+  assert.equal(f.parts.rendering._modelOwnsVisual('abc123', null), true);
+  anchor = new Cesium.Cartesian3(40, 50, 60);
+  assert.equal(f.queries.getDetectableObjects()[0].position, anchor);
+  for (const tracked of [
+    null,
+    { ready: false, show: true },
+    { ready: true, show: false },
+  ]) {
+    f.flightState._trackedModel = tracked;
+    assert.equal(
+      f.parts.rendering._modelOwnsVisual('abc123', { ready: true, show: true }),
+      false,
+    );
+  }
+  f.flightState._trackedModel = { ready: true, show: true };
+  f.parts.tracking._trackedModelRegimeActive = () => false;
+  assert.equal(f.parts.rendering._modelOwnsVisual('abc123', null), false);
+});

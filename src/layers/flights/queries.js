@@ -452,8 +452,8 @@ export function createQueries({
         const isTracked = icao24 === flightState._trackedIcao;
         // Keep planes rendered as a 3D model (billboard hidden) so the detection box
         // doesn't vanish on the 2D→3D handoff; bb.position stays current while hidden.
-        const model = flightState._models.get(icao24);
-        const modelOwnsVisual = parts.rendering._modelOwnsVisual(icao24);
+        const model = flightState._models.get(icao24) ?? null;
+        const modelOwnsVisual = parts.rendering._modelOwnsVisual(icao24, model);
         if (!isTracked && !bb.show && !modelOwnsVisual) continue;
         const info = flightState.records.data.get(icao24);
         let object = flightState._detectionObjects.get(icao24);
