@@ -1,5 +1,10 @@
 # God's Eye View Current State
 
+Touch-first devices use three times the default Cesium zoom sensitivity, so
+pinching traverses globe and street scales with fewer gestures. Cesium retains
+its distance-aware zoom, collision handling and minimum/maximum distance limits.
+Fine-pointer desktop mouse and trackpad sensitivity is unchanged.
+
 Analyst region queries resolve unique Natural Earth names offline without
 geocoding, so Gold Coast and Ivory Coast name the West African natural regions.
 Duplicate names require a geocoded containment anchor; when several entries for
