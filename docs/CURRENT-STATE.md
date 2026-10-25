@@ -9,13 +9,7 @@ broader suffix variants. Follow-ups retain boundary provenance, and cancelled
 lookups preserve the previous analyst cohort and boundary source. Navigation
 search keeps a successful geocode, with no search or view-based region recovery.
 
-Overpass reserves each normalized query before its disk-cache lookup. The
-initial disk lookup, upstream quota admission, fetching and memory publication
-are coalesced under that reservation. A caller that joined a reservation
-rejected by another client's quota retries admission with its own quota.
-Stale fallback runs per response after the reservation is released, and disk
-writes finish asynchronously. Settled and rejected reservations are removed
-only while they still own their map entry.
+Manager-owned periodic network updates pause while the document is hidden. Returning to a visible tab runs one overdue update per enabled layer without overlapping an active refresh and restarts that layer's polling schedule from the return, so the next poll follows one interval later whether or not the catch-up update succeeds; explicit refresh requests remain available. Transit also defers camera-driven feed admission while hidden and rechecks coverage on return. Visibility listeners are released with their polling intervals.
 
 Terrain height requests accept at most 64 points, matching the browser service's
 existing batch size and one bounded upstream chunk. Larger requests return HTTP
@@ -423,6 +417,8 @@ than relabeling older geometry. The cone represents forecast center uncertainty,
 not storm size or the full hazard area. Successful empty and unavailable states
 are distinct. One owned native Cesium data source preserves polygon holes and
 geographic seams and releases on disable; forecast animation is not implied.
+NHC movement speed is converted from miles per hour to rounded knots by the
+proxy; advisory wind intensity is already in knots and is passed through.
 Cyclone markers, labels, tracks and cones are hidden beyond the horizon on every map source.
 Consult the linked official advisory for safety decisions.
 
@@ -1923,6 +1919,10 @@ Launch payloads with missing records now say PAYLOAD DATA UNAVAILABLE. Missing n
 Updated: September 23, 2026
 
 ## Aircraft and vessel server modules
+
+OpenSky credential-file failures emit a fixed warning once per process; neither
+JSON parser excerpts nor filesystem error messages are logged. The environment
+example uses an absolute path compatible with the macOS launchers.
 
 Standalone aircraft routes now live in `server/providers/aircraft/`: OpenSky
 state vectors and regional fallback, adsb.lol military positions, ADSBDB
@@ -4225,6 +4225,8 @@ animation. Polls, surface completions and trail fades request individual renders
 Disable clears vehicles, detection references, requests, timers and holds;
 destruction also releases collections and registrations.
 
+The `scripts/qa-layer-visibility.mjs` gate uses the development-only registration seam and real browser tab visibility to prove periodic work pauses while hidden, explicit refresh still works, resume performs one overdue refresh, and disabled layers stay stopped.
+
 **Acceptance harness.** Run against an already running development server:
 
 ```sh
@@ -5523,6 +5525,11 @@ easier to meet (detection is now on more often), but does not create it.
   short-way-round longitude span and wraps the padded edges, so a dateline-
   crossing box stays its true width. Raw subtraction inflated a 0.41° metro box
   to 86.7° and a 60° territory to 132°.
+- **Point distances take the short way round 180°.** The annotation
+  resolver's `approximateDistanceM` (voice "point out" proximity checks) and
+  `places_nearby` distances wrap the longitude difference. Raw subtraction put
+  Savusavu 38,148 km from a camera over the Lau Islands, so the proximity check
+  refused it, and sorted a place 2 km across 180° last.
 - CCTV calibration persists at `godsEyeView.cctv.calibration.v2` (v2 rebuild;
   the store was wiped clean, no import from the old `v1` key).
 - CCTV v3 floor QA pins are: zero samples for heading-only edits; zero transient
@@ -6019,7 +6026,7 @@ closed. Performance and live agency reliability require recorded validation.
 
 ## Wind forecast models
 
-Wind supports selectable GFS/IFS models with persisted model choice. Each fetch chooses the available cycle and forecast step nearest the current time; rows show both issue and valid UTC timestamps. Grid identities include model, cycle, forecast step and any requested scalar field. The six model/field cache slots each retain the last two issued grids for manifest/grid rollover, coalesce concurrent requests, retain last-good data on failures and retry no faster than once per minute. Model changes clear the old field immediately, cancel old acquisition and ignore superseded results.
+Wind supports selectable GFS/IFS models with persisted model choice. Each fetch chooses the available cycle and forecast step nearest the current time; rows show both issue and valid UTC timestamps. Grid identities include model, cycle, forecast step and any requested scalar field. The six model/field cache slots each retain the last two issued grids for manifest/grid rollover, coalesce concurrent requests, retain last-good data on failures and retry no faster than once per minute. Model changes clear the old field immediately, cancel old acquisition and ignore superseded results. Last-good data is marked stale; the wind row shows it, and `get_wind` returns `stale` and adds "(forecast may be stale)" to its summary.
 
 ### Local Weather review candidate
 
