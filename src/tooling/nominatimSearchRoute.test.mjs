@@ -18,6 +18,7 @@ import { fetchRegionalJson } from '../../server/providers/regional/http.js';
 import { localProviderPlugins } from '../../server/providers/local.js';
 import { createPlaceSearch, createGoogleGeocoder } from '../search/index.js';
 import { createPhotonGeocoder } from '../keylessGeocoder.js';
+import { brandUserAgent } from '../branding.js';
 
 const HIT = [
   {
@@ -135,12 +136,16 @@ test('a search reaches the upstream identified, and the answer is cached', async
       });
       assert.equal(calls.length, 1);
       const headers = calls[0].options.headers;
-      assert.match(
-        String(headers['User-Agent']),
-        /gods-eye-view\/\d/,
+      assert.equal(
+        headers['User-Agent'],
+        brandUserAgent('geocoder', 'local-first globe app'),
         'the policy asks for a User-Agent identifying the application',
       );
-      assert.ok(headers.Referer, 'a Referer is sent alongside it');
+      assert.equal(
+        headers.Referer,
+        undefined,
+        'no Referer: SKYNET has no public site and must not name another project',
+      );
       assert.equal(
         calls[0].options.redirect,
         'error',

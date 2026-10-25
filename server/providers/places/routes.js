@@ -2,6 +2,7 @@ import { makeRateLimiter, clientKey } from '../common/rate-limit.js';
 import { haversineKm } from '../common/geo.js';
 import { readResponseTextCapped } from '../common/http.js';
 import { normalizeOsrmSteps } from '../../../src/data/routeSteps.js';
+import { brandUserAgent } from '../../../src/branding.js';
 import {
   normalizeRouteProfile,
   projectRouteResult,
@@ -176,7 +177,7 @@ async function fetchRoute({
         // The endpoint is configured above; a redirect is the one way out of
         // it, so it is refused rather than followed.
         redirect: 'error',
-        headers: { 'User-Agent': 'gods-eye-view/dev (local)' },
+        headers: { 'User-Agent': brandUserAgent('directions') },
       }),
     );
     if (upstreamRes.status === 429) {

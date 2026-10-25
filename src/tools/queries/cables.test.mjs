@@ -96,7 +96,10 @@ test('the local fetch serves bundled data files and nothing outside them', async
   // SKYNET does not ship the CC BY-NC-SA cable data, so check the local fetch
   // against a dataset that always ships.
   const bundled = await fetchImpl(
-    new URL('../../data/local_data/dams/dams.geojson', import.meta.url).href,
+    new URL(
+      '../../data/local_data/natural_earth/countries.json',
+      import.meta.url,
+    ).href,
   );
   assert.equal(bundled.status, 200);
   assert.ok((await bundled.json()).features.length > 100);

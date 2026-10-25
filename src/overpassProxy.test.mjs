@@ -13,6 +13,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import createViteConfig, { fetchOverpassPayload, overpassPayloadIsData, readOverpassDisk } from '../vite.config.js';
 import { resolveOverpassUpstreamTag } from '../server/providers/overpass/constants.js';
+import { brandUserAgent } from './branding.js';
 
 const DATA = { status: 200, body: '{"elements":[]}' };
 
@@ -67,7 +68,7 @@ test('configured failover accepts empty data and keeps the application identity'
     endpoints,
     fetchImpl: async (url, options) => {
       seen.push(url);
-      assert.equal(options.headers['User-Agent'], 'gods-eye-view/0.1 (+https://github.com/bilawalsidhu/gods-eye-view)');
+      assert.equal(options.headers['User-Agent'], brandUserAgent('overpass', 'local-first globe app'));
       assert.equal(options.redirect, 'error');
       return new Response(seen.length === 1 ? url : DATA.body, { status: seen.length === 1 ? 406 : 200 });
     },

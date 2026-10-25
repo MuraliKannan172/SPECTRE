@@ -986,6 +986,17 @@ body.cockpit-mode #view-switcher button {
   background: rgba(255, 40, 0, 0.12);
 }
 
+/* mobile-shell.css */
+body.mobile-shell #mobile-tab-bar {
+  background: rgba(22, 10, 8, 0.94);
+}
+body.mobile-shell[data-mobile-sheet='layers'] #left-panel-stack, body.mobile-shell[data-mobile-sheet='cameras'] #right-context-rail, body.mobile-shell[data-mobile-sheet='context'] #right-context-rail, body.mobile-shell[data-mobile-sheet='more'] #right-context-rail {
+  background: rgba(22, 10, 8, 0.96);
+}
+body.mobile-shell[data-mobile-sheet='search'] #command-dock, body.mobile-shell[data-mobile-sheet='more'] #command-dock {
+  background: rgba(22, 10, 8, 0.96);
+}
+
 /* overlays.css */
 #intel-hud {
   --hud-color: rgba(255, 40, 0, 0.6);

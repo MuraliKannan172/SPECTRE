@@ -8,7 +8,7 @@ import { cameraForArea, cameraLookingAt } from '../views.js';
 import { BRANDING } from '../../branding.js';
 
 /** Tool arguments that describe a view: an area to frame, or a camera. */
-export const VIEW_ARGUMENTS = Object.freeze({
+const VIEW_ARGUMENTS = Object.freeze({
   view: Object.freeze({
     type: 'object',
     description:
