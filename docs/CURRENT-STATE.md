@@ -1,5 +1,16 @@
 # God's Eye View Current State
 
+Civil aircraft share one delayed render timestamp per fleet update. Extrapolated
+fixes reuse their local coordinate frame until their coordinates change, including
+in-place ground-height corrections. Update cadence, contact counts, interpolation,
+turn rates and tracked-aircraft motion are unchanged. Cached frames are weakly
+keyed by each position fix and do not retain retired history.
+
+Touch-first devices use three times the default Cesium zoom sensitivity, so
+pinching traverses globe and street scales with fewer gestures. Cesium retains
+its distance-aware zoom, collision handling and minimum/maximum distance limits.
+Fine-pointer desktop mouse and trackpad sensitivity is unchanged.
+
 Analyst region queries resolve unique Natural Earth names offline without
 geocoding, so Gold Coast and Ivory Coast name the West African natural regions.
 Duplicate names require a geocoded containment anchor; when several entries for
