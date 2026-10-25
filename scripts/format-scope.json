@@ -1088,5 +1088,9 @@
   "scripts/qa-status-badges.mjs",
   "src/dockerTrustedPeers.test.mjs",
   "src/cameraGlobeRotation.test.mjs",
-  "src/voice/globeResetConfirmation.test.mjs"
+  "src/voice/globeResetConfirmation.test.mjs",
+  "server/providers/intel.js",
+  "src/tooling/intelProxy.test.mjs",
+  "server/providers/eonet.js",
+  "src/tooling/eonetProxy.test.mjs"
 ]
