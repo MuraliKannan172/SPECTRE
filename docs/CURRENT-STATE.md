@@ -4208,7 +4208,9 @@ to 0.45 at two minutes, 0.20 at ten minutes and 0.08 at fifteen minutes.
 
 **Cards and DETECT.** The card presents route, mode/operator, displayed motion,
 display delay and newest-report age, reported speed/stop, vehicle ID, and
-available trail duration. Its anchor follows the rendered marker; text is
+available trail duration. Report age is rounded to whole seconds and stays in seconds while that rounded
+count is below 90; otherwise it shows completed minutes calculated from the
+rounded second count. Its anchor follows the rendered marker; text is
 checked at 4 Hz and published when it changes. DETECT labels retain route,
 mode and motion, with the selected label suppressed beside its fuller card.
 Candidate membership changes on revisions, coalesced at 4 Hz; paints read
