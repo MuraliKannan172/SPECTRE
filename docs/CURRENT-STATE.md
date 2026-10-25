@@ -4643,7 +4643,7 @@ silently demoting every later lookup for the session.
   multi-sensor datasheets publish a capability range, not the lens's current zoom, so those
   cameras keep their estimate and show `SPEC FOV min–max° (CAPABILITY)` beside it. Public
   camera state carries `fovSource`, `specFovMinDeg`, `specFovMaxDeg` and `spec` (#452).
-- **FIRMS**: no ground clamping (zero 3D-tiles height sampling), ≤18 screen-decluttered ambient labels, click-to-inspect detail card, 2.5k/3k sprite budgets viewport-clipped by FRP.
+- **FIRMS**: no ground clamping (zero 3D-tiles height sampling), ≤18 screen-decluttered ambient labels, click-to-inspect detail card, 2.5k/3k sprite budgets viewport-clipped by FRP. Fire-power labels share display rounding before localization: one decimal below the rounded 10 MW boundary, then whole megawatts (for example, 9.96 MW reads 10 MW).
 - **CCTV v2 foundation:** a pitched
   frustum wireframe (4 corner rays + far-cap rectangle) with a monitor plane at the frustum's
   far cap, retargeting the existing video/canvas texture pipeline. Stills are drawn at their source aspect, centered on the placeholder dark (`#01070c`), instead of being stretched to the 16:9 canvas. Manual calibration only —
