@@ -1115,5 +1115,9 @@
   "src/layers/news/panel.js",
   "src/layers/news/view.js",
   "src/layers/news/view.test.mjs",
-  "src/theme/skynet-news.css"
+  "src/theme/skynet-news.css",
+  "src/layers/satelliteFootprint/footprint.js",
+  "src/layers/satelliteFootprint/footprint.test.mjs",
+  "src/layers/satelliteFootprint/index.js",
+  "src/layers/satelliteFootprint/index.test.mjs"
 ]

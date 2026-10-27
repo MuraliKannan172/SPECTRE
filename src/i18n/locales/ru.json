@@ -2977,5 +2977,7 @@
   "News unavailable": "Новости недоступны",
   "World affairs": "Международные события",
   "Cybersecurity": "Кибербезопасность",
-  "Heavy snow": "Сильный снегопад"
+  "Heavy snow": "Сильный снегопад",
+  "FOOTPRINT": "ЗОНА",
+  "Ground visibility of the satellite you track: where it stands at least {degrees}° above the horizon. Line of sight only, not a sensor field of view.": "Видимость отслеживаемого спутника с земли: там, где он поднимается не менее чем на {degrees}° над горизонтом. Только прямая видимость, а не поле зрения датчика."
 }

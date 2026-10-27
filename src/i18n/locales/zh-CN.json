@@ -2767,5 +2767,7 @@
   "News unavailable": "新闻不可用",
   "World affairs": "国际时事",
   "Cybersecurity": "网络安全",
-  "Heavy snow": "强降雪"
+  "Heavy snow": "强降雪",
+  "FOOTPRINT": "覆盖区",
+  "Ground visibility of the satellite you track: where it stands at least {degrees}° above the horizon. Line of sight only, not a sensor field of view.": "你所跟踪卫星的地面可见范围：在该区域内卫星高出地平线至少 {degrees}°。仅表示视线可达，并非传感器视场。"
 }

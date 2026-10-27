@@ -2907,5 +2907,7 @@
   "News unavailable": "Noticias no disponibles",
   "World affairs": "Asuntos internacionales",
   "Cybersecurity": "Ciberseguridad",
-  "Heavy snow": "Nevadas intensas"
+  "Heavy snow": "Nevadas intensas",
+  "FOOTPRINT": "HUELLA",
+  "Ground visibility of the satellite you track: where it stands at least {degrees}° above the horizon. Line of sight only, not a sensor field of view.": "Visibilidad desde el suelo del satélite que sigues: donde está al menos {degrees}° sobre el horizonte. Solo línea de visión, no el campo de visión de un sensor."
 }
