@@ -76,7 +76,19 @@ export function createClientToolExecutor({
         runner(name, args, { signal: controller.signal }),
         timeout,
       ]);
-      return { ok: true, result: plainResult(result) };
+      const plain = plainResult(result);
+      // The runner reports a refused action (a layer that would not turn on)
+      // as a result with ok: false; the model must see that as a failure.
+      if (plain?.ok === false) {
+        const reason =
+          plain.error || plain.say || 'the globe refused the action';
+        return {
+          ok: false,
+          error: String(reason).slice(0, 300),
+          result: plain,
+        };
+      }
+      return { ok: true, result: plain };
     } catch (error) {
       return {
         ok: false,

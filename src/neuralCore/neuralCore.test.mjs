@@ -154,6 +154,32 @@ test('only registered globe tools with valid arguments reach the runner', async 
   });
 });
 
+test('a globe action the app refused is reported as failed', async () => {
+  const refused = {
+    ok: false,
+    layerId: 'news',
+    error: 'Could not enable the requested layer',
+    say: "Couldn't turn on news.",
+  };
+  const execute = createClientToolExecutor({ runner: async () => refused });
+  assert.deepEqual(
+    await execute('set_layer_visibility', { layerId: 'news', enabled: true }),
+    {
+      ok: false,
+      error: 'Could not enable the requested layer',
+      result: refused,
+    },
+  );
+  const quiet = createClientToolExecutor({
+    runner: async () => ({ ok: false }),
+  });
+  assert.deepEqual(await quiet('zoom_to_globe', {}), {
+    ok: false,
+    error: 'the globe refused the action',
+    result: { ok: false },
+  });
+});
+
 test('runner results are reduced to bounded JSON', () => {
   class Entity {}
   const loop = { a: 1 };
