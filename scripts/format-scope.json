@@ -1153,5 +1153,12 @@
   "src/share/shareLinkPath.test.mjs",
   "src/tools/registry.js",
   "src/tools/registry.test.mjs",
-  "scripts/export-neural-core-tools.mjs"
+  "scripts/export-neural-core-tools.mjs",
+  "src/neuralCore/client.js",
+  "src/neuralCore/context.js",
+  "src/neuralCore/executor.js",
+  "src/neuralCore/view.js",
+  "src/neuralCore/panel.js",
+  "src/neuralCore/neuralCore.test.mjs",
+  "src/theme/skynet-neural-core.css"
 ]

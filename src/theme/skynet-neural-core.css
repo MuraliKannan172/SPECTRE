@@ -1,0 +1,397 @@
+/* ═══════════════════════════════════════════════
+   SKYNET — Neural Core chat (src/neuralCore/panel.js).
+   Loaded after skynet.css; uses its --sk-* tokens. Animation only marks
+   real state: streaming text and running tools.
+   ═══════════════════════════════════════════════ */
+
+.skynet-nc-launcher {
+  position: fixed;
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
+  z-index: 158;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--sk-red-deep);
+  border-radius: 999px;
+  background: rgba(5, 5, 7, 0.9);
+  color: var(--sk-text);
+  font: 700 11px/1 var(--font-display);
+  letter-spacing: 0.18em;
+  cursor: pointer;
+}
+
+.skynet-nc-launcher:hover,
+.skynet-nc-launcher[aria-expanded='true'] {
+  border-color: var(--sk-red);
+  box-shadow: 0 0 12px var(--sk-red-glow);
+}
+
+.skynet-nc-launcher-mark {
+  color: var(--sk-red);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.skynet-nc-launcher[data-tone='offline'] .skynet-nc-launcher-mark {
+  color: var(--sk-text-dim);
+}
+
+.skynet-nc {
+  position: fixed;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 220px));
+  border: 1px solid var(--sk-border);
+  border-radius: 10px;
+  background: rgba(8, 8, 10, 0.97);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+  color: var(--sk-text);
+  font: 400 13px/1.45 var(--font-sans);
+}
+
+.skynet-nc[hidden],
+.skynet-nc [hidden] {
+  display: none;
+}
+
+.skynet-nc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 4px;
+}
+
+.skynet-nc-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-right: auto;
+}
+
+.skynet-nc-wordmark {
+  font: 700 15px/1 var(--font-display);
+  letter-spacing: 0.3em;
+}
+
+.skynet-nc-accent {
+  color: var(--sk-red);
+}
+
+.skynet-nc-sublabel {
+  color: var(--sk-text-dim);
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.skynet-nc-icon {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--sk-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sk-text-dim);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.skynet-nc-icon:hover {
+  border-color: var(--sk-red-deep);
+  color: var(--sk-text);
+}
+
+.skynet-nc-status,
+.skynet-nc-search {
+  margin: 0;
+  padding: 0 12px;
+  color: var(--sk-text-dim);
+  font: 400 11px/1.4 var(--font-mono);
+}
+
+.skynet-nc-status::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--sk-text-faint);
+  vertical-align: 1px;
+}
+
+.skynet-nc-status[data-tone='ready']::before {
+  background: var(--sk-ok);
+}
+
+.skynet-nc-status[data-tone='degraded']::before {
+  background: var(--sk-warn);
+}
+
+.skynet-nc-status[data-tone='offline'] {
+  color: var(--sk-text);
+}
+
+.skynet-nc-status[data-tone='offline']::before {
+  background: var(--sk-red-deep);
+}
+
+.skynet-nc-messages {
+  flex: 1;
+  min-height: 0;
+  margin: 8px 0 0;
+  padding: 0 12px;
+  overflow-y: auto;
+  list-style: none;
+  border-top: 1px solid var(--sk-border);
+}
+
+.skynet-nc-empty {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--sk-text-dim);
+}
+
+/* Before the first message the hint, not an empty list, fills the space. */
+.skynet-nc-messages:empty {
+  flex: 0;
+}
+
+.skynet-nc-messages:empty + .skynet-nc-empty {
+  flex: 1;
+}
+
+.skynet-nc-msg {
+  margin: 12px 0;
+}
+
+.skynet-nc-msg.is-user {
+  margin-left: 15%;
+  padding: 8px 10px;
+  border: 1px solid var(--sk-border);
+  border-radius: 8px;
+  background: var(--sk-surface-2);
+}
+
+.skynet-nc-msg.is-user .skynet-nc-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.skynet-nc-text {
+  overflow-wrap: anywhere;
+}
+
+.skynet-nc-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.skynet-nc-tool {
+  padding: 2px 8px;
+  border: 1px solid var(--sk-border);
+  border-radius: 999px;
+  color: var(--sk-text-dim);
+  font: 400 11px/1.5 var(--font-mono);
+}
+
+.skynet-nc-tool[data-state='start'] {
+  border-color: var(--sk-red-deep);
+  color: var(--sk-text);
+  animation: skynet-nc-working 1.2s ease-in-out infinite;
+}
+
+.skynet-nc-tool[data-state='error'] {
+  border-color: var(--sk-warn);
+  color: var(--sk-warn);
+}
+
+@keyframes skynet-nc-working {
+  50% {
+    border-color: var(--sk-red);
+  }
+}
+
+.skynet-nc-cite {
+  display: inline-block;
+  min-width: 18px;
+  margin: 0 2px;
+  padding: 0 4px;
+  border: 1px solid var(--sk-red-deep);
+  border-radius: 4px;
+  color: var(--sk-red);
+  font: 600 10px/16px var(--font-mono);
+  text-align: center;
+  text-decoration: none;
+  vertical-align: 1px;
+}
+
+a.skynet-nc-cite:hover {
+  background: var(--accent-dim);
+}
+
+.skynet-nc-sources {
+  margin: 8px 0 0;
+  padding-left: 22px;
+  color: var(--sk-text-dim);
+  font-size: 11px;
+}
+
+.skynet-nc-sources a {
+  color: var(--sk-text);
+}
+
+.skynet-nc-outlet {
+  margin-left: 6px;
+  color: var(--sk-text-faint);
+}
+
+.skynet-nc-asof,
+.skynet-nc-error {
+  margin: 6px 0 0;
+  font: 400 11px/1.4 var(--font-mono);
+}
+
+.skynet-nc-asof {
+  color: var(--sk-text-dim);
+}
+
+.skynet-nc-error {
+  color: var(--sk-warn);
+}
+
+.skynet-nc-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.skynet-nc-meta {
+  margin-right: auto;
+  color: var(--sk-text-faint);
+  font: 400 10px/1.4 var(--font-mono);
+}
+
+.skynet-nc-action {
+  padding: 2px 8px;
+  border: 1px solid var(--sk-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sk-text-dim);
+  font: 400 11px/1.5 var(--font-sans);
+  cursor: pointer;
+}
+
+.skynet-nc-action:hover {
+  border-color: var(--sk-red-deep);
+  color: var(--sk-text);
+}
+
+.skynet-nc-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--sk-border);
+}
+
+.skynet-nc-input {
+  flex: 1;
+  min-height: 34px;
+  max-height: 160px;
+  padding: 7px 9px;
+  border: 1px solid var(--sk-border);
+  border-radius: 6px;
+  background: var(--sk-surface);
+  color: var(--sk-text);
+  font: inherit;
+  resize: none;
+}
+
+.skynet-nc-send,
+.skynet-nc-stop {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--sk-red-deep);
+  border-radius: 6px;
+  background: var(--sk-red-deep);
+  color: #fff;
+  font: 700 11px/1 var(--font-display);
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+.skynet-nc-stop {
+  background: transparent;
+  color: var(--sk-text);
+}
+
+.skynet-nc-disclaimer {
+  margin: 0;
+  padding: 0 12px 10px;
+  color: var(--sk-text-faint);
+  font-size: 10px;
+}
+
+.skynet-nc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skynet-nc :focus-visible,
+.skynet-nc-launcher:focus-visible {
+  outline: 2px solid var(--sk-red);
+  outline-offset: 1px;
+}
+
+/* Clean view, recording and cockpit hide the app's chrome; these follow. */
+body.ui-clean-view .skynet-nc-launcher,
+body.ui-clean-view .skynet-nc,
+body.recording-mode .skynet-nc-launcher,
+body.recording-mode .skynet-nc,
+body.cockpit-mode .skynet-nc-launcher,
+body.cockpit-mode .skynet-nc {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skynet-nc-tool[data-state='start'] {
+    animation: none;
+  }
+}
+
+/* Phone shell: a sheet above the tab bar that gives way to the shell's own
+   sheets; the launcher sits just above the tab bar. */
+body.mobile-shell .skynet-nc-launcher {
+  right: 12px;
+  bottom: calc(var(--mobile-tab-space) + 12px);
+}
+
+body.mobile-shell .skynet-nc {
+  right: 0;
+  bottom: var(--mobile-tab-space);
+  left: 0;
+  width: auto;
+  height: var(--mobile-sheet-max-height);
+  border-radius: 12px 12px 0 0;
+}
+
+body.mobile-shell[data-mobile-sheet] .skynet-nc {
+  display: none;
+}
