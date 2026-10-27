@@ -255,6 +255,20 @@ export const DATA_CREDITS = [
       '<a href="https://www.gdeltproject.org/" target="_blank" rel="noopener">The GDELT Project</a> ' +
       '(location-matched article links; publisher terms apply)',
   },
+  // SKYNET: the News layer and NASA EONET (DATA_SOURCES.md, "SKYNET layers").
+  {
+    key: 'intel-news',
+    html:
+      'News layer, ticker and panel: stories from the local intel service ' +
+      '(headline, short summary and link only; publisher terms apply). ' +
+      'GDELT headlines: <a href="https://www.gdeltproject.org/" target="_blank" rel="noopener">The GDELT Project</a>',
+  },
+  {
+    key: 'nasa-eonet',
+    html:
+      'Natural events: <a href="https://eonet.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA EONET</a> ' +
+      '(Earth Observatory Natural Event Tracker); each event links the sources EONET lists',
+  },
   {
     key: 'google-news-rss',
     html:
