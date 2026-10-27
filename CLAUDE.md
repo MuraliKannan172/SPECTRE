@@ -71,9 +71,12 @@ code.
 `npm test` has one known environmental failure on this machine:
 `src/tooling/skyAssets.paintOut.test.mjs` (the space in the Windows user path
 becomes `%20`). `src/sdr/decoderDiagnostics.test.mjs` can flake under
-full-suite load and passes alone, as does `src/data/geoFileImport.test.mjs`
-("repeated incomplete KML roots finish within an isolated process deadline",
-a 5 s wall-clock budget). `src/terrainHeightsBounds.test.mjs` fails
+full-suite load and passes alone. `src/data/geoFileImport.test.mjs`
+("repeated incomplete KML roots finish within an isolated process deadline")
+has a 5 s wall-clock budget that is almost all the child's Cesium import
+(about 5 s on a busy machine, against about 50 ms for the KML work itself),
+so it fails whenever a dev server and a live Cesium tab are running, even
+alone. `src/terrainHeightsBounds.test.mjs` fails
 ("1 !== 2") once a dev server has written `.gev-cache/terrain-heights.json`,
 because the test reads the real cache; it passes with that file moved aside.
 Anything else failing is a regression.
