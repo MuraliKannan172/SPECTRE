@@ -50,7 +50,7 @@ function outletLink(document, name, url) {
 /**
  * @param {{document: Document, layer: object, now?: () => number,
  *   reduceMotion?: () => boolean, setTimer?: typeof setTimeout,
- *   clearTimer?: typeof clearTimeout}} options
+ *   clearTimer?: typeof clearTimeout, onOpen?: () => void}} options
  * @returns {{open: () => void, close: () => void, destroy: () => void}}
  */
 export function mountNewsPanel({
@@ -62,6 +62,7 @@ export function mountNewsPanel({
     false,
   setTimer = (...args) => setTimeout(...args),
   clearTimer = (id) => clearTimeout(id),
+  onOpen = () => {},
 }) {
   const body = document.body;
 
@@ -291,6 +292,7 @@ export function mountNewsPanel({
     drawer.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
     body.classList.add('skynet-news-open');
+    onOpen();
     search.focus();
     void runQuery();
   }
