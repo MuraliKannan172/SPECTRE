@@ -71,6 +71,57 @@ A Server-Sent Events stream.
 }
 ```
 
+## Neural Core (`/api/intel/chat`)
+
+The app's proxy (`server/providers/intel.js`) answers these only for requests from this machine (unless `SKYNET_CHAT_ALLOW_LAN=1`). Writes need a same-origin JSON body of at most 64 KB. The service itself refuses any request that carries an `Origin` header, so only the proxy can write to it. One turn runs at a time (`409 {"detail": {"code": "busy"}}`), at most `SKYNET_CHAT_TURNS_PER_MINUTE` a minute (`429`).
+
+### `POST /api/intel/chat`
+
+Body: `{"message": "...", "conversation_id": null, "regenerate": false, "viewport": {...}, "layer_state": {...}}`. With no `conversation_id`, the current conversation continues. `regenerate: true` replaces the last answer. `viewport` and `layer_state` are injected into the system prompt and are at most 8 KB each.
+
+The response is `text/event-stream`:
+
+| Event | Data |
+|---|---|
+| `turn` | `{"turn_id", "conversation_id"}` |
+| `token` | `{"text"}`: the next piece of the answer |
+| `tool_status` | `{"tool", "state": "start" \| "done" \| "error", "host"?, "code"?}` |
+| `client_tool` | `{"turn_id", "call_id", "name", "args"}`: a globe tool for the browser to run |
+| `citation` | `{"n", "url", "title", "source"}`: source `[n]` of this turn |
+| `done` | `{"model", "tokens_per_s", "eval_count", "prompt_eval_count", "as_of", "citations", "degraded", "rounds", "seconds", "refused"?}` |
+| `error` | `{"code", "message"}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped` |
+
+At most 4 tool rounds run per turn, and the final request offers no tools. `as_of` is set when news or web results were used.
+
+### `POST /api/intel/chat/tool-result`
+
+`{"turn_id", "call_id", "ok", "result", "error"}` for a `client_tool` call (result at most 32 KB). The turn waits 15 s before telling the model the call timed out. `204`, or `404` for an unknown call.
+
+### `POST /api/intel/chat/stop`
+
+`{"turn_id"}` ends that turn after the current event. `204`.
+
+### `GET /api/intel/chat/history` and `DELETE /api/intel/chat/history`
+
+The current conversation as `{"conversation_id", "messages": [{"role", "content", "citations", "meta", "created_at"}]}`; `DELETE` clears every conversation (`204`).
+
+### `GET /api/intel/chat/status`
+
+```json
+{
+  "model": "qwen3.5-9b-64k-gpu:latest", "num_ctx": 16384, "low_resource": false,
+  "ollama": {"reachable": true, "version": "0.40.11"},
+  "model_present": true, "tools": true,
+  "loaded": {"size_vram": 3360948223, "size": 3360948223, "expires_at": "...", "context_length": 16384},
+  "search": {"provider": "ddgs", "keyless": true, "best_effort": true, "configured": true, "problem": null, "last_ok_at": null, "last_error": null},
+  "chat_problem": null
+}
+```
+
+`loaded` comes from Ollama's `/api/ps` and is `null` until the first answer loads the model.
+
+Tool schemas live in `shared/tools/neural-core.tools.json`. `npm run tools:export` writes its client half from `src/tools/registry.js`, and `uv run --project intel python intel/scripts/export_tools.py` writes the server half.
+
 ## Shapes
 
 ### Story
@@ -165,5 +216,12 @@ While the switch is off, the API also stops serving what such sources reported, 
 | `SKYNET_INTEL_DB` | `intel/data/skynet.db` | SQLite file (gitignored). |
 | `SKYNET_INTEL_FEEDS_LOCAL` | `intel/feeds.local.yaml` | Your own feed additions and overrides (gitignored). |
 | `SKYNET_NONCOMMERCIAL_SOURCES` | off | Shared with the app's Provider Settings switch. |
+| `OLLAMA_HOST` | `127.0.0.1:11434` | Ollama's address. |
+| `OLLAMA_MODEL` | `qwen3.5-9b-64k-gpu:latest` (`bonsai-2:9b` in low-resource mode) | The chat model, chosen by the Phase 4 eval; it must list the `tools` capability for native tool calls. |
+| `OLLAMA_NUM_CTX` | `16384` | Context window. |
+| `OLLAMA_KEEP_ALIVE` | `5m` | How long the model stays loaded after a turn. |
+| `SKYNET_LOW_RESOURCE` | off | 8k context and smaller history and web budgets. |
+| `SKYNET_SEARCH_PROVIDER` | `ddgs` | `ddgs`, `searxng` (with `SEARXNG_URL`), `brave` (`BRAVE_API_KEY`) or `tavily` (`TAVILY_API_KEY`). |
+| `SKYNET_CHAT_TURNS_PER_MINUTE` | `12` | Chat rate limit. |
 
 `intel/feeds.local.yaml` uses the same shape as `intel/feeds.default.yaml`. Entries merge by `id`, so `- {id: bbc-world, enabled: false}` turns one off, and a new id adds a feed. `gdelt: {enabled: false}` switches GDELT off.

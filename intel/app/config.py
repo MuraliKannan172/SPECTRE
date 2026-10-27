@@ -18,6 +18,11 @@ REPO_ROOT = INTEL_DIR.parent
 BRANDING_JS = REPO_ROOT / "src" / "branding.js"
 
 NON_COMMERCIAL_SOURCES_ENV = "SKYNET_NONCOMMERCIAL_SOURCES"
+# Chosen by the Phase 4 eval (docs/phase4/neural-core-eval.md): qwen3.5 made no
+# model errors in two runs; bonsai, fully on the GPU and about twice as fast,
+# is the low-resource choice.
+DEFAULT_MODEL = "qwen3.5-9b-64k-gpu:latest"
+LOW_RESOURCE_MODEL = "bonsai-2:9b"
 _TRUTHY = {"1", "true", "yes", "on"}
 MIN_POLL_SECONDS = 30
 
@@ -88,7 +93,7 @@ class Settings:
     user_agent: str = f"{BRAND_NAME}-intel/{BRAND_VERSION}"
     # Neural Core (ADR-001 D5, D10).
     ollama_host: str = "http://127.0.0.1:11434"
-    ollama_model: str = "bonsai-2:9b"
+    ollama_model: str = DEFAULT_MODEL
     ollama_num_ctx: int = 16384
     ollama_keep_alive: str = "5m"
     ollama_think: bool = False
@@ -142,6 +147,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             raise ValueError(f"{name} must be a whole number") from error
 
     hosts = tuple(h.strip() for h in get("SKYNET_INTEL_ALLOWED_HOSTS", "").split(",") if h.strip())
+    low_resource = get("SKYNET_LOW_RESOURCE", "0").strip().lower() in _TRUTHY
     return Settings(
         db_path=Path(get("SKYNET_INTEL_DB", str(INTEL_DIR / "data" / "skynet.db"))),
         feeds_default=Path(get("SKYNET_INTEL_FEEDS", str(INTEL_DIR / "feeds.default.yaml"))),
@@ -152,11 +158,12 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         gdelt_enabled=get("SKYNET_INTEL_GDELT", "1").strip().lower() in _TRUTHY,
         allowed_hosts=hosts or Settings.allowed_hosts,
         ollama_host=ollama_base_url(get("OLLAMA_HOST", "")),
-        ollama_model=get("OLLAMA_MODEL", Settings.ollama_model).strip() or Settings.ollama_model,
+        ollama_model=get("OLLAMA_MODEL", "").strip()
+        or (LOW_RESOURCE_MODEL if low_resource else DEFAULT_MODEL),
         ollama_num_ctx=get_int("OLLAMA_NUM_CTX", Settings.ollama_num_ctx, 2048),
         ollama_keep_alive=get("OLLAMA_KEEP_ALIVE", Settings.ollama_keep_alive).strip() or "5m",
         ollama_think=get("OLLAMA_THINK", "0").strip().lower() in _TRUTHY,
-        low_resource=get("SKYNET_LOW_RESOURCE", "0").strip().lower() in _TRUTHY,
+        low_resource=low_resource,
         search_provider=get("SKYNET_SEARCH_PROVIDER", "ddgs").strip().lower() or "ddgs",
         searxng_url=get("SEARXNG_URL", "").strip() or None,
         brave_api_key=get("BRAVE_API_KEY", "").strip() or None,

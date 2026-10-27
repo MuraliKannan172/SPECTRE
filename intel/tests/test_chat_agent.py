@@ -211,7 +211,10 @@ def test_fetched_pages_are_wrapped_as_untrusted_data(make_agent) -> None:  # typ
     collect(agent, turn_for(agent, "read https://site.example/a"))
     content = fake.requests[1]["messages"][-1]["content"]
     assert content.startswith('<untrusted_web_content source="https://site.example/a">')
-    assert content.rstrip().endswith("</untrusted_web_content>")
+    # The page stays inside the wrapper; only our citation hint follows it.
+    body, hint = content.split("</untrusted_web_content>")
+    assert "The answer is 42." in body
+    assert hint == agent_module.CITE_HINT
     assert agent.chats.tool_log()[0]["url"] == "https://site.example/a"
 
 

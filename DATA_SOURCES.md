@@ -68,6 +68,19 @@ Bundled with the intel service:
 | `eonet.gsfc.nasa.gov` | **Natural Events (EONET)** layer: open events from the last 30 days, through `/api/eonet` (cached 10 min) | NASA Earth Observatory Natural Event Tracker, a NASA service; US federal government work, public domain in the US. Each event links to the sources EONET lists (for example IRWIN, InciWeb, GDACS); SKYNET stores no copy of their pages. |
 | `127.0.0.1:8100` (your machine) | **News** layer, ticker and panel, through `/api/intel/*` | The intel service above; each story keeps its own outlets' links. GDELT items carry the required GDELT citation and link in the app. |
 
+### SKYNET Neural Core: web search and pages (`intel/app/web/`)
+
+The Neural Core reads the web only when a question needs it, and only from the intel service on this machine. Nothing it reads is stored: answers keep the source titles and URLs as citations, and the tool log keeps URLs, never content. Every answer that used the web links its sources and ends with "As of".
+
+| Source | Used for | Terms / attribution |
+| --- | --- | --- |
+| DuckDuckGo results through the `ddgs` package (default, keyless) | `web_search` | DuckDuckGo offers no official search API; `ddgs` reads its public result pages. Best effort: it can be rate-limited or break when the site changes, and the panel says so ("best effort"). Results are titles, links and snippets of third-party pages, which keep their publishers' terms. |
+| Your SearXNG instance (`SEARXNG_URL`, recommended) | `web_search` | Your own metasearch instance; its configured engines' terms apply. |
+| Brave Search API (`BRAVE_API_KEY`) | `web_search` | Brave's API terms and your plan's quota. |
+| Tavily (`TAVILY_API_KEY`) | `web_search` | Tavily's terms and your plan's quota. |
+| Any public http(s) page the model asks to read | `fetch_page` | Read once, as text, for that answer: robots.txt is honoured, at most 1 MB, 10 s and 3 redirects, public addresses only (SSRF guard). Shown to the model as untrusted data; never stored. |
+| Ollama on this machine (`OLLAMA_HOST`) | the chat model | Local inference; models keep their own licences (`bonsai-2:9b`, `qwen3.5-9b`). No prompt or answer leaves the machine except the search queries and page requests above. |
+
 ---
 
 ## Live sources (fetched at runtime — not stored in this repo)

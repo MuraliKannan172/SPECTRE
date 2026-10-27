@@ -42,6 +42,8 @@ CLIENT_TOOL_TIMEOUT = 15.0
 CHARS_PER_TOKEN = 4
 MAX_CLIENT_RESULT_CHARS = 4000
 INFO_TOOLS = frozenset({"news_search", "news_near", "web_search", "fetch_page"})
+# Said after the untrusted block, so it reads as ours, not the source's.
+CITE_HINT = "\nCite each fact you use from these sources with its number, like [1]."
 
 Event = tuple[str, dict[str, Any]]
 
@@ -366,7 +368,7 @@ class Agent:
                     new.append(sources.items[number - 1])
                 dated = f" ({result.published})" if result.published else ""
                 lines.append(f"[{number}] {result.title}{dated}\n{result.url}\n{result.snippet}")
-            text = wrap_untrusted(f"web_search:{args['query'][:80]}", "\n\n".join(lines))[:budget]
+            text = wrap_untrusted(f"web_search:{args['query'][:80]}", "\n\n".join(lines))[:budget] + CITE_HINT
             state["web_chars"] += len(text)
             return text, new
         if name == "fetch_page":
@@ -374,7 +376,10 @@ class Agent:
             page = await self.fetcher.fetch(args["url"], max_chars=limit)
             number, fresh = sources.add(page.url, page.title, _host(page.url))
             note = " (truncated)" if page.truncated else ""
-            text = wrap_untrusted(page.url, f"[{number}] {page.title or page.url}{note}\n{page.text}")
+            text = (
+                wrap_untrusted(page.url, f"[{number}] {page.title or page.url}{note}\n{page.text}")
+                + CITE_HINT
+            )
             state["web_chars"] += len(text)
             return text, [sources.items[number - 1]] if fresh else []
         return f"error: {name} is not a server tool", []
@@ -422,7 +427,7 @@ class Agent:
             place = f", {row['place_name']}" if row.get("place_name") else ""
             heading = f"[{number}] {row['title']} ({outlet}, {iso(row['published_at'])}{place})"
             lines.append(f"{heading}\n{row.get('summary') or ''}")
-        return wrap_untrusted("news store", "\n\n".join(lines)), new
+        return wrap_untrusted("news store", "\n\n".join(lines)) + CITE_HINT, new
 
 
 def _call_parts(call: dict[str, Any]) -> tuple[str, Any]:
