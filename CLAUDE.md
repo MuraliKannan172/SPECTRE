@@ -83,7 +83,18 @@ Anything else failing is a regression.
 
 `npm run qa:skynet-news` (needs `npm run dev` on port 4173; fixtures only,
 no intel service or network) is the News, Natural Events and share-link
-smoke test and should pass in full.
+smoke test and should pass in full. `npm run qa:neural-core` (same setup,
+mocked chat endpoints) is the Neural Core panel smoke test and should pass
+in full.
+
+The Neural Core eval needs Ollama and network for web search:
+`uv run --project intel python intel/scripts/neural_core_eval.py --model <tag>`.
+It writes `docs/phase4/eval-<model>.json`; web prompts can fail when the
+keyless ddgs search returns nothing, which the answer itself should admit.
+Tool schemas are generated: after changing `src/tools/registry.js` run
+`npm run tools:export`, after changing `intel/app/chat/tools.py` run
+`uv run --project intel python intel/scripts/export_tools.py`; tests on both
+sides fail when the shared artifact is stale.
 
 `npm run test:track` (needs `npm run dev` on port 4173) fails the "arrival:
 moveEnd + first reveal" check at its 500 ms deadline under headless software
