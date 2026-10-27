@@ -5,21 +5,46 @@ import http from 'node:http';
  * (intel/, FastAPI on 127.0.0.1:8100). The browser never talks to the service
  * directly, so the app's CSP stays same-origin.
  *
- * - Read-only: GET and HEAD on the news, story, stream and health routes.
+ * - News routes are read-only: GET and HEAD on news, story, stream, health.
+ * - Neural Core routes (/chat...) answer only requests from this machine,
+ *   unless SKYNET_CHAT_ALLOW_LAN=1 opts LAN viewers in. Writes must come from
+ *   this page's own origin and carry a JSON body of at most 64 KB.
  * - The target is loopback only. SKYNET_INTEL_URL may move the port, never
  *   the host off this machine.
  * - Host is set to the target's, which the service's DNS-rebinding allowlist
- *   accepts; only Accept and Last-Event-ID are forwarded, never cookies or
- *   credentials.
- * - The SSE stream is piped unbuffered, and closing the browser's request
- *   closes the upstream one.
+ *   accepts; only Accept, Last-Event-ID and Content-Type are forwarded, never
+ *   cookies, credentials or Origin (the service refuses any request that
+ *   carries an Origin, so only this proxy can write to it).
+ * - Event streams (news, a chat turn) are piped unbuffered with no timeout,
+ *   and closing the browser's request closes the upstream one.
  * - When the service is not running, the answer is 503
  *   {"state":"intel_offline"}, and the rest of the app is unaffected.
  */
 
 const DEFAULT_TARGET = 'http://127.0.0.1:8100';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
-const ROUTE = /^\/(?:news(?:\/stream|\/\d{1,12})?|health)(?:\?|$)/;
+const ROUTES = Object.freeze([
+  {
+    methods: ['GET', 'HEAD'],
+    pattern: /^\/(?:news(?:\/stream|\/\d{1,12})?|health)(?:\?|$)/,
+    stream: /^\/news\/stream/,
+  },
+  { methods: ['GET'], pattern: /^\/chat\/(?:status|history)$/, chat: true },
+  {
+    methods: ['DELETE'],
+    pattern: /^\/chat\/history$/,
+    chat: true,
+    write: true,
+  },
+  {
+    methods: ['POST'],
+    pattern: /^\/chat(?:\/tool-result|\/stop)?$/,
+    chat: true,
+    write: true,
+    body: true,
+    stream: /^\/chat$/,
+  },
+]);
 const FORWARD_REQUEST_HEADERS = ['accept', 'last-event-id'];
 const FORWARD_RESPONSE_HEADERS = [
   'content-type',
@@ -27,6 +52,7 @@ const FORWARD_RESPONSE_HEADERS = [
   'retry-after',
 ];
 const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_BODY_BYTES = 64 * 1024;
 
 /** The service base URL: SKYNET_INTEL_URL when it is http on loopback. */
 export function intelTarget(env = process.env) {
@@ -54,32 +80,113 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+function isLoopbackAddress(address = '') {
+  return (
+    address === '::1' ||
+    address.startsWith('127.') ||
+    address.startsWith('::ffff:127.')
+  );
+}
+
+/** A write from this page: no Origin (not a browser), or this host's own. */
+function sameOrigin(req) {
+  if (req.headers['sec-fetch-site'] === 'cross-site') return false;
+  const origin = req.headers.origin;
+  if (origin === undefined) return true;
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
+function readBody(req, limit) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(Object.assign(new Error('too large'), { code: 'TOO_LARGE' }));
+        req.pause();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+/** The route for this path and method, or the status that refuses it. */
+function routeFor(path, method) {
+  const matches = ROUTES.filter((route) => route.pattern.test(path));
+  if (!matches.length) return { status: 404, error: 'not_found' };
+  const route = matches.find((entry) => entry.methods.includes(method));
+  return route ? { route } : { status: 405, error: 'method_not_allowed' };
+}
+
 /**
- * @param {{target?: string, request?: typeof http.request, timeoutMs?: number}} [options]
- * @returns {(req: http.IncomingMessage, res: http.ServerResponse) => void}
+ * @param {{target?: string, request?: typeof http.request, timeoutMs?: number,
+ *   env?: Record<string, string|undefined>}} [options]
+ * @returns {(req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>}
  */
 export function createIntelHandler({
   target = intelTarget(),
   request = http.request,
   timeoutMs = REQUEST_TIMEOUT_MS,
+  env = process.env,
 } = {}) {
   const base = new URL(target);
-  return function intelHandler(req, res) {
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      sendJson(res, 405, { error: 'method_not_allowed' });
-      return;
-    }
+  const allowLan = String(env.SKYNET_CHAT_ALLOW_LAN || '') === '1';
+  return async function intelHandler(req, res) {
     const path = req.url || '/';
-    if (!ROUTE.test(path)) {
-      sendJson(res, 404, { error: 'not_found' });
+    const { route, status, error } = routeFor(path, req.method);
+    if (!route) {
+      sendJson(res, status, { error });
       return;
     }
-    const streaming = path.startsWith('/news/stream');
+    if (
+      route.chat &&
+      !allowLan &&
+      !isLoopbackAddress(req.socket?.remoteAddress)
+    ) {
+      sendJson(res, 403, { error: 'chat_local_only' });
+      return;
+    }
+    if (route.write && !sameOrigin(req)) {
+      sendJson(res, 403, { error: 'cross_origin' });
+      return;
+    }
     const headers = { host: base.host };
     for (const name of FORWARD_REQUEST_HEADERS) {
       if (typeof req.headers[name] === 'string')
         headers[name] = req.headers[name];
     }
+    let body = null;
+    if (route.body) {
+      const type = String(req.headers['content-type'] || '')
+        .split(';', 1)[0]
+        .trim()
+        .toLowerCase();
+      if (type !== 'application/json') {
+        sendJson(res, 415, { error: 'json_only' });
+        return;
+      }
+      try {
+        body = await readBody(req, MAX_BODY_BYTES);
+      } catch (failure) {
+        const tooLarge = failure.code === 'TOO_LARGE';
+        res.setHeader('Connection', 'close');
+        sendJson(res, tooLarge ? 413 : 400, {
+          error: tooLarge ? 'too_large' : 'bad_body',
+        });
+        return;
+      }
+      headers['content-type'] = 'application/json';
+      headers['content-length'] = String(body.length);
+    }
+    const streaming = Boolean(route.stream?.test(path));
     const upstream = request({
       hostname: base.hostname.replace(/^\[|\]$/g, ''),
       port: base.port || 80,
@@ -87,7 +194,7 @@ export function createIntelHandler({
       method: req.method,
       headers,
     });
-    // The browser left (tab closed, EventSource closed): stop the upstream too.
+    // The browser left (tab closed, stream closed): stop the upstream too.
     const closeUpstream = () => upstream.destroy();
     res.once('close', closeUpstream);
     if (!streaming) {
@@ -110,7 +217,7 @@ export function createIntelHandler({
       if (streaming) res.flushHeaders?.();
       incoming.pipe(res);
     });
-    upstream.on('error', (error) => {
+    upstream.on('error', (failure) => {
       res.removeListener('close', closeUpstream);
       if (res.destroyed || res.writableEnded) return; // the browser already left
       if (res.headersSent) {
@@ -120,14 +227,14 @@ export function createIntelHandler({
       sendJson(res, 503, {
         state: 'intel_offline',
         error:
-          error.code === 'ECONNREFUSED'
+          failure.code === 'ECONNREFUSED'
             ? 'connection_refused'
-            : error.code === 'ETIMEDOUT'
+            : failure.code === 'ETIMEDOUT'
               ? 'timeout'
               : 'unavailable',
       });
     });
-    upstream.end();
+    upstream.end(body ?? undefined);
   };
 }
 

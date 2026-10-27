@@ -152,3 +152,130 @@ test('the stream is relayed as it arrives and closes upstream when the browser l
   controller.abort();
   await closed;
 });
+
+test('chat writes are forwarded as JSON, without Origin, and the turn streams', async (t) => {
+  const seen = [];
+  const upstream = await listen(async (req, res) => {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    seen.push({ method: req.method, url: req.url, headers: req.headers, body });
+    if (req.url === '/api/intel/chat') {
+      // A slow first event must not trip the request timeout.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.end('event: turn\ndata: {}\n\n');
+      return;
+    }
+    res.writeHead(req.method === 'GET' ? 200 : 204).end();
+  });
+  const handler = createIntelHandler({ target: upstream.url, timeoutMs: 100 });
+  const proxy = await listen((req, res) => {
+    req.url = req.url.slice('/api/intel'.length) || '/';
+    handler(req, res);
+  });
+  t.after(() => closeAll(upstream.server, proxy.server));
+  const origin = proxy.url;
+
+  const turn = await fetch(`${proxy.url}/api/intel/chat`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin },
+    body: JSON.stringify({ message: 'hi' }),
+  });
+  assert.equal(turn.status, 200);
+  assert.equal(turn.headers.get('x-accel-buffering'), 'no');
+  assert.match(await turn.text(), /event: turn/);
+  const forwarded = seen[0];
+  assert.equal(forwarded.body, '{"message":"hi"}');
+  assert.equal(forwarded.headers['content-type'], 'application/json');
+  assert.equal(forwarded.headers.origin, undefined);
+  assert.equal(forwarded.headers.host, new URL(upstream.url).host);
+
+  const status = await fetch(`${proxy.url}/api/intel/chat/status`);
+  assert.equal(status.status, 200);
+  const cleared = await fetch(`${proxy.url}/api/intel/chat/history`, {
+    method: 'DELETE',
+    headers: { origin },
+  });
+  assert.equal(cleared.status, 204);
+  assert.deepEqual(
+    seen.slice(1).map((r) => `${r.method} ${r.url}`),
+    ['GET /api/intel/chat/status', 'DELETE /api/intel/chat/history'],
+  );
+});
+
+test('chat writes from other sites, or not JSON, or too big are refused', async (t) => {
+  let reached = 0;
+  const upstream = await listen((_req, res) => {
+    reached += 1;
+    res.writeHead(204).end();
+  });
+  const proxy = await proxyFor(upstream.url);
+  t.after(() => closeAll(upstream.server, proxy.server));
+  const post = (headers, body = '{}') =>
+    fetch(`${proxy.url}/api/intel/chat/stop`, {
+      method: 'POST',
+      headers,
+      body,
+    });
+
+  const json = { 'content-type': 'application/json' };
+  assert.equal(
+    (await post({ ...json, origin: 'https://evil.example' })).status,
+    403,
+  );
+  assert.equal(
+    (await post({ ...json, 'sec-fetch-site': 'cross-site' })).status,
+    403,
+  );
+  assert.equal((await post({ 'content-type': 'text/plain' })).status, 415);
+  assert.equal((await post(json, 'x'.repeat(70_000))).status, 413);
+  const evilDelete = await fetch(`${proxy.url}/api/intel/chat/history`, {
+    method: 'DELETE',
+    headers: { origin: 'https://evil.example' },
+  });
+  assert.equal(evilDelete.status, 403);
+  assert.equal((await fetch(`${proxy.url}/api/intel/chat/run`)).status, 404);
+  assert.equal(reached, 0);
+});
+
+test('chat answers this machine only unless LAN is opted in', async () => {
+  const calls = [];
+  const fakeRequest = () => {
+    calls.push(1);
+    return {
+      on() {},
+      once() {},
+      setTimeout() {},
+      end() {},
+      destroy() {},
+    };
+  };
+  const reply = () => {
+    const res = { headersSent: false, status: 0, body: '' };
+    res.writeHead = (code) => (res.status = code);
+    res.end = (text = '') => (res.body = String(text));
+    res.once = () => {};
+    return res;
+  };
+  const lan = {
+    method: 'GET',
+    url: '/chat/status',
+    headers: {},
+    socket: { remoteAddress: '192.168.1.40' },
+  };
+  const closed = createIntelHandler({ request: fakeRequest, env: {} });
+  const refused = reply();
+  await closed(lan, refused);
+  assert.equal(refused.status, 403);
+  assert.match(refused.body, /chat_local_only/);
+  // News stays readable from the LAN (it was before); chat does not.
+  await closed({ ...lan, url: '/health' }, reply());
+  assert.equal(calls.length, 1);
+
+  const open = createIntelHandler({
+    request: fakeRequest,
+    env: { SKYNET_CHAT_ALLOW_LAN: '1' },
+  });
+  await open(lan, reply());
+  assert.equal(calls.length, 2);
+});
