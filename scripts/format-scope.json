@@ -1150,5 +1150,8 @@
   "src/testSupport/shareViewFixtures.mjs",
   "src/ui/shareLinks.test.mjs",
   "src/ui/shareButton.test.mjs",
-  "src/share/shareLinkPath.test.mjs"
+  "src/share/shareLinkPath.test.mjs",
+  "src/tools/registry.js",
+  "src/tools/registry.test.mjs",
+  "scripts/export-neural-core-tools.mjs"
 ]

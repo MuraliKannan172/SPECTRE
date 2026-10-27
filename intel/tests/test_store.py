@@ -45,7 +45,7 @@ def _story(n: int, **overrides: object) -> tuple[StoryRow, SourceRow]:
 
 def test_migrations_apply_once_and_record_checksums(tmp_path: Path) -> None:
     conn = connect(tmp_path / "m.db")
-    assert migrate(conn) == [1]
+    assert migrate(conn) == [1, 2]
     assert migrate(conn) == []
     row = conn.execute("SELECT version, name FROM schema_migrations").fetchone()
     assert (row["version"], row["name"]) == (1, "0001_init.sql")

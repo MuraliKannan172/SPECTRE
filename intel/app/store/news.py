@@ -72,6 +72,8 @@ class NewsQuery:
     cursor: str | None = None
     # Non-commercial sources off: only stories first reported by an open feed.
     open_only: bool = False
+    # Match stories containing any of the words in q, not all of them.
+    any_term: bool = False
 
 
 # A story's primary source is its earliest outlet; its headline and summary
@@ -88,8 +90,9 @@ class CursorError(ValueError):
     pass
 
 
-def fts_match_expression(text: str) -> str | None:
-    """User text to an FTS5 expression: every word quoted, all required.
+def fts_match_expression(text: str, *, any_term: bool = False) -> str | None:
+    """User text to an FTS5 expression: every word quoted, all required (or,
+    with any_term, any one of them).
 
     Quoting each token means no user input is ever parsed as FTS syntax, so
     stray quotes, NEAR, column filters or a lone '*' cannot raise an error.
@@ -97,7 +100,7 @@ def fts_match_expression(text: str) -> str | None:
     tokens = _FTS_TOKEN.findall(text or "")
     if not tokens:
         return None
-    return " ".join(f'"{token}"' for token in tokens[:16])
+    return (" OR " if any_term else " ").join(f'"{token}"' for token in tokens[:16])
 
 
 def _encode_cursor(payload: dict[str, Any]) -> str:
@@ -346,7 +349,7 @@ class NewsStore:
         """Filtered stories, newest first (or best match first with `q`)."""
         limit = max(1, min(int(query.limit), MAX_PAGE))
         where, params = self._filters(query)
-        match = fts_match_expression(query.q) if query.q else None
+        match = fts_match_expression(query.q, any_term=query.any_term) if query.q else None
         cursor = _decode_cursor(query.cursor) if query.cursor else None
 
         if query.q and not match:

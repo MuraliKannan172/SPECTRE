@@ -16,7 +16,12 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+from .api.chat import ChatGate
+from .api.chat import router as chat_router
 from .api.routes import router
+from .chat.agent import Agent
+from .chat.ollama import OllamaClient
+from .chat.tools import ToolRegistry
 from .config import BRAND_NAME, Settings, load_settings
 from .geo.gazetteer import Gazetteer
 from .geo.geoparse import GeoParser
@@ -24,7 +29,12 @@ from .hub import EventHub
 from .ingest.feeds import load_feed_config
 from .ingest.pipeline import Pipeline
 from .ingest.scheduler import Scheduler
+from .store.chat import ChatStore
 from .store.news import NewsStore
+from .web.fetch import TIMEOUT_SECONDS as FETCH_TIMEOUT
+from .web.fetch import PageFetcher
+from .web.guard import guarded_client
+from .web.search import SearchService, make_search_service
 
 log = logging.getLogger("skynet.intel")
 
@@ -35,6 +45,10 @@ def create_app(
     transport: httpx.AsyncBaseTransport | None = None,
     geoparser: GeoParser | None = None,
     start_scheduler: bool = True,
+    ollama_transport: httpx.AsyncBaseTransport | None = None,
+    fetch_transport: httpx.AsyncBaseTransport | None = None,
+    search: SearchService | None = None,
+    tool_registry: ToolRegistry | None = None,
 ) -> FastAPI:
     settings = settings or load_settings()
 
@@ -62,6 +76,44 @@ def create_app(
         app.state.geoparser = parser
         app.state.scheduler = scheduler
         app.state.started_at = int(time.time())
+        chats = ChatStore(str(settings.db_path), settings.logs_dir)
+        ollama_http = httpx.AsyncClient(transport=ollama_transport, trust_env=False)
+        fetch_http = guarded_client(
+            user_agent=settings.user_agent, timeout=FETCH_TIMEOUT, transport=fetch_transport
+        )
+        search_service = search or make_search_service(
+            settings.search_provider,
+            searxng_url=settings.searxng_url,
+            brave_key=settings.brave_api_key,
+            tavily_key=settings.tavily_api_key,
+            client=client,
+        )
+        app.state.chats = chats
+        app.state.search = search_service
+        app.state.chat_gate = ChatGate(settings.chat_turns_per_minute)
+        app.state.chat_problem = None
+        registry = tool_registry
+        if registry is None:
+            try:
+                registry = ToolRegistry.from_artifact()
+            except (OSError, ValueError) as error:
+                app.state.chat_problem = (
+                    f"tool artifact unreadable ({type(error).__name__}): run npm run tools:export"
+                )
+        app.state.agent = (
+            Agent(
+                settings=settings,
+                ollama=OllamaClient(settings.ollama_host, ollama_http),
+                news=store,
+                chats=chats,
+                search=search_service,
+                fetcher=PageFetcher(fetch_http, user_agent_token=settings.user_agent.split("/", 1)[0]),
+                registry=registry,
+                open_only=lambda: not settings.noncommercial_enabled(),
+            )
+            if registry is not None
+            else None
+        )
         task = asyncio.create_task(scheduler.run()) if start_scheduler else None
         log.info(
             "intel ready: %d sources, %d recent stories indexed, poll %ds",
@@ -78,6 +130,9 @@ def create_app(
                     await task
             await scheduler.drain()
             await client.aclose()
+            await ollama_http.aclose()
+            await fetch_http.aclose()
+            chats.close()
             store.close()
 
     app = FastAPI(
@@ -91,6 +146,7 @@ def create_app(
     # DNS-rebinding defence: only requests addressed to this machine by name.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(settings.allowed_hosts))
     app.include_router(router)
+    app.include_router(chat_router)
     return app
 
 
