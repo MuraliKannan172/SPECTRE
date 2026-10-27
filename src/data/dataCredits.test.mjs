@@ -141,3 +141,13 @@ test('every Street Level imagery source is in the attribution lightbox', () => {
       `${key} has no credit`,
     );
 });
+
+test('the News and Natural Events layers are in the attribution lightbox', () => {
+  const news = DATA_CREDITS.find((entry) => entry.key === 'intel-news');
+  assert.ok(news, 'the News layer must be credited');
+  // GDELT's terms: cite the project and link to it wherever its data shows.
+  assert.match(news.html, /href="https:\/\/www\.gdeltproject\.org\/"/);
+  const eonet = DATA_CREDITS.find((entry) => entry.key === 'nasa-eonet');
+  assert.ok(eonet, 'NASA EONET must be credited');
+  assert.match(eonet.html, /href="https:\/\/eonet\.gsfc\.nasa\.gov\/"/);
+});
