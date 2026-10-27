@@ -1119,5 +1119,8 @@
   "src/layers/satelliteFootprint/footprint.js",
   "src/layers/satelliteFootprint/footprint.test.mjs",
   "src/layers/satelliteFootprint/index.js",
-  "src/layers/satelliteFootprint/index.test.mjs"
+  "src/layers/satelliteFootprint/index.test.mjs",
+  "src/layers/news/shareOptions.js",
+  "src/layers/news/shareOptions.test.mjs",
+  "scripts/qa-skynet-news.mjs"
 ]

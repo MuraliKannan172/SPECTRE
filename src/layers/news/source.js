@@ -1,5 +1,10 @@
 import { readResponseJsonCapped } from '../../sources/httpBody.js';
-import { normalizeNewsPage, normalizeNewsStory } from './records.js';
+import {
+  NEWS_DEFAULT_WINDOW_HOURS,
+  NEWS_WINDOW_HOURS,
+  normalizeNewsPage,
+  normalizeNewsStory,
+} from './records.js';
 
 /**
  * SKYNET: read news from the local intel service through the app's own
@@ -9,8 +14,7 @@ import { normalizeNewsPage, normalizeNewsStory } from './records.js';
 export const NEWS_RESPONSE_LIMIT = 4 * 1024 * 1024;
 export const NEWS_PAGE_SIZE = 200;
 export const NEWS_MAX_RECORDS = 600;
-export const NEWS_WINDOW_HOURS = Object.freeze([6, 24, 72, 168]);
-export const NEWS_DEFAULT_WINDOW_HOURS = 24;
+export { NEWS_DEFAULT_WINDOW_HOURS, NEWS_WINDOW_HOURS };
 
 // Data, not UI copy: freshness.js marks them for the catalog and translates
 // them when they are shown (this module stays free of i18n).

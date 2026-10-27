@@ -18,6 +18,9 @@ export const NEWS_CATEGORIES = Object.freeze([
   'politics',
   'world',
 ]);
+/** The time windows the layer offers, in hours. */
+export const NEWS_WINDOW_HOURS = Object.freeze([6, 24, 72, 168]);
+export const NEWS_DEFAULT_WINDOW_HOURS = 24;
 const CATEGORY_SET = new Set(NEWS_CATEGORIES);
 const FRESHNESS_STATES = new Set([
   'live',
