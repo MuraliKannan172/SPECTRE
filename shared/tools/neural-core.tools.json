@@ -1,0 +1,699 @@
+{
+  "version": 1,
+  "client": [
+    {
+      "type": "function",
+      "function": {
+        "name": "fly_to_location",
+        "description": "Fly the camera to a place by name (query) or to latitude/longitude. Omit rangeM for automatic framing.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Place name, e.g. \"Tokyo\" or \"Suez Canal\"."
+            },
+            "latitude": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "viewMode": {
+              "type": "string",
+              "enum": [
+                "close",
+                "overview"
+              ],
+              "description": "close for a landmark, overview for a region."
+            },
+            "rangeM": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 20000000,
+              "description": "Camera distance in metres."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "adjust_camera_zoom",
+        "description": "Zoom the camera in or out.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "in",
+                "out"
+              ]
+            },
+            "amount": {
+              "type": "string",
+              "enum": [
+                "little",
+                "medium",
+                "lot"
+              ]
+            }
+          },
+          "required": [
+            "direction",
+            "amount"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "zoom_to_globe",
+        "description": "Reset the view to the whole globe.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set_layer_visibility",
+        "description": "Turn one map data layer on or off.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "type": "string",
+              "enum": [
+                "gnss-integrity",
+                "s2-ghostmaps",
+                "flights",
+                "military",
+                "local-adsb",
+                "ais-live-vessels",
+                "satellites",
+                "rocket-launches",
+                "earthquakes",
+                "local-firms",
+                "fire-perimeters",
+                "weather-cyclones",
+                "weather-radar",
+                "weather-satellite",
+                "weather-lightning",
+                "wind",
+                "air-quality",
+                "traffic",
+                "transit",
+                "bikeshare",
+                "cctv",
+                "alpr-cameras",
+                "radio",
+                "street-level",
+                "recent-imagery",
+                "directions",
+                "military-installations",
+                "local-datacenters",
+                "local-dams",
+                "telegeography-submarine-cables",
+                "news",
+                "natural-events"
+              ]
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "layerId",
+            "enabled"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set_map_stack",
+        "description": "Change the base map imagery.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stack": {
+              "type": "string",
+              "enum": [
+                "photoreal",
+                "bing-aerial",
+                "bing-labels",
+                "esri-imagery",
+                "osm"
+              ]
+            }
+          },
+          "required": [
+            "stack"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set_visual_style",
+        "description": "Change the visual style or sensor look (e.g. thermal, surveillance, noir).",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "style": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "retro",
+                "surveillance",
+                "thermal",
+                "anime",
+                "noir",
+                "snow"
+              ]
+            }
+          },
+          "required": [
+            "style"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "track_entity",
+        "description": "Find a flight, ship or satellite by name, callsign or ID and follow it with the camera.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "layerId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "stop_tracking",
+        "description": "Stop following the tracked object.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "annotate_map",
+        "description": "Draw pins, labels, areas, arrows or routes on the map at named places or coordinates.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "annotations": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 24,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "pin",
+                      "highlight",
+                      "area",
+                      "arrow",
+                      "route",
+                      "label"
+                    ]
+                  },
+                  "target": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "points": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 12,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "latitude": {
+                          "type": "number",
+                          "minimum": -90,
+                          "maximum": 90
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "minimum": -180,
+                          "maximum": 180
+                        },
+                        "screenX": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "screenY": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      }
+                    }
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "walking",
+                      "driving",
+                      "cycling"
+                    ]
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  "toTarget": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "toLatitude": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "toLongitude": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "color": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "amber",
+                      "cyan",
+                      "green",
+                      "red"
+                    ]
+                  },
+                  "footprint": {
+                    "type": "boolean"
+                  },
+                  "intent": {
+                    "type": "string",
+                    "enum": [
+                      "the_thing",
+                      "around_the_thing"
+                    ]
+                  },
+                  "entityKind": {
+                    "type": "string",
+                    "enum": [
+                      "building",
+                      "compound",
+                      "district",
+                      "street",
+                      "point_feature"
+                    ]
+                  },
+                  "screenX": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "screenY": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "toScreenX": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "toScreenY": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            },
+            "flyTo": {
+              "type": "boolean"
+            },
+            "persist": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "annotations"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "clear_annotations",
+        "description": "Remove all drawn annotations.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "next_satellite_pass",
+        "description": "When a satellite (e.g. ISS) next passes over a point; defaults to the view centre.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target"
+          ],
+          "properties": {
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "latitude": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "minElevationDeg": {
+              "type": "number",
+              "minimum": 5,
+              "maximum": 60
+            },
+            "visibleOnly": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_earthquakes",
+        "description": "Earthquakes of magnitude 2.5 or more from the USGS feed for the last 24 hours, strongest first. Optionally limited to an area and a minimum magnitude.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "area": {
+              "type": "object",
+              "description": "Where to look. Give exactly one of: place (a name such as \"Taiwan\" or \"San Francisco Bay\"), bbox ([west, south, east, north] in degrees), or lat and lon with radius_km.",
+              "properties": {
+                "place": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "bbox": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                "lat": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "lon": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                "radius_km": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 2000
+                }
+              },
+              "additionalProperties": false
+            },
+            "min_magnitude": {
+              "type": "number",
+              "minimum": 2.5,
+              "maximum": 10
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "Most rows to return (default 25, at most 200)."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "server": [
+    {
+      "type": "function",
+      "function": {
+        "name": "news_search",
+        "description": "Search the local news store (recent headlines collected from news feeds). Use for news questions.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Keywords."
+            },
+            "since_hours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 720,
+              "description": "Look back this many hours (default 72)."
+            },
+            "region": {
+              "type": "string",
+              "enum": [
+                "world",
+                "africa",
+                "americas",
+                "asia-pacific",
+                "europe",
+                "middle-east"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "disaster",
+                "conflict",
+                "cyber",
+                "health",
+                "space",
+                "science",
+                "economy",
+                "politics",
+                "world"
+              ]
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "news_near",
+        "description": "News stories placed near a point on the globe.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "lon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "radius_km": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 3000
+            },
+            "since_hours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 720,
+              "description": "Look back this many hours (default 72)."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "lat",
+            "lon"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "web_search",
+        "description": "Search the web. Required for anything current (latest, now, today) or not in the news store.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "recency": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "any"
+              ]
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "fetch_page",
+        "description": "Read one public web page (http/https) as text, e.g. a search result to check details.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "layer_state",
+        "description": "The map layers that are on, with their options.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "viewport",
+        "description": "The camera position, the visible area and the current time.",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    }
+  ]
+}

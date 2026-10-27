@@ -56,6 +56,21 @@ def _brand() -> tuple[str, str]:
 BRAND_NAME, BRAND_VERSION = _brand()
 
 
+def ollama_base_url(value: str) -> str:
+    """OLLAMA_HOST as Ollama itself accepts it ("host:port", a bind address such
+    as 0.0.0.0, or a URL) turned into a URL this service can call."""
+    value = (value or "").strip().rstrip("/")
+    if not value:
+        return "http://127.0.0.1:11434"
+    if "://" not in value:
+        value = f"http://{value}"
+    scheme, rest = value.split("://", 1)
+    host, _, port = rest.partition(":")
+    if host in {"0.0.0.0", "", "[::]"}:  # noqa: S104 (a bind address, never connected to)
+        host = "127.0.0.1"
+    return f"{scheme}://{host}:{port or '11434'}"
+
+
 @dataclass(frozen=True)
 class Settings:
     db_path: Path
@@ -71,6 +86,31 @@ class Settings:
     heartbeat_seconds: float = 15.0
     allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost", "[::1]")
     user_agent: str = f"{BRAND_NAME}-intel/{BRAND_VERSION}"
+    # Neural Core (ADR-001 D5, D10).
+    ollama_host: str = "http://127.0.0.1:11434"
+    ollama_model: str = "bonsai-2:9b"
+    ollama_num_ctx: int = 16384
+    ollama_keep_alive: str = "5m"
+    ollama_think: bool = False
+    low_resource: bool = False
+    search_provider: str = "ddgs"
+    searxng_url: str | None = None
+    brave_api_key: str | None = None
+    tavily_api_key: str | None = None
+    chat_turns_per_minute: int = 12
+    logs_dir: Path = REPO_ROOT / ".skynet-logs"
+
+    @property
+    def num_ctx(self) -> int:
+        """Low-resource mode caps the context at 8192 tokens."""
+        return min(self.ollama_num_ctx, 8192) if self.low_resource else self.ollama_num_ctx
+
+    @property
+    def budgets(self) -> dict[str, int]:
+        """Token budgets per turn (ADR-001 D5); 8k contexts get the small set."""
+        if self.num_ctx <= 8192:
+            return {"history": 1500, "web": 2500, "page": 1200}
+        return {"history": 3000, "web": 6000, "page": 2500}
 
     @property
     def stale_after_seconds(self) -> int:
@@ -111,4 +151,15 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         retention_days=get_int("SKYNET_INTEL_RETENTION_DAYS", 30, 1),
         gdelt_enabled=get("SKYNET_INTEL_GDELT", "1").strip().lower() in _TRUTHY,
         allowed_hosts=hosts or Settings.allowed_hosts,
+        ollama_host=ollama_base_url(get("OLLAMA_HOST", "")),
+        ollama_model=get("OLLAMA_MODEL", Settings.ollama_model).strip() or Settings.ollama_model,
+        ollama_num_ctx=get_int("OLLAMA_NUM_CTX", Settings.ollama_num_ctx, 2048),
+        ollama_keep_alive=get("OLLAMA_KEEP_ALIVE", Settings.ollama_keep_alive).strip() or "5m",
+        ollama_think=get("OLLAMA_THINK", "0").strip().lower() in _TRUTHY,
+        low_resource=get("SKYNET_LOW_RESOURCE", "0").strip().lower() in _TRUTHY,
+        search_provider=get("SKYNET_SEARCH_PROVIDER", "ddgs").strip().lower() or "ddgs",
+        searxng_url=get("SEARXNG_URL", "").strip() or None,
+        brave_api_key=get("BRAVE_API_KEY", "").strip() or None,
+        tavily_api_key=get("TAVILY_API_KEY", "").strip() or None,
+        chat_turns_per_minute=get_int("SKYNET_CHAT_TURNS_PER_MINUTE", 12, 1),
     )

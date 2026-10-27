@@ -54,6 +54,7 @@
     "check:boundaries": "node scripts/check-import-directions.mjs && node scripts/check-package-boundaries.mjs",
     "qa:transit": "node scripts/qa-transit.mjs",
     "qa:skynet-news": "node scripts/qa-skynet-news.mjs",
+    "tools:export": "node scripts/export-neural-core-tools.mjs",
     "mcp": "node server/mcp/stdio.js"
   },
   "dependencies": {
