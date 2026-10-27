@@ -628,6 +628,15 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     token: 'i',
     disposition: 'enabled-only',
   }),
+  // SKYNET layers:start. Tokens follow upstream's next-free rule; if upstream
+  // later claims 5 or 6, SKYNET renumbers its own at that merge.
+  Object.freeze({
+    id: 'natural-events',
+    token: '6',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({ id: 'news', token: '5', disposition: 'enabled-only' }),
+  // SKYNET layers:end
   Object.freeze({
     id: 'radio',
     token: 'r',

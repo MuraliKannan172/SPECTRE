@@ -68,6 +68,9 @@ const PANEL_GROUPS = [
   {
     label: msg('Events'),
     ids: [
+      // SKYNET
+      'news',
+      'natural-events',
       'rocket-launches',
       'earthquakes',
       'local-firms',
