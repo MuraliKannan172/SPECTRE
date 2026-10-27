@@ -557,6 +557,9 @@ body.cockpit-mode #view-switcher button {
 .first-run-choices button:hover .first-run-arrow, .first-run-choices button:focus-visible .first-run-arrow {
   color: rgba(255, 86, 54, 0.9);
 }
+.first-run-dismiss:hover, .first-run-dismiss:focus-visible {
+  color: rgba(255, 86, 54, 0.86);
+}
 .first-run-suppress {
   color: rgba(231, 204, 199, 0.66);
 }
@@ -1498,6 +1501,16 @@ body.mobile-shell[data-mobile-sheet='search'] #command-dock, body.mobile-shell[d
 .gev-pointer-reticle::after {
   border: 1px dashed rgba(255, 86, 54, 0.35);
 }
+#gev-voice-control .gev-voice-panel {
+  color: rgba(250, 227, 223, 0.92);
+  background: rgba(31, 11, 7, 0.96);
+  border: 1px solid rgba(255, 86, 54, 0.34);
+  box-shadow: 0 0.85rem 2rem rgba(0, 0, 0, 0.58),
+    0 0 1.2rem rgba(255, 40, 0, 0.08);
+}
+.gev-voice-settings-note {
+  color: rgba(230, 196, 190, 0.72);
+}
 
 /* voice-cost.css */
 .gev-voice-tier-btn {
@@ -1513,6 +1526,17 @@ body.mobile-shell[data-mobile-sheet='search'] #command-dock, body.mobile-shell[d
 }
 .gev-voice-provider-field select {
   background: #1b0c09;
+}
+#gev-voice-control:has(> .gev-voice-settings-button) .gev-voice-provider-field:not([hidden]) {
+  border-color: rgba(211, 137, 123, 0.28);
+  background: rgba(27, 12, 9, 0.88);
+}
+#gev-voice-control .gev-voice-settings-button {
+  color: rgba(230, 196, 190, 0.72);
+  background: rgba(27, 12, 9, 0.92);
+}
+#gev-voice-control .gev-voice-settings-button:is(:hover, [aria-expanded='true']) {
+  background: rgba(255, 40, 0, 0.12);
 }
 
 /* weather.css */

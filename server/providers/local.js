@@ -26,6 +26,7 @@ import { keySetupEndpoint } from '../standalone/key-setup.js';
 import { weatherProxy } from './weather.js';
 import { firePerimetersProxy } from './firePerimeters.js';
 import { gnssIntegrityProxy } from './gnssIntegrity.js';
+import { ghostMapsProxy } from './ghostMaps.js';
 import { cycloneProxy } from './cyclones.js';
 import { windProxy } from './wind.js';
 import { intelProxy } from './intel.js';
@@ -69,6 +70,7 @@ function localProviderPlugins({ realtime, gemini } = {}) {
     // SKYNET: the local intel service (news) and NASA EONET natural events.
     intelProxy(),
     eonetProxy(),
+    ghostMapsProxy(),
     keySetupEndpoint(),
   ];
 }

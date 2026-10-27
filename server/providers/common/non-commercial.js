@@ -2,7 +2,8 @@
  * SKYNET: free APIs whose terms allow only personal, non-commercial use stay
  * off by default. They are OpenSky (flights and tracks), Open-Meteo's free
  * tier (cockpit weather and weather effects), Google News RSS (regional
- * headlines) and adsbdb route data (callsign routes).
+ * headlines), adsbdb route data (callsign routes) and S2 Underground's
+ * GhostMaps products (CC BY-NC-SA 4.0).
  *
  * The owner turns them on with the "Non-commercial sources" switch in Provider
  * Settings, which writes SKYNET_NONCOMMERCIAL_SOURCES=1. Providers read it per

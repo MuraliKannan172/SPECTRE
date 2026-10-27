@@ -31,8 +31,8 @@ test('News and Natural Events round-trip through a share link', () => {
     params,
     normalizeLayerState({ enabledLayerIds: ['news', 'natural-events'] }),
   );
-  // Registry order (natural-events, news), tokens 6 and 5.
-  assert.equal(params.get('l'), '6.5');
+  // Registry order (natural-events, news), tokens 0y and 0z.
+  assert.equal(params.get('l'), '0y.0z');
 });
 
 test('the News time window and category filter round-trip too', () => {
@@ -51,9 +51,9 @@ test('the News time window and category filter round-trip too', () => {
     params
       .get('lo')
       .split('_')
-      .filter((part) => part.startsWith('5.'))
+      .filter((part) => part.startsWith('0z.'))
       .join('_'),
-    '5.w.72_5.c.conflict-cyber',
+    '0z.w.72_0z.c.conflict-cyber',
   );
   assert.deepEqual(
     decodeLayerStateParams(params).options.news,
@@ -68,10 +68,12 @@ test('default News settings add nothing to the link, and bad values are dropped'
     normalizeLayerState({ enabledLayerIds: ['news'] }),
   );
   assert.ok(
-    !(params.get('lo') || '').split('_').some((part) => part.startsWith('5.')),
+    !(params.get('lo') || '').split('_').some((part) => part.startsWith('0z.')),
   );
 
-  const forged = new URLSearchParams('v=2&l=5&lo=5.w.48_5.c.conflict-weather');
+  const forged = new URLSearchParams(
+    'v=2&l=0z&lo=0z.w.48_0z.c.conflict-weather',
+  );
   assert.deepEqual(decodeLayerStateParams(forged).options.news, {
     windowHours: 24,
     categoryFilter: '',

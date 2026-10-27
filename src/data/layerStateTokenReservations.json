@@ -20,6 +20,7 @@
   ["radio", "r"],
   ["recent-imagery", "1"],
   ["rocket-launches", "x"],
+  ["s2-ghostmaps", "5"],
   ["satellites", "s"],
   ["street-level", "0"],
   ["telegeography-submarine-cables", "u"],
@@ -30,6 +31,6 @@
   ["weather-radar", "v"],
   ["weather-satellite", "o"],
   ["wind", "k"],
-  ["news", "5"],
-  ["natural-events", "6"]
+  ["news", "0z"],
+  ["natural-events", "0y"]
 ]

@@ -247,7 +247,7 @@ function layerState(page) {
       layerTokens: (hash.get('l') || '').split('.').filter(Boolean),
       newsOptions: (hash.get('lo') || '')
         .split('_')
-        .filter((part) => part.startsWith('5.')),
+        .filter((part) => part.startsWith('0z.')),
     };
   });
 }
@@ -454,17 +454,17 @@ async function run(browser) {
   record(
     'The News filter narrows the points and lands in the hash',
     state.news.source?.points === FILTERED.length &&
-      state.newsOptions.join('_') === '5.w.72_5.c.disaster-space',
+      state.newsOptions.join('_') === '0z.w.72_0z.c.disaster-space',
     `points=${state.news.source?.points} lo=${state.newsOptions.join('_')}`,
   );
   state = await waitFor(
     page,
-    (s) => s.layerTokens.includes('5') && s.layerTokens.includes('6'),
+    (s) => s.layerTokens.includes('0z') && s.layerTokens.includes('0y'),
     10_000,
   );
   record(
-    'The share hash carries both layers (tokens 5 and 6)',
-    state.layerTokens.includes('5') && state.layerTokens.includes('6'),
+    'The share hash carries both layers (tokens 0y and 0z)',
+    state.layerTokens.includes('0z') && state.layerTokens.includes('0y'),
     `l=${state.layerTokens.join('.')}`,
   );
   fs.mkdirSync(SHOTS_DIR, { recursive: true });

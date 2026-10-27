@@ -142,7 +142,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
     id: 'non-commercial-sources',
     title: msg('NON-COMMERCIAL SOURCES'),
     unlocks: msg(
-      'Personal use only: worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines and adsbdb flight routes. Their free terms forbid commercial use, so they stay off until you turn them on.',
+      'Personal use only: worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines, adsbdb flight routes and S2 GhostMaps intel maps. Their terms forbid commercial use, so they stay off until you turn them on.',
     ),
     getUrl: '',
     envVars: Object.freeze(['SKYNET_NONCOMMERCIAL_SOURCES']),
