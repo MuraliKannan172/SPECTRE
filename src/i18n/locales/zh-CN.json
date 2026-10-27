@@ -2727,5 +2727,45 @@
     "other": "地球上有 {count} 条新闻"
   },
   "Stories the intel service could place, colored by category, sized by how many outlets report them and faded by age. Select one to fly to it; click its card to open the article. The News panel lists every outlet.": "情报服务能够定位的新闻：颜色表示类别，大小表示报道媒体数量，越旧越淡。选中一条可飞到该处；点击其卡片可打开文章。新闻面板列出所有媒体。",
-  "Natural Events (EONET)": "自然事件（EONET）"
+  "Natural Events (EONET)": "自然事件（EONET）",
+  "OFFLINE": "离线",
+  "Search all stories, filter by region and source, and open every outlet": "搜索全部新闻，按地区和来源筛选，并打开每家媒体",
+  "Close the News panel": "关闭新闻面板",
+  "Search headlines": "搜索标题",
+  "Time": "时间",
+  "Category": "类别",
+  "Region": "地区",
+  "News stories": "新闻报道",
+  "From the local intel service: headline, short summary and link only.": "来自本地情报服务：仅含标题、简短摘要和链接。",
+  "Latest headlines": "最新标题",
+  "ALERT": "警报",
+  "Show this story on the globe": "在地球上显示这条新闻",
+  "Not placed on the globe": "未在地球上定位",
+  "{count} stories": {
+    "other": "{count} 条新闻"
+  },
+  "No stories match these filters": "没有符合这些筛选条件的新闻",
+  "Global feeds": "全球信息源",
+  "Africa": "非洲",
+  "Americas": "美洲",
+  "Asia-Pacific": "亚太",
+  "Europe": "欧洲",
+  "Middle East": "中东",
+  "Last 6 hours": "最近 6 小时",
+  "Last 24 hours": "最近 24 小时",
+  "Last 3 days": "最近 3 天",
+  "Last 7 days": "最近 7 天",
+  "All categories": "全部类别",
+  "All regions": "全部地区",
+  "All sources": "全部来源",
+  "Article": "文章",
+  "{count} more stories at this place · see the News panel": {
+    "other": "此处还有 {count} 条新闻 · 请查看新闻面板"
+  },
+  "News panel": "新闻面板",
+  "Intel service offline: run scripts\\skynet.ps1 to start it": "情报服务离线：运行 scripts\\skynet.ps1 以启动它",
+  "News unavailable": "新闻不可用",
+  "World affairs": "国际时事",
+  "Cybersecurity": "网络安全",
+  "Heavy snow": "强降雪"
 }

@@ -10,6 +10,7 @@ import { resolveLocale, applyDocumentLanguage } from '../i18n/locale.js';
 import { applyDocumentTranslations, setLocale } from '../i18n/index.js';
 import { applyBranding } from '../ui/branding.js';
 import { createGoogleTokenSource } from '../maps/googleTokens.js';
+import { mountNewsPanel } from '../layers/news/panel.js';
 
 // The existing controls and layer catalog contain page-scoped state.
 let constructed = false;
@@ -77,7 +78,20 @@ export function createStandaloneApplication({
       }),
     createData: (context) =>
       createStandaloneData({ ...context, allowQaRegistration, catalog }),
-    createTools: (context) =>
-      createStandaloneTools({ ...context, loadingScreen, placeSearch, voice }),
+    createTools: async (context) => {
+      const tools = await createStandaloneTools({
+        ...context,
+        loadingScreen,
+        placeSearch,
+        voice,
+      });
+      // SKYNET: the News drawer and ticker, shown while the News layer is on.
+      const news = catalog?.layers?.find((layer) => layer.id === 'news');
+      if (news?.subscribe) {
+        const panel = mountNewsPanel({ document, layer: news });
+        context.defer(() => panel.destroy());
+      }
+      return tools;
+    },
   });
 }

@@ -12,7 +12,8 @@ export const NEWS_MAX_RECORDS = 600;
 export const NEWS_WINDOW_HOURS = Object.freeze([6, 24, 72, 168]);
 export const NEWS_DEFAULT_WINDOW_HOURS = 24;
 
-// Data, not UI copy: the layer translates these when it shows them.
+// Data, not UI copy: freshness.js marks them for the catalog and translates
+// them when they are shown (this module stays free of i18n).
 export const INTEL_OFFLINE =
   'Intel service offline: run scripts\\skynet.ps1 to start it';
 export const NEWS_UNAVAILABLE = 'News unavailable';
