@@ -133,3 +133,33 @@ def test_status_reports_model_and_load_state(tmp_path: Path) -> None:
         status = client.get("/api/intel/chat/status").json()
     assert status["ollama"] == {"reachable": True, "version": "0.40.11"}
     assert status["tools"] is True and status["loaded"]["size_vram"] == 3_400_000_000
+
+
+class StoppingAgent:
+    """A turn that is stopped mid-stream and whose generator fails to close."""
+
+    def __init__(self, gate) -> None:  # type: ignore[no-untyped-def]
+        self.gate = gate
+        self.turns = 0
+
+    async def run(self, turn):  # type: ignore[no-untyped-def]
+        self.turns += 1
+        try:
+            yield "turn", {"turn_id": turn.turn_id}
+            self.gate.stop.set()  # as POST /chat/stop would
+            yield "token", {"text": "partial"}
+        finally:
+            if self.turns == 1:
+                raise RuntimeError("close failed")
+
+
+def test_a_stopped_turn_frees_the_gate_even_if_closing_fails(tmp_path: Path) -> None:
+    with client_for(tmp_path, FakeOllama([])) as client:
+        state = client.app.state
+        state.agent = StoppingAgent(state.chat_gate)
+        first = client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS)
+        assert first.status_code == 200
+        assert '"code": "stopped"' in first.text
+        assert not state.chat_gate.busy()
+        again = client.post("/api/intel/chat", json={"message": "hi again"}, headers=HEADERS)
+        assert again.status_code == 200

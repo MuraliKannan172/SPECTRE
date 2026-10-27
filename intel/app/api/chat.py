@@ -10,6 +10,7 @@ calling 127.0.0.1:8100 from the user's browser always does.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
 import uuid
@@ -152,8 +153,11 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
                     yield _sse("error", {"code": "stopped"})
                     break
         finally:
-            await events.aclose()
+            # Release first: closing a turn cut short (stop, browser gone) can
+            # raise, and a held gate would refuse every message as busy.
             gate.release(turn.turn_id)
+            with contextlib.suppress(Exception):
+                await events.aclose()
 
     return StreamingResponse(
         stream(),
