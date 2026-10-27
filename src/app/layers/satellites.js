@@ -1,4 +1,5 @@
 import { createSatellitesLayer } from '../../layers/satellites/index.js';
+import { withSatelliteFootprint } from '../../layers/satelliteFootprint/index.js';
 import * as picking from '../../data/pickRegistry.js';
 import * as focus from '../../data/focusDeemphasis.js';
 import * as readout from '../../data/trackedReadout.js';
@@ -9,7 +10,7 @@ import * as layerState from '../../data/layerState.js';
 
 /** Construct one layer using the application scene owners and a supplied source. */
 export function createApplicationSatellites({ source }) {
-  return createSatellitesLayer({
+  const layer = createSatellitesLayer({
     source,
     services: {
       picking,
@@ -21,4 +22,6 @@ export function createApplicationSatellites({ source }) {
       layerState,
     },
   });
+  // SKYNET: the FOOTPRINT row option (off by default).
+  return withSatelliteFootprint(layer, { readout });
 }
