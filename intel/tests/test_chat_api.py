@@ -12,6 +12,7 @@ from helpers import FEEDS_YAML, make_settings
 from test_chat_agent import CLIENT_TOOLS, FakeOllama, say
 
 from app.chat.tools import ToolRegistry
+from app.config import DEFAULT_MODEL
 from app.main import create_app
 from app.web.search import SearchService
 
@@ -100,7 +101,7 @@ def test_status_reports_an_offline_ollama(tmp_path: Path) -> None:
     with client_for(tmp_path, FakeOllama([], offline=True)) as client:
         status = client.get("/api/intel/chat/status").json()
         assert status["ollama"] == {"reachable": False, "version": None, "error": "offline"}
-        assert status["model"] == "bonsai-2:9b"
+        assert status["model"] == DEFAULT_MODEL
         assert status["search"]["configured"] is False
 
 
@@ -114,7 +115,7 @@ def test_status_reports_model_and_load_state(tmp_path: Path) -> None:
             return httpx.Response(
                 200,
                 json={
-                    "models": [{"name": "bonsai-2:9b", "size_vram": 3_400_000_000, "context_length": 16384}]
+                    "models": [{"name": DEFAULT_MODEL, "size_vram": 3_400_000_000, "context_length": 16384}]
                 },
             )
         return fake(request)

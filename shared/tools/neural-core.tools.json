@@ -636,7 +636,8 @@
                 "week",
                 "month",
                 "any"
-              ]
+              ],
+              "description": "Only for breaking news; leave out for everything else."
             },
             "limit": {
               "type": "integer",

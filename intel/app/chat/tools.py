@@ -75,7 +75,11 @@ SERVER_TOOLS: list[dict[str, Any]] = [
         "Search the web. Required for anything current (latest, now, today) or not in the news store.",
         {
             "query": {"type": "string", "minLength": 1, "maxLength": 300},
-            "recency": {"type": "string", "enum": ["day", "week", "month", "any"]},
+            "recency": {
+                "type": "string",
+                "enum": ["day", "week", "month", "any"],
+                "description": "Only for breaking news; leave out for everything else.",
+            },
             "limit": {"type": "integer", "minimum": 1, "maximum": 8},
         },
         ["query"],
