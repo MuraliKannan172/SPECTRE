@@ -9,13 +9,13 @@ const TITLE_MAX = 110;
 export const NEWS_CATEGORY_LABELS = Object.freeze({
   disaster: msg('Disaster'),
   conflict: msg('Conflict'),
-  cyber: msg('Cyber'),
+  cyber: msg('Cybersecurity'),
   health: msg('Health'),
   space: msg('Space'),
   science: msg('Science'),
   economy: msg('Economy'),
   politics: msg('Politics'),
-  world: msg('World'),
+  world: msg('World affairs'),
 });
 
 /** The citation GDELT's terms require wherever its data is shown. */
@@ -52,7 +52,11 @@ export function primaryNewsLink(record) {
  * @param {number} nowMs - Current epoch milliseconds.
  * @param {{canOpen?: boolean}} [options] - Whether a click can open the link.
  */
-export function buildNewsCard(record, nowMs, { canOpen = true } = {}) {
+export function buildNewsCard(
+  record,
+  nowMs,
+  { canOpen = true, colocated = 0 } = {},
+) {
   const category = t(
     NEWS_CATEGORY_LABELS[record.category] ?? NEWS_CATEGORY_LABELS.world,
   );
@@ -68,6 +72,15 @@ export function buildNewsCard(record, nowMs, { canOpen = true } = {}) {
       }),
     ].join(' · '),
   ];
+  if (colocated > 0)
+    details.push(
+      tn(
+        colocated,
+        '{count} more story at this place · see the News panel',
+        '{count} more stories at this place · see the News panel',
+        { count: colocated },
+      ),
+    );
   if (record.viaGdelt) details.push(t(GDELT_CITATION));
   const link = canOpen ? primaryNewsLink(record) : null;
   if (link) details.push(t('Click the card to open the article ↗'));

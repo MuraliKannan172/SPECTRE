@@ -23,7 +23,7 @@ export const EONET_CATEGORIES = Object.freeze({
   landslides: Object.freeze({ color: '#A16207', label: msg('Landslides') }),
   drought: Object.freeze({ color: '#D97706', label: msg('Drought') }),
   dustHaze: Object.freeze({ color: '#D6D3D1', label: msg('Dust and haze') }),
-  snow: Object.freeze({ color: '#F8FAFC', label: msg('Snow') }),
+  snow: Object.freeze({ color: '#F8FAFC', label: msg('Heavy snow') }),
   tempExtremes: Object.freeze({
     color: '#F472B6',
     label: msg('Temperature extremes'),

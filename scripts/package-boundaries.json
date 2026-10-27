@@ -1730,6 +1730,7 @@
       "./standalone/catalog"
     ],
     "modules": [
+      "src/layers/news/freshness.js",
       "src/app/layers/news.js",
       "src/layers/news/index.js",
       "src/layers/news/source.js",
@@ -2606,6 +2607,7 @@
   "application-layer-construction": {
     "exports": ["./application/layers"],
     "modules": [
+      "src/layers/news/freshness.js",
       "src/app/layers/news.js",
       "src/app/layers/naturalEvents.js",
       "src/layers/eonet/index.js",

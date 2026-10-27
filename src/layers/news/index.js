@@ -16,6 +16,7 @@ import {
   NEWS_WINDOW_HOURS,
 } from './source.js';
 import { createNewsStream } from './stream.js';
+import { newsFreshness } from './freshness.js';
 import {
   NEWS_CLUSTER_COLOR,
   newsClusterSize,
@@ -26,9 +27,12 @@ export * from './cards.js';
 export * from './records.js';
 export * from './source.js';
 export * from './style.js';
+export * from './freshness.js';
 
 const PICK_PREFIX = 'news:';
 const LIST_LIMIT = 8;
+// Stories closer than this share a place: zooming will not separate them.
+const COLOCATED_METERS = 1_000;
 const CARD_HOST_OPTIONS = Object.freeze({
   cohortLimit: 1,
   collisionCapacity: 1,
@@ -98,6 +102,8 @@ export function createNewsLayer({
   let lastUpdate = null;
   let loading = false;
   let selectedId = null;
+  let selectedColocated = 0;
+  let panelOpener = null;
   let windowHours = NEWS_DEFAULT_WINDOW_HOURS;
   let categories = new Set();
   const records = new Map();
@@ -174,7 +180,10 @@ export function createNewsLayer({
       return;
     }
     const card = {
-      ...buildNewsCard(record, now(), { canOpen: Boolean(openExternal) }),
+      ...buildNewsCard(record, now(), {
+        canOpen: Boolean(openExternal),
+        colocated: selectedColocated,
+      }),
       position: Cesium.Cartesian3.fromDegrees(
         record.location.lon,
         record.location.lat,
@@ -189,8 +198,9 @@ export function createNewsLayer({
     overlayHost.setEntries(NEWS_OVERLAY_SOURCE_ID, [card], CARD_HOST_OPTIONS);
   }
 
-  function select(id, { focus = false } = {}) {
+  function select(id, { focus = false, colocated = 0 } = {}) {
     selectedId = records.has(id) ? id : null;
+    selectedColocated = selectedId === null ? 0 : colocated;
     publishCard();
     const record = selectedId === null ? null : records.get(selectedId);
     if (focus && record?.location && viewer?.camera) {
@@ -206,12 +216,28 @@ export function createNewsLayer({
     notify();
   }
 
-  function zoomToCluster(entities) {
+  /**
+   * A cluster click zooms in until the stories separate. Stories placed at
+   * the very same point (a country's center, say) never separate, so for
+   * those the newest is selected and its card says how many share the place.
+   */
+  function openCluster(entities) {
     const positions = entities
       .map((entity) => entity.position?.getValue?.(Cesium.JulianDate.now()))
       .filter(Boolean);
     if (!positions.length || !viewer?.camera) return;
     const sphere = Cesium.BoundingSphere.fromPoints(positions);
+    if (sphere.radius < COLOCATED_METERS) {
+      const ids = entities
+        .map((entity) => Number(String(entity.id).slice(PICK_PREFIX.length)))
+        .filter((id) => records.has(id))
+        .sort(
+          (a, b) =>
+            records.get(b).publishedAt - records.get(a).publishedAt || b - a,
+        );
+      if (ids.length) select(ids[0], { colocated: ids.length - 1 });
+      return;
+    }
     sphere.radius = Math.max(sphere.radius, 50_000);
     viewer.camera.flyToBoundingSphere(sphere, {
       duration: reduceMotion() ? 0 : 1.2,
@@ -249,7 +275,7 @@ export function createNewsLayer({
           String(entity?.id ?? '').startsWith(PICK_PREFIX),
         );
         if (mine.length) {
-          zoomToCluster(mine);
+          openCluster(mine);
           return;
         }
       }
@@ -289,6 +315,10 @@ export function createNewsLayer({
         cluster.billboard.image = image;
         cluster.billboard.verticalOrigin = Cesium.VerticalOrigin.CENTER;
         cluster.billboard.disableDepthTestDistance = 50_000;
+        // Cesium gives only the cluster's label the clustered entities as its
+        // id; the billboard drawn in its place needs them too, or a click on
+        // it picks nothing.
+        cluster.billboard.id = clustered;
       }
     });
   }
@@ -452,26 +482,37 @@ export function createNewsLayer({
       return () => subscribers.delete(listener);
     },
 
+    /** The drawer's own queries (any story, placed or not) through the source. */
+    searchStories(params, options) {
+      return source.search
+        ? source.search(params, options)
+        : Promise.resolve({ records: [], freshness: null });
+    },
+
+    /** The drawer registers how the row's "News panel" chip opens it. */
+    setPanelOpener(open) {
+      panelOpener = typeof open === 'function' ? open : null;
+      rowControlsListener?.();
+    },
+
     getRowControls() {
       const visible = newest().filter(wanted);
-      const status = error
-        ? t(error)
-        : freshness?.state === 'offline'
-          ? t('Every news source is failing; showing cached stories')
-          : freshness?.stale
-            ? t('Stale · updated {age} ago', {
-                age: formatNewsAge((freshness.ageSeconds ?? 0) * 1000),
-              })
-            : freshness?.ageSeconds != null
-              ? t('Updated {age} ago', {
-                  age: formatNewsAge(freshness.ageSeconds * 1000),
-                })
-              : loading
-                ? t('Loading news…')
-                : null;
+      const status = newsFreshness({ freshness, error, loading }).text;
       const gdelt = visible.some((record) => record.viaGdelt);
       return {
         chips: [
+          ...(panelOpener
+            ? [
+                {
+                  id: 'open-panel',
+                  label: t('News panel'),
+                  onClick: () => panelOpener?.(),
+                  title: t(
+                    'Search all stories, filter by region and source, and open every outlet',
+                  ),
+                },
+              ]
+            : []),
           ...NEWS_WINDOW_HOURS.map((hours) => ({
             id: `window-${hours}`,
             label: t(WINDOW_LABELS[hours]),

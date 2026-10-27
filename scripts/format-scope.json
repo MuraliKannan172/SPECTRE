@@ -1109,5 +1109,11 @@
   "src/layers/news/source.test.mjs",
   "src/layers/news/stream.js",
   "src/layers/news/style.js",
-  "src/layers/news/style.test.mjs"
+  "src/layers/news/style.test.mjs",
+  "src/layers/news/freshness.js",
+  "src/layers/news/freshness.test.mjs",
+  "src/layers/news/panel.js",
+  "src/layers/news/view.js",
+  "src/layers/news/view.test.mjs",
+  "src/theme/skynet-news.css"
 ]
