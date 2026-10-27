@@ -6,15 +6,16 @@
  *
  * Drives the real app in headless Chromium against a running dev server
  * (`npm run dev`, default :4173). Every /api/intel/chat* request is answered by
- * request interception with the payloads the intel service sends, so neither
- * the service nor Ollama is needed.
+ * request interception with the payloads the intel service sends, and the news
+ * feed with an empty live page, so neither the service nor Ollama is needed.
  *
  *   (i)   READY — the header shows the model, its load state and the search
  *         provider from /chat/status.
- *   (ii)  TURN — a message streams an answer; the globe tool the "model" asks
- *         for really runs (the camera moves) and its result is posted back;
- *         the answer shows tool progress, a citation chip, its source list,
- *         "As of" and tokens/s.
+ *   (ii)  TURN — a message streams an answer; the globe tools the "model" asks
+ *         for really run (the camera moves, the News layer turns on) and their
+ *         results are posted back; the answer shows tool progress, a citation
+ *         chip, its source list, "As of" and tokens/s. Regenerate re-asks the
+ *         question; Clear asks once more before deleting the history.
  *   (iii) OFFLINE — with Ollama reported unreachable, the header and the turn
  *         both say so plainly.
  *   (iv)  PHONE — at 375 px the panel is a sheet above the tab bar with no
@@ -48,6 +49,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // ── Mocked intel service (shapes from intel/app/api/chat.py) ──────────────
 const TURN_ID = 'a'.repeat(32);
 const CALL_ID = 'b'.repeat(12);
+const LAYER_CALL_ID = 'c'.repeat(12);
+const NEWS_FRESHNESS = {
+  state: 'live',
+  stale: false,
+  offline: false,
+  updated_at: new Date().toISOString(),
+  age_seconds: 60,
+  poll_seconds: 600,
+};
 const TOKYO = { latitude: 35.68, longitude: 139.69 };
 const CITATION = {
   n: 1,
@@ -103,6 +113,18 @@ const TURN = {
       },
     ],
     ['tool_status', { tool: 'fly_to_location', state: 'done' }],
+    // A SKYNET layer that only the Neural Core's copy of the enum names.
+    ['tool_status', { tool: 'set_layer_visibility', state: 'start' }],
+    [
+      'client_tool',
+      {
+        turn_id: TURN_ID,
+        call_id: LAYER_CALL_ID,
+        name: 'set_layer_visibility',
+        args: { layerId: 'news', enabled: true },
+      },
+    ],
+    ['tool_status', { tool: 'set_layer_visibility', state: 'done' }],
     ['tool_status', { tool: 'web_search', state: 'start', host: null }],
     ['citation', CITATION],
     ['tool_status', { tool: 'web_search', state: 'done' }],
@@ -127,6 +149,8 @@ const TURN = {
 
 let mode = 'ready';
 const toolResults = [];
+const turnBodies = [];
+let historyCleared = 0;
 
 function intercept(request) {
   const url = new URL(request.url());
@@ -137,18 +161,31 @@ function intercept(request) {
       body: JSON.stringify(body),
     });
   if (url.pathname === '/api/intel/chat/status') return json(STATUS[mode]);
-  if (url.pathname === '/api/intel/chat/history')
+  if (url.pathname === '/api/intel/chat/history') {
+    if (request.method() === 'DELETE') {
+      historyCleared += 1;
+      return request.respond({ status: 204, body: '' });
+    }
     return json({ conversation_id: null, messages: [] });
+  }
   if (url.pathname === '/api/intel/chat/tool-result') {
     toolResults.push(JSON.parse(request.postData() || '{}'));
     return request.respond({ status: 204, body: '' });
   }
-  if (url.pathname === '/api/intel/chat' && request.method() === 'POST')
+  // An empty but live news feed, so the News layer can turn on.
+  if (url.pathname === '/api/intel/news/stream')
+    return request.respond({ status: 204, body: '' });
+  if (url.pathname === '/api/intel/news')
+    return json({ items: [], next_cursor: null, freshness: NEWS_FRESHNESS });
+  if (url.pathname === '/api/intel/health') return json({ state: 'live' });
+  if (url.pathname === '/api/intel/chat' && request.method() === 'POST') {
+    turnBodies.push(JSON.parse(request.postData() || '{}'));
     return request.respond({
       status: 200,
       contentType: 'text/event-stream',
       body: TURN[mode],
     });
+  }
   return request.continue();
 }
 
@@ -277,10 +314,19 @@ async function run(page) {
       posted?.ok === true,
     JSON.stringify(posted)?.slice(0, 160),
   );
+  const layerResult = toolResults.find((r) => r.call_id === LAYER_CALL_ID);
+  const newsOn = await page.evaluate(() =>
+    window.__godsEyeView.dataManager.isEnabled('news'),
+  );
+  record(
+    'The Neural Core can turn on the News layer (a SKYNET layer)',
+    layerResult?.ok === true && newsOn === true,
+    JSON.stringify({ ok: layerResult?.ok, newsOn }),
+  );
   record(
     'Tool progress is shown and settles',
     answer.tools.join(' | ') ===
-      'done:Flying the camera | done:Searching the web',
+      'done:Flying the camera | done:Switching a layer | done:Searching the web',
     answer.tools.join(' | '),
   );
   const chip = answer.chips[0];
@@ -303,6 +349,56 @@ async function run(page) {
   await page.screenshot({
     path: path.join(SHOTS_DIR, 'skynet-neural-core.png'),
   });
+
+  // Regenerate replaces the answer; it does not add a second one.
+  await page.evaluate(() =>
+    [...document.querySelectorAll('.skynet-nc-regenerate')]
+      .find((button) => !button.hidden)
+      .click(),
+  );
+  await page.waitForFunction(
+    () =>
+      document.getElementById('skynet-neural-core').dataset.busy === 'false',
+    { timeout: 30_000 },
+  );
+  await sleep(300);
+  const afterRegenerate = await page.evaluate(() => ({
+    answers: document.querySelectorAll('.skynet-nc-msg.is-assistant').length,
+    questions: document.querySelectorAll('.skynet-nc-msg.is-user').length,
+  }));
+  record(
+    'Regenerate re-asks the same question and replaces the answer',
+    turnBodies.at(-1)?.regenerate === true &&
+      afterRegenerate.answers === 1 &&
+      afterRegenerate.questions === 1,
+    JSON.stringify({ body: turnBodies.at(-1), ...afterRegenerate }),
+  );
+
+  // Clear needs two clicks, then empties the conversation.
+  await page.evaluate(() => {
+    const clear = document.querySelector('.skynet-nc-header .skynet-nc-icon');
+    clear.click();
+  });
+  const armed = await page.evaluate(() => ({
+    label: document.querySelector('.skynet-nc-header .skynet-nc-icon')
+      .textContent,
+    messages: document.querySelectorAll('.skynet-nc-msg').length,
+  }));
+  await page.evaluate(() =>
+    document.querySelector('.skynet-nc-header .skynet-nc-icon').click(),
+  );
+  await sleep(500);
+  const cleared = await page.evaluate(
+    () => document.querySelectorAll('.skynet-nc-msg').length,
+  );
+  record(
+    'Clear history asks once more, then deletes and empties the list',
+    armed.label === 'Clear?' &&
+      armed.messages > 0 &&
+      historyCleared === 1 &&
+      cleared === 0,
+    JSON.stringify({ armed, historyCleared, cleared }),
+  );
 
   console.log('(iii) OFFLINE...');
   mode = 'offline';
