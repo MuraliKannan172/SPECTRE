@@ -436,6 +436,7 @@ export async function initKeySetup({
   const destroy = () => {
     if (disposed) return;
     disposed = true;
+    delete root.dataset.ready;
     unregisterUnsavedWork();
     lifetime.abort();
     signal?.removeEventListener('abort', destroy);
@@ -649,6 +650,7 @@ export async function initKeySetup({
         : msg('Turned off in {store}. Restarting — this page reloads itself.'),
     );
   });
+  root.dataset.ready = 'true';
   // Remove buttons are rendered per row; delegate so re-renders stay wired.
   rowsHost?.addEventListener('click', (event) => {
     const authButton = event.target?.closest?.(

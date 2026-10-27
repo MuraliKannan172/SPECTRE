@@ -913,6 +913,48 @@ test('markup, startup ordering and accessibility remain pinned', () => {
   assert.match(choicesBlock, /overflow-y: auto;/);
 });
 
+test('the card closes without a keyboard: the ESC hint is a button, kept on phones', () => {
+  const html = expandApplicationHtml(
+    fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8'),
+  );
+  const module = fs.readFileSync(
+    new URL('./firstRunExperience.js', import.meta.url),
+    'utf8',
+  );
+  // The whole stylesheet, so a hide rule added in any other file is caught too.
+  const css = readStylesheet(new URL('../style.css', import.meta.url));
+  const footer = html.slice(
+    html.indexOf('class="first-run-footer"'),
+    html.indexOf('data-first-run-status'),
+  );
+  assert.match(
+    footer,
+    /<button type="button" class="first-run-dismiss" data-first-run-dismiss>/,
+  );
+  assert.match(footer, /data-i18n>ESC to dismiss</);
+  assert.match(footer, /data-i18n>DISMISS</);
+  // It closes the way ESC does, through the one dismiss path, so the session
+  // flag and focus handling are the same.
+  assert.match(
+    module,
+    /querySelector\('\[data-first-run-dismiss\]'\)\s*\?\.addEventListener\('click', \(\) => dismiss\(\)\)/,
+  );
+  // Phones used to hide the hint, leaving no way out but picking a mission.
+  assert.doesNotMatch(css, /first-run-footer > span:last-child/);
+  assert.doesNotMatch(css, /\.first-run-dismiss\s*\{[^}]*display:\s*none/);
+  // A 44px touch target that does not add to the footer row's height.
+  assert.match(
+    css,
+    /\.first-run-dismiss::before \{[^}]*position: absolute;[^}]*height: 44px;/,
+  );
+  assert.doesNotMatch(css, /\.first-run-dismiss \{[^}]*min-height/);
+  // Touch screens read DISMISS rather than a key they do not have.
+  assert.match(
+    css,
+    /@media \(hover: none\) and \(pointer: coarse\) \{\s*\.first-run-dismiss-key \{\s*display: none;/,
+  );
+});
+
 test('the launcher keeps focus, restores it, and never disables the focused button', () => {
   const module = fs.readFileSync(
     new URL('./firstRunExperience.js', import.meta.url),
@@ -1010,13 +1052,15 @@ test('the voice TOOL SCHEMA matches the pinned contract — the mission mapping 
   // Globe rotation adds one camera motion and its descriptions; Globe View
   // framing/default guidance updates only move_camera and mode descriptions.
   // Radio markup and the complete production-request comparison pin locality.
-  // Restore the base camera/Globe View wording with the globe-rotation append.
+  // Panel adds timeout and named voice/provider targets; consolidated guidance
+  // preserves the mission mapping and globe-rotation arguments.
+  // S2 GhostMaps extends the generated layer enums; both feature contracts remain.
   // SKYNET: three descriptions name "the globe" instead of the product, 27
-  // characters shorter than upstream's 30878 (as at the fork point: 30655 vs 30628).
-  assert.equal(block.length, 30851, 'serialized tool schema length drifted');
+  // characters shorter than upstream's 31206 (upstream pins f772df95…).
+  assert.equal(block.length, 31179, 'serialized tool schema length drifted');
   assert.equal(
     crypto.createHash('sha256').update(block).digest('hex'),
-    '30fde695fba434c8188d7032bc5b1cbcf0f54b0363f48e24549a9198a5208971',
+    'a5aa01845100caf926be4864c750a3c6e3ddae955dcda1ee06c06d1a0d1c0432',
     'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
   );
   const instructions = fs.readFileSync(

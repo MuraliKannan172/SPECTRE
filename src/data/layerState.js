@@ -26,7 +26,7 @@ const NEW_SINGLE_CHARACTER_TOKEN_PATTERN = /^[0-9]$/;
  * out-of-grammar ID is rejected outright, because half an address is a
  * DIFFERENT aircraft, not a shorter name for the same one.
  */
-const TRACKING_ID_GRAMMAR = /^[0-9a-z~_-]{1,16}$/;
+export const TRACKING_ID_GRAMMAR = /^[0-9a-z~_-]{1,16}$/;
 /**
  * Ceilings for the untrusted v2 layer fields. The layer ceiling covers the
  * complete reserved one-character space plus every two-character base-36
@@ -634,16 +634,19 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     token: 'i',
     disposition: 'enabled-only',
   }),
-  // SKYNET layers:start. Tokens follow upstream's next-free rule; if upstream
-  // later claims 5 or 6, SKYNET renumbers its own at that merge.
+  // SKYNET layers:start. Upstream allocates 6-9, then 00, 01, ... in order;
+  // SKYNET takes 0y and 0z, clear of the next 38 upstream layers. Not further
+  // out: the compact share codec stores enabled layers as a bitset indexed by
+  // token number (0z is 71, so at most 4 extra bytes). News and Natural
+  // Events held 5 and 6 until upstream claimed 5 for s2-ghostmaps.
   Object.freeze({
     id: 'natural-events',
-    token: '6',
+    token: '0y',
     disposition: 'enabled-only',
   }),
   Object.freeze({
     id: 'news',
-    token: '5',
+    token: '0z',
     disposition: 'enabled+options',
     optionOwner: 'news',
   }),
@@ -663,6 +666,11 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
   Object.freeze({
     id: 'rocket-launches',
     token: 'x',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 's2-ghostmaps',
+    token: '5',
     disposition: 'enabled-only',
   }),
   Object.freeze({
