@@ -187,3 +187,21 @@ test('a stopped intel service shows the start instruction', async () => {
   assert.match(layer.getRowControls().info, /skynet\.ps1/);
   layer.disable();
 });
+
+test('the category filter string sets categories and is reported back', () => {
+  const { layer } = build({ records: [], freshness: null });
+  layer.setParams({ categoryFilter: 'cyber-conflict' });
+  assert.deepEqual(layer.getParams(), {
+    windowHours: 24,
+    categories: ['conflict', 'cyber'],
+    categoryFilter: 'conflict-cyber',
+  });
+  layer.setParams({ categoryFilter: 'not-a-category' });
+  assert.deepEqual(
+    layer.getParams().categories,
+    ['conflict', 'cyber'],
+    'an invalid filter changes nothing',
+  );
+  layer.setParams({ categoryFilter: '' });
+  assert.equal(layer.getParams().categoryFilter, '');
+});

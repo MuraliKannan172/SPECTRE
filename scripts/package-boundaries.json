@@ -672,6 +672,8 @@
   "ui-shell": {
     "exports": ["./ui/shell"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/i18n/marker.js",
       "src/ui/mobileShell.js",
       "src/exclusiveSurfaces.js",
@@ -954,6 +956,8 @@
   "civil-flights": {
     "exports": ["./layers/flights"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/i18n/marker.js",
       "src/cyberSonar.js",
       "src/data/aircraftClass.js",
@@ -1007,6 +1011,8 @@
   "military-flights": {
     "exports": ["./layers/military"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/i18n/marker.js",
       "src/cyberSonar.js",
       "src/data/aircraftClass.js",
@@ -1053,6 +1059,8 @@
   "aircraft-mechanics": {
     "exports": ["./aircraft"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/i18n/marker.js",
       "src/data/aircraftClass.js",
       "src/data/aircraftIcons.js",
@@ -1533,6 +1541,8 @@
   "radio-layer": {
     "exports": ["./layers/radio"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/data/iconOrientation.js",
       "src/data/idSwitches.js",
       "src/data/layerState.js",
@@ -1730,6 +1740,7 @@
       "./standalone/catalog"
     ],
     "modules": [
+      "src/layers/news/shareOptions.js",
       "src/layers/satelliteFootprint/index.js",
       "src/layers/satelliteFootprint/footprint.js",
       "src/layers/news/freshness.js",
@@ -2609,6 +2620,7 @@
   "application-layer-construction": {
     "exports": ["./application/layers"],
     "modules": [
+      "src/layers/news/shareOptions.js",
       "src/layers/satelliteFootprint/index.js",
       "src/layers/satelliteFootprint/footprint.js",
       "src/layers/news/freshness.js",
@@ -3268,6 +3280,8 @@
   "ui-share-restoration": {
     "exports": ["./ui/share-restoration"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/i18n/marker.js",
       "src/data/installationFeedback.js",
       "src/data/idSwitches.js",
@@ -3895,6 +3909,8 @@
   "tools": {
     "exports": ["./tools"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/branding.js",
       "src/tools/index.js",
       "src/tools/catalog.js",
@@ -4042,6 +4058,8 @@
   "view": {
     "exports": ["./view"],
     "modules": [
+      "src/layers/news/shareOptions.js",
+      "src/layers/news/records.js",
       "src/view/index.js",
       "src/data/idSwitches.js",
       "src/data/layerState.js",

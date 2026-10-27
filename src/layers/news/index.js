@@ -18,6 +18,10 @@ import {
 import { createNewsStream } from './stream.js';
 import { newsFreshness } from './freshness.js';
 import {
+  decodeNewsCategoryFilter,
+  encodeNewsCategoryFilter,
+} from './shareOptions.js';
+import {
   NEWS_CLUSTER_COLOR,
   newsClusterSize,
   newsMarkerStyle,
@@ -439,6 +443,14 @@ export function createNewsLayer({
         );
         refetch = true;
       }
+      // The share-link and stored-state form of the category filter.
+      const fromFilter = decodeNewsCategoryFilter(params.categoryFilter);
+      if (fromFilter) {
+        refetch ||=
+          encodeNewsCategoryFilter(fromFilter) !==
+          encodeNewsCategoryFilter([...categories]);
+        categories = new Set(fromFilter);
+      }
       if (NEWS_CATEGORIES.includes(params.toggleCategory)) {
         const next = new Set(categories);
         if (next.has(params.toggleCategory)) next.delete(params.toggleCategory);
@@ -457,7 +469,11 @@ export function createNewsLayer({
     },
 
     getParams() {
-      return { windowHours, categories: [...categories].sort() };
+      return {
+        windowHours,
+        categories: [...categories].sort(),
+        categoryFilter: encodeNewsCategoryFilter([...categories]),
+      };
     },
 
     /** The state the drawer and ticker render; plain data. */

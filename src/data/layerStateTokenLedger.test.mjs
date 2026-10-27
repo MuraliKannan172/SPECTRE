@@ -55,8 +55,10 @@ const UPSTREAM_RESERVATIONS = Object.fromEntries(
     ([id]) => !Object.hasOwn(SKYNET_RESERVATIONS, id),
   ),
 );
-const SKYNET_REGISTRY_BLOCK =
-  /\n {2}\/\/ SKYNET layers:start[\s\S]*?\/\/ SKYNET layers:end/;
+// Every SKYNET-marked block (imports, registry rows, option groups): the
+// fixtures below run upstream's codec alone.
+const SKYNET_BLOCKS =
+  /\n *\/\/ SKYNET ([a-z]+):start[\s\S]*?\/\/ SKYNET \1:end/g;
 
 test('pre-ledger published ownership is independent of the candidate mapping', () => {
   assert.notStrictEqual(
@@ -119,7 +121,7 @@ function writeCodecFixture(cwd, rows, entries) {
     readFileSync(new URL('./idSwitches.js', import.meta.url)),
   );
   const source = readFileSync(CODEC_SOURCE_PATH, 'utf8').replace(
-    SKYNET_REGISTRY_BLOCK,
+    SKYNET_BLOCKS,
     '',
   );
   const registryEnd = ']);\n\nexport const REGISTERED_LAYER_IDS';

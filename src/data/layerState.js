@@ -2,6 +2,9 @@
 // Local, not i18n/marker.js: the token-ledger tests run this file in isolation.
 const msg = (text) => text;
 import { normalizeIdSwitches, patchRequestedIdSwitches } from './idSwitches.js';
+// SKYNET imports:start
+import { NEWS_SHARE_OPTIONS } from '../layers/news/shareOptions.js';
+// SKYNET imports:end
 import reservationRows from './layerStateTokenReservations.json' with { type: 'json' };
 
 const VALID_DISPOSITIONS = new Set([
@@ -449,6 +452,9 @@ const OPTION_GROUPS = Object.freeze({
         /^\d{1,3}$/.test(value) ? normalizeVolume(Number(value) / 100) : null,
     }),
   ]),
+  // SKYNET options:start
+  news: NEWS_SHARE_OPTIONS,
+  // SKYNET options:end
 });
 
 export const SHARE_TRACKING_RESTORE_POLICIES = Object.freeze({
@@ -635,7 +641,12 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     token: '6',
     disposition: 'enabled-only',
   }),
-  Object.freeze({ id: 'news', token: '5', disposition: 'enabled-only' }),
+  Object.freeze({
+    id: 'news',
+    token: '5',
+    disposition: 'enabled+options',
+    optionOwner: 'news',
+  }),
   // SKYNET layers:end
   Object.freeze({
     id: 'radio',
