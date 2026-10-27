@@ -75,8 +75,9 @@ full-suite load and passes alone. `src/data/geoFileImport.test.mjs`
 ("repeated incomplete KML roots finish within an isolated process deadline")
 has a 5 s wall-clock budget that is almost all the child's Cesium import
 (1.4 s idle, 5.3 s with a dev server and a live Cesium tab running, against
-about 50 ms for the KML work itself). It can fail alone while those run and
-passes in about 1.6 s once they are stopped. `src/terrainHeightsBounds.test.mjs` fails
+about 50 ms for the KML work itself). It can fail alone while those run, or
+under the full suite's parallel load, and passes alone in about 1.5 s once
+they are stopped. `src/terrainHeightsBounds.test.mjs` fails
 ("1 !== 2") once a dev server has written `.gev-cache/terrain-heights.json`,
 because the test reads the real cache; it passes with that file moved aside.
 Anything else failing is a regression.
