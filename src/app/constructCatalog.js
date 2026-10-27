@@ -29,6 +29,8 @@ import { createApplicationFirePerimeters } from './layers/perimeters.js';
 import { createApplicationGnssIntegrity } from './layers/gnss.js';
 import { createApplicationCables } from './layers/submarineCables.js';
 import { createApplicationStreetLevel } from './layers/streetLevel.js';
+import { createApplicationNews } from './layers/news.js';
+import { createApplicationNaturalEvents } from './layers/naturalEvents.js';
 import { createInfrastructureLayers } from '../data/infrastructure.js';
 import { localGeoJsonServices } from './localGeojsonServices.js';
 
@@ -169,6 +171,9 @@ export function createApplicationCatalog({
           source: 'NASA FIRMS · LIVE',
           feed: sources.firms,
         }),
+        // SKYNET: news from the local intel service and NASA EONET events.
+        createApplicationNews({ source: sources.news }),
+        createApplicationNaturalEvents({ source: sources['natural-events'] }),
       ],
       metadata,
     );

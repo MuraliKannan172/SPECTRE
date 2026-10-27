@@ -1092,5 +1092,22 @@
   "server/providers/intel.js",
   "src/tooling/intelProxy.test.mjs",
   "server/providers/eonet.js",
-  "src/tooling/eonetProxy.test.mjs"
+  "src/tooling/eonetProxy.test.mjs",
+  "src/app/layers/naturalEvents.js",
+  "src/app/layers/news.js",
+  "src/layers/eonet/cards.js",
+  "src/layers/eonet/eonet.test.mjs",
+  "src/layers/eonet/index.js",
+  "src/layers/eonet/source.js",
+  "src/layers/news/cards.js",
+  "src/layers/news/index.js",
+  "src/layers/news/index.test.mjs",
+  "src/layers/news/records.js",
+  "src/layers/news/records.test.mjs",
+  "src/layers/news/shareLink.test.mjs",
+  "src/layers/news/source.js",
+  "src/layers/news/source.test.mjs",
+  "src/layers/news/stream.js",
+  "src/layers/news/style.js",
+  "src/layers/news/style.test.mjs"
 ]

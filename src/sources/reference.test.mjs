@@ -18,7 +18,14 @@ test('reference factories retain compatibility without starting acquisition or s
     'fire-perimeters',
     'cables',
     'gnss-integrity',
+    // SKYNET
+    'news',
+    'natural-events',
   ]);
+  assert.notEqual(first.news, second.news);
+  assert.notEqual(first['natural-events'], second['natural-events']);
+  assert.equal(typeof first.news.getSnapshot, 'function');
+  assert.equal(typeof first['natural-events'].getSnapshot, 'function');
   assert.notEqual(first.earthquakes, second.earthquakes);
   assert.notEqual(first['air-quality'], second['air-quality']);
   assert.notEqual(first['fire-perimeters'], second['fire-perimeters']);

@@ -29,5 +29,7 @@
   ["weather-lightning", "l"],
   ["weather-radar", "v"],
   ["weather-satellite", "o"],
-  ["wind", "k"]
+  ["wind", "k"],
+  ["news", "5"],
+  ["natural-events", "6"]
 ]

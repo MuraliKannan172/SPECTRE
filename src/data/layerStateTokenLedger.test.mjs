@@ -37,12 +37,26 @@ const CHECKER_PATH = fileURLToPath(
 const NEXT_PATH = fileURLToPath(
   new URL('../../scripts/next-layer-state-token.mjs', import.meta.url),
 );
-const reservationRows = JSON.parse(
+const productionRows = JSON.parse(
   readFileSync(
     new URL('./layerStateTokenReservations.json', import.meta.url),
     'utf8',
   ),
 );
+// SKYNET: the allocation simulations below model upstream's ledger, so
+// SKYNET's own reservations are taken out of their fixtures (rows here, the
+// marked registry block in writeCodecFixture) and pinned separately.
+const SKYNET_RESERVATIONS = Object.freeze({ news: '5', 'natural-events': '6' });
+const reservationRows = productionRows.filter(
+  ([id]) => !Object.hasOwn(SKYNET_RESERVATIONS, id),
+);
+const UPSTREAM_RESERVATIONS = Object.fromEntries(
+  Object.entries(LAYER_STATE_TOKEN_RESERVATIONS).filter(
+    ([id]) => !Object.hasOwn(SKYNET_RESERVATIONS, id),
+  ),
+);
+const SKYNET_REGISTRY_BLOCK =
+  /\n {2}\/\/ SKYNET layers:start[\s\S]*?\/\/ SKYNET layers:end/;
 
 test('pre-ledger published ownership is independent of the candidate mapping', () => {
   assert.notStrictEqual(
@@ -104,7 +118,10 @@ function writeCodecFixture(cwd, rows, entries) {
     providerCodec,
     readFileSync(new URL('./idSwitches.js', import.meta.url)),
   );
-  const source = readFileSync(CODEC_SOURCE_PATH, 'utf8');
+  const source = readFileSync(CODEC_SOURCE_PATH, 'utf8').replace(
+    SKYNET_REGISTRY_BLOCK,
+    '',
+  );
   const registryEnd = ']);\n\nexport const REGISTERED_LAYER_IDS';
   assert.equal(source.split(registryEnd).length, 2);
   const additions = entries
@@ -125,12 +142,15 @@ function writeCodecFixture(cwd, rows, entries) {
 
 test('reservation ledger is complete, pinned, and rejects duplicate or malformed rows', () => {
   assert.deepEqual(
-    { ...parseLayerStateTokenReservations(reservationRows) },
+    { ...parseLayerStateTokenReservations(productionRows) },
     { ...LAYER_STATE_TOKEN_RESERVATIONS },
   );
-  assert.equal(Object.keys(LAYER_STATE_TOKEN_RESERVATIONS).length, 31);
+  // SKYNET's reservations, then upstream's 31 exactly as published.
+  for (const [id, token] of Object.entries(SKYNET_RESERVATIONS))
+    assert.equal(LAYER_STATE_TOKEN_RESERVATIONS[id], token, id);
+  assert.equal(Object.keys(UPSTREAM_RESERVATIONS).length, 31);
   assert.deepEqual(
-    { ...LAYER_STATE_TOKEN_RESERVATIONS },
+    { ...UPSTREAM_RESERVATIONS },
     {
       ...LEGACY_LAYER_STATE_TOKENS,
       'street-level': '0',
@@ -360,7 +380,7 @@ test('an isolated valid two-character fixture round-trips an l field beyond the 
     );
     assert.equal(
       validateLayerStateAllocations(
-        LAYER_STATE_TOKEN_RESERVATIONS,
+        UPSTREAM_RESERVATIONS,
         codec.LAYER_STATE_TOKEN_RESERVATIONS,
       ),
       true,
