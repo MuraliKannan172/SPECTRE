@@ -78,6 +78,10 @@ a 5 s wall-clock budget). `src/terrainHeightsBounds.test.mjs` fails
 because the test reads the real cache; it passes with that file moved aside.
 Anything else failing is a regression.
 
+`npm run qa:skynet-news` (needs `npm run dev` on port 4173; fixtures only,
+no intel service or network) is the News, Natural Events and share-link
+smoke test and should pass in full.
+
 `npm run test:track` (needs `npm run dev` on port 4173) fails the "arrival:
 moveEnd + first reveal" check at its 500 ms deadline under headless software
 GL on this machine; upstream fails it the same way.
