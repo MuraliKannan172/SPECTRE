@@ -39,7 +39,7 @@ The script runs 15 prompts, scored pass or fail, plus 3 refusal prompts scored s
 
 - It runs the service's own app in-process on a copy of the intel database, with the scheduler off. The real chat history is untouched.
 - Globe calls get a plain success result. These prompts measure the model's choice of tool, not the globe.
-- Real globe execution is covered elsewhere: by `npm run qa:neural-core` (the camera really moves) and by live checks in the app.
+- Real globe execution is covered elsewhere: by `npm run qa:neural-core` (the camera really moves and the News layer really turns on) and by live checks in the app.
 
 ### What the score does not measure
 
