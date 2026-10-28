@@ -5,6 +5,7 @@ import cesium from 'vite-plugin-cesium';
 import { DEFAULT_ALLOWED_HOSTS, hostCheckPlugin } from './allowedHosts.js';
 import { embedFramingPlugin } from './embed-framing.js';
 import { panelBuildPlugin } from './panel.js';
+import { spectreBootHtmlPlugins } from './spectreBootHtml.js';
 
 /**
  * The repository root (this file lives at `<root>/build/vite.js`), as a
@@ -157,6 +158,8 @@ export function createBrowserViteConfig({
       cesium(),
       applicationHtmlPlugin(),
       brandingHtmlPlugin(),
+      // SPECTRE: the boot overlay's own early chunk; Cesium.js deferred.
+      ...spectreBootHtmlPlugins(),
       ...plugins,
       embedFramingPlugin(),
       panelBuildPlugin(),
