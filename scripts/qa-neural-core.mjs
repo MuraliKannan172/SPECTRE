@@ -327,11 +327,24 @@ async function ask(page, text) {
   });
 }
 
-/** Hold the mic button down for `ms` with the mouse (a real gesture). */
-async function holdMic(page, ms) {
+/**
+ * Hold the mic button down with the mouse (a real gesture): with
+ * `untilListening`, first until the panel says the microphone is recording
+ * (it can take a moment to open), then for `ms` more, as a person would.
+ */
+async function holdMic(page, ms, { untilListening = false } = {}) {
   const box = await (await page.$('.skynet-nc-mic')).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
+  if (untilListening)
+    await page
+      .waitForFunction(
+        () =>
+          document.querySelector('.skynet-nc-voice')?.dataset.code ===
+          'listening',
+        { timeout: 10_000 },
+      )
+      .catch(() => {});
   await sleep(ms);
   await page.mouse.up();
   await sleep(300);
@@ -538,7 +551,7 @@ async function run(page) {
     { timeout: 15_000 },
   );
   const turnsBefore = turnBodies.length;
-  await holdMic(page, 1500);
+  await holdMic(page, 1500, { untilListening: true });
   await page
     .waitForFunction(
       () =>

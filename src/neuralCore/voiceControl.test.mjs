@@ -107,6 +107,18 @@ test('hold, speak, release: the transcript becomes a question', async () => {
   assert.ok(calls.spoken >= 1, 'a press silences any reply being spoken');
 });
 
+test('it says Listening only once the microphone is really recording', async () => {
+  const { control, recorder } = setup();
+  let open;
+  recorder.start = () => new Promise((resolve) => (open = resolve));
+  control.mic.fire('pointerdown');
+  await tick();
+  assert.equal(control.hint.dataset.code, 'opening');
+  open(true);
+  await tick();
+  assert.equal(control.hint.dataset.code, 'listening');
+});
+
 test('the keyboard works the same way, ignoring key repeat', async () => {
   const { control, calls } = setup();
   control.mic.fire('keydown', { key: ' ' });

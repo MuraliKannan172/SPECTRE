@@ -185,6 +185,7 @@ const VOICE_TEXT = Object.freeze({
   voice_loading: msg('Local voice is loading…'),
   voice_failed: msg('Local voice failed to load; see the intel service log.'),
   voice_unavailable: msg('Local voice is not available.'),
+  opening: msg('Opening the microphone…'),
   listening: msg('Listening… release to send'),
   transcribing: msg('Transcribing…'),
   speaking: msg('Speaking… press the mic to stop'),
