@@ -92,6 +92,17 @@ The Neural Core eval needs Ollama and network for web search:
 `uv run --project intel python intel/scripts/neural_core_eval.py --model <tag>`.
 It writes `docs/phase4/eval-<model>.json`; web prompts can fail when the
 keyless ddgs search returns nothing, which the answer itself should admit.
+Local voice (Phase 5) is opt-in: `.\scripts\skynet.ps1 -Voice` installs the
+intel `voice` extra and fetches the pinned models into `intel/data/voice/`.
+A plain `uv sync --project intel` (without `--extra voice`) removes the voice
+packages; `skynet.ps1 -Sync` keeps them. The real-engine tests run only with
+`$env:SKYNET_VOICE_TEST_DIR` set to a copy of the models (never
+`intel/data`). The latency bench,
+`node scripts/bench-local-voice.mjs --runs 3 --clear-history`, needs the dev
+server, the intel service with voice ready and Ollama; `--clear-history`
+deletes the chat history, so run it only against an intel service whose
+`SKYNET_INTEL_DB` is a copy.
+
 Tool schemas are generated: after changing `src/tools/registry.js` run
 `npm run tools:export`, after changing `intel/app/chat/tools.py` run
 `uv run --project intel python intel/scripts/export_tools.py`; tests on both

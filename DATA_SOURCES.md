@@ -81,6 +81,16 @@ The Neural Core reads the web only when a question needs it, and only from the i
 | Any public http(s) page the model asks to read | `fetch_page` | Read once, as text, for that answer: robots.txt is honoured, at most 1 MB, 10 s and 3 redirects, public addresses only (SSRF guard). Shown to the model as untrusted data; never stored. |
 | Ollama on this machine (`OLLAMA_HOST`) | the chat model | Local inference; models keep their own licences (`bonsai-2:9b`, `qwen3.5-9b`). No prompt or answer leaves the machine except the search queries and page requests above. |
 
+### SKYNET Neural Core: local voice (`intel/app/voice/`, opt-in)
+
+Push-to-talk in the Neural Core panel. Speech is recognised and spoken on this machine: a recording is sent once, to the local intel service, and is never stored or logged; its transcript is kept like a typed question. Nothing here is installed or downloaded until you run `scripts\skynet.ps1 -Voice`, which installs the `voice` extra and fetches the models below into `intel/data/voice/` (gitignored), checking each file against a pinned SHA-256.
+
+| Model or component | Used for | Licence / source |
+| --- | --- | --- |
+| faster-whisper `base` (Systran, CTranslate2 conversion of OpenAI Whisper base), revision `ebe41f70` | speech to text | MIT; `huggingface.co/Systran/faster-whisper-base` |
+| Kokoro-82M (hexgrad), int8 ONNX export and voice pack `voices-v1.0.bin` from kokoro-onnx | text to speech (English voices only) | Apache-2.0 weights and voices; kokoro-onnx MIT; `github.com/thewh1teagle/kokoro-onnx` release `model-files-v1.0` |
+| espeak-ng (through phonemizer and espeakng-loader) | turning text into phonemes for Kokoro | **GPL-3.0** (phonemizer GPL-3.0-or-later). Installed only with the opt-in `voice` extra; see NOTICE.md. |
+
 ---
 
 ## Live sources (fetched at runtime — not stored in this repo)
