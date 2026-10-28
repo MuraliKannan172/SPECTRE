@@ -38,8 +38,26 @@ test('the header and loader show the emblem mark shipped in public/brand', () =>
   }
   assert.ok(existsSync(publicFile(BRANDING.logo)), BRANDING.logo);
   // The opaque master is for docs only, never the shipped bundle.
-  assert.ok(existsSync(new URL('../docs/brand/spectre-logo-source.png', import.meta.url)));
+  assert.ok(
+    existsSync(
+      new URL('../docs/brand/spectre-logo-source.png', import.meta.url),
+    ),
+  );
   assert.ok(!existsSync(publicFile('/brand/spectre-logo-source.png')));
+});
+
+test('the theme reds match BRANDING.colors, so a revert cannot half-apply', () => {
+  const css = read('src/theme/spectre.css');
+  const token = (name) =>
+    css
+      .match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1]
+      .trim()
+      .toLowerCase();
+  const { accent, accentDeep } = BRANDING.colors;
+  assert.equal(token('sp-red'), accent.toLowerCase());
+  assert.equal(token('sp-red-deep'), accentDeep.toLowerCase());
+  const rgb = [1, 3, 5].map((i) => parseInt(accent.slice(i, i + 2), 16));
+  assert.equal(token('sp-red-rgb'), rgb.join(', '));
 });
 
 test('index.html takes its product name and colour from branding tokens', () => {

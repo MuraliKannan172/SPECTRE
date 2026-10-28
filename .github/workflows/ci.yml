@@ -185,9 +185,9 @@ jobs:
       - name: Run tests (no network)
         run: uv run --project intel pytest intel/tests
 
-  # SPECTRE: the News, Natural Events, share-link and Neural Core panel smoke
-  # tests. Hermetic: every /api/intel and /api/eonet request is answered by
-  # fixtures, so no intel service, Ollama or network is needed.
+  # SPECTRE: the News, Natural Events, share-link, Neural Core panel and boot
+  # overlay smoke tests. Hermetic: every /api/intel and /api/eonet request is
+  # answered by fixtures, so no intel service, Ollama or network is needed.
   spectre-browser:
     name: SPECTRE browser smoke
     runs-on: ubuntu-latest
@@ -227,6 +227,9 @@ jobs:
 
       - name: Neural Core panel
         run: npm run qa:neural-core -- --url http://localhost:4173
+
+      - name: Boot overlay and brand glitch
+        run: npm run qa:spectre-boot -- --url http://localhost:4173
 
       - name: Preview server log
         if: failure()
