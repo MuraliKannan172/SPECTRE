@@ -15,6 +15,8 @@ import { createNeuralCoreClient } from '../neuralCore/client.js';
 import { layerStateSnapshot, viewportSnapshot } from '../neuralCore/context.js';
 import { createClientToolExecutor } from '../neuralCore/executor.js';
 import { mountNeuralCorePanel } from '../neuralCore/panel.js';
+import { bootStep, reportGlobe, reportLayers } from '../boot/appSignals.js';
+import { mountBrandSettings } from '../boot/settings.js';
 
 // The existing controls and layer catalog contain page-scoped state.
 let constructed = false;
@@ -56,21 +58,27 @@ export function createStandaloneApplication({
         resolveApiKey: () => googleApiKey,
         signal: context.signal,
       });
-      const scene = await createStandaloneScene({
-        ...context,
-        googleApiKey,
-        // Without a key, Google 3D can still load with tokens from the
-        // app's server when it offers them.
-        googleTokens: googleApiKey ? null : createGoogleTokenSource(),
-        cesiumToken,
-        loaderStatus,
-      });
-      catalog = createStandaloneCatalog({
-        sources,
-        streetLevelProviders,
-        signal: context.signal,
-        surface: scene.operations.surface,
-      });
+      // SPECTRE: the boot overlay's GLOBE ENGINE and DATA LAYERS rows.
+      const scene = await bootStep('globe', () =>
+        createStandaloneScene({
+          ...context,
+          googleApiKey,
+          // Without a key, Google 3D can still load with tokens from the
+          // app's server when it offers them.
+          googleTokens: googleApiKey ? null : createGoogleTokenSource(),
+          cesiumToken,
+          loaderStatus,
+        }),
+      );
+      reportGlobe(scene);
+      catalog = await bootStep('layers', () =>
+        createStandaloneCatalog({
+          sources,
+          streetLevelProviders,
+          signal: context.signal,
+          surface: scene.operations.surface,
+        }),
+      );
       return scene;
     },
     createControls: (context) =>
@@ -80,8 +88,13 @@ export function createStandaloneApplication({
         placeSearch,
         catalog,
       }),
-    createData: (context) =>
-      createStandaloneData({ ...context, allowQaRegistration, catalog }),
+    createData: async (context) => {
+      const data = await bootStep('layers', () =>
+        createStandaloneData({ ...context, allowQaRegistration, catalog }),
+      );
+      reportLayers(catalog);
+      return data;
+    },
     createTools: async (context) => {
       const tools = await createStandaloneTools({
         ...context,
@@ -105,6 +118,8 @@ export function createStandaloneApplication({
         onOpen: () => newsPanel?.close(),
       });
       context.defer(() => neuralCore.destroy());
+      const brandSettings = mountBrandSettings(document);
+      if (brandSettings) context.defer(brandSettings);
       const news = catalog?.layers?.find((layer) => layer.id === 'news');
       if (news?.subscribe) {
         newsPanel = mountNewsPanel({

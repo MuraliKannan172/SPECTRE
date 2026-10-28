@@ -1,5 +1,14 @@
 # Changelog
 
+- **SPECTRE boot overlay and brand glitch.** The emblem assembles on black
+  while the app loads behind it, with four status rows fed by real signals:
+  the globe's first frame, the layer catalog, `/api/intel/health` and
+  `/api/intel/chat/status` (each probe times out after 3 s; nothing holds the
+  app past 9 s). Any key or click skips it. Display ▸ Boot animation
+  (Full / Short / Off) and Brand glitch (On / Off); `?boot=off|short|full`
+  overrides, embedded views never show it, and reduced motion gets a static
+  logo. The header mark glitches on hover and now and then while idle, never
+  in recording or clean view. `npm run qa:spectre-boot` is its smoke test.
 - **Renamed SKYNET → SPECTRE** ("Global Intelligence Dashboard"). Every name
   that is ours now says SPECTRE; God's Eye View's credits are unchanged.
   **Breaking:**

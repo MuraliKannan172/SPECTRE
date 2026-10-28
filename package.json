@@ -55,6 +55,7 @@
     "qa:transit": "node scripts/qa-transit.mjs",
     "qa:spectre-news": "node scripts/qa-spectre-news.mjs",
     "qa:neural-core": "node scripts/qa-neural-core.mjs",
+    "qa:spectre-boot": "node scripts/qa-spectre-boot.mjs",
     "tools:export": "node scripts/export-neural-core-tools.mjs",
     "mcp": "node server/mcp/stdio.js"
   },

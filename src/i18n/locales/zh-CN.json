@@ -2913,5 +2913,32 @@
   "REAL-TIME": "实时",
   "ANALYZE": "分析",
   "PREDICT": "预测",
-  "GLOBAL INSIGHTS": "全球洞察"
+  "GLOBAL INSIGHTS": "全球洞察",
+  "intel service offline": "情报服务离线",
+  "unexpected reply": "意外的响应",
+  "no active feeds": "没有活动的信息源",
+  "{count} feeds": {
+    "other": "{count} 个信息源"
+  },
+  "stale feeds {stale}/{total}": "过时的信息源 {stale}/{total}",
+  "Ollama not reachable": "无法连接 Ollama",
+  "{model} not pulled": "{model} 未下载",
+  "model check failed": "模型检查失败",
+  "{model}, JSON tool calls": "{model}，JSON 工具调用",
+  "fell back to {basemap}": "已回退到 {basemap}",
+  "{count} layers": {
+    "other": "{count} 个图层"
+  },
+  "{unavailable} of {count} layers unavailable": "{count} 个图层中有 {unavailable} 个不可用",
+  "Boot animation": "启动动画",
+  "Short": "简短",
+  "Off": "关",
+  "Brand glitch": "品牌故障效果",
+  "On": "开",
+  "ONLINE": "在线",
+  "NO RESPONSE": "无响应",
+  "GLOBE ENGINE": "地球引擎",
+  "INTEL SERVICE": "情报服务",
+  "PRESS ANY KEY OR CLICK TO SKIP": "按任意键或点击以跳过",
+  "{name} startup status": "{name} 启动状态"
 }

@@ -3129,5 +3129,38 @@
   "REAL-TIME": "В РЕАЛЬНОМ ВРЕМЕНИ",
   "ANALYZE": "АНАЛИЗ",
   "PREDICT": "ПРОГНОЗ",
-  "GLOBAL INSIGHTS": "ГЛОБАЛЬНЫЙ ОБЗОР"
+  "GLOBAL INSIGHTS": "ГЛОБАЛЬНЫЙ ОБЗОР",
+  "intel service offline": "сервис разведки не в сети",
+  "unexpected reply": "неожиданный ответ",
+  "no active feeds": "нет активных лент",
+  "{count} feeds": {
+    "one": "{count} лента",
+    "few": "{count} ленты",
+    "many": "{count} лент",
+    "other": "{count} ленты"
+  },
+  "stale feeds {stale}/{total}": "устаревшие ленты {stale}/{total}",
+  "Ollama not reachable": "Ollama недоступна",
+  "{model} not pulled": "{model} не загружена",
+  "model check failed": "не удалось проверить модель",
+  "{model}, JSON tool calls": "{model}, вызовы инструментов через JSON",
+  "fell back to {basemap}": "переключено на {basemap}",
+  "{count} layers": {
+    "one": "{count} слой",
+    "few": "{count} слоя",
+    "many": "{count} слоёв",
+    "other": "{count} слоя"
+  },
+  "{unavailable} of {count} layers unavailable": "недоступно слоёв: {unavailable} из {count}",
+  "Boot animation": "Анимация запуска",
+  "Short": "Короткий",
+  "Off": "Выкл.",
+  "Brand glitch": "Глитч логотипа",
+  "On": "Вкл.",
+  "ONLINE": "В СЕТИ",
+  "NO RESPONSE": "НЕТ ОТВЕТА",
+  "GLOBE ENGINE": "ДВИЖОК ГЛОБУСА",
+  "INTEL SERVICE": "СЕРВИС РАЗВЕДКИ",
+  "PRESS ANY KEY OR CLICK TO SKIP": "НАЖМИТЕ ЛЮБУЮ КЛАВИШУ ИЛИ ЩЁЛКНИТЕ, ЧТОБЫ ПРОПУСТИТЬ",
+  "{name} startup status": "Состояние запуска {name}"
 }
