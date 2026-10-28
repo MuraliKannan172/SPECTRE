@@ -39,7 +39,11 @@ Seconds from releasing the mic button. Median of 3 runs, range in brackets.
   - News store: each run searched the news store.
   - Web: each run searched the web.
   - All 9 transcripts were right. The web question came back as "who won the most recent Formula 1 race."
-- **Speech did not slow the chat model.** Spoken and typed turns generated at the same speed within run-to-run noise. Kokoro and Whisper run on CPU threads while qwen's offloaded layers also use the CPU.
+- **With long answers, speaking slowed generation by about 11%.**
+  - News answers averaged about 820 characters, so Kokoro was speaking while qwen was still writing. Both use the CPU: qwen has about 19% of its layers there.
+  - Spoken news turns ran at 24.6–25.0 tokens/s and typed ones at 26.1–28.2. The ranges do not overlap. This is 3 runs each.
+  - Globe and web answers were short (72–226 characters), so most of the speech came after generation ended, and those rows show no difference. That does not show speech is free.
+  - Every typed run came straight after a spoken one, so an ordering effect cannot be ruled out.
 
 ## Where the time goes
 
@@ -52,10 +56,12 @@ Seconds from releasing the mic button. Median of 3 runs, range in brackets.
 
 ## Limits of this measurement
 
-- **The questions are synthetic speech** (Kokoro reading the question), not a person at a microphone. Real speech, accents and room noise will be harder for whisper `base`.
+- **The questions are synthetic speech** (Kokoro reading the question), not a person at a microphone. Real speech, accents and room noise will be harder for whisper `base`. No real microphone, permission prompt or human voice was tested.
+- **"First word heard" is when the page starts the audio** (`AudioBufferSourceNode.start()` in headless Chrome, which may have no real output device). The output device's own latency is not included, and Bluetooth headphones add noticeably more. Nobody listened through speakers during the bench.
 - **Answers are English only.** Spoken replies are English only, so a question detected as another language is answered in text with a note.
 - **Each phase was timed once per run, with 3 runs per question.** It is a small sample, and web timings depend on what the search returns that minute.
 - **Cold start is not included.**
-  - The voice engines load in 1.6–4 s when the service starts, in the background; requests get `503 voice_loading` until then.
+  - The voice engines loaded in 1.6–4 s when the service started, in the background; requests get `503 voice_loading` until then. Those loads came right after the models were downloaded, with the files in the OS cache. Kokoro's first load in the design probe took 10.1 s, so a load after a reboot will take longer; that was not measured.
+  - The engines' memory use (on a 16 GB machine also running qwen) was not measured.
   - qwen's cold load (26.5 s in Phase 4) was taken by the warm-up turn.
 - **A browser on the RTX GPU was not measured.** The browser drew on the Intel iGPU; one on the RTX would compete with qwen for its 8 GB.
