@@ -4,7 +4,7 @@ import * as Cesium from 'cesium';
 export const ESRI_ATTRIBUTION_HTML =
   '<a href="https://www.esri.com" target="_blank" rel="noopener">Powered by Esri</a>';
 
-// SKYNET: Blue Marble shaded relief and bathymetry from NASA GIBS. Cloud-free
+// SPECTRE: Blue Marble shaded relief and bathymetry from NASA GIBS. Cloud-free
 // and public domain, but only to zoom 8 (about 600 m per pixel at the
 // equator), so city close-ups are soft.
 export const GIBS_BASEMAP_URL =

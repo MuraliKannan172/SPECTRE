@@ -1,5 +1,5 @@
 /**
- * SKYNET services for `npm run doctor` (ADR-001 phase 6): the intel service,
+ * SPECTRE services for `npm run doctor` (ADR-001 phase 6): the intel service,
  * Ollama and the chat model, web search, local voice, GPU memory, and whether
  * any local service listens on this machine's network address.
  *
@@ -119,10 +119,9 @@ export async function inspectServices({
   exposure = exposedServices,
   timeoutMs = PROBE_MS,
 } = {}) {
-  const intelUrl = String(readEnv('SKYNET_INTEL_URL') || DEFAULT_INTEL).replace(
-    /\/+$/,
-    '',
-  );
+  const intelUrl = String(
+    readEnv('SPECTRE_INTEL_URL') || DEFAULT_INTEL,
+  ).replace(/\/+$/, '');
   const services = {
     intel: { url: intelUrl, reachable: false, state: null, stories: null },
     chat: null,
@@ -166,7 +165,7 @@ const gb = (bytes) => (bytes / 1e9).toFixed(1);
 
 /** The services as report lines; [OK], [WARN] or [--] like the setup report. */
 export function formatServicesReport(services) {
-  const lines = ['SKYNET services (information only):'];
+  const lines = ['SPECTRE services (information only):'];
   const add = (level, text) => lines.push(`  [${level}] ${text}`);
   const { intel, chat, ollama, voice } = services;
 
@@ -178,7 +177,7 @@ export function formatServicesReport(services) {
   else
     add(
       'WARN',
-      `Intel service not running at ${intel.url}: start it with .\\scripts\\skynet.ps1`,
+      `Intel service not running at ${intel.url}: start it with .\\scripts\\spectre.ps1`,
     );
 
   const ollamaUp = chat ? chat.ollama?.reachable : ollama.reachable;
@@ -226,8 +225,8 @@ export function formatServicesReport(services) {
       add(
         '--',
         voice.reason === 'disabled'
-          ? 'Local voice turned off (SKYNET_VOICE=0)'
-          : 'Local voice not set up (optional): .\\scripts\\skynet.ps1 -Voice',
+          ? 'Local voice turned off (SPECTRE_VOICE=0)'
+          : 'Local voice not set up (optional): .\\scripts\\spectre.ps1 -Voice',
       );
     else if (voice.state === 'failed')
       add('WARN', `Local voice failed to load: ${voice.error}`);
@@ -252,6 +251,6 @@ export function formatServicesReport(services) {
       `${item.name} answers on your network address ${item.address}:${item.port}, not only on this computer; other machines may reach it unless a firewall blocks them`,
     );
   if (!services.exposed.length)
-    add('OK', 'No SKYNET or Ollama port answers on your network address');
+    add('OK', 'No SPECTRE or Ollama port answers on your network address');
   return lines.join('\n');
 }

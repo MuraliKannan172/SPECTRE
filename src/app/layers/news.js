@@ -4,7 +4,7 @@ import * as picking from '../../data/pickRegistry.js';
 import * as overlays from '../../overlays/worldOverlay.js';
 import { isPointerFree } from '../../data/inputOwnership.js';
 
-/** SKYNET: wire the intel-service News layer into the application catalog. */
+/** SPECTRE: wire the intel-service News layer into the application catalog. */
 export function createApplicationNews(options) {
   return createNewsLayer({
     overlayHost: {

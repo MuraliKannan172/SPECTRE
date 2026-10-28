@@ -4,7 +4,7 @@ import * as picking from '../../data/pickRegistry.js';
 import * as overlays from '../../overlays/worldOverlay.js';
 import { isPointerFree } from '../../data/inputOwnership.js';
 
-/** SKYNET: wire the NASA EONET Natural Events layer into the application catalog. */
+/** SPECTRE: wire the NASA EONET Natural Events layer into the application catalog. */
 export function createApplicationNaturalEvents(options) {
   return createEonetLayer({
     overlayHost: {

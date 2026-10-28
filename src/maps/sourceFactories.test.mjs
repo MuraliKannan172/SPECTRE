@@ -335,7 +335,7 @@ test('unreachable keyless terrain falls back to flat terrain marked as a fallbac
   assert.equal(result.fallback, true);
 });
 
-// SKYNET: Esri's terms tie its basemaps to Esri software or an ArcGIS Online
+// SPECTRE: Esri's terms tie its basemaps to Esri software or an ArcGIS Online
 // subscription, so the keyless default is NASA Blue Marble from GIBS.
 test('without keys the default is NASA Blue Marble, credited, with an OSM fallback', () => {
   const keyless = createDefaultMapSources();

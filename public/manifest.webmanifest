@@ -1,8 +1,8 @@
 {
   "id": ".",
-  "name": "SKYNET",
-  "short_name": "SKYNET",
-  "description": "A local-first global intelligence globe: live flights, satellites, weather and news on a 3D Earth.",
+  "name": "SPECTRE",
+  "short_name": "SPECTRE",
+  "description": "A local-first global intelligence dashboard: live flights, satellites, weather and news on a 3D Earth.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

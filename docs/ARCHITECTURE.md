@@ -1,6 +1,6 @@
-# SKYNET architecture
+# SPECTRE architecture
 
-How SKYNET's parts fit together, where data flows, and where the trust boundaries are. The decisions behind them are in [ADR-001.md](ADR-001.md). God's Eye View's own architecture (layers, voice, scenes) is described in [APPLICATION.md](APPLICATION.md) and [CODE-BOUNDARIES.md](CODE-BOUNDARIES.md).
+How SPECTRE's parts fit together, where data flows, and where the trust boundaries are. The decisions behind them are in [ADR-001.md](ADR-001.md). God's Eye View's own architecture (layers, voice, scenes) is described in [APPLICATION.md](APPLICATION.md) and [CODE-BOUNDARIES.md](CODE-BOUNDARIES.md).
 
 ```mermaid
 flowchart LR
@@ -40,9 +40,9 @@ flowchart LR
 
 | Process | Address | Started by |
 |---|---|---|
-| Web app (Vite dev server; `vite preview` in CI) | `localhost:4173` (LAN only if you turn on GEV's LAN sharing) | `scripts\skynet.ps1` or `npm run dev` |
-| Intel service (FastAPI, Python 3.12 via uv) | `127.0.0.1:8100` (`SKYNET_INTEL_URL` may move the port, never the host) | `scripts\skynet.ps1` (or `-IntelOnly`) |
-| Ollama | `OLLAMA_HOST`, default `127.0.0.1:11434` | the Ollama app; not managed by SKYNET |
+| Web app (Vite dev server; `vite preview` in CI) | `localhost:4173` (LAN only if you turn on GEV's LAN sharing) | `scripts\spectre.ps1` or `npm run dev` |
+| Intel service (FastAPI, Python 3.12 via uv) | `127.0.0.1:8100` (`SPECTRE_INTEL_URL` may move the port, never the host) | `scripts\spectre.ps1` (or `-IntelOnly`) |
+| Ollama | `OLLAMA_HOST`, default `127.0.0.1:11434` | the Ollama app; not managed by SPECTRE |
 
 The browser talks only to `localhost:4173`. Its Content Security Policy is same-origin for connections it makes to the app, so every intel request goes through the proxy.
 
@@ -64,7 +64,7 @@ The browser talks only to `localhost:4173`. Its Content Security Policy is same-
    - **Server tools** run in the intel service: news search, news near a place, web search, page fetch, layer state, viewport. Web and news text goes back to the model wrapped as untrusted data, with numbered sources.
    - **Globe tools** (fly, zoom, layers, styles, tracking, annotations) go to the browser as a `client_tool` event. The panel runs them through GEV's own action runner (`src/neuralCore/executor.js`, the same path voice uses) and posts the result to `POST /api/intel/chat/tool-result`. The agent waits up to 15 s. A refused action is reported as a failure.
 4. **Answer.** Tokens stream to the panel. The `done` event carries citations, "As of" (when news or web was used), the model and tokens per second.
-5. **Record.** History is stored in SQLite (`intel/app/store/chat.py`). Tool calls and fetched URLs, never content, go to `.skynet-logs/tools-YYYYMMDD.jsonl`.
+5. **Record.** History is stored in SQLite (`intel/app/store/chat.py`). Tool calls and fetched URLs, never content, go to `.spectre-logs/tools-YYYYMMDD.jsonl`.
 
 The tool schemas are generated from two sources:
 - **Client half:** from `src/tools/registry.js`, by `npm run tools:export`.
@@ -77,13 +77,13 @@ Tests on both sides fail when the shared file is stale.
 1. **Record.** The mic opens on press and closes on release (`src/neuralCore/voice.js`, `voiceControl.js`). The recording is posted once to `POST /api/intel/voice/transcribe`.
 2. **Transcribe.** faster-whisper `base` turns it into text on the CPU (`intel/app/voice/`), and the panel sends that text as an ordinary chat turn.
 3. **Speak.** The streamed answer is split into sentences. Each goes to `POST /api/intel/voice/speak` (Kokoro-82M on the CPU), with at most two requests out at once. The WAV is played with Web Audio.
-4. **Load.** The models load once, in the background, when the service starts. They are fetched only by `scripts\skynet.ps1 -Voice`, checked against pinned SHA-256 hashes.
+4. **Load.** The models load once, in the background, when the service starts. They are fetched only by `scripts\spectre.ps1 -Voice`, checked against pinned SHA-256 hashes.
 
 ## Trust boundaries
 
 | Boundary | Guard |
 |---|---|
-| Other websites → the proxy | Writes need this page's own Origin. Chat and voice answer this machine only. `SKYNET_CHAT_ALLOW_LAN=1` opens chat, never voice. Bodies are limited to each route's type and size. |
+| Other websites → the proxy | Writes need this page's own Origin. Chat and voice answer this machine only. `SPECTRE_CHAT_ALLOW_LAN=1` opens chat, never voice. Bodies are limited to each route's type and size. |
 | The proxy → the intel service | Loopback only. Origin, cookies and credentials are never forwarded. |
 | Anything else → the intel service | Requests carrying an Origin or a cross-site fetch marker are refused (403). A Host allowlist blocks DNS rebinding (400). |
 | The model → the web | `intel/app/web/guard.py` (53 tests):<br/>• http(s) on ports 80 and 443 only, no credentials in the URL;<br/>• every DNS answer must be public, and the connection goes to the address that was checked;<br/>• each redirect is re-checked (at most 3);<br/>• robots.txt is honoured; at most 10 s, 1 MB, text types only. |
@@ -95,9 +95,9 @@ Tests on both sides fail when the shared file is stale.
 
 | Path | Contents | In git |
 |---|---|---|
-| `intel/data/skynet.db` | News stories, feed state, chat history | no |
+| `intel/data/spectre.db` | News stories, feed state, chat history | no |
 | `intel/data/voice/` | Pinned voice models (opt-in) | no |
-| `.skynet-logs/` | Tool log (URLs, no content); the intel service's log when started by `skynet.ps1` | no |
+| `.spectre-logs/` | Tool log (URLs, no content); the intel service's log when started by `spectre.ps1` | no |
 | `.env` | Keys and settings (owner-only permissions, set by Provider Settings) | no |
 | `shared/tools/neural-core.tools.json` | Generated tool schemas | yes |
 
@@ -112,11 +112,11 @@ Measured on an RTX 5060 Laptop GPU (8 GB) with 16 GB RAM ([phase4/neural-core-ev
 | Cesium (browser) | On this machine it drew on the Intel iGPU, using no RTX memory. A browser on the RTX shares its 8 GB with the model; not measured. |
 | Local voice | CPU only, 8 threads each for speech to text and text to speech. RAM not measured. |
 
-`SKYNET_LOW_RESOURCE=1` picks the smaller model, an 8k context and smaller history, web and page budgets. A reduced tool subset and reduced layer density are not built; GEV's Density control is the manual knob.
+`SPECTRE_LOW_RESOURCE=1` picks the smaller model, an 8k context and smaller history, web and page budgets. A reduced tool subset and reduced layer density are not built; GEV's Density control is the manual knob.
 
-## Where SKYNET's code lives
+## Where SPECTRE's code lives
 
-SKYNET keeps its own code apart so that `git merge upstream/main` stays tractable. Changes to upstream files are registration points, marked `SKYNET`.
+SPECTRE keeps its own code apart so that `git merge upstream/main` stays tractable. Changes to upstream files are registration points, marked `SPECTRE`.
 
 | Area | Paths |
 |---|---|
@@ -127,4 +127,4 @@ SKYNET keeps its own code apart so that `git merge upstream/main` stays tractabl
 | Tool registry | `src/tools/registry.js`, `shared/tools/` |
 | Branding and theme | `src/branding.js`, `src/theme/` |
 | Basemap default | `src/maps/catalog.js` (`KEYLESS_DEFAULT_STACK_ID`), `src/maps/imagery.js` |
-| Scripts | `scripts/skynet.ps1`, `scripts/skynet-doctor.mjs`, `scripts/qa-skynet-news.mjs`, `scripts/qa-neural-core.mjs`, `scripts/bench-local-voice.mjs` |
+| Scripts | `scripts/spectre.ps1`, `scripts/spectre-doctor.mjs`, `scripts/qa-spectre-news.mjs`, `scripts/qa-neural-core.mjs`, `scripts/bench-local-voice.mjs` |

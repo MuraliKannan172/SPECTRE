@@ -109,7 +109,7 @@ export const SHARE_VIEW_ENUMS = Object.freeze({
     'bing-labels',
     'esri-imagery',
     'osm',
-    'nasa-gibs', // SKYNET: appended, so existing compact codes keep their stack
+    'nasa-gibs', // SPECTRE: appended, so existing compact codes keep their stack
   ]),
   hudVariant: Object.freeze(['tactical', 'operator', 'minimal', 'cyber']),
   detectionMode: Object.freeze(['OFF', 'SPARSE', 'BALANCED', 'DENSE']),
@@ -300,9 +300,9 @@ export const SHARE_VIEW_LAYER_OPTION_ABSENT = Object.freeze({
     sinceDays: 0,
   }),
   radio: Object.freeze({ filter: 'all', volume: 0.8 }),
-  // SKYNET options:start
+  // SPECTRE options:start
   news: Object.freeze({ windowHours: 24, categoryFilter: '' }),
-  // SKYNET options:end
+  // SPECTRE options:end
 });
 
 /** The frozen meaning of an omitted option; unlisted options are always written. */

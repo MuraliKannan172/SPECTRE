@@ -60,7 +60,7 @@ function normalizeRssArticles(xml, limit = 5) {
 
 /**
  * @param {object|null} place
- * @param {{nonCommercial?: boolean}} [options] SKYNET: Google News RSS is for
+ * @param {{nonCommercial?: boolean}} [options] SPECTRE: Google News RSS is for
  *   personal use only, so it is tried only when the owner turned on
  *   non-commercial sources; GDELT is the default.
  */

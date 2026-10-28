@@ -76,7 +76,7 @@ async function build() {
   const viewer = fakeViewer();
   assert.equal(await layer.init(viewer), 'ready');
   const footprint = viewer.added[0].entities.getById(
-    'skynet-satellite-footprint',
+    'spectre-satellite-footprint',
   );
   return { inner, layer, viewer, footprint };
 }

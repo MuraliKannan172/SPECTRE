@@ -531,7 +531,7 @@ test('the DISPLAY 3D toggle gives local aircraft magenta class models', async (t
   const [model] = loads;
   assert.equal(
     model.url,
-    // SKYNET removed bell206.glb; helicopters share the airplane model.
+    // SPECTRE removed bell206.glb; helicopters share the airplane model.
     '/models/airplane.glb',
     'the Flights helicopter model',
   );

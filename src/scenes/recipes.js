@@ -5,7 +5,7 @@
 
 import { msg, t } from '../i18n/index.js';
 
-// SKYNET: the Bhote Koshi / Nepal event recipes were removed with their
+// SPECTRE: the Bhote Koshi / Nepal event recipes were removed with their
 // CC BY-NC 4.0 data (see NOTICE.md). Event recipes can be added here again.
 const EVENT_RECIPES = [];
 

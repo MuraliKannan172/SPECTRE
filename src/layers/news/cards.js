@@ -1,4 +1,4 @@
-/** SKYNET: card model for one selected news story. Pure — no Cesium types. */
+/** SPECTRE: card model for one selected news story. Pure — no Cesium types. */
 import { msg, t, tn } from '../../i18n/index.js';
 import { NEWS_ALERT_RING, NEWS_CATEGORY_COLORS } from './style.js';
 

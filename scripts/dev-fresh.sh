@@ -255,7 +255,7 @@ if ! grep -q "return createApplicationCatalog(" "$SOURCE_ROOT/src/standalone/cat
   exit 1
 fi
 
-echo "Stopping all existing SKYNET dev servers..."
+echo "Stopping all existing SPECTRE dev servers..."
 pkill -f "${ROOT_DIR}/node_modules/.bin/vite" >/dev/null 2>&1 || true
 pkill -f "${ROOT_DIR}/node_modules/vite/bin/vite.js" >/dev/null 2>&1 || true
 
@@ -271,7 +271,7 @@ fi
 echo "Clearing Vite cache..."
 rm -rf node_modules/.vite
 
-echo "Starting fresh SKYNET dev server..."
+echo "Starting fresh SPECTRE dev server..."
 case "${HOST}" in
   localhost|127.0.0.1|::1)
     echo "Local-only mode: reachable at http://localhost:${PORT}/ (set HOST=0.0.0.0 for LAN)"

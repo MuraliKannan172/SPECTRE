@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="180 120 775 520" role="img" aria-labelledby="logo-title">
-  <title id="logo-title">SKYNET</title>
-  <!-- SKYNET mark: a globe inside a targeting reticle. The reticle (#shell)
+  <title id="logo-title">SPECTRE</title>
+  <!-- SPECTRE mark: a globe inside a targeting reticle. The reticle (#shell)
        stays fixed; src/logoGaze.js moves #globe and #globe_cage toward the
        pointer, so keep those two ids. Colours follow src/branding.js. -->
   <defs>

@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core: what the panel shows, as plain data. Pure (no DOM), so
+ * SPECTRE Neural Core: what the panel shows, as plain data. Pure (no DOM), so
  * it is tested in Node; panel.js only renders it. Every label reflects real
  * state reported by the intel service.
  */
@@ -36,7 +36,7 @@ const TOOL_FAILURES = Object.freeze({
 
 const ERRORS = Object.freeze({
   intel_offline: msg(
-    'Intel service offline: run scripts\\skynet.ps1 to start it',
+    'Intel service offline: run scripts\\spectre.ps1 to start it',
   ),
   ollama_offline: msg('Ollama is not running. Start Ollama, then try again.'),
   ollama_model_missing: msg(
@@ -174,19 +174,19 @@ function searchNote(search) {
 const VOICE_TEXT = Object.freeze({
   ready: msg('Hold to talk'),
   unsupported: msg('This browser cannot record audio.'),
-  disabled: msg('Local voice is turned off (SKYNET_VOICE=0).'),
+  disabled: msg('Local voice is turned off (SPECTRE_VOICE=0).'),
   not_installed: msg(
-    'Local voice is not installed: run scripts\\skynet.ps1 -Voice',
+    'Local voice is not installed: run scripts\\spectre.ps1 -Voice',
   ),
   models_missing: msg(
-    'Local voice models are missing: run scripts\\skynet.ps1 -Voice',
+    'Local voice models are missing: run scripts\\spectre.ps1 -Voice',
   ),
   voice_idle: msg('Local voice is starting…'),
   voice_loading: msg('Local voice is loading…'),
   voice_failed: msg('Local voice failed to load; see the intel service log.'),
   voice_unavailable: msg('Local voice is not available.'),
   voice_local_only: msg(
-    'Local voice works only on the computer running SKYNET.',
+    'Local voice works only on the computer running SPECTRE.',
   ),
   opening: msg('Opening the microphone…'),
   listening: msg('Listening… release to send'),

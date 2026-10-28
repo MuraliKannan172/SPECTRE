@@ -64,7 +64,7 @@ test('the status payload reports presence without any credential material', () =
     // Secret missing: the OpenSky pair must read as NOT set.
   };
   const status = keySetupStatus(env);
-  // Switch rows (SKYNET's non-commercial sources) are not credentials.
+  // Switch rows (SPECTRE's non-commercial sources) are not credentials.
   assert.equal(
     status.total,
     KEY_SETUP_KEYS.filter((key) => !key.hidden && key.kind !== 'switch').length,
@@ -84,7 +84,7 @@ test('the status payload reports presence without any credential material', () =
 
 test('the non-commercial sources switch shows its state but never counts as a key', () => {
   const off = keySetupStatus({});
-  const on = keySetupStatus({ SKYNET_NONCOMMERCIAL_SOURCES: '1' });
+  const on = keySetupStatus({ SPECTRE_NONCOMMERCIAL_SOURCES: '1' });
   const row = (status) =>
     status.keys.find((key) => key.id === 'non-commercial-sources');
   assert.equal(row(off).kind, 'switch');
@@ -92,7 +92,7 @@ test('the non-commercial sources switch shows its state but never counts as a ke
   assert.equal(row(on).set, true);
   assert.equal(on.setCount, off.setCount);
   assert.equal(on.total, off.total);
-  assert.ok(knownKeySetupEnvVars().has('SKYNET_NONCOMMERCIAL_SOURCES'));
+  assert.ok(knownKeySetupEnvVars().has('SPECTRE_NONCOMMERCIAL_SOURCES'));
 });
 
 test('whitespace-only env values do not count as configured', () => {

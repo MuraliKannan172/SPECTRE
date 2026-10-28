@@ -1,7 +1,7 @@
 MIT License
 
 Copyright (c) 2026 Bilawal Sidhu
-Copyright (c) 2026 Murali Kannan and SKYNET contributors (modifications; see NOTICE.md)
+Copyright (c) 2026 Murali Kannan and SPECTRE contributors (modifications; see NOTICE.md)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -34,20 +34,20 @@ remain subject to their own licenses and terms. Notably:
   - Datacenters and Dams (OpenStreetMap / Open Infrastructure Map extracts):
     Open Database License (ODbL) 1.0 — attribution + share-alike on the data.
   - TeleGeography Submarine Cable Map: CC BY-NC-SA 3.0 — NonCommercial +
-    ShareAlike. SKYNET does NOT ship it; scripts/fetch-optional-data.ps1 lets
+    ShareAlike. SPECTRE does NOT ship it; scripts/fetch-optional-data.ps1 lets
     you download it for personal, non-commercial use into a gitignored folder.
 
-SKYNET removed upstream's Bhote Koshi event imagery and derived river
+SPECTRE removed upstream's Bhote Koshi event imagery and derived river
 centerline (CC BY-NC 4.0); see NOTICE.md.
 
 Live sources (Google Maps, OpenSky, adsb.lol, AISStream, CelesTrak, USGS,
 OSM Overpass, City of Austin, GBFS) are fetched at runtime under each
 provider's terms; some (e.g. Google Maps, OpenSky) restrict commercial use
-and require you to supply your own credentials. SKYNET keeps the
+and require you to supply your own credentials. SPECTRE keeps the
 personal-use-only ones (OpenSky, Open-Meteo's free API, Google News RSS,
 adsbdb routes) off until you turn on Non-commercial sources.
 
-The fonts SKYNET bundles are under the SIL Open Font License 1.1 (JetBrains
+The fonts SPECTRE bundles are under the SIL Open Font License 1.1 (JetBrains
 Mono, Inter, Rajdhani) and the Apache License 2.0 (Material Symbols); see
 NOTICE.md.
 

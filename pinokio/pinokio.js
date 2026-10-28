@@ -1,7 +1,7 @@
 module.exports = {
   version: '3.6',
-  title: 'SKYNET',
-  description: 'A local-first global intelligence globe: live flights, satellites, weather and news on a 3D Earth.',
+  title: 'SPECTRE',
+  description: 'A local-first global intelligence dashboard: live flights, satellites, weather and news on a 3D Earth.',
   menu: async (kernel, info) => {
     const installed = await kernel.exists(__dirname, '.installed');
     const installing = info.running('install.js');
@@ -25,7 +25,7 @@ module.exports = {
         // Open in the system browser without changing the app's framing policy.
         // This also avoids relying on Pinokio's embedded browser behavior.
         return [
-          { default: true, icon: 'fa-solid fa-earth-americas', text: 'Open SKYNET', href: local.url, popout: true },
+          { default: true, icon: 'fa-solid fa-earth-americas', text: 'Open SPECTRE', href: local.url, popout: true },
           { icon: 'fa-solid fa-terminal', text: 'Server', href: 'start.js' },
         ];
       }

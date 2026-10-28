@@ -29,7 +29,7 @@ function fixture(name, overrides = {}, preview = false) {
     // The rate-limited proxies reach for these; give them the real ones so a
     // fixture request is throttled exactly as production would be.
     makeRateLimiter, clientKey,
-    // The proxies identify themselves with SKYNET's User-Agent.
+    // The proxies identify themselves with SPECTRE's User-Agent.
     brandUserAgent,
     // terrain.js gates cross-site requests first; fixture requests carry no
     // browser headers, so admit them like a loopback tool.

@@ -200,7 +200,7 @@ test('no unchanged Realtime tool definition drifts silently', () => {
     'track_entity',
     // Point-and-ask: 'pointer' sentinels and referent arguments.
     'annotate_map',
-    // SKYNET: brand-neutral wording ("the globe" for the product name).
+    // SPECTRE: brand-neutral wording ("the globe" for the product name).
     'set_visual_style',
   ]);
   const unchanged = realtimeTools()
@@ -241,7 +241,7 @@ test('no unchanged Realtime tool definition drifts silently', () => {
     'Direct the camera like a drone operator: orbit the current view target, pan, tilt, or rotate — one bounded nudge (mode=once) or continuous motion until stopped (mode=continuous). Continuous motion also stops on any manual camera input or when a navigation tool runs. Say the RESULTING state when confirming ("Orbiting slowly").';
   camera.parameters.properties.direction.description =
     'Required except for orbit (defaults right/clockwise) and stop.';
-  // SKYNET: 13, not upstream's 14 — set_visual_style is in TOUCHED above.
+  // SPECTRE: 13, not upstream's 14 — set_visual_style is in TOUCHED above.
   assert.equal(unchanged.length, 13);
   const digest = createHash('sha256')
     .update(JSON.stringify(unchanged))

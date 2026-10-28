@@ -2,9 +2,9 @@
 // Local, not i18n/marker.js: the token-ledger tests run this file in isolation.
 const msg = (text) => text;
 import { normalizeIdSwitches, patchRequestedIdSwitches } from './idSwitches.js';
-// SKYNET imports:start
+// SPECTRE imports:start
 import { NEWS_SHARE_OPTIONS } from '../layers/news/shareOptions.js';
-// SKYNET imports:end
+// SPECTRE imports:end
 import reservationRows from './layerStateTokenReservations.json' with { type: 'json' };
 
 const VALID_DISPOSITIONS = new Set([
@@ -452,9 +452,9 @@ const OPTION_GROUPS = Object.freeze({
         /^\d{1,3}$/.test(value) ? normalizeVolume(Number(value) / 100) : null,
     }),
   ]),
-  // SKYNET options:start
+  // SPECTRE options:start
   news: NEWS_SHARE_OPTIONS,
-  // SKYNET options:end
+  // SPECTRE options:end
 });
 
 export const SHARE_TRACKING_RESTORE_POLICIES = Object.freeze({
@@ -634,8 +634,8 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     token: 'i',
     disposition: 'enabled-only',
   }),
-  // SKYNET layers:start. Upstream allocates 6-9, then 00, 01, ... in order;
-  // SKYNET takes 0y and 0z, clear of the next 38 upstream layers. Not further
+  // SPECTRE layers:start. Upstream allocates 6-9, then 00, 01, ... in order;
+  // SPECTRE takes 0y and 0z, clear of the next 38 upstream layers. Not further
   // out: the compact share codec stores enabled layers as a bitset indexed by
   // token number (0z is 71, so at most 4 extra bytes). News and Natural
   // Events held 5 and 6 until upstream claimed 5 for s2-ghostmaps.
@@ -650,7 +650,7 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     disposition: 'enabled+options',
     optionOwner: 'news',
   }),
-  // SKYNET layers:end
+  // SPECTRE layers:end
   Object.freeze({
     id: 'radio',
     token: 'r',

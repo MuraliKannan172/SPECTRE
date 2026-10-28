@@ -128,7 +128,7 @@ const CONTROLLER_STACKS = [
   },
 ];
 
-// SKYNET adds NASA Blue Marble, its keyless default, to upstream's five.
+// SPECTRE adds NASA Blue Marble, its keyless default, to upstream's five.
 test('the row renders exactly the six owner-approved sources', () => {
   const container = makeElement();
   renderMapStackChips(container, CONTROLLER_STACKS, {
@@ -224,7 +224,7 @@ test('clicking a chip dispatches that stack id — the same selection the dropdo
     doc,
   });
 
-  // SKYNET: indices follow its six-chip row (NASA Blue Marble is fourth).
+  // SPECTRE: indices follow its six-chip row (NASA Blue Marble is fourth).
   container.children[5].click();
   container.children[4].click();
   container.children[1].click();

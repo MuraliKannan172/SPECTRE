@@ -1,15 +1,15 @@
 /**
- * SKYNET: free APIs whose terms allow only personal, non-commercial use stay
+ * SPECTRE: free APIs whose terms allow only personal, non-commercial use stay
  * off by default. They are OpenSky (flights and tracks), Open-Meteo's free
  * tier (cockpit weather and weather effects), Google News RSS (regional
  * headlines), adsbdb route data (callsign routes) and S2 Underground's
  * GhostMaps products (CC BY-NC-SA 4.0).
  *
  * The owner turns them on with the "Non-commercial sources" switch in Provider
- * Settings, which writes SKYNET_NONCOMMERCIAL_SOURCES=1. Providers read it per
+ * Settings, which writes SPECTRE_NONCOMMERCIAL_SOURCES=1. Providers read it per
  * request, so a save applies without restarting.
  */
-export const NON_COMMERCIAL_SOURCES_ENV = 'SKYNET_NONCOMMERCIAL_SOURCES';
+export const NON_COMMERCIAL_SOURCES_ENV = 'SPECTRE_NONCOMMERCIAL_SOURCES';
 
 /** English reason sent to clients when a gated source is off. */
 export const NON_COMMERCIAL_SOURCES_OFF_REASON =

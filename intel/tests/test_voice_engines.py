@@ -1,9 +1,9 @@
 """The real local voice engines (opt-in: they need the voice install and a copy of the models).
 
-Skipped unless SKYNET_VOICE_TEST_DIR names a directory laid out like the voice
+Skipped unless SPECTRE_VOICE_TEST_DIR names a directory laid out like the voice
 directory (never intel/data itself), for example:
 
-    $env:SKYNET_VOICE_TEST_DIR = "C:\\temp\\voice"   # a copy of intel\\data\\voice
+    $env:SPECTRE_VOICE_TEST_DIR = "C:\\temp\\voice"   # a copy of intel\\data\\voice
     uv run --project intel pytest intel/tests/test_voice_engines.py
 """
 
@@ -28,11 +28,11 @@ from app.voice.engine import (
 from app.voice.models import missing_files, packages_installed
 
 VOICE_DIR = (
-    Path(os.environ.get("SKYNET_VOICE_TEST_DIR", "")) if os.environ.get("SKYNET_VOICE_TEST_DIR") else None
+    Path(os.environ.get("SPECTRE_VOICE_TEST_DIR", "")) if os.environ.get("SPECTRE_VOICE_TEST_DIR") else None
 )
 pytestmark = pytest.mark.skipif(
     VOICE_DIR is None or not packages_installed() or bool(missing_files(VOICE_DIR)),
-    reason="set SKYNET_VOICE_TEST_DIR to a copy of the voice models, with the voice install",
+    reason="set SPECTRE_VOICE_TEST_DIR to a copy of the voice models, with the voice install",
 )
 
 

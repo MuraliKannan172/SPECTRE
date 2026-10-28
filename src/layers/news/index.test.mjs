@@ -184,7 +184,7 @@ test('a stopped intel service shows the start instruction', async () => {
   layer.enable();
   assert.equal(await layer.update(), false);
   assert.equal(layer.getStats().error, INTEL_OFFLINE);
-  assert.match(layer.getRowControls().info, /skynet\.ps1/);
+  assert.match(layer.getRowControls().info, /spectre\.ps1/);
   layer.disable();
 });
 

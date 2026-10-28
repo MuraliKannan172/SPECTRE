@@ -8,7 +8,7 @@ import {
   networkAddresses,
   nvidiaGpus,
   ollamaUrl,
-} from '../scripts/skynet-doctor.mjs';
+} from '../scripts/spectre-doctor.mjs';
 
 function fakeFetch(routes) {
   return async (url) => {
@@ -66,12 +66,12 @@ test('everything running: the report says what is loaded and what is optional', 
   assert.match(text, /\[OK\] Web search: ddgs \(keyless, best effort\)/);
   assert.match(
     text,
-    /\[--\] Local voice not set up \(optional\): \.\\scripts\\skynet\.ps1 -Voice/,
+    /\[--\] Local voice not set up \(optional\): \.\\scripts\\spectre\.ps1 -Voice/,
   );
   assert.match(text, /\[OK\] GPU: RTX 5060, 5600 of 8151 MiB in use/);
   assert.match(
     text,
-    /\[OK\] No SKYNET or Ollama port answers on your network address/,
+    /\[OK\] No SPECTRE or Ollama port answers on your network address/,
   );
 });
 
@@ -131,12 +131,12 @@ test('a missing model, a degraded model and an exposed port are warnings', async
   assert.match(degradedText, /\[WARN\] .*no native tool calling \(degraded\)/);
 });
 
-test('SKYNET_INTEL_URL and OLLAMA_HOST move the probes', async () => {
+test('SPECTRE_INTEL_URL and OLLAMA_HOST move the probes', async () => {
   const asked = [];
   await inspectServices({
     readEnv: (name) =>
       ({
-        SKYNET_INTEL_URL: 'http://127.0.0.1:8200/',
+        SPECTRE_INTEL_URL: 'http://127.0.0.1:8200/',
         OLLAMA_HOST: '127.0.0.1:11500',
       })[name] || '',
     fetchImpl: async (url) => {

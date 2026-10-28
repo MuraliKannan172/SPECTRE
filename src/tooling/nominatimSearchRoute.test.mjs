@@ -144,7 +144,7 @@ test('a search reaches the upstream identified, and the answer is cached', async
       assert.equal(
         headers.Referer,
         undefined,
-        'no Referer: SKYNET has no public site and must not name another project',
+        'no Referer: SPECTRE has no public site and must not name another project',
       );
       assert.equal(
         calls[0].options.redirect,

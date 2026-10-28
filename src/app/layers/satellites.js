@@ -22,6 +22,6 @@ export function createApplicationSatellites({ source }) {
       layerState,
     },
   });
-  // SKYNET: the FOOTPRINT row option (off by default).
+  // SPECTRE: the FOOTPRINT row option (off by default).
   return withSatelliteFootprint(layer, { readout });
 }

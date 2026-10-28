@@ -1,5 +1,5 @@
 /**
- * SKYNET: validate the intel service's news stories before anything renders.
+ * SPECTRE: validate the intel service's news stories before anything renders.
  *
  * The service already cleans what it stores, but the browser treats the API
  * as untrusted: every string is bounded and control-free, every link must be

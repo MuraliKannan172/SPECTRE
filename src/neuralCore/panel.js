@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core panel: a launcher and a chat window over the globe
+ * SPECTRE Neural Core panel: a launcher and a chat window over the globe
  * (ADR-001 D5). Streams answers, shows real tool progress, numbered citation
  * chips and "As of", runs globe tools through the app's own runner, and keeps
  * history in the intel service. Text is only ever set with textContent; links
@@ -89,72 +89,72 @@ export function mountNeuralCorePanel({
   const body = document.body;
   const launcher = button(
     document,
-    'skynet-nc-launcher',
+    'spectre-nc-launcher',
     null,
     t('Open the Neural Core chat'),
   );
   launcher.append(
-    element(document, 'span', 'skynet-nc-launcher-mark', '◉'),
+    element(document, 'span', 'spectre-nc-launcher-mark', '◉'),
     element(document, 'span', '', t('NEURAL CORE')),
   );
-  launcher.setAttribute('aria-controls', 'skynet-neural-core');
+  launcher.setAttribute('aria-controls', 'spectre-neural-core');
   launcher.setAttribute('aria-expanded', 'false');
 
-  const panel = element(document, 'section', 'skynet-nc');
-  panel.id = 'skynet-neural-core';
+  const panel = element(document, 'section', 'spectre-nc');
+  panel.id = 'spectre-neural-core';
   panel.hidden = true;
   panel.setAttribute('aria-label', BRANDING.neuralCoreLabel);
 
-  const header = element(document, 'header', 'skynet-nc-header');
-  const brand = element(document, 'div', 'skynet-nc-brand');
-  const mark = element(document, 'span', 'skynet-nc-wordmark');
+  const header = element(document, 'header', 'spectre-nc-header');
+  const brand = element(document, 'div', 'spectre-nc-brand');
+  const mark = element(document, 'span', 'spectre-nc-wordmark');
   mark.setAttribute('translate', 'no');
   mark.append(
     document.createTextNode(BRANDING.wordmark.lead),
-    element(document, 'span', 'skynet-nc-accent', BRANDING.wordmark.accent),
+    element(document, 'span', 'spectre-nc-accent', BRANDING.wordmark.accent),
   );
   brand.append(
     mark,
-    element(document, 'span', 'skynet-nc-sublabel', BRANDING.neuralCoreLabel),
+    element(document, 'span', 'spectre-nc-sublabel', BRANDING.neuralCoreLabel),
   );
   const clearButton = button(
     document,
-    'skynet-nc-icon',
+    'spectre-nc-icon',
     '⌫',
     t('Clear chat history'),
   );
   const closeButton = button(
     document,
-    'skynet-nc-icon',
+    'spectre-nc-icon',
     '×',
     t('Close the Neural Core'),
   );
   header.append(brand, clearButton, closeButton);
-  const statusLine = element(document, 'p', 'skynet-nc-status');
-  const searchLine = element(document, 'p', 'skynet-nc-search');
+  const statusLine = element(document, 'p', 'spectre-nc-status');
+  const searchLine = element(document, 'p', 'spectre-nc-search');
 
-  const list = element(document, 'ol', 'skynet-nc-messages');
+  const list = element(document, 'ol', 'spectre-nc-messages');
   list.setAttribute('aria-label', t('Conversation'));
   const empty = element(
     document,
     'p',
-    'skynet-nc-empty',
+    'spectre-nc-empty',
     t(
       'Ask about the news, the web or the map: “What’s the latest on the cyclone?”, “Fly to Lima”, “Show earthquakes”.',
     ),
   );
-  const announcer = element(document, 'p', 'skynet-nc-sr');
+  const announcer = element(document, 'p', 'spectre-nc-sr');
   announcer.setAttribute('role', 'status');
 
-  const form = element(document, 'form', 'skynet-nc-composer');
-  const input = element(document, 'textarea', 'skynet-nc-input');
+  const form = element(document, 'form', 'spectre-nc-composer');
+  const input = element(document, 'textarea', 'spectre-nc-input');
   input.rows = 1;
   input.maxLength = MAX_INPUT;
   input.placeholder = t('Ask the Neural Core');
   input.setAttribute('aria-label', t('Message to the Neural Core'));
-  const sendButton = button(document, 'skynet-nc-send', t('Send'));
+  const sendButton = button(document, 'spectre-nc-send', t('Send'));
   sendButton.type = 'submit';
-  const stopButton = button(document, 'skynet-nc-stop', t('Stop'));
+  const stopButton = button(document, 'spectre-nc-stop', t('Stop'));
   stopButton.hidden = true;
 
   // -- local voice -------------------------------------------------------------
@@ -201,7 +201,7 @@ export function mountNeuralCorePanel({
   const disclaimer = element(
     document,
     'p',
-    'skynet-nc-disclaimer',
+    'spectre-nc-disclaimer',
     t(
       'Local model; answers can be wrong. Not for navigation or emergencies. It will not locate or track people.',
     ),
@@ -282,8 +282,8 @@ export function mountNeuralCorePanel({
       if (segment.kind === 'cite') {
         const url = safeLink(segment.url);
         const chip = url
-          ? element(document, 'a', 'skynet-nc-cite', `${segment.n}`)
-          : element(document, 'span', 'skynet-nc-cite', `${segment.n}`);
+          ? element(document, 'a', 'spectre-nc-cite', `${segment.n}`)
+          : element(document, 'span', 'spectre-nc-cite', `${segment.n}`);
         if (url) {
           chip.href = url;
           chip.target = '_blank';
@@ -301,28 +301,28 @@ export function mountNeuralCorePanel({
   }
 
   function addUser(text) {
-    const item = element(document, 'li', 'skynet-nc-msg is-user');
-    item.append(element(document, 'p', 'skynet-nc-text', text));
+    const item = element(document, 'li', 'spectre-nc-msg is-user');
+    item.append(element(document, 'p', 'spectre-nc-text', text));
     list.append(item);
     empty.hidden = true;
     return item;
   }
 
   function addAssistant() {
-    const item = element(document, 'li', 'skynet-nc-msg is-assistant');
-    const tools = element(document, 'ul', 'skynet-nc-tools');
-    const text = element(document, 'div', 'skynet-nc-text');
-    const sources = element(document, 'ol', 'skynet-nc-sources');
-    const asOf = element(document, 'p', 'skynet-nc-asof');
-    const error = element(document, 'p', 'skynet-nc-error');
-    const footer = element(document, 'footer', 'skynet-nc-footer');
-    const meta = element(document, 'span', 'skynet-nc-meta');
-    const voiceMeta = element(document, 'span', 'skynet-nc-meta');
+    const item = element(document, 'li', 'spectre-nc-msg is-assistant');
+    const tools = element(document, 'ul', 'spectre-nc-tools');
+    const text = element(document, 'div', 'spectre-nc-text');
+    const sources = element(document, 'ol', 'spectre-nc-sources');
+    const asOf = element(document, 'p', 'spectre-nc-asof');
+    const error = element(document, 'p', 'spectre-nc-error');
+    const footer = element(document, 'footer', 'spectre-nc-footer');
+    const meta = element(document, 'span', 'spectre-nc-meta');
+    const voiceMeta = element(document, 'span', 'spectre-nc-meta');
     voiceMeta.hidden = true;
-    const copy = button(document, 'skynet-nc-action', t('Copy'));
+    const copy = button(document, 'spectre-nc-action', t('Copy'));
     const regenerate = button(
       document,
-      'skynet-nc-action skynet-nc-regenerate',
+      'spectre-nc-action spectre-nc-regenerate',
       t('Regenerate'),
     );
     footer.append(meta, voiceMeta, copy, regenerate);
@@ -355,7 +355,7 @@ export function mountNeuralCorePanel({
     const key = data.tool;
     let chip = entry.running.get(key);
     if (data.state === 'start' || !chip) {
-      chip = element(document, 'li', 'skynet-nc-tool');
+      chip = element(document, 'li', 'spectre-nc-tool');
       entry.tools.append(chip);
       entry.running.set(key, chip);
     }
@@ -367,7 +367,7 @@ export function mountNeuralCorePanel({
   function renderSources(entry) {
     entry.sources.replaceChildren();
     for (const source of entry.citations) {
-      const row = element(document, 'li', 'skynet-nc-source');
+      const row = element(document, 'li', 'spectre-nc-source');
       const url = safeLink(source.url);
       const link = url
         ? element(document, 'a', '', source.title || url)
@@ -381,7 +381,7 @@ export function mountNeuralCorePanel({
       row.append(link);
       if (source.source)
         row.append(
-          element(document, 'span', 'skynet-nc-outlet', source.source),
+          element(document, 'span', 'spectre-nc-outlet', source.source),
         );
       entry.sources.append(row);
     }
@@ -402,7 +402,7 @@ export function mountNeuralCorePanel({
     entry.meta.textContent = [done.model, speed].filter(Boolean).join(' · ');
     entry.footer.hidden = false;
     // Only the latest answer can be regenerated.
-    for (const node of list.querySelectorAll('.skynet-nc-regenerate'))
+    for (const node of list.querySelectorAll('.spectre-nc-regenerate'))
       node.hidden = true;
     entry.regenerate.hidden = Boolean(done.refused);
   }
@@ -594,7 +594,7 @@ export function mountNeuralCorePanel({
     if (destroyed) return;
     panel.hidden = false;
     launcher.setAttribute('aria-expanded', 'true');
-    body.classList.add('skynet-nc-open');
+    body.classList.add('spectre-nc-open');
     onOpen();
     input.focus();
     void refreshStatus();
@@ -619,7 +619,7 @@ export function mountNeuralCorePanel({
     speaker?.stop();
     panel.hidden = true;
     launcher.setAttribute('aria-expanded', 'false');
-    body.classList.remove('skynet-nc-open');
+    body.classList.remove('spectre-nc-open');
     if (pollTimer !== null) clearTimer(pollTimer);
     pollTimer = null;
     if (restoreFocus) launcher.focus();
@@ -695,7 +695,7 @@ export function mountNeuralCorePanel({
       if (pollTimer !== null) clearTimer(pollTimer);
       if (clearArmed) clearTimeout(clearArmed);
       for (const remove of listeners) remove();
-      body.classList.remove('skynet-nc-open');
+      body.classList.remove('spectre-nc-open');
       launcher.remove();
       panel.remove();
     },

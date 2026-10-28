@@ -305,7 +305,7 @@ test('doctor describes the credential ladder without exposing values', () => {
     'off until an OpenAI key is added, or a Codex ChatGPT sign-in is selected in Provider Settings (experimental)',
   );
   assert.match(capabilities.missions, /token allowance/);
-  // SKYNET: OpenSky and Open-Meteo are off until non-commercial sources are on.
+  // SPECTRE: OpenSky and Open-Meteo are off until non-commercial sources are on.
   assert.match(capabilities.flights, /^adsb\.lol within 250 nm of the view/);
   assert.match(capabilities.weather, /^off: Open-Meteo free API is non-commercial/);
 
@@ -409,7 +409,7 @@ test('doctor never calls a dependency-missing setup ready', () => {
 });
 
 test('doctor counts OPENSKY_CREDENTIALS_FILE as OAuth credentials, from the environment or .env', () => {
-  // SKYNET: OpenSky is used only with Non-commercial sources on.
+  // SPECTRE: OpenSky is used only with Non-commercial sources on.
   assert.equal(
     buildCapabilitySummary(
       {},

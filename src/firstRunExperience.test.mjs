@@ -1055,7 +1055,7 @@ test('the voice TOOL SCHEMA matches the pinned contract — the mission mapping 
   // Panel adds timeout and named voice/provider targets; consolidated guidance
   // preserves the mission mapping and globe-rotation arguments.
   // S2 GhostMaps extends the generated layer enums; both feature contracts remain.
-  // SKYNET: three descriptions name "the globe" instead of the product, 27
+  // SPECTRE: three descriptions name "the globe" instead of the product, 27
   // characters shorter than upstream's 31206 (upstream pins f772df95…), and
   // set_map_stack adds 'nasa-gibs' (12 characters).
   assert.equal(block.length, 31191, 'serialized tool schema length drifted');

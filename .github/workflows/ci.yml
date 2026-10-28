@@ -149,10 +149,10 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
-  # SKYNET: the intel service (news, the Neural Core and local voice). The
+  # SPECTRE: the intel service (news, the Neural Core and local voice). The
   # optional voice extra is not installed, so its real-engine tests skip.
   intel:
-    name: SKYNET intel service (Python)
+    name: SPECTRE intel service (Python)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -185,11 +185,11 @@ jobs:
       - name: Run tests (no network)
         run: uv run --project intel pytest intel/tests
 
-  # SKYNET: the News, Natural Events, share-link and Neural Core panel smoke
+  # SPECTRE: the News, Natural Events, share-link and Neural Core panel smoke
   # tests. Hermetic: every /api/intel and /api/eonet request is answered by
   # fixtures, so no intel service, Ollama or network is needed.
-  skynet-browser:
-    name: SKYNET browser smoke
+  spectre-browser:
+    name: SPECTRE browser smoke
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -223,7 +223,7 @@ jobs:
           exit 1
 
       - name: News, Natural Events and share links
-        run: npm run qa:skynet-news -- --url http://localhost:4173
+        run: npm run qa:spectre-news -- --url http://localhost:4173
 
       - name: Neural Core panel
         run: npm run qa:neural-core -- --url http://localhost:4173

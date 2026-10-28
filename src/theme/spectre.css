@@ -1,38 +1,38 @@
 /* ═══════════════════════════════════════════════
-   SKYNET — Vanta black + Ferrari red
+   SPECTRE — Vanta black + Ferrari red
    Loaded last (style.css). Re-points the upstream tokens in
-   src/ui/styles/foundation.css; skynet-recolor.css (generated) covers the
+   src/ui/styles/foundation.css; spectre-recolor.css (generated) covers the
    cyan literals that do not use them. Remove the two imports from style.css
    to return to the upstream palette.
    ═══════════════════════════════════════════════ */
 
 :root {
-  --sk-bg: #000000; /* Vanta black */
-  --sk-bg-1: #050507;
-  --sk-surface: #0b0b0e;
-  --sk-surface-2: #121217;
-  --sk-border: #22222a;
-  --sk-red: #ff2800; /* Ferrari red: text, icons, active states (5.56:1 on black) */
-  --sk-red-deep: #d40000; /* Rosso Corsa: fills and borders only (3.8:1, not small text) */
-  --sk-red-glow: rgba(255, 40, 0, 0.35);
-  --sk-text: #ececef;
-  --sk-text-dim: #8b8b94; /* 6.2:1 on black */
-  --sk-text-faint: #7c7c84; /* dimmest text allowed: 4.74:1 on --sk-surface, 4.51:1 on --sk-surface-2 */
-  --sk-warn: #ffd400;
-  --sk-ok: #34d399;
+  --sp-bg: #000000; /* Vanta black */
+  --sp-bg-1: #050507;
+  --sp-surface: #0b0b0e;
+  --sp-surface-2: #121217;
+  --sp-border: #22222a;
+  --sp-red: #ff2800; /* Ferrari red: text, icons, active states (5.56:1 on black) */
+  --sp-red-deep: #d40000; /* Rosso Corsa: fills and borders only (3.8:1, not small text) */
+  --sp-red-glow: rgba(255, 40, 0, 0.35);
+  --sp-text: #ececef;
+  --sp-text-dim: #8b8b94; /* 6.2:1 on black */
+  --sp-text-faint: #7c7c84; /* dimmest text allowed: 4.74:1 on --sp-surface, 4.51:1 on --sp-surface-2 */
+  --sp-warn: #ffd400;
+  --sp-ok: #34d399;
 
   /* Upstream tokens, re-pointed. */
-  --bg-dark: var(--sk-bg);
+  --bg-dark: var(--sp-bg);
   --glass-bg: rgba(8, 8, 10, 0.8);
   --glass-border: rgba(255, 255, 255, 0.07);
   --glass-border-hover: rgba(255, 40, 0, 0.4);
-  --accent: var(--sk-red);
+  --accent: var(--sp-red);
   --accent-dim: rgba(255, 40, 0, 0.14);
-  --accent-glow: var(--sk-red-glow);
-  --text-primary: var(--sk-text);
-  --text-secondary: var(--sk-text-dim);
-  --text-dim: var(--sk-text-faint);
-  --menu-bg: var(--sk-surface-2);
+  --accent-glow: var(--sp-red-glow);
+  --text-primary: var(--sp-text);
+  --text-secondary: var(--sp-text-dim);
+  --text-dim: var(--sp-text-faint);
+  --menu-bg: var(--sp-surface-2);
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Rajdhani', var(--font-sans);
@@ -40,12 +40,12 @@
 
 html,
 body {
-  background: var(--sk-bg);
-  color: var(--sk-text);
+  background: var(--sp-bg);
+  color: var(--sp-text);
 }
 
 /* The HUD draws its text in --hud-color; red at upstream's 60% opacity is
-   2.5:1 on black, so SKYNET uses a lighter red that stays AA (5.7:1). */
+   2.5:1 on black, so SPECTRE uses a lighter red that stays AA (5.7:1). */
 #intel-hud {
   --hud-color: rgba(255, 74, 46, 0.95);
   --hud-glow: rgba(255, 40, 0, 0.4);
@@ -58,19 +58,19 @@ body {
   font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: 0.32em;
-  color: var(--sk-text);
+  color: var(--sp-text);
 }
 
 .title-accent {
-  color: var(--sk-red);
+  color: var(--sp-red);
 }
 
 #title-bar .subtitle {
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
 }
 
 #loading-screen {
-  background: var(--sk-bg);
+  background: var(--sp-bg);
 }
 
 /* The bundled variable icon font, set to the axes upstream requested from
@@ -91,26 +91,26 @@ body {
 }
 
 :where(button, [role='button'], a[href]):hover {
-  text-shadow: 0 0 10px var(--sk-red-glow);
+  text-shadow: 0 0 10px var(--sp-red-glow);
 }
 
 /* Cesium credit line and Data attribution lightbox. */
 .cesium-credit-lightbox {
-  background: var(--sk-surface) !important;
-  color: var(--sk-text) !important;
-  border: 1px solid var(--sk-border) !important;
+  background: var(--sp-surface) !important;
+  color: var(--sp-text) !important;
+  border: 1px solid var(--sp-border) !important;
 }
 
 .cesium-credit-lightbox a,
 .cesium-widget-credits a {
-  color: var(--sk-red);
+  color: var(--sp-red);
 }
 
 .cesium-credit-lightbox-overlay {
   background: rgba(0, 0, 0, 0.72) !important;
 }
 
-/* Provider Settings switch rows (SKYNET's non-commercial sources). */
+/* Provider Settings switch rows (SPECTRE's non-commercial sources). */
 .key-setup-switch {
   display: inline-flex;
   align-items: center;
@@ -124,9 +124,9 @@ body {
   width: 34px;
   height: 18px;
   margin: 0;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 9px;
-  background: var(--sk-surface-2);
+  background: var(--sp-surface-2);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
@@ -139,18 +139,18 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--sk-text-dim);
+  background: var(--sp-text-dim);
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
 .key-setup-switch input[type='checkbox']:checked {
-  border-color: var(--sk-red);
+  border-color: var(--sp-red);
   background: rgba(255, 40, 0, 0.18);
 }
 
 .key-setup-switch input[type='checkbox']:checked::after {
   transform: translateX(16px);
-  background: var(--sk-red);
+  background: var(--sp-red);
 }
 
 .key-setup-switch input[type='checkbox']:disabled {

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * bench-local-voice.mjs — SKYNET Phase 5: measured end-to-end latency of the
+ * bench-local-voice.mjs — SPECTRE Phase 5: measured end-to-end latency of the
  * Neural Core's local voice on this machine (docs/ADR-001.md, phase 5).
  *
  * Needs the real stack: `npm run dev` (:4173), the intel service with local
- * voice ready (scripts\skynet.ps1 -Voice) and Ollama. Each question is first
+ * voice ready (scripts\spectre.ps1 -Voice) and Ollama. Each question is first
  * spoken by the service's own Kokoro voice into a WAV file, padded with
  * silence, and fed to Chrome as its microphone; the bench then holds the mic
  * button for the clip's length and releases it, exactly as a person would.
@@ -18,7 +18,7 @@
  *   firstAudio   the first sound of the answer starts playing
  *
  * --clear-history deletes the Neural Core chat history before every run so
- * runs start alike. Use it only with an intel service whose SKYNET_INTEL_DB
+ * runs start alike. Use it only with an intel service whose SPECTRE_INTEL_DB
  * is a copy: it deletes whatever conversation the service holds.
  *
  * Run:  node scripts/bench-local-voice.mjs [--runs 3] [--clear-history] [--headful]
@@ -112,19 +112,19 @@ async function openPanel(page) {
   await page.waitForFunction(
     () =>
       window.__godsEyeView?.viewer &&
-      document.querySelector('.skynet-nc-launcher'),
+      document.querySelector('.spectre-nc-launcher'),
     { timeout: 120_000 },
   );
   await sleep(3000);
   await page.keyboard.press('Escape');
   await page.evaluate(() => {
-    if (document.getElementById('skynet-neural-core').hidden)
-      document.querySelector('.skynet-nc-launcher').click();
+    if (document.getElementById('spectre-neural-core').hidden)
+      document.querySelector('.spectre-nc-launcher').click();
   });
   await page.waitForFunction(
     () =>
       document
-        .querySelector('.skynet-nc-mic')
+        .querySelector('.spectre-nc-mic')
         ?.getAttribute('aria-disabled') === 'false',
     { timeout: 30_000 },
   );
@@ -144,7 +144,7 @@ async function clearHistory(page) {
     fetch('/api/intel/chat/history', { method: 'DELETE' }),
   );
   await page.evaluate(() =>
-    document.querySelector('.skynet-nc-messages').replaceChildren(),
+    document.querySelector('.spectre-nc-messages').replaceChildren(),
   );
 }
 
@@ -157,12 +157,12 @@ async function settle(page, { spoken = false, timeout = 150_000 } = {}) {
     (wantSpeech) => {
       const answer = document.querySelector('.is-assistant:last-child');
       const code =
-        document.querySelector('.skynet-nc-voice')?.dataset.code || '';
+        document.querySelector('.spectre-nc-voice')?.dataset.code || '';
       if (!answer || answer.querySelector('footer')?.hidden) return false;
       if (['speaking', 'transcribing', 'listening'].includes(code))
         return false;
       if (!wantSpeech) return true;
-      const failed = answer.querySelector('.skynet-nc-error:not([hidden])');
+      const failed = answer.querySelector('.spectre-nc-error:not([hidden])');
       return Boolean(
         answer.dataset.voiceFirstAudioMs ||
         failed ||
@@ -175,14 +175,14 @@ async function settle(page, { spoken = false, timeout = 150_000 } = {}) {
 }
 
 async function spokenRun(page, clip) {
-  const box = await (await page.$('.skynet-nc-mic')).boundingBox();
+  const box = await (await page.$('.spectre-nc-mic')).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   // The fake microphone plays the clip from when it opens: hold from there.
   await page
     .waitForFunction(
       () =>
-        document.querySelector('.skynet-nc-voice')?.dataset.code ===
+        document.querySelector('.spectre-nc-voice')?.dataset.code ===
         'listening',
       { timeout: 10_000 },
     )
@@ -205,30 +205,30 @@ async function spokenRun(page, clip) {
       firstAudio: number(data.voiceFirstAudioMs),
       sttSeconds: number(data.voiceSttSeconds),
       ttsSeconds: number(data.voiceTtsSeconds),
-      tools: [...(answer?.querySelectorAll('.skynet-nc-tool') || [])].map(
+      tools: [...(answer?.querySelectorAll('.spectre-nc-tool') || [])].map(
         (n) => n.textContent,
       ),
       error:
-        answer?.querySelector('.skynet-nc-error:not([hidden])')?.textContent ||
+        answer?.querySelector('.spectre-nc-error:not([hidden])')?.textContent ||
         null,
-      meta: answer?.querySelector('.skynet-nc-meta')?.textContent || '',
+      meta: answer?.querySelector('.spectre-nc-meta')?.textContent || '',
       answerChars:
-        answer?.querySelector('.skynet-nc-text')?.textContent.length || 0,
+        answer?.querySelector('.spectre-nc-text')?.textContent.length || 0,
     };
   });
 }
 
 async function typedRun(page, text) {
   await page.evaluate((question) => {
-    const input = document.querySelector('.skynet-nc-input');
+    const input = document.querySelector('.spectre-nc-input');
     input.value = question;
-    document.querySelector('.skynet-nc-composer').requestSubmit();
+    document.querySelector('.spectre-nc-composer').requestSubmit();
   }, text);
   await sleep(500);
   await settle(page);
   return page.evaluate(
     () =>
-      document.querySelector('.is-assistant:last-child .skynet-nc-meta')
+      document.querySelector('.is-assistant:last-child .spectre-nc-meta')
         ?.textContent || '',
   );
 }
@@ -255,7 +255,7 @@ async function main() {
     );
   const chat = await (await api('/api/intel/chat/status')).json();
   if (!chat.ollama?.reachable) throw new Error('Ollama is not reachable');
-  const dir = path.join(os.tmpdir(), 'skynet-voice-bench');
+  const dir = path.join(os.tmpdir(), 'spectre-voice-bench');
   if (/\s/.test(dir))
     throw new Error(
       `Chrome's fake microphone cannot read a path with spaces: ${dir}`,

@@ -73,7 +73,7 @@ function weatherEffectsProxy() {
         return;
       }
       if (!nonCommercialSourcesEnabled()) {
-        // SKYNET: Open-Meteo's free API is non-commercial only.
+        // SPECTRE: Open-Meteo's free API is non-commercial only.
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',

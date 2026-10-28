@@ -3,7 +3,7 @@
 History is one running conversation per install: the panel shows the latest,
 and "clear history" deletes every conversation and message. The tool log is
 kept (names, arguments, status, timing and URLs, no content), mirrored as
-JSON lines under .skynet-logs/ for inspection outside SQLite.
+JSON lines under .spectre-logs/ for inspection outside SQLite.
 """
 
 from __future__ import annotations

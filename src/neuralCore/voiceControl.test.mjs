@@ -144,10 +144,10 @@ test('when local voice cannot run, a press says why and records nothing', async 
   const { control, calls } = setup({ ready: false });
   control.update({ state: 'unavailable', reason: 'models_missing' });
   assert.equal(control.mic.attributes['aria-disabled'], 'true');
-  assert.match(control.mic.title, /skynet\.ps1 -Voice/);
+  assert.match(control.mic.title, /spectre\.ps1 -Voice/);
   await hold(control.mic);
   assert.equal(calls.started, 0);
-  assert.match(control.hint.textContent, /scripts\\skynet\.ps1 -Voice/);
+  assert.match(control.hint.textContent, /scripts\\spectre\.ps1 -Voice/);
 });
 
 test('a refused microphone, a busy panel and a failed transcript each say so', async () => {
@@ -179,7 +179,7 @@ test('voice state, microphone failures and timings read plainly', () => {
   assert.match(voiceState({ state: 'failed' }).reason, /failed to load/);
   assert.match(
     voiceState({ state: 'unavailable', reason: 'not_installed' }).reason,
-    /not installed: run scripts\\skynet\.ps1 -Voice/,
+    /not installed: run scripts\\spectre\.ps1 -Voice/,
   );
   assert.match(
     voiceState(null, { failureCode: 'intel_offline' }).reason,
@@ -190,7 +190,7 @@ test('voice state, microphone failures and timings read plainly', () => {
     /cannot record/,
   );
   // A LAN page over http, or the proxy refusing voice off this machine.
-  const localOnly = /only on the computer running SKYNET/;
+  const localOnly = /only on the computer running SPECTRE/;
   assert.match(
     voiceState(null, { supported: false, secure: false }).reason,
     localOnly,

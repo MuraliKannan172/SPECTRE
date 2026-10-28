@@ -1,5 +1,5 @@
 /**
- * SKYNET: the one live connection to /api/intel/news/stream.
+ * SPECTRE: the one live connection to /api/intel/news/stream.
  *
  * Owned by the News layer and open only while the layer is on, so turning
  * the layer off leaves no background connection. A browser EventSource does

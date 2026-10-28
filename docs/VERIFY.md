@@ -1,5 +1,7 @@
 # Verifying SKYNET
 
+> **Renamed.** The product is now **SPECTRE** (2026-10-28). The results below are the v0.1.0 record and keep the old names. To run the steps today, use the new names: `.\scripts\spectre.ps1`, `npm run qa:spectre-news`, `scripts/generate-spectre-recolor.mjs` and `SPECTRE_*` settings (the old `skynet.ps1` and `SKYNET_*` names still work for one release, with a warning).
+
 Manual checks for a release. Each step has the commands to run and the expected result. Commands run in PowerShell from the repository root unless a step says otherwise.
 
 The **Result** column records the v0.1.0 run on 2026-10-28, on the development machine (Windows 11, Core Ultra 9 275HX, RTX 5060 Laptop GPU 8 GB, 16 GB RAM, Ollama 0.40.11 with `qwen3.5-9b-64k-gpu:latest`). Steps 6 to 8 used the real app and services, with the intel service on a copy of its database so test questions stayed out of the real chat history.

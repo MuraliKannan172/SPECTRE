@@ -279,7 +279,7 @@ export function renderRegionalBrief(payload, info) {
   if (this.localCondition) {
     const condition = this.services.weatherCodeLabel(weather?.weatherCode);
     const conditionKey = WEATHER_CONDITION_KEYS[condition];
-    // SKYNET: Open-Meteo's free API is off until non-commercial sources are on.
+    // SPECTRE: Open-Meteo's free API is off until non-commercial sources are on.
     const disabled = payload?.weatherStatus === 'disabled';
     this.localCondition.textContent = disabled
       ? t('WEATHER OFF · PERSONAL-USE SOURCE')

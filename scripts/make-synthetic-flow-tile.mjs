@@ -1,6 +1,6 @@
 // Generate a synthetic TomTom-schema traffic-flow vector tile for tests.
 //
-// SKYNET replaced the recorded TomTom tile (proprietary, © TomTom) with this
+// SPECTRE replaced the recorded TomTom tile (proprietary, © TomTom) with this
 // deterministic street grid. It uses TomTom's Mapbox Vector Tile layout (layer
 // "Traffic flow", traffic_level / road_type / road_closure properties) so
 // src/layers/traffic/flowDecode.js is exercised exactly as live tiles exercise

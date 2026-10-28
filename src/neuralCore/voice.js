@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core local voice (Phase 5): push-to-talk recording, sentence
+ * SPECTRE Neural Core local voice (Phase 5): push-to-talk recording, sentence
  * splitting of a streamed answer, and an ordered, bounded speech queue. The
  * speech itself is made by the intel service (faster-whisper and Kokoro, on
  * this machine); the panel wires these pieces to its mic button.

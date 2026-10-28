@@ -1,7 +1,7 @@
 [project]
-name = "skynet-intel"
+name = "spectre-intel"
 version = "0.1.0"
-description = "SKYNET intel service: real-time news ingest, dedupe, geoparse and search behind /api/intel."
+description = "SPECTRE intel service: real-time news ingest, dedupe, geoparse and search behind /api/intel."
 license = "MIT"
 requires-python = ">=3.11,<3.13"
 dependencies = [

@@ -1,6 +1,6 @@
-"""SKYNET intel service: FastAPI app factory and entry point.
+"""SPECTRE intel service: FastAPI app factory and entry point.
 
-Start it with scripts/skynet.ps1, which runs uvicorn on 127.0.0.1:8100 with
+Start it with scripts/spectre.ps1, which runs uvicorn on 127.0.0.1:8100 with
 this module's create_default_app as a factory.
 """
 
@@ -23,13 +23,14 @@ from .api.voice import router as voice_router
 from .chat.agent import Agent
 from .chat.ollama import OllamaClient
 from .chat.tools import ToolRegistry
-from .config import BRAND_NAME, Settings, load_settings
+from .config import BRAND_NAME, DEFAULT_DB, DEFAULT_LOGS, Settings, load_settings
 from .geo.gazetteer import Gazetteer
 from .geo.geoparse import GeoParser
 from .hub import EventHub
 from .ingest.feeds import load_feed_config
 from .ingest.pipeline import Pipeline
 from .ingest.scheduler import Scheduler
+from .legacy import migrate_defaults
 from .store.chat import ChatStore
 from .store.news import NewsStore
 from .voice.service import VoiceService
@@ -38,7 +39,7 @@ from .web.fetch import PageFetcher
 from .web.guard import guarded_client
 from .web.search import SearchService, make_search_service
 
-log = logging.getLogger("skynet.intel")
+log = logging.getLogger("spectre.intel")
 
 
 def create_app(
@@ -57,6 +58,13 @@ def create_app(
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # SPECTRE: carry the pre-rename database and logs over, once (copies only).
+        migrate_defaults(
+            db_path=settings.db_path,
+            default_db=DEFAULT_DB,
+            logs_dir=settings.logs_dir,
+            default_logs=DEFAULT_LOGS,
+        )
         config = load_feed_config(settings.feeds_default, settings.feeds_local)
         store = NewsStore(str(settings.db_path))
         store.sync_feeds(config.all_defs())

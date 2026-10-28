@@ -37,7 +37,7 @@ export const VIEW_MAPS = Object.freeze([
   'bing-labels',
   'esri-imagery',
   'osm',
-  'nasa-gibs', // SKYNET
+  'nasa-gibs', // SPECTRE
 ]);
 
 /**

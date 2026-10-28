@@ -267,7 +267,7 @@ def _tally(rows: list[dict[str, Any]]) -> str:
 
 async def evaluate(model: str) -> dict[str, Any]:
     base = load_settings()
-    scratch = Path(tempfile.mkdtemp(prefix="skynet-eval-"))
+    scratch = Path(tempfile.mkdtemp(prefix="spectre-eval-"))
     db = scratch / "eval.db"
     if base.db_path.exists():
         shutil.copy2(base.db_path, db)

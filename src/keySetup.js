@@ -238,7 +238,7 @@ function updateCloudVoiceAuthControl(auth, busy = false) {
   toggle.setAttribute('aria-disabled', String(busy));
 }
 
-/** Build one on/off row (SKYNET); saving writes 1 or removes the variable. */
+/** Build one on/off row (SPECTRE); saving writes 1 or removes the variable. */
 function buildSwitchRow(documentRef, key) {
   const row = documentRef.createElement('section');
   row.className = 'key-setup-row key-setup-switch-row';

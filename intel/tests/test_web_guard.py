@@ -272,7 +272,7 @@ def test_the_guarded_stack_reads_a_public_page() -> None:
 
 def mock_fetcher(handler) -> PageFetcher:  # type: ignore[no-untyped-def]
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=False)
-    return PageFetcher(client, user_agent_token="skynet")
+    return PageFetcher(client, user_agent_token="spectre")
 
 
 def routes(table: dict[str, httpx.Response]):  # type: ignore[no-untyped-def]

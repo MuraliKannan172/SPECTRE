@@ -8,15 +8,21 @@ import { apiNotFoundPlugin } from './api-not-found.js';
 import { googleTokenUnavailablePlugin } from './google-token-unavailable.js';
 import { standaloneVoiceTools } from './voiceTools.js';
 import { unwatchedRuntimeDirsPlugin } from './unwatched-cache.js';
+import { adoptLegacyBrandEnv } from '../providers/common/legacyBrandEnv.js'; // SPECTRE
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Load this checkout's configuration and attach its local provider middleware. */
 export default defineConfig(({ command, mode }) => {
+  // SPECTRE: settings still named SKYNET_* work for one release. Adopting them
+  // before and after the .env merge keeps the usual order (process
+  // environment, then .env), with the new name winning within each.
+  adoptLegacyBrandEnv(process.env);
   const loaded = loadEnv(mode, root, '');
   for (const [key, value] of Object.entries(loaded)) {
     if (process.env[key] === undefined) process.env[key] = value;
   }
+  adoptLegacyBrandEnv(process.env);
   const tools = standaloneVoiceTools();
   return createBrowserViteConfig({
     plugins: [

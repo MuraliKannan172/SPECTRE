@@ -18,7 +18,7 @@ test('reference factories retain compatibility without starting acquisition or s
     'fire-perimeters',
     'cables',
     'gnss-integrity',
-    // SKYNET
+    // SPECTRE
     'news',
     'natural-events',
   ]);

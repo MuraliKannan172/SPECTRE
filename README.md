@@ -1,12 +1,12 @@
-# SKYNET
+# SPECTRE
 
 **A local-first global intelligence globe.** Live flights, satellites, weather, cameras and public data on a 3D Earth, with real-time news intelligence and a local AI analyst, the Neural Core, all running on your own machine with no paid keys required.
 
-![SKYNET on the keyless NASA Blue Marble basemap, with the news and natural-events layers on](docs/images/skynet-globe.jpg)
+![SPECTRE on the keyless NASA Blue Marble basemap, with the news and natural-events layers on](docs/images/spectre-globe.jpg)
 
-SKYNET is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © Bilawal Sidhu), rebranded in a Vanta-black and Ferrari-red theme. It keeps God's Eye View's layers and tools, except where their data could not be redistributed. [NOTICE.md](NOTICE.md) lists every change from upstream.
+SPECTRE is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © Bilawal Sidhu), rebranded in a Vanta-black and Ferrari-red theme. It keeps God's Eye View's layers and tools, except where their data could not be redistributed. [NOTICE.md](NOTICE.md) lists every change from upstream.
 
-> **Status: v0.1.0** (tagged locally as `skynet-v0.1.0`). All six phases of [docs/ADR-001.md](docs/ADR-001.md) are done. What was verified and what was not is in [docs/VERIFY.md](docs/VERIFY.md).
+> **Status: v0.1.0** (tagged locally as `spectre-v0.1.0`). All six phases of [docs/ADR-001.md](docs/ADR-001.md) are done. What was verified and what was not is in [docs/VERIFY.md](docs/VERIFY.md).
 
 ## What it does
 
@@ -19,7 +19,7 @@ SKYNET is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-vi
   - **What it refuses.** It will not locate or profile people.
   - **When Ollama is not running,** the panel says so.
 
-  ![The Neural Core answering a news question with numbered sources](docs/images/skynet-neural-core.jpg)
+  ![The Neural Core answering a news question with numbered sources](docs/images/spectre-neural-core.jpg)
 - **Local voice (optional).** Hold the mic in the Neural Core panel and ask. Speech is recognised and spoken on your computer (faster-whisper and Kokoro); the answer is read aloud in English as it arrives.
 
 ## Quick start (Windows 11, PowerShell)
@@ -46,7 +46,7 @@ SKYNET is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-vi
      ```powershell
      ollama pull bonsai-2:9b
      ```
-     then set `SKYNET_LOW_RESOURCE=1`.
+     then set `SPECTRE_LOW_RESOURCE=1`.
 
    The built-in default, `qwen3.5-9b-64k-gpu:latest`, is the developer's local build of Qwen 3.5 9B, so set `OLLAMA_MODEL` on any other machine. The public `qwen3.5:9b` and `bonsai-2:9b` tags exist in the Ollama library, but the developer measured only the local build and `bonsai-2:9b` ([eval](docs/phase4/neural-core-eval.md)). Check yours with `npm run doctor`: it reports whether the model is installed and can call tools.
 3. **Check the setup.** It reports Node, the keys you have, the intel service, Ollama and your model, web search, local voice, GPU memory, and any service reachable from your network:
@@ -54,17 +54,17 @@ SKYNET is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-vi
    ```powershell
    npm run doctor
    ```
-4. **Start SKYNET.** This starts the intel service and the web app together; Ctrl+C stops both. The first run sets up the Python environment and runs `npm ci`:
+4. **Start SPECTRE.** This starts the intel service and the web app together; Ctrl+C stops both. The first run sets up the Python environment and runs `npm ci`:
 
    ```powershell
-   .\scripts\skynet.ps1
+   .\scripts\spectre.ps1
    ```
 5. **Open** http://localhost:4173.
 
 **Optional local voice:** this installs speech recognition and synthesis and fetches about 270 MB of pinned models:
 
 ```powershell
-.\scripts\skynet.ps1 -Voice
+.\scripts\spectre.ps1 -Voice
 ```
 
 If PowerShell says running scripts is disabled (Windows' default policy is Restricted), allow local scripts for your account once:
@@ -91,7 +91,7 @@ Everything below "Without keys" works out of the box. Keys go in **Provider Sett
 
 ## Costs
 
-SKYNET itself is free, and its default setup needs no paid service: the Neural Core and local voice run on your own hardware. Keyed providers have their own free tiers and prices, which change; check them before adding a key:
+SPECTRE itself is free, and its default setup needs no paid service: the Neural Core and local voice run on your own hardware. Keyed providers have their own free tiers and prices, which change; check them before adding a key:
 - [Google Maps Platform](https://mapsplatform.google.com/pricing/)
 - [Cesium ion](https://cesium.com/pricing/)
 - [OpenAI API](https://openai.com/api/pricing/)
@@ -104,13 +104,13 @@ SKYNET itself is free, and its default setup needs no paid service: the Neural C
 
 ## Data you have to opt in to
 
-Some free sources allow only personal, non-commercial use, so SKYNET leaves them off:
+Some free sources allow only personal, non-commercial use, so SPECTRE leaves them off:
 
 - **Non-commercial sources switch** (Provider Settings). It turns on:
   - worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines and adsbdb flight routes;
   - the news feeds whose terms are personal-use or unchecked (UN News, BBC, Al Jazeera and others in `intel/feeds.default.yaml`).
 
-  It writes `SKYNET_NONCOMMERCIAL_SOURCES=1` to your local `.env`.
+  It writes `SPECTRE_NONCOMMERCIAL_SOURCES=1` to your local `.env`.
 - **Submarine cables** (TeleGeography, CC BY-NC-SA) are not shipped. For personal use, run:
 
   ```powershell
@@ -127,7 +127,7 @@ Some free sources allow only personal, non-commercial use, so SKYNET leaves them
   - The browser reaches the intel service only through the app's own proxy, which refuses other sites.
 - **What stays on your machine.**
   - Chat history stays local.
-  - The tool log in `.skynet-logs/` records which tools ran and which URLs were read, never page content.
+  - The tool log in `.spectre-logs/` records which tools ran and which URLs were read, never page content.
   - Voice recordings are never stored.
 - **What the model can and cannot do.**
   - Pages the model reads go through an SSRF guard: public addresses only, robots.txt honoured, capped in size and time.
@@ -138,7 +138,7 @@ The full checklist, with evidence, is in [docs/phase6/security-checklist.md](doc
 
 ## Responsible use
 
-SKYNET models **events, assets, infrastructure and systems**: aircraft, vessels, satellites, fires, cameras, cities. It does not search for, recognise or track individual people, and contributions that cross that line will not be merged.
+SPECTRE models **events, assets, infrastructure and systems**: aircraft, vessels, satellites, fires, cameras, cities. It does not search for, recognise or track individual people, and contributions that cross that line will not be merged.
 
 It is not for navigation, emergency response or any other safety-critical use. Data comes from public feeds that can be late, incomplete or wrong, and the Neural Core is a local model whose answers can be wrong.
 
@@ -148,7 +148,7 @@ It is not for navigation, emergency response or any other safety-critical use. D
 - [docs/VERIFY.md](docs/VERIFY.md): manual verification steps and their results.
 - [docs/API.md](docs/API.md): the intel service API.
 - [docs/ADR-001.md](docs/ADR-001.md): the design and its decisions.
-- [CONTRIBUTING.md](CONTRIBUTING.md): how to change SKYNET.
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to change SPECTRE.
 - [DATA_SOURCES.md](DATA_SOURCES.md): data sources and their terms.
 - Measurements:
   - [docs/phase4/neural-core-eval.md](docs/phase4/neural-core-eval.md): the Neural Core eval.

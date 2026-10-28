@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core: the globe tools the local chat model may call (ADR-001
+ * SPECTRE Neural Core: the globe tools the local chat model may call (ADR-001
  * D5). They run in the browser through the voice runner, which handles both
  * app actions and catalog tools; this module only chooses the subset and
  * words it briefly so it fits a small model's context. Argument schemas are
@@ -61,7 +61,7 @@ const PRUNED = Object.freeze({
 });
 
 /**
- * SKYNET layers the Neural Core may toggle. They stay out of the upstream voice
+ * SPECTRE layers the Neural Core may toggle. They stay out of the upstream voice
  * enums (VOICE_OFF_LAYERS), whose prompt sits at its size budget; the runner
  * toggles any registered layer id, so only this copy of the enum names them.
  */

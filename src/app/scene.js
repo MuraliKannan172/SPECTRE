@@ -7,7 +7,7 @@ import {
 import { registerDataCredits } from '../data/dataCredits.js';
 import { configureCreditKeyboardAccess } from '../creditKeyboard.js';
 import { MapStackController } from '../mapStackController.js';
-import { KEYLESS_DEFAULT_STACK_ID } from '../maps/catalog.js'; // SKYNET
+import { KEYLESS_DEFAULT_STACK_ID } from '../maps/catalog.js'; // SPECTRE
 import { loadPhotorealisticTileset } from '../mapStartup.js';
 import { initLogoGaze } from '../logoGaze.js';
 import {

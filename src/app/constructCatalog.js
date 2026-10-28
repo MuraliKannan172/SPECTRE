@@ -173,7 +173,7 @@ export function createApplicationCatalog({
           source: 'NASA FIRMS · LIVE',
           feed: sources.firms,
         }),
-        // SKYNET: news from the local intel service and NASA EONET events.
+        // SPECTRE: news from the local intel service and NASA EONET events.
         createApplicationNews({ source: sources.news }),
         createApplicationNaturalEvents({ source: sources['natural-events'] }),
       ],

@@ -1,5 +1,5 @@
 /**
- * SKYNET: what the News drawer and ticker show, as plain data. Pure — no DOM
+ * SPECTRE: what the News drawer and ticker show, as plain data. Pure — no DOM
  * and no Cesium — so it is tested in Node; panel.js only renders it.
  */
 import { msg, t, tn } from '../../i18n/index.js';

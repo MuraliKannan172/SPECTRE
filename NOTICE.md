@@ -1,16 +1,16 @@
 # NOTICE
 
-SKYNET is a modified version of **God's Eye View** by Bilawal Sidhu,
+SPECTRE is a modified version of **God's Eye View** by Bilawal Sidhu,
 https://github.com/bilawalsidhu/gods-eye-view, forked from `main` at commit
 `7be5937f` (version 0.2.1) on 2026-10-22.
 
 God's Eye View is licensed under the MIT License, Copyright (c) 2026 Bilawal
 Sidhu. That copyright and permission notice are kept in [LICENSE](LICENSE) and
-apply to the upstream code SKYNET contains. SKYNET's own changes are also
-offered under the MIT License. SKYNET is not affiliated with or endorsed by
+apply to the upstream code SPECTRE contains. SPECTRE's own changes are also
+offered under the MIT License. SPECTRE is not affiliated with or endorsed by
 God's Eye View or its authors.
 
-## What SKYNET changed
+## What SPECTRE changed
 
 Every change below is in the git history; the design is in
 [docs/ADR-001.md](docs/ADR-001.md).
@@ -40,12 +40,12 @@ Every change below is in the git history; the design is in
   sources is on.
 
 **Branding and theme**
-- All product naming lives in `src/branding.js`; a new logo and icons; SKYNET
+- All product naming lives in `src/branding.js`; a new logo and icons; SPECTRE
   User-Agents toward upstream services.
 - A Vanta-black and Ferrari-red theme (`src/theme/`), with fonts bundled instead
   of loaded from Google Fonts.
 
-## Third-party components added by SKYNET
+## Third-party components added by SPECTRE
 
 | Component | Licence |
 | --- | --- |
@@ -53,8 +53,8 @@ Every change below is in the git history; the design is in
 | material-symbols (Material Symbols Outlined font) | Apache License 2.0 |
 | Intel service Python packages (installed by uv from `intel/uv.lock`, not committed): FastAPI, Starlette, Pydantic, Uvicorn, HTTPX, feedparser, RapidFuzz, PyYAML, spaCy and its `en_core_web_sm` model | See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 | GeoNames `cities15000` and `countryInfo`, in `intel/app/geo/data/gazetteer.json.gz` | CC BY 4.0, "GeoNames, https://www.geonames.org/" |
-| Local voice, opt-in only (`scripts\skynet.ps1 -Voice`; not installed or bundled by default): faster-whisper, CTranslate2, ONNX Runtime, kokoro-onnx, PyAV | MIT (faster-whisper, CTranslate2, ONNX Runtime, kokoro-onnx); BSD-3-Clause (PyAV, whose wheels bundle FFmpeg libraries under FFmpeg's own licence) |
-| Local voice, opt-in only: phonemizer and espeak-ng (through espeakng-loader, MIT), pulled in by kokoro-onnx | **GPL-3.0** (phonemizer GPL-3.0-or-later). SKYNET's code stays MIT and never ships these; the person who opts in installs them on their own machine. Piper, the brief's other text-to-speech option, is GPL-3.0 itself. |
+| Local voice, opt-in only (`scripts\spectre.ps1 -Voice`; not installed or bundled by default): faster-whisper, CTranslate2, ONNX Runtime, kokoro-onnx, PyAV | MIT (faster-whisper, CTranslate2, ONNX Runtime, kokoro-onnx); BSD-3-Clause (PyAV, whose wheels bundle FFmpeg libraries under FFmpeg's own licence) |
+| Local voice, opt-in only: phonemizer and espeak-ng (through espeakng-loader, MIT), pulled in by kokoro-onnx | **GPL-3.0** (phonemizer GPL-3.0-or-later). SPECTRE's code stays MIT and never ships these; the person who opts in installs them on their own machine. Piper, the brief's other text-to-speech option, is GPL-3.0 itself. |
 | Voice models fetched by `intel/scripts/fetch_voice_models.py`: faster-whisper `base`, Kokoro-82M and its voices | MIT (Whisper base); Apache-2.0 (Kokoro-82M) |
 
 Data sources, their terms and required attribution are listed in

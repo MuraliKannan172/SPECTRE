@@ -6,18 +6,18 @@ import {
   generate,
   recolor,
   recolorValue,
-} from '../../scripts/generate-skynet-recolor.mjs';
+} from '../../scripts/generate-spectre-recolor.mjs';
 import { BRANDING } from '../branding.js';
 
 test('the generated recolor sheet matches the current upstream stylesheets', () => {
   const committed = readFileSync(
-    new URL('./skynet-recolor.css', import.meta.url),
+    new URL('./spectre-recolor.css', import.meta.url),
     'utf8',
   );
   assert.equal(
     committed,
     generate(),
-    'run node scripts/generate-skynet-recolor.mjs after changing src/ui/styles/',
+    'run node scripts/generate-spectre-recolor.mjs after changing src/ui/styles/',
   );
 });
 

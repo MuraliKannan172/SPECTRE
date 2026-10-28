@@ -67,7 +67,7 @@ function localProviderPlugins({ realtime, gemini } = {}) {
     mapillaryProxy(),
     firePerimetersProxy(),
     gnssIntegrityProxy(),
-    // SKYNET: the local intel service (news) and NASA EONET natural events.
+    // SPECTRE: the local intel service (news) and NASA EONET natural events.
     intelProxy(),
     eonetProxy(),
     ghostMapsProxy(),

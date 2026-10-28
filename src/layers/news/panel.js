@@ -1,6 +1,6 @@
 /**
- * SKYNET: the News drawer (search, filters, every outlet's link) and the
- * headline ticker. Self-contained DOM owned by SKYNET — deliberately outside
+ * SPECTRE: the News drawer (search, filters, every outlet's link) and the
+ * headline ticker. Self-contained DOM owned by SPECTRE — deliberately outside
  * GEV's rail panels, share-link panel state and voice panel list — mounted
  * once by the application. Text is only ever set with textContent; links are
  * real anchors to validated http(s) URLs, opened with noopener.
@@ -40,7 +40,7 @@ function fillSelect(select, options, value) {
 }
 
 function outletLink(document, name, url) {
-  const link = element(document, 'a', 'skynet-news-outlet', `${name} ↗`);
+  const link = element(document, 'a', 'spectre-news-outlet', `${name} ↗`);
   link.href = url;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
@@ -67,40 +67,40 @@ export function mountNewsPanel({
   const body = document.body;
 
   // -- the toggle (the ticker bar's first control) ----------------------
-  const toggle = element(document, 'button', 'skynet-news-toggle');
-  toggle.id = 'skynet-news-toggle';
+  const toggle = element(document, 'button', 'spectre-news-toggle');
+  toggle.id = 'spectre-news-toggle';
   toggle.type = 'button';
   toggle.title = t(
     'Search all stories, filter by region and source, and open every outlet',
   );
-  toggle.setAttribute('aria-controls', 'skynet-news-drawer');
+  toggle.setAttribute('aria-controls', 'spectre-news-drawer');
   toggle.setAttribute('aria-expanded', 'false');
   const toggleLabel = element(document, 'span', '', t('NEWS'));
-  const toggleCount = element(document, 'span', 'skynet-news-toggle-count');
+  const toggleCount = element(document, 'span', 'spectre-news-toggle-count');
   toggle.append(toggleLabel, toggleCount);
 
   // -- the drawer --------------------------------------------------------
-  const drawer = element(document, 'aside', 'skynet-news-drawer');
-  drawer.id = 'skynet-news-drawer';
+  const drawer = element(document, 'aside', 'spectre-news-drawer');
+  drawer.id = 'spectre-news-drawer';
   drawer.hidden = true;
   drawer.setAttribute('aria-label', t('News'));
-  const header = element(document, 'header', 'skynet-news-header');
-  const title = element(document, 'h2', 'skynet-news-title', t('NEWS'));
-  const badge = element(document, 'span', 'skynet-news-badge');
-  const close = element(document, 'button', 'skynet-news-close', '×');
+  const header = element(document, 'header', 'spectre-news-header');
+  const title = element(document, 'h2', 'spectre-news-title', t('NEWS'));
+  const badge = element(document, 'span', 'spectre-news-badge');
+  const close = element(document, 'button', 'spectre-news-close', '×');
   close.type = 'button';
   close.setAttribute('aria-label', t('Close the News panel'));
   header.append(title, badge, close);
 
-  const form = element(document, 'form', 'skynet-news-filters');
+  const form = element(document, 'form', 'spectre-news-filters');
   form.setAttribute('role', 'search');
-  const search = element(document, 'input', 'skynet-news-search');
+  const search = element(document, 'input', 'spectre-news-search');
   search.type = 'search';
   search.maxLength = 200;
   search.placeholder = t('Search headlines');
   search.setAttribute('aria-label', t('Search headlines'));
   const labelled = (label, control) => {
-    const wrap = element(document, 'label', 'skynet-news-field');
+    const wrap = element(document, 'label', 'spectre-news-field');
     wrap.append(element(document, 'span', '', label), control);
     return wrap;
   };
@@ -121,34 +121,34 @@ export function mountNewsPanel({
     labelled(t('Source'), sourceSelect),
   );
 
-  const status = element(document, 'p', 'skynet-news-status');
+  const status = element(document, 'p', 'spectre-news-status');
   status.setAttribute('role', 'status');
-  const list = element(document, 'ol', 'skynet-news-list');
+  const list = element(document, 'ol', 'spectre-news-list');
   list.setAttribute('aria-label', t('News stories'));
-  const footer = element(document, 'footer', 'skynet-news-footer');
+  const footer = element(document, 'footer', 'spectre-news-footer');
   const footnote = element(
     document,
     'p',
     '',
     t('From the local intel service: headline, short summary and link only.'),
   );
-  const citation = element(document, 'p', 'skynet-news-citation');
+  const citation = element(document, 'p', 'spectre-news-citation');
   footer.append(footnote, citation);
   drawer.append(header, form, status, list, footer);
 
   // -- the ticker bar: toggle, freshness, newest headline ---------------
-  const ticker = element(document, 'div', 'skynet-news-ticker');
-  ticker.id = 'skynet-news-ticker';
+  const ticker = element(document, 'div', 'spectre-news-ticker');
+  ticker.id = 'spectre-news-ticker';
   ticker.hidden = true;
   ticker.setAttribute('role', 'region');
   ticker.setAttribute('aria-live', 'off');
   ticker.setAttribute('aria-label', t('Latest headlines'));
-  const tickerBadge = element(document, 'span', 'skynet-news-ticker-badge');
-  const tickerAge = element(document, 'span', 'skynet-news-ticker-age');
+  const tickerBadge = element(document, 'span', 'spectre-news-ticker-badge');
+  const tickerAge = element(document, 'span', 'spectre-news-ticker-age');
   const tickerHeadline = element(
     document,
     'button',
-    'skynet-news-ticker-headline',
+    'spectre-news-ticker-headline',
   );
   tickerHeadline.type = 'button';
   ticker.append(toggle, tickerBadge, tickerAge, tickerHeadline);
@@ -177,11 +177,11 @@ export function mountNewsPanel({
     });
     list.replaceChildren(
       ...items.map((item) => {
-        const row = element(document, 'li', 'skynet-news-item');
+        const row = element(document, 'li', 'spectre-news-item');
         row.dataset.storyId = String(item.id);
         if (item.selected) row.classList.add('is-selected');
-        row.style.setProperty('--skynet-news-color', item.color);
-        const heading = element(document, 'button', 'skynet-news-headline');
+        row.style.setProperty('--spectre-news-color', item.color);
+        const heading = element(document, 'button', 'spectre-news-headline');
         heading.type = 'button';
         heading.textContent = item.alert
           ? `${t('ALERT')} · ${item.title}`
@@ -193,15 +193,15 @@ export function mountNewsPanel({
         const meta = element(
           document,
           'p',
-          'skynet-news-meta',
+          'spectre-news-meta',
           `${item.category} · ${item.meta}`,
         );
         row.append(heading, meta);
         if (item.summary)
           row.append(
-            element(document, 'p', 'skynet-news-summary', item.summary),
+            element(document, 'p', 'spectre-news-summary', item.summary),
           );
-        const outlets = element(document, 'p', 'skynet-news-outlets');
+        const outlets = element(document, 'p', 'spectre-news-outlets');
         for (const outlet of item.outlets)
           outlets.append(outletLink(document, outlet.name, outlet.url));
         if (item.gdelt) {
@@ -291,7 +291,7 @@ export function mountNewsPanel({
     if (destroyed || !layer.getModel().enabled) return;
     drawer.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
-    body.classList.add('skynet-news-open');
+    body.classList.add('spectre-news-open');
     onOpen();
     search.focus();
     void runQuery();
@@ -301,7 +301,7 @@ export function mountNewsPanel({
     if (drawer.hidden) return;
     drawer.hidden = true;
     toggle.setAttribute('aria-expanded', 'false');
-    body.classList.remove('skynet-news-open');
+    body.classList.remove('spectre-news-open');
     request?.abort();
     if (restoreFocus && !ticker.hidden) toggle.focus();
   }
@@ -328,7 +328,7 @@ export function mountNewsPanel({
       ? `${t('ALERT')} · ${entry.title}`
       : entry.title;
     tickerHeadline.dataset.storyId = String(entry.id);
-    tickerHeadline.style.setProperty('--skynet-news-color', entry.color);
+    tickerHeadline.style.setProperty('--spectre-news-color', entry.color);
     tickerHeadline.title = entry.gdelt ? gdeltCitation().text : '';
   }
 
@@ -399,9 +399,9 @@ export function mountNewsPanel({
   ])
     on(select, 'change', () => scheduleQuery(0));
   on(list, 'click', (event) => {
-    const button = event.target?.closest?.('.skynet-news-headline');
+    const button = event.target?.closest?.('.spectre-news-headline');
     if (!button || button.disabled) return;
-    const id = Number(button.closest('.skynet-news-item')?.dataset.storyId);
+    const id = Number(button.closest('.spectre-news-item')?.dataset.storyId);
     if (Number.isSafeInteger(id)) layer.setParams({ storyId: id, focus: true });
   });
   on(tickerHeadline, 'click', () => {
@@ -429,7 +429,7 @@ export function mountNewsPanel({
       for (const timer of [queryTimer, liveTimer, tickerTimer])
         if (timer !== null) clearTimer(timer);
       request?.abort();
-      body.classList.remove('skynet-news-open');
+      body.classList.remove('spectre-news-open');
       drawer.remove();
       ticker.remove();
     },

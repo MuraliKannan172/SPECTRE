@@ -11,7 +11,7 @@ import { brandUserAgent } from '../../../src/branding.js';
 /**
  * The usage policy for the public Nominatim instance asks for a User-Agent or
  * Referer that identifies the application, and states that stock library
- * agents will not do. SKYNET sends its own User-Agent; it has no public site
+ * agents will not do. SPECTRE sends its own User-Agent; it has no public site
  * to give as a Referer, and must not borrow another project's.
  */
 const NOMINATIM_HEADERS = Object.freeze({

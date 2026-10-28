@@ -5,10 +5,11 @@
 const RUNTIME_WRITE_GLOBS = Object.freeze([
   '**/.gev-cache/**',
   '**/.gev-logs/**',
-  // SKYNET intel service: its SQLite database, logs and Python virtualenv.
+  // SPECTRE intel service: its SQLite database, logs and Python virtualenv.
   '**/intel/data/**',
   '**/intel/.venv/**',
-  '**/.skynet-logs/**',
+  '**/.spectre-logs/**',
+  '**/.skynet-logs/**', // the pre-rename log folder, kept after migration
 ]);
 
 /**

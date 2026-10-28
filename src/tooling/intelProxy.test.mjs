@@ -44,7 +44,7 @@ async function closeAll(...servers) {
 test('the target stays on this machine', () => {
   assert.equal(intelTarget({}), 'http://127.0.0.1:8100');
   assert.equal(
-    intelTarget({ SKYNET_INTEL_URL: 'http://localhost:9100/' }),
+    intelTarget({ SPECTRE_INTEL_URL: 'http://localhost:9100/' }),
     'http://localhost:9100',
   );
   for (const unsafe of [
@@ -54,7 +54,7 @@ test('the target stays on this machine', () => {
     'not a url',
   ]) {
     assert.equal(
-      intelTarget({ SKYNET_INTEL_URL: unsafe }),
+      intelTarget({ SPECTRE_INTEL_URL: unsafe }),
       'http://127.0.0.1:8100',
     );
   }
@@ -274,7 +274,7 @@ test('chat answers this machine only unless LAN is opted in', async () => {
 
   const open = createIntelHandler({
     request: fakeRequest,
-    env: { SKYNET_CHAT_ALLOW_LAN: '1' },
+    env: { SPECTRE_CHAT_ALLOW_LAN: '1' },
   });
   await open(lan, reply());
   assert.equal(calls.length, 2);
@@ -379,7 +379,7 @@ test('voice refuses other sites, the wrong type, oversize audio and the LAN', as
   // Opting LAN viewers in to chat never opens voice to them.
   const lanChat = createIntelHandler({
     target: upstream.url,
-    env: { SKYNET_CHAT_ALLOW_LAN: '1' },
+    env: { SPECTRE_CHAT_ALLOW_LAN: '1' },
   });
   const refused = { status: 0, body: '' };
   refused.writeHead = (code) => (refused.status = code);

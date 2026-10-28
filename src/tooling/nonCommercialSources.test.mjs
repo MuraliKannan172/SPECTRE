@@ -1,4 +1,4 @@
-// SKYNET: free APIs whose terms allow only personal, non-commercial use stay
+// SPECTRE: free APIs whose terms allow only personal, non-commercial use stay
 // off until the owner turns on "Non-commercial sources" in Provider Settings.
 // These pin the default (off) for every gated route; liveProviders.test.mjs
 // and localServices.test.mjs pin the opted-in paths.

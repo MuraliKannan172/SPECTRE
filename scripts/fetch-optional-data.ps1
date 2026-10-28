@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Download optional datasets that SKYNET does not ship because their licenses
+  Download optional datasets that SPECTRE does not ship because their licenses
   forbid commercial use or redistribution.
 
 .DESCRIPTION
@@ -26,7 +26,7 @@ $licenseNotice = @'
 TeleGeography Submarine Cable Map data is licensed CC BY-NC-SA 3.0
 (https://creativecommons.org/licenses/by-nc-sa/3.0/). You may use it only for
 personal, non-commercial purposes, with attribution to TeleGeography, and must
-not redistribute it with SKYNET. Commercial use needs a TeleGeography license.
+not redistribute it with SPECTRE. Commercial use needs a TeleGeography license.
 '@
 
 if (-not $AcceptNonCommercialLicense) {

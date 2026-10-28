@@ -1,5 +1,28 @@
 # Changelog
 
+- **Renamed SKYNET → SPECTRE** ("Global Intelligence Dashboard"). Every name
+  that is ours now says SPECTRE; God's Eye View's credits are unchanged.
+  **Breaking:**
+  - Settings `SKYNET_*` are now `SPECTRE_*`. The old names are still read
+    for one release, with a deprecation warning, and the new name wins when
+    both are set. Provider Settings writes the new name and comments out the
+    old line, so an old value cannot override the Non-commercial sources
+    switch.
+  - The start script is `scripts\spectre.ps1`; `scripts\skynet.ps1` forwards
+    to it with a warning for one release. `npm run qa:skynet-news` is now
+    `npm run qa:spectre-news`.
+  - The intel database `intel/data/skynet.db` is now `spectre.db`, and the
+    tool-log folder `.skynet-logs/` is `.spectre-logs/`. Both are copied once
+    at the first start after the rename; the old ones are kept, never
+    deleted.
+  - Outbound requests identify as `SPECTRE-<component>/0.1` instead of
+    `SKYNET-<component>/0.1`.
+  - The intel Python package is `spectre-intel`; CSS tokens `--sk-*` are
+    `--sp-*` and `skynet-*` classes are `spectre-*`.
+  - The MCP server keeps its name (`gods-eye-view`); no client config
+    changes. Rename the project folder and any repository or image names
+    yourself.
+
 - The tracked-aircraft descriptor now publishes `verticalRateMps`, on both the
   civil and military layers, so a consumer reading `getTrackedInfo()` no longer
   has to reach past it into the raw poll record for climb/descent. Reported,

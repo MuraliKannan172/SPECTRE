@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core: the browser side of /api/intel/chat and /voice, through
+ * SPECTRE Neural Core: the browser side of /api/intel/chat and /voice, through
  * the app's same-origin proxy (server/providers/intel.js). Transport only, no
  * DOM.
  */

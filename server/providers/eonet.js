@@ -2,7 +2,7 @@ import { readResponseTextCapped } from './common/http.js';
 import { brandUserAgent } from '../../src/branding.js';
 
 /**
- * SKYNET: NASA EONET v3 natural events (open events from the last 30 days).
+ * SPECTRE: NASA EONET v3 natural events (open events from the last 30 days).
  *
  * EONET is a NASA service; its event metadata is public domain. Each event
  * is reduced to one point (its latest geometry; a polygon's centroid), a
@@ -211,7 +211,7 @@ export function eonetProxy({
   }
 
   return {
-    name: 'skynet-eonet',
+    name: 'spectre-eonet',
     configureServer({ middlewares }) {
       middlewares.use('/api/eonet', handler);
     },

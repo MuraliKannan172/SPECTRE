@@ -1,12 +1,12 @@
 /* ═══════════════════════════════════════════════
-   SKYNET — News ticker bar and drawer (src/layers/news/panel.js).
-   Loaded after skynet.css; uses its --sk-* tokens. Remove the link in
+   SPECTRE — News ticker bar and drawer (src/layers/news/panel.js).
+   Loaded after spectre.css; uses its --sk-* tokens. Remove the link in
    index.html and the mount in src/standalone/application.js together.
    ═══════════════════════════════════════════════ */
 
 /* Under the title bar, left-aligned: clear of the top-centre actions and of
    the sync chips that appear below them. */
-.skynet-news-ticker {
+.spectre-news-ticker {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 100px);
   left: calc(env(safe-area-inset-left, 0px) + 36px);
@@ -16,102 +16,102 @@
   gap: 8px;
   max-width: min(400px, calc(100vw - 32px));
   padding: 4px 6px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 6px;
   background: rgba(5, 5, 7, 0.88);
   font: 500 12px/1.3 var(--font-sans);
-  color: var(--sk-text);
+  color: var(--sp-text);
 }
 
-.skynet-news-ticker[hidden],
-.skynet-news-drawer[hidden],
-.skynet-news-ticker [hidden],
-.skynet-news-drawer [hidden] {
+.spectre-news-ticker[hidden],
+.spectre-news-drawer[hidden],
+.spectre-news-ticker [hidden],
+.spectre-news-drawer [hidden] {
   display: none;
 }
 
-.skynet-news-toggle {
+.spectre-news-toggle {
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
-  border: 1px solid var(--sk-red-deep);
+  border: 1px solid var(--sp-red-deep);
   border-radius: 4px;
   background: transparent;
-  color: var(--sk-red);
+  color: var(--sp-red);
   font: 700 11px/1.2 var(--font-display);
   letter-spacing: 0.16em;
   cursor: pointer;
 }
 
-.skynet-news-toggle:hover,
-.skynet-news-toggle[aria-expanded='true'] {
+.spectre-news-toggle:hover,
+.spectre-news-toggle[aria-expanded='true'] {
   background: var(--accent-dim);
 }
 
-.skynet-news-toggle-count {
-  color: var(--sk-text-dim);
+.spectre-news-toggle-count {
+  color: var(--sp-text-dim);
   font-family: var(--font-mono);
   letter-spacing: 0;
 }
 
-.skynet-news-ticker-badge,
-.skynet-news-badge {
+.spectre-news-ticker-badge,
+.spectre-news-badge {
   flex: none;
   padding: 1px 6px;
   border-radius: 3px;
   font: 700 10px/1.4 var(--font-mono);
   letter-spacing: 0.08em;
-  color: var(--sk-bg);
-  background: var(--sk-ok);
+  color: var(--sp-bg);
+  background: var(--sp-ok);
 }
 
-.skynet-news-ticker-badge[data-tone='stale'],
-.skynet-news-badge[data-tone='stale'] {
-  background: var(--sk-warn);
+.spectre-news-ticker-badge[data-tone='stale'],
+.spectre-news-badge[data-tone='stale'] {
+  background: var(--sp-warn);
 }
 
-.skynet-news-ticker-badge[data-tone='offline'],
-.skynet-news-badge[data-tone='offline'] {
-  color: var(--sk-text);
-  background: var(--sk-red-deep);
+.spectre-news-ticker-badge[data-tone='offline'],
+.spectre-news-badge[data-tone='offline'] {
+  color: var(--sp-text);
+  background: var(--sp-red-deep);
 }
 
-.skynet-news-ticker-badge[data-tone='loading'],
-.skynet-news-ticker-badge[data-tone='idle'] {
-  color: var(--sk-text-dim);
-  background: var(--sk-surface-2);
+.spectre-news-ticker-badge[data-tone='loading'],
+.spectre-news-ticker-badge[data-tone='idle'] {
+  color: var(--sp-text-dim);
+  background: var(--sp-surface-2);
 }
 
-.skynet-news-ticker-age {
+.spectre-news-ticker-age {
   flex: none;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font-family: var(--font-mono);
 }
 
-.skynet-news-ticker-headline {
+.spectre-news-ticker-headline {
   min-width: 0;
   overflow: hidden;
   padding: 2px 4px;
   border: 0;
-  border-left: 3px solid var(--skynet-news-color, var(--sk-text-dim));
+  border-left: 3px solid var(--spectre-news-color, var(--sp-text-dim));
   background: transparent;
-  color: var(--sk-text);
+  color: var(--sp-text);
   font: inherit;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-  animation: skynet-news-in 240ms ease-out;
+  animation: spectre-news-in 240ms ease-out;
 }
 
-.skynet-news-ticker-headline:hover {
+.spectre-news-ticker-headline:hover {
   color: #fff;
   text-decoration: underline;
 }
 
-@keyframes skynet-news-in {
+@keyframes spectre-news-in {
   from {
     opacity: 0;
     transform: translateY(3px);
@@ -120,7 +120,7 @@
 
 /* ── Drawer ───────────────────────────────────── */
 
-.skynet-news-drawer {
+.spectre-news-drawer {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 118px);
   right: 16px;
@@ -129,89 +129,89 @@
   display: flex;
   flex-direction: column;
   width: min(400px, calc(100vw - 32px));
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 8px;
   background: rgba(8, 8, 10, 0.96);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
-  color: var(--sk-text);
+  color: var(--sp-text);
   font: 400 13px/1.4 var(--font-sans);
 }
 
-.skynet-news-header {
+.spectre-news-header {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px 6px;
 }
 
-.skynet-news-title {
+.spectre-news-title {
   margin: 0;
   font: 700 15px/1 var(--font-display);
   letter-spacing: 0.28em;
 }
 
-.skynet-news-close {
+.spectre-news-close {
   margin-left: auto;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 4px;
   background: transparent;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
 }
 
-.skynet-news-close:hover {
-  border-color: var(--sk-red-deep);
-  color: var(--sk-text);
+.spectre-news-close:hover {
+  border-color: var(--sp-red-deep);
+  color: var(--sp-text);
 }
 
-.skynet-news-filters {
+.spectre-news-filters {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px 8px;
   padding: 4px 12px 8px;
-  border-bottom: 1px solid var(--sk-border);
+  border-bottom: 1px solid var(--sp-border);
 }
 
-.skynet-news-search {
+.spectre-news-search {
   grid-column: 1 / -1;
 }
 
-.skynet-news-field {
+.spectre-news-field {
   display: grid;
   gap: 2px;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font-size: 11px;
 }
 
-.skynet-news-search,
-.skynet-news-field select {
+.spectre-news-search,
+.spectre-news-field select {
   min-width: 0;
   padding: 5px 7px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 4px;
-  background: var(--sk-surface);
-  color: var(--sk-text);
+  background: var(--sp-surface);
+  color: var(--sp-text);
   font: inherit;
   font-size: 12px;
 }
 
-.skynet-news-drawer :focus-visible {
-  outline: 2px solid var(--sk-red);
+.spectre-news-drawer :focus-visible {
+  outline: 2px solid var(--sp-red);
   outline-offset: 1px;
 }
 
-.skynet-news-status {
+.spectre-news-status {
   margin: 0;
   padding: 6px 12px;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font-size: 11px;
 }
 
-.skynet-news-list {
+.spectre-news-list {
   flex: 1;
   min-height: 0;
   margin: 0;
@@ -220,93 +220,93 @@
   list-style: none;
 }
 
-.skynet-news-item {
+.spectre-news-item {
   padding: 8px 8px 8px 10px;
-  border-left: 3px solid var(--skynet-news-color, var(--sk-text-dim));
-  border-bottom: 1px solid var(--sk-border);
+  border-left: 3px solid var(--spectre-news-color, var(--sp-text-dim));
+  border-bottom: 1px solid var(--sp-border);
 }
 
-.skynet-news-item.is-selected {
-  background: var(--sk-surface-2);
+.spectre-news-item.is-selected {
+  background: var(--sp-surface-2);
 }
 
-.skynet-news-headline {
+.spectre-news-headline {
   display: block;
   width: 100%;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--sk-text);
+  color: var(--sp-text);
   font: 600 13px/1.35 var(--font-sans);
   text-align: left;
   cursor: pointer;
 }
 
-.skynet-news-headline:hover:not(:disabled) {
+.spectre-news-headline:hover:not(:disabled) {
   text-decoration: underline;
 }
 
-.skynet-news-headline:disabled {
+.spectre-news-headline:disabled {
   cursor: default;
 }
 
-.skynet-news-meta,
-.skynet-news-summary,
-.skynet-news-outlets {
+.spectre-news-meta,
+.spectre-news-summary,
+.spectre-news-outlets {
   margin: 3px 0 0;
   font-size: 11px;
 }
 
-.skynet-news-meta {
-  color: var(--sk-text-dim);
+.spectre-news-meta {
+  color: var(--sp-text-dim);
 }
 
-.skynet-news-summary {
+.spectre-news-summary {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--sk-text);
+  color: var(--sp-text);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
 
-.skynet-news-outlets {
+.spectre-news-outlets {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
 }
 
-.skynet-news-outlet {
-  color: var(--sk-red);
+.spectre-news-outlet {
+  color: var(--sp-red);
   text-decoration: none;
 }
 
-.skynet-news-outlet:hover {
+.spectre-news-outlet:hover {
   text-decoration: underline;
 }
 
-.skynet-news-footer {
+.spectre-news-footer {
   padding: 6px 12px 10px;
-  border-top: 1px solid var(--sk-border);
-  color: var(--sk-text-faint);
+  border-top: 1px solid var(--sp-border);
+  color: var(--sp-text-faint);
   font-size: 11px;
 }
 
-.skynet-news-footer p {
+.spectre-news-footer p {
   margin: 2px 0 0;
 }
 
 /* Clean view, recording and cockpit hide the app's chrome; these follow. */
-body.ui-clean-view .skynet-news-ticker,
-body.ui-clean-view .skynet-news-drawer,
-body.recording-mode .skynet-news-ticker,
-body.recording-mode .skynet-news-drawer,
-body.cockpit-mode .skynet-news-ticker,
-body.cockpit-mode .skynet-news-drawer {
+body.ui-clean-view .spectre-news-ticker,
+body.ui-clean-view .spectre-news-drawer,
+body.recording-mode .spectre-news-ticker,
+body.recording-mode .spectre-news-drawer,
+body.cockpit-mode .spectre-news-ticker,
+body.cockpit-mode .spectre-news-drawer {
   display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skynet-news-ticker-headline {
+  .spectre-news-ticker-headline {
     animation: none;
   }
 }
@@ -314,13 +314,13 @@ body.cockpit-mode .skynet-news-drawer {
 /* Phone shell (src/ui/styles/mobile-shell.css): the ticker sits under the
    title, clear of the corner buttons; the drawer is a sheet above the tab
    bar, and gives way while one of the shell's own sheets is open. */
-body.mobile-shell .skynet-news-ticker {
+body.mobile-shell .spectre-news-ticker {
   top: calc(var(--mobile-top-inset) + 58px);
   left: calc(env(safe-area-inset-left, 0px) + 16px);
   max-width: calc(100vw - 68px);
 }
 
-body.mobile-shell .skynet-news-drawer {
+body.mobile-shell .spectre-news-drawer {
   top: auto;
   right: 0;
   bottom: var(--mobile-tab-space);
@@ -330,6 +330,6 @@ body.mobile-shell .skynet-news-drawer {
   border-radius: 12px 12px 0 0;
 }
 
-body.mobile-shell[data-mobile-sheet] .skynet-news-drawer {
+body.mobile-shell[data-mobile-sheet] .spectre-news-drawer {
   display: none;
 }

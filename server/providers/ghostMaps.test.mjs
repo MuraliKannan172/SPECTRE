@@ -265,7 +265,7 @@ test('routes: unknown paths and methods are refused without contacting GitHub', 
     subscribers: () => 0,
   };
   let handler;
-  // SKYNET: the routes below run with Non-commercial sources on.
+  // SPECTRE: the routes below run with Non-commercial sources on.
   ghostMapsProxy({ watcher, sourcesEnabled: () => true }).configureServer({
     middlewares: { use: (_route, fn) => (handler = fn) },
   });
@@ -294,7 +294,7 @@ test('routes: unknown paths and methods are refused without contacting GitHub', 
   assert.equal(started, 2);
 });
 
-test('SKYNET: with Non-commercial sources off, GitHub is never contacted', async () => {
+test('SPECTRE: with Non-commercial sources off, GitHub is never contacted', async () => {
   let started = 0;
   const watcher = {
     start: () => {

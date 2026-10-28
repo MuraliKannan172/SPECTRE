@@ -14,7 +14,7 @@ export function createReferenceSources() {
     'fire-perimeters': createWfigsPerimeterSource(),
     cables: createBundledCableSource(),
     'gnss-integrity': createAdsbGnssSource(),
-    // SKYNET: same-origin /api/intel and /api/eonet proxies.
+    // SPECTRE: same-origin /api/intel and /api/eonet proxies.
     news: createIntelNewsSource(),
     'natural-events': createEonetSource(),
   };

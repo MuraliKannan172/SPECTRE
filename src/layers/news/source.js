@@ -7,7 +7,7 @@ import {
 } from './records.js';
 
 /**
- * SKYNET: read news from the local intel service through the app's own
+ * SPECTRE: read news from the local intel service through the app's own
  * /api/intel proxy (same origin; the browser never contacts the service).
  */
 
@@ -19,7 +19,7 @@ export { NEWS_DEFAULT_WINDOW_HOURS, NEWS_WINDOW_HOURS };
 // Data, not UI copy: freshness.js marks them for the catalog and translates
 // them when they are shown (this module stays free of i18n).
 export const INTEL_OFFLINE =
-  'Intel service offline: run scripts\\skynet.ps1 to start it';
+  'Intel service offline: run scripts\\spectre.ps1 to start it';
 export const NEWS_UNAVAILABLE = 'News unavailable';
 
 /** The intel service is not running (the proxy answered intel_offline). */

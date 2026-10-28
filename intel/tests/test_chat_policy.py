@@ -87,10 +87,10 @@ def test_registry_checks_arguments() -> None:
 def test_low_resource_mode_picks_the_small_model_and_budgets(tmp_path) -> None:
     from app.config import DEFAULT_MODEL, LOW_RESOURCE_MODEL, load_settings
 
-    env = {"SKYNET_ENV_FILE": str(tmp_path / ".env")}
+    env = {"SPECTRE_ENV_FILE": str(tmp_path / ".env")}
     assert load_settings(env).ollama_model == DEFAULT_MODEL
-    small = load_settings({**env, "SKYNET_LOW_RESOURCE": "1"})
+    small = load_settings({**env, "SPECTRE_LOW_RESOURCE": "1"})
     assert small.ollama_model == LOW_RESOURCE_MODEL
     assert small.num_ctx == 8192 and small.budgets["page"] == 1200
-    chosen = load_settings({**env, "SKYNET_LOW_RESOURCE": "1", "OLLAMA_MODEL": "other:7b"})
+    chosen = load_settings({**env, "SPECTRE_LOW_RESOURCE": "1", "OLLAMA_MODEL": "other:7b"})
     assert chosen.ollama_model == "other:7b"

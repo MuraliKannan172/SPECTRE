@@ -3,14 +3,14 @@ import { t } from '../../i18n/index.js';
 import { FOOTPRINT_MIN_ELEVATION_DEG, footprintRing } from './footprint.js';
 
 /**
- * SKYNET: a FOOTPRINT option on the satellites layer. While it is on and the
+ * SPECTRE: a FOOTPRINT option on the satellites layer. While it is on and the
  * camera tracks a satellite, a ring on the ground marks where that satellite
  * stands at least FOOTPRINT_MIN_ELEVATION_DEG above the horizon. It wraps the
  * upstream layer instead of editing it: every other method passes through,
  * and with the option off (the default) the layer behaves exactly as before.
  * The option is in memory only; share links do not carry it.
  */
-export const FOOTPRINT_CHIP_ID = 'skynet-footprint';
+export const FOOTPRINT_CHIP_ID = 'spectre-footprint';
 export const FOOTPRINT_PARAM = 'visibilityFootprint';
 const TRACKED_PREFIX = 'satellites:';
 const UPDATE_MS = 250;
@@ -88,10 +88,10 @@ export function withSatelliteFootprint(
     async init(nextViewer, ...rest) {
       const result = await layer.init(nextViewer, ...rest);
       viewer = nextViewer;
-      dataSource = new Cesium.CustomDataSource('skynet-satellite-footprint');
+      dataSource = new Cesium.CustomDataSource('spectre-satellite-footprint');
       const color = Cesium.Color.fromCssColorString(FOOTPRINT_COLOR);
       entity = dataSource.entities.add({
-        id: 'skynet-satellite-footprint',
+        id: 'spectre-satellite-footprint',
         show: false,
         polyline: {
           // A callback makes this a dynamic polyline, drawn synchronously

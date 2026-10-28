@@ -423,7 +423,7 @@ class CockpitCloudEffectsController {
       .then(async (payload) => {
         if (this.abort !== request || request.signal.aborted) return null;
         if (payload?.status === 'disabled') {
-          // SKYNET: Open-Meteo's free API stays off until the owner turns on
+          // SPECTRE: Open-Meteo's free API stays off until the owner turns on
           // non-commercial sources in Provider Settings.
           this.disabledAt = Date.now();
           this.targetStrength = 0;
