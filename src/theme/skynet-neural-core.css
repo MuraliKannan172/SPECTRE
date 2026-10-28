@@ -338,6 +338,45 @@ a.skynet-nc-cite:hover {
   color: var(--sk-text);
 }
 
+/* Push-to-talk (Phase 5): held to record; marked, not disabled, when local
+   voice cannot run, so a press can still say why. */
+.skynet-nc-mic {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: 1px solid var(--sk-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sk-text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.skynet-nc-mic:hover {
+  border-color: var(--sk-red-deep);
+}
+
+.skynet-nc-mic[data-state='recording'] {
+  border-color: var(--sk-red);
+  background: var(--sk-red-deep);
+  animation: skynet-nc-working 1.2s ease-in-out infinite;
+}
+
+.skynet-nc-mic[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: help;
+}
+
+.skynet-nc-voice {
+  margin: 0;
+  padding: 0 12px 6px;
+  color: var(--sk-text-dim);
+  font-size: 11px;
+}
+
 .skynet-nc-disclaimer {
   margin: 0;
   padding: 0 12px 10px;
@@ -371,7 +410,8 @@ body.cockpit-mode .skynet-nc {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skynet-nc-tool[data-state='start'] {
+  .skynet-nc-tool[data-state='start'],
+  .skynet-nc-mic[data-state='recording'] {
     animation: none;
   }
 }

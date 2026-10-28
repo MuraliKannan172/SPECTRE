@@ -3,7 +3,9 @@
  * (ADR-001 D5). Streams answers, shows real tool progress, numbered citation
  * chips and "As of", runs globe tools through the app's own runner, and keeps
  * history in the intel service. Text is only ever set with textContent; links
- * are real anchors to http(s) URLs, opened with noopener.
+ * are real anchors to http(s) URLs, opened with noopener. With local voice
+ * (Phase 5), a held mic button asks by voice and the answer is spoken as it
+ * streams.
  */
 import { BRANDING } from '../branding.js';
 import { t } from '../i18n/index.js';
@@ -14,7 +16,15 @@ import {
   errorText,
   statusSummary,
   toolLabel,
+  voiceTimingText,
 } from './view.js';
+import {
+  createRecorder,
+  createSentenceSplitter,
+  createSpeaker,
+  voiceSupported,
+} from './voice.js';
+import { mountVoiceControl } from './voiceControl.js';
 
 const STATUS_POLL_MS = 10_000;
 const MAX_INPUT = 4000;
@@ -62,7 +72,7 @@ function safeLink(url) {
  *   execute: (name: string, args: object) => Promise<{ok: boolean, result?: any, error?: string}>,
  *   viewport: () => object, layerState: () => object,
  *   setTimer?: typeof setInterval, clearTimer?: typeof clearInterval,
- *   onOpen?: () => void}} options
+ *   onOpen?: () => void, localVoice?: boolean, now?: () => number}} options
  */
 export function mountNeuralCorePanel({
   document,
@@ -73,6 +83,8 @@ export function mountNeuralCorePanel({
   setTimer = (...args) => setInterval(...args),
   clearTimer = (id) => clearInterval(id),
   onOpen = () => {},
+  localVoice = voiceSupported(),
+  now = () => performance.now(),
 }) {
   const body = document.body;
   const launcher = button(
@@ -144,7 +156,48 @@ export function mountNeuralCorePanel({
   sendButton.type = 'submit';
   const stopButton = button(document, 'skynet-nc-stop', t('Stop'));
   stopButton.hidden = true;
-  form.append(input, sendButton, stopButton);
+
+  // -- local voice -------------------------------------------------------------
+  let busy = false;
+  let voiceStatus = null;
+  let spokenTurn = null;
+  const speaker = localVoice
+    ? createSpeaker({
+        speak: (text, options) => client.speak(text, options),
+        onFirstAudio: (clip) => {
+          if (!spokenTurn) return;
+          spokenTurn.ttsSeconds = clip.seconds;
+          markVoice(spokenTurn, 'firstAudio');
+        },
+        onPlay: () => {
+          if (!voice.hint.dataset.code) voice.show('speaking');
+        },
+        onIdle: () => {
+          if (voice.hint.dataset.code === 'speaking') voice.show(null);
+        },
+        // A sentence that is only a citation or an "As of" line has nothing
+        // to say; that is not a failure.
+        onError: (error) => {
+          if (error?.code !== 'nothing_to_say') voice.show('speech_failed');
+        },
+      })
+    : null;
+  const recorder = localVoice
+    ? createRecorder({
+        mediaDevices: globalThis.navigator.mediaDevices,
+        MediaRecorder: globalThis.MediaRecorder,
+      })
+    : null;
+  const voice = mountVoiceControl({
+    document,
+    client,
+    recorder,
+    speaker,
+    isBusy: () => busy,
+    onQuestion: (question) =>
+      void send({ message: question.text, spoken: question }),
+  });
+  form.append(input, voice.mic, sendButton, stopButton);
   const disclaimer = element(
     document,
     'p',
@@ -161,6 +214,7 @@ export function mountNeuralCorePanel({
     empty,
     announcer,
     form,
+    voice.hint,
     disclaimer,
   );
   body.append(launcher, panel);
@@ -170,7 +224,6 @@ export function mountNeuralCorePanel({
   let historyLoaded = false;
   let pollTimer = null;
   let model = '';
-  let busy = false;
   let controller = null;
   let currentTurn = null;
   let clearArmed = null;
@@ -206,6 +259,20 @@ export function mountNeuralCorePanel({
     searchLine.textContent = summary.search || '';
     searchLine.hidden = !summary.search;
     launcher.dataset.tone = summary.tone;
+  }
+
+  async function refreshVoice() {
+    if (!localVoice) return;
+    try {
+      voiceStatus = await client.voiceStatus();
+      if (!destroyed) voice.update(voiceStatus);
+    } catch (error) {
+      if (!destroyed)
+        voice.update(
+          null,
+          error instanceof NeuralCoreError ? error.code : 'network',
+        );
+    }
   }
 
   // -- messages --------------------------------------------------------------
@@ -250,13 +317,15 @@ export function mountNeuralCorePanel({
     const error = element(document, 'p', 'skynet-nc-error');
     const footer = element(document, 'footer', 'skynet-nc-footer');
     const meta = element(document, 'span', 'skynet-nc-meta');
+    const voiceMeta = element(document, 'span', 'skynet-nc-meta');
+    voiceMeta.hidden = true;
     const copy = button(document, 'skynet-nc-action', t('Copy'));
     const regenerate = button(
       document,
       'skynet-nc-action skynet-nc-regenerate',
       t('Regenerate'),
     );
-    footer.append(meta, copy, regenerate);
+    footer.append(meta, voiceMeta, copy, regenerate);
     for (const node of [sources, asOf, error, footer]) node.hidden = true;
     item.append(tools, text, sources, asOf, error, footer);
     list.append(item);
@@ -270,6 +339,7 @@ export function mountNeuralCorePanel({
       error,
       footer,
       meta,
+      voiceMeta,
       copy,
       regenerate,
       raw: '',
@@ -396,12 +466,69 @@ export function mountNeuralCorePanel({
     }
   }
 
-  async function send({ message = '', regenerate = false } = {}, replace) {
+  /** Milliseconds from the mic's release to `step`, kept on the answer for the latency bench. */
+  function markVoice(turn, step) {
+    if (turn[step] != null) return;
+    turn[step] = now() - turn.releasedAt;
+    const item = turn.entry.item;
+    const key = `voice${step[0].toUpperCase()}${step.slice(1)}Ms`;
+    item.dataset[key] = String(Math.round(turn[step]));
+    if (step === 'firstAudio' && turn.ttsSeconds != null)
+      item.dataset.voiceTtsSeconds = String(turn.ttsSeconds);
+    turn.entry.voiceMeta.textContent = voiceTimingText({
+      heardMs: turn.heard,
+      firstWordMs: turn.firstAudio,
+    });
+    turn.entry.voiceMeta.hidden = false;
+  }
+
+  /** Speak a turn asked by voice, sentence by sentence, as it streams. */
+  function startSpeech(entry, spoken) {
+    const turn = {
+      entry,
+      releasedAt: spoken.releasedAt,
+      heard: spoken.transcribedAt - spoken.releasedAt,
+    };
+    entry.item.dataset.voiceRecordedMs = String(
+      Math.round(spoken.recordedAt - spoken.releasedAt),
+    );
+    entry.item.dataset.voiceHeardMs = String(Math.round(turn.heard));
+    entry.item.dataset.voiceSttSeconds = String(spoken.sttSeconds ?? '');
+    entry.voiceMeta.textContent = voiceTimingText({ heardMs: turn.heard });
+    entry.voiceMeta.hidden = false;
+    const speaks = (voiceStatus?.speaks || ['en']).includes(spoken.language);
+    if (!speaker || !speaks) {
+      voice.show('english_only');
+      return { push() {}, end() {} };
+    }
+    speaker.begin();
+    spokenTurn = turn;
+    const splitter = createSentenceSplitter();
+    const say = (sentences) => {
+      for (const sentence of sentences) {
+        markVoice(turn, 'firstSentence');
+        speaker.say(sentence);
+      }
+    };
+    return {
+      push(text) {
+        markVoice(turn, 'firstToken');
+        say(splitter.push(text));
+      },
+      end: () => say(splitter.flush()),
+    };
+  }
+
+  async function send(
+    { message = '', regenerate = false, spoken = null } = {},
+    replace,
+  ) {
     if (busy || destroyed) return;
     if (!regenerate && !message.trim()) return;
     if (regenerate && replace) replace.item.remove();
     else if (!regenerate) addUser(message.trim());
     const entry = addAssistant();
+    const speech = spoken ? startSpeech(entry, spoken) : null;
     toolChip(entry, { tool: 'model', state: 'start' });
     entry.running
       .get('model')
@@ -430,6 +557,7 @@ export function mountNeuralCorePanel({
             clearWaiting();
             entry.raw += data.text || '';
             renderText(entry.text, entry.raw, entry.citations);
+            speech?.push(data.text || '');
           } else if (name === 'tool_status') {
             clearWaiting();
             toolChip(entry, data);
@@ -439,6 +567,7 @@ export function mountNeuralCorePanel({
           } else if (name === 'done') {
             clearWaiting();
             finish(entry, data);
+            speech?.end();
             announcer.textContent = t('Answer ready');
           } else if (name === 'error') {
             clearWaiting();
@@ -469,7 +598,12 @@ export function mountNeuralCorePanel({
     onOpen();
     input.focus();
     void refreshStatus();
-    if (pollTimer === null) pollTimer = setTimer(refreshStatus, STATUS_POLL_MS);
+    void refreshVoice();
+    if (pollTimer === null)
+      pollTimer = setTimer(() => {
+        void refreshStatus();
+        void refreshVoice();
+      }, STATUS_POLL_MS);
     if (!historyLoaded) {
       historyLoaded = true;
       try {
@@ -482,6 +616,7 @@ export function mountNeuralCorePanel({
 
   function close({ restoreFocus = false } = {}) {
     if (panel.hidden) return;
+    speaker?.stop();
     panel.hidden = true;
     launcher.setAttribute('aria-expanded', 'false');
     body.classList.remove('skynet-nc-open');
@@ -544,6 +679,7 @@ export function mountNeuralCorePanel({
     input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
   });
   on(stopButton, 'click', () => {
+    speaker?.stop();
     if (currentTurn) void client.stop(currentTurn).catch(() => {});
     controller?.abort();
   });
@@ -554,6 +690,7 @@ export function mountNeuralCorePanel({
     send: (message) => send({ message }),
     destroy() {
       destroyed = true;
+      voice.destroy();
       controller?.abort();
       if (pollTimer !== null) clearTimer(pollTimer);
       if (clearArmed) clearTimeout(clearArmed);
