@@ -102,7 +102,7 @@ bashTest('dev-fresh reports the real keyless startup map and fallback', async ()
   });
   assert.equal(
     keyless.stdout.trim(),
-    'Startup map: Esri World Imagery with keyless terrain (OpenStreetMap fallback)',
+    'Startup map: NASA Blue Marble with keyless terrain (OpenStreetMap fallback)',
   );
 });
 

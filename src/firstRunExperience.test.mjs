@@ -1056,11 +1056,12 @@ test('the voice TOOL SCHEMA matches the pinned contract — the mission mapping 
   // preserves the mission mapping and globe-rotation arguments.
   // S2 GhostMaps extends the generated layer enums; both feature contracts remain.
   // SKYNET: three descriptions name "the globe" instead of the product, 27
-  // characters shorter than upstream's 31206 (upstream pins f772df95…).
-  assert.equal(block.length, 31179, 'serialized tool schema length drifted');
+  // characters shorter than upstream's 31206 (upstream pins f772df95…), and
+  // set_map_stack adds 'nasa-gibs' (12 characters).
+  assert.equal(block.length, 31191, 'serialized tool schema length drifted');
   assert.equal(
     crypto.createHash('sha256').update(block).digest('hex'),
-    'a5aa01845100caf926be4864c750a3c6e3ddae955dcda1ee06c06d1a0d1c0432',
+    '35db6154ee4a00423a9fba84067c3b1fda6848ee32a5d15eb99400e79b10f572',
     'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
   );
   const instructions = fs.readFileSync(

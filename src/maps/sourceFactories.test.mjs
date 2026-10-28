@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
-import { createIonImagery } from './imagery.js';
+import {
+  createGibsImagery,
+  createIonImagery,
+  GIBS_ATTRIBUTION_HTML,
+  GIBS_BASEMAP_URL,
+} from './imagery.js';
 import { createWorldTerrain, createKeylessTerrain } from './terrain.js';
 import { createDefaultMapSources } from './defaultSources.js';
 
@@ -328,4 +333,37 @@ test('unreachable keyless terrain falls back to flat terrain marked as a fallbac
   const result = await createKeylessTerrain();
   assert.ok(result.provider instanceof Cesium.EllipsoidTerrainProvider);
   assert.equal(result.fallback, true);
+});
+
+// SKYNET: Esri's terms tie its basemaps to Esri software or an ArcGIS Online
+// subscription, so the keyless default is NASA Blue Marble from GIBS.
+test('without keys the default is NASA Blue Marble, credited, with an OSM fallback', () => {
+  const keyless = createDefaultMapSources();
+  assert.equal(keyless.defaultId, 'nasa-gibs');
+  const gibs = keyless.sources.find(
+    ({ descriptor }) => descriptor.id === 'nasa-gibs',
+  );
+  assert.equal(gibs.available, true);
+  assert.equal(gibs.terrain.id, 'keyless');
+  assert.equal(gibs.imagery, createGibsImagery);
+  assert.equal(gibs.credit, GIBS_ATTRIBUTION_HTML);
+  assert.match(gibs.credit, /NASA Blue Marble/);
+  assert.equal(gibs.constructionFallback.id, 'osm');
+  assert.equal(gibs.tileFailureFallback.id, 'osm');
+  assert.equal(
+    createDefaultMapSources({ googleTileset: { show: true } }).defaultId,
+    'photoreal',
+  );
+  const esri = keyless.sources.find(
+    ({ descriptor }) => descriptor.id === 'esri-imagery',
+  );
+  assert.equal(esri.available, true, 'Esri stays a choice');
+
+  const provider = createGibsImagery();
+  assert.equal(provider.maximumLevel, 8);
+  assert.equal(provider.url, GIBS_BASEMAP_URL);
+  assert.match(
+    GIBS_BASEMAP_URL,
+    /^https:\/\/gibs\.earthdata\.nasa\.gov\/wmts\/epsg3857\/best\/BlueMarble_ShadedRelief_Bathymetry\/default\/GoogleMapsCompatible_Level8\/\{z\}\/\{y\}\/\{x\}\.jpeg$/,
+  );
 });

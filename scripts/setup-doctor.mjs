@@ -225,7 +225,7 @@ export function buildCapabilitySummary(
       ? 'Google Photorealistic 3D Tiles (direct)'
       : route === 'google-ion'
         ? 'Google Photorealistic 3D Tiles through Cesium ion; Bing and world-terrain stacks available'
-        : 'Esri World Imagery (keyless satellite basemap) with keyless terrain',
+        : 'NASA Blue Marble (keyless, about 600 m per pixel) with keyless terrain',
     flights,
     weather: nonCommercialSources
       ? 'Open-Meteo cockpit weather (personal, non-commercial use)'

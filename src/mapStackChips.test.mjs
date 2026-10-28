@@ -106,6 +106,13 @@ const CONTROLLER_STACKS = [
     unavailableReason: null,
   },
   {
+    id: 'nasa-gibs',
+    label: 'NASA Blue Marble',
+    requiresIon: false,
+    available: true,
+    unavailableReason: null,
+  },
+  {
     id: 'esri-imagery',
     label: 'Esri Satellite',
     requiresIon: false,
@@ -121,7 +128,8 @@ const CONTROLLER_STACKS = [
   },
 ];
 
-test('the row renders exactly the five owner-approved sources', () => {
+// SKYNET adds NASA Blue Marble, its keyless default, to upstream's five.
+test('the row renders exactly the six owner-approved sources', () => {
   const container = makeElement();
   renderMapStackChips(container, CONTROLLER_STACKS, {
     activeId: 'photoreal',
@@ -130,12 +138,20 @@ test('the row renders exactly the five owner-approved sources', () => {
 
   assert.deepEqual(
     container.children.map((chip) => chip.dataset.stackId),
-    ['photoreal', 'bing-aerial', 'bing-labels', 'esri-imagery', 'osm'],
+    [
+      'photoreal',
+      'bing-aerial',
+      'bing-labels',
+      'nasa-gibs',
+      'esri-imagery',
+      'osm',
+    ],
   );
   assert.deepEqual(container.children.map(chipText), [
     'Google 3D',
     'Bing Aerial',
     'Bing Labels',
+    'NASA Blue Marble',
     'Esri Satellite',
     'OSM',
   ]);
@@ -143,6 +159,7 @@ test('the row renders exactly the five owner-approved sources', () => {
     'photoreal',
     'bing-aerial',
     'bing-labels',
+    'nasa-gibs',
     'esri-imagery',
     'osm',
   ]);
@@ -168,8 +185,23 @@ test('internal and future stacks stay outside the approved presentation set', ()
   ];
   renderMapStackChips(container, withHybrid, { activeId: 'photoreal', doc });
 
-  assert.equal(container.children.length, 5);
+  assert.equal(container.children.length, 6);
   assert.doesNotMatch(container.children.map(chipText).join(' '), /Hybrid/);
+});
+
+test('the Esri chip states its licence terms; the others keep their label', () => {
+  const container = makeElement();
+  renderMapStackChips(container, CONTROLLER_STACKS, {
+    activeId: 'nasa-gibs',
+    doc,
+  });
+  const title = (id) =>
+    container.children.find((chip) => chip.dataset.stackId === id).title;
+  assert.equal(
+    title('esri-imagery'),
+    'Esri Satellite: Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription',
+  );
+  assert.equal(title('nasa-gibs'), 'NASA Blue Marble');
 });
 
 test('re-rendering replaces the previous chips instead of stacking a second row', () => {
@@ -192,8 +224,9 @@ test('clicking a chip dispatches that stack id — the same selection the dropdo
     doc,
   });
 
+  // SKYNET: indices follow its six-chip row (NASA Blue Marble is fourth).
+  container.children[5].click();
   container.children[4].click();
-  container.children[3].click();
   container.children[1].click();
   assert.deepEqual(selected, ['osm', 'esri-imagery', 'bing-aerial']);
 });
@@ -230,12 +263,12 @@ test('the lit chip tracks controller state, not the click', () => {
   // A rejected/superseded switch reports the stack that is genuinely active.
   syncMapStackChips(container, 'photoreal');
   assert.ok(container.children[0].classList.contains('active'));
-  assert.equal(container.children[4].getAttribute('aria-pressed'), 'false');
+  assert.equal(container.children[5].getAttribute('aria-pressed'), 'false');
 
   // A landed switch moves both the class and the pressed state.
   syncMapStackChips(container, 'osm');
-  assert.ok(container.children[4].classList.contains('active'));
-  assert.equal(container.children[4].getAttribute('aria-pressed'), 'true');
+  assert.ok(container.children[5].classList.contains('active'));
+  assert.equal(container.children[5].getAttribute('aria-pressed'), 'true');
   assert.ok(!container.children[0].classList.contains('active'));
   assert.equal(container.children[0].getAttribute('aria-pressed'), 'false');
 });

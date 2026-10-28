@@ -3122,5 +3122,6 @@
   "Spoken replies are in English only; this answer is shown as text.": "Голосовые ответы есть только на английском; этот ответ показан текстом.",
   "The answer could not be spoken.": "Не удалось озвучить ответ.",
   "voice: heard in {heard} s": "голос: распознан за {heard} с",
-  "voice: heard in {heard} s, first word after {first} s": "голос: распознан за {heard} с, первое слово через {first} с"
+  "voice: heard in {heard} s, first word after {first} s": "голос: распознан за {heard} с, первое слово через {first} с",
+  "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri лицензирует эту подложку для использования с ПО Esri или с подпиской ArcGIS Online"
 }

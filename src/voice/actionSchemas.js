@@ -364,6 +364,7 @@ const schemas = [
             'bing-labels',
             'esri-imagery',
             'osm',
+            'nasa-gibs',
           ],
         },
       },

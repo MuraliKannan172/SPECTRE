@@ -208,6 +208,15 @@ export const DATA_CREDITS = [
     html: 'Earthquakes: Data courtesy of the U.S. Geological Survey',
   },
   {
+    // SKYNET: the keyless default basemap.
+    key: 'nasa-blue-marble',
+    html:
+      'Basemap: NASA Blue Marble (NASA Earth Observatory), served by ' +
+      "NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science " +
+      'Data and Information System (ESDIS). ' +
+      '<a href="https://earthobservatory.nasa.gov/features/BlueMarble" target="_blank" rel="noopener">earthobservatory.nasa.gov</a>',
+  },
+  {
     key: 'nasa-gibs',
     html:
       'Recent imagery: We acknowledge the use of imagery provided by services from ' +
