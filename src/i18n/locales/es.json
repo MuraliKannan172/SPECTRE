@@ -3057,5 +3057,36 @@
   "REAL-TIME": "TIEMPO REAL",
   "ANALYZE": "ANALIZAR",
   "PREDICT": "PREDECIR",
-  "GLOBAL INSIGHTS": "VISIÓN GLOBAL"
+  "GLOBAL INSIGHTS": "VISIÓN GLOBAL",
+  "intel service offline": "servicio de inteligencia sin conexión",
+  "unexpected reply": "respuesta inesperada",
+  "no active feeds": "sin fuentes activas",
+  "{count} feeds": {
+    "one": "{count} fuente",
+    "many": "{count} fuentes",
+    "other": "{count} fuentes"
+  },
+  "stale feeds {stale}/{total}": "fuentes desactualizadas {stale}/{total}",
+  "Ollama not reachable": "Ollama no accesible",
+  "{model} not pulled": "{model} no descargado",
+  "model check failed": "falló la comprobación del modelo",
+  "{model}, JSON tool calls": "{model}, llamadas a herramientas en JSON",
+  "fell back to {basemap}": "recurrió a {basemap}",
+  "{count} layers": {
+    "one": "{count} capa",
+    "many": "{count} capas",
+    "other": "{count} capas"
+  },
+  "{unavailable} of {count} layers unavailable": "{unavailable} de {count} capas no disponibles",
+  "Boot animation": "Animación de inicio",
+  "Short": "Corta",
+  "Off": "Desactivado",
+  "Brand glitch": "Glitch de marca",
+  "On": "Activado",
+  "ONLINE": "EN LÍNEA",
+  "NO RESPONSE": "SIN RESPUESTA",
+  "GLOBE ENGINE": "MOTOR DEL GLOBO",
+  "INTEL SERVICE": "SERVICIO DE INTELIGENCIA",
+  "PRESS ANY KEY OR CLICK TO SKIP": "PULSA CUALQUIER TECLA O HAZ CLIC PARA OMITIR",
+  "{name} startup status": "Estado de arranque de {name}"
 }

@@ -1168,5 +1168,15 @@
   "src/neuralCore/voice.test.mjs",
   "src/neuralCore/voiceControl.js",
   "src/neuralCore/voiceControl.test.mjs",
-  "src/spectreDoctor.test.mjs"
+  "src/spectreDoctor.test.mjs",
+  "src/boot/spectre-boot.js",
+  "src/boot/probes.js",
+  "src/boot/probes.test.mjs",
+  "src/boot/session.js",
+  "src/boot/appSignals.js",
+  "src/boot/settings.js",
+  "src/boot/settings.test.mjs",
+  "src/boot/entry.js",
+  "src/theme/spectre-boot.css",
+  "scripts/qa-spectre-boot.mjs"
 ]

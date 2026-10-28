@@ -3,6 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- SPECTRE: black from the first paint, before any stylesheet loads. The
+       cover hides the page until src/boot/entry.js swaps in the boot overlay
+       (or removes it with the boot animation off); if that script never runs,
+       the cover hides itself after 10 s. -->
+  <style>
+    html, body { background: #000; }
+    #spectre-boot-cover {
+      position: fixed; inset: 0; z-index: 2147483000;
+      background: #000; pointer-events: none;
+      animation: spectre-boot-cover-out 0s 10s forwards;
+    }
+    @keyframes spectre-boot-cover-out { to { visibility: hidden; } }
+  </style>
   <title>{{brand.title}}</title>
   <meta name="description" content="{{brand.description}}" />
   <!-- SPECTRE emblem icons from public/brand/ (drawn by hand; only the
@@ -35,8 +48,15 @@
   <link rel="stylesheet" href="/src/theme/spectre.css" />
   <link rel="stylesheet" href="/src/theme/spectre-news.css" />
   <link rel="stylesheet" href="/src/theme/spectre-neural-core.css" />
+  <!-- SPECTRE boot loader (src/boot/): its two largest layers, then its
+       styles last. -->
+  <link rel="preload" as="image" href="/brand/spectre-mark.png" />
+  <link rel="preload" as="image" href="/brand/spectre-wordmark.png" />
+  <link rel="stylesheet" href="/src/theme/spectre-boot.css" />
 </head>
 <body>
+  <div id="spectre-boot-cover" aria-hidden="true"></div>
+
   <!-- gev:template scene-chrome -->
 
   <!-- gev:template cockpit -->
@@ -55,6 +75,8 @@
 
   <!-- gev:template hud-loading -->
 
+  <!-- Module scripts run in order: the boot overlay starts before the app. -->
+  <script type="module" src="/src/boot/entry.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

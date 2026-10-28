@@ -1,0 +1,575 @@
+/* SPECTRE boot loader and brand glitch, ported from the rebrand pack's
+   reference styles. Loaded last from index.html. Tokens fall back to the
+   emblem's own colours. Only transform / opacity / clip-path / mask are
+   animated (the jitter's brief brightness filter apart). */
+
+.sp-boot {
+  --_red: var(--sp-red, #f80000);
+  --_red-rgb: var(--sp-red-rgb, 248, 0, 0);
+  --_text: var(--sp-text, #c8c8c8);
+  --_dim: var(--sp-text-dim, #8b8b94);
+  --_ok: var(--sp-ok, #34d399);
+  --_warn: var(--sp-warn, #ffd400);
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  background: #000;
+  color: var(--_text);
+  font: 12px/1.5
+    var(--font-mono, 'JetBrains Mono', ui-monospace, Consolas, monospace);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 1;
+  transition: opacity 0.26s ease;
+}
+.sp-boot.is-out {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 0.18s;
+}
+.sp-boot[data-reduced='1'].is-out {
+  transition-duration: 0.25s;
+}
+
+.sp-boot__stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: clamp(18px, 4vh, 36px);
+  width: 100%;
+  padding: 0 16px;
+}
+
+/* CRT scanlines + slow sweep (decorative) */
+.sp-boot__scan {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0 2px,
+    rgba(0, 0, 0, 0.28) 2px 3px
+  );
+}
+.sp-boot__scan::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -30%;
+  height: 26%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(var(--_red-rgb), 0.07),
+    transparent
+  );
+  animation: sp-sweep 3.4s linear infinite;
+}
+@keyframes sp-sweep {
+  to {
+    transform: translateY(520%);
+  }
+}
+
+/* ---------- lockup (emblem / wordmark / subtitle / tagline as separate layers) ---------- */
+.sp-lockup {
+  position: relative;
+  width: min(78vw, 880px, calc(50vh * var(--ar, 1.65212)));
+  aspect-ratio: var(--ar, 1.65212);
+}
+.sp-lockup::before {
+  /* cheap static glow (no per-frame filter cost) */
+  content: '';
+  position: absolute;
+  inset: -14% -8%;
+  z-index: -1;
+  background: radial-gradient(
+    closest-side,
+    rgba(var(--_red-rgb), 0.16),
+    transparent 72%
+  );
+}
+.sp-lockup .sp-part {
+  position: absolute;
+  opacity: 0;
+}
+.sp-lockup .sp-part.is-on,
+.sp-lockup .sp-part.is-in {
+  opacity: 1;
+}
+.sp-lockup .sp-part.is-in {
+  animation:
+    sp-scan-in 0.62s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    sp-flick 0.62s steps(1) both;
+}
+@keyframes sp-scan-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(-40px);
+  }
+}
+@keyframes sp-flick {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  14% {
+    opacity: 0.15;
+  }
+  22% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.4;
+  }
+  38% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ---------- shared glitch part (boot lockup layers AND inline header mark) ---------- */
+.sp-part {
+  position: relative;
+}
+.sp-part--inline {
+  display: inline-block;
+  line-height: 0;
+}
+.sp-part > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.sp-ghost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  -webkit-mask: var(--sp-mask) center / 100% 100% no-repeat;
+  mask: var(--sp-mask) center / 100% 100% no-repeat;
+  clip-path: inset(0 0 100% 0);
+}
+.sp-part:not(.has-mask) .sp-ghost {
+  display: none; /* never show unmasked rectangles */
+}
+.sp-ghost--r {
+  background: #ff1a1a;
+}
+.sp-ghost--w {
+  background: #ffffff;
+}
+
+.sp-part.is-glitch > img {
+  animation: sp-jit var(--sp-dur, 380ms) steps(1) both;
+}
+.sp-part.is-glitch .sp-ghost {
+  animation-duration: var(--sp-dur, 380ms);
+  animation-timing-function: steps(1, end);
+  animation-fill-mode: both;
+}
+.sp-part.is-glitch[data-sp-variant='a'] .sp-ghost--r {
+  animation-name: sp-r-a;
+}
+.sp-part.is-glitch[data-sp-variant='b'] .sp-ghost--r {
+  animation-name: sp-r-b;
+}
+.sp-part.is-glitch[data-sp-variant='c'] .sp-ghost--r {
+  animation-name: sp-r-c;
+}
+.sp-part.is-glitch[data-sp-variant='a'] .sp-ghost--w {
+  animation-name: sp-w-a;
+}
+.sp-part.is-glitch[data-sp-variant='b'] .sp-ghost--w {
+  animation-name: sp-w-b;
+}
+.sp-part.is-glitch[data-sp-variant='c'] .sp-ghost--w {
+  animation-name: sp-w-c;
+}
+
+@keyframes sp-jit {
+  0% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  12% {
+    transform: translate(-3px, 1px);
+    filter: brightness(1.5) contrast(1.2);
+  }
+  24% {
+    transform: translate(4px, -1px);
+    filter: none;
+  }
+  36% {
+    transform: translate(-2px, 0);
+    filter: brightness(0.7);
+  }
+  48% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  62% {
+    transform: translate(3px, 1px);
+    filter: brightness(1.35);
+  }
+  78% {
+    transform: translate(-1px, 0);
+    filter: none;
+  }
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes sp-r-a {
+  0% {
+    opacity: 0.9;
+    clip-path: inset(8% 0 82% 0);
+    transform: translate(-9px, 0);
+  }
+  14% {
+    opacity: 0.9;
+    clip-path: inset(34% 0 52% 0);
+    transform: translate(7px, 0);
+  }
+  28% {
+    opacity: 0.9;
+    clip-path: inset(62% 0 20% 0);
+    transform: translate(-12px, 0);
+  }
+  42% {
+    opacity: 0.9;
+    clip-path: inset(4% 0 70% 0);
+    transform: translate(10px, 0);
+  }
+  58% {
+    opacity: 0.9;
+    clip-path: inset(78% 0 6% 0);
+    transform: translate(-6px, 0);
+  }
+  74% {
+    opacity: 0.9;
+    clip-path: inset(22% 0 60% 0);
+    transform: translate(8px, 0);
+  }
+  88% {
+    opacity: 0.7;
+    clip-path: inset(48% 0 40% 0);
+    transform: translate(-3px, 0);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: none;
+  }
+}
+@keyframes sp-r-b {
+  0% {
+    opacity: 0.9;
+    clip-path: inset(52% 0 36% 0);
+    transform: translate(10px, 0);
+  }
+  16% {
+    opacity: 0.9;
+    clip-path: inset(12% 0 76% 0);
+    transform: translate(-8px, 0);
+  }
+  30% {
+    opacity: 0.9;
+    clip-path: inset(70% 0 14% 0);
+    transform: translate(6px, 0);
+  }
+  46% {
+    opacity: 0.9;
+    clip-path: inset(28% 0 58% 0);
+    transform: translate(-13px, 0);
+  }
+  62% {
+    opacity: 0.9;
+    clip-path: inset(86% 0 2% 0);
+    transform: translate(9px, 0);
+  }
+  78% {
+    opacity: 0.7;
+    clip-path: inset(40% 0 48% 0);
+    transform: translate(-4px, 0);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: none;
+  }
+}
+@keyframes sp-r-c {
+  0% {
+    opacity: 0.9;
+    clip-path: inset(20% 0 72% 0);
+    transform: translate(-6px, 0);
+  }
+  18% {
+    opacity: 0.9;
+    clip-path: inset(58% 0 28% 0);
+    transform: translate(12px, 0);
+  }
+  34% {
+    opacity: 0.9;
+    clip-path: inset(2% 0 90% 0);
+    transform: translate(-10px, 0);
+  }
+  50% {
+    opacity: 0.9;
+    clip-path: inset(74% 0 10% 0);
+    transform: translate(7px, 0);
+  }
+  68% {
+    opacity: 0.9;
+    clip-path: inset(36% 0 50% 0);
+    transform: translate(-9px, 0);
+  }
+  84% {
+    opacity: 0.6;
+    clip-path: inset(14% 0 74% 0);
+    transform: translate(3px, 0);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: none;
+  }
+}
+@keyframes sp-w-a {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  20% {
+    opacity: 0.55;
+    clip-path: inset(44% 0 50% 0);
+    transform: translate(5px, 0);
+  }
+  40% {
+    opacity: 0;
+  }
+  60% {
+    opacity: 0.55;
+    clip-path: inset(16% 0 78% 0);
+    transform: translate(-6px, 0);
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: none;
+  }
+}
+@keyframes sp-w-b {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  24% {
+    opacity: 0.55;
+    clip-path: inset(64% 0 30% 0);
+    transform: translate(-5px, 0);
+  }
+  44% {
+    opacity: 0;
+  }
+  64% {
+    opacity: 0.55;
+    clip-path: inset(30% 0 64% 0);
+    transform: translate(6px, 0);
+  }
+  84% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: none;
+  }
+}
+@keyframes sp-w-c {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  18% {
+    opacity: 0.55;
+    clip-path: inset(8% 0 86% 0);
+    transform: translate(7px, 0);
+  }
+  38% {
+    opacity: 0;
+  }
+  58% {
+    opacity: 0.55;
+    clip-path: inset(80% 0 14% 0);
+    transform: translate(-4px, 0);
+  }
+  78% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: none;
+  }
+}
+
+/* ---------- real-state status rows ---------- */
+.sp-boot__sys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: min(86vw, 520px);
+  display: grid;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.sp-boot__sys.is-on {
+  opacity: 1;
+}
+.sp-boot__sys li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto 11ch;
+  gap: 10px;
+  align-items: baseline;
+  padding: 1px 4px;
+}
+.sp-boot__sys .sp-k {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.sp-boot__sys .sp-d {
+  color: var(--_dim);
+  letter-spacing: 0.06em;
+  text-transform: none;
+  justify-self: end;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  /* narrow phones: drop the detail column, tighten tracking */
+  .sp-boot {
+    letter-spacing: 0.1em;
+  }
+  .sp-boot__sys li {
+    grid-template-columns: 16px minmax(0, 1fr) 11ch;
+  }
+  .sp-boot__sys .sp-d {
+    display: none;
+  }
+}
+.sp-boot__sys .sp-v {
+  text-align: right;
+}
+.sp-boot__sys li[data-state='pending'] .sp-i,
+.sp-boot__sys li[data-state='pending'] .sp-v {
+  color: var(--_dim);
+  animation: sp-dots 1s steps(1) infinite;
+}
+.sp-boot__sys li[data-state='ok'] .sp-i,
+.sp-boot__sys li[data-state='ok'] .sp-v {
+  color: var(--_ok);
+}
+.sp-boot__sys li[data-state='degraded'] .sp-i,
+.sp-boot__sys li[data-state='degraded'] .sp-v {
+  color: var(--_warn);
+}
+.sp-boot__sys li[data-state='offline'] .sp-i,
+.sp-boot__sys li[data-state='offline'] .sp-v,
+.sp-boot__sys li[data-state='timeout'] .sp-i,
+.sp-boot__sys li[data-state='timeout'] .sp-v {
+  color: var(--_red);
+}
+.sp-boot__sys li.is-flash {
+  animation: sp-flash 0.22s steps(2) 1;
+}
+@keyframes sp-dots {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@keyframes sp-flash {
+  0% {
+    background: rgba(var(--_red-rgb), 0.25);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* progress = systems resolved / systems total (real, not time-based) */
+.sp-boot__bar {
+  width: min(86vw, 520px);
+  height: 2px;
+  background: #1a1a1f;
+  overflow: hidden;
+}
+.sp-boot__bar i {
+  display: block;
+  height: 100%;
+  background: var(--_red);
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 0.35s ease;
+}
+
+.sp-boot__hint {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: 10px;
+  color: var(--_dim);
+}
+
+/* ---------- reduced motion: static logo, no glitch, no sweep ---------- */
+.sp-boot[data-reduced='1'] *,
+.sp-boot[data-reduced='1'] *::after {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-boot *,
+  .sp-boot *::after,
+  .sp-part,
+  .sp-part * {
+    animation: none !important;
+  }
+}
+
+/* ---------- Display panel: Boot animation / Brand glitch ---------- */
+/* These rows have no toggle button above them, so each is a whole tile. */
+.spectre-brand-settings .pp-slider-row {
+  border-top: 1px solid var(--glass-border);
+  border-radius: 8px;
+}
+.spectre-brand-settings .pp-slider-row + .pp-slider-row {
+  margin-top: 4px;
+}
