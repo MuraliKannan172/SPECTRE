@@ -21,6 +21,8 @@
  *   (viii) GLITCH — the header mark glitches on hover, not in recording or
  *          clean view, and not with Brand glitch off.
  *   (ix)   PHONE — at 390 px the overlay has no sideways scroll.
+ *   (x)    MAX WAIT — with Cesium blocked the app never starts; the globe and
+ *          layer rows end as NO RESPONSE at 9 s and the overlay still leaves.
  *
  * Screenshots saved to qa-shots/ (gitignored). Exits non-zero on any FAIL.
  * Run:  node scripts/qa-spectre-boot.mjs [--url http://localhost:4173] [--headful]
@@ -97,6 +99,10 @@ const CHAT = {
 function interceptor(scenario) {
   return (request) => {
     const url = new URL(request.url());
+    // Cesium.js (build) or Vite's prebundled cesium.js (dev): without it the
+    // app never starts, so only the boot's own 9 s release can end it.
+    if (scenario === 'no-app' && /\/cesium\.js$/i.test(url.pathname))
+      return request.abort();
     const json = (body, status = 200) =>
       request.respond({
         status,
@@ -236,7 +242,11 @@ async function openPage(
   const page = await context.newPage();
   const consoleErrors = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() !== 'error') return;
+    // Provider Settings asks the dev server's /api/setup/status; the preview
+    // server CI runs against has no such route, with or without the boot.
+    if (/\/api\/setup\/status$/.test(message.location()?.url || '')) return;
+    consoleErrors.push(message.text());
   });
   page.on('pageerror', (error) =>
     consoleErrors.push(String(error?.message || error)),
@@ -585,6 +595,29 @@ async function run(browser) {
   }
 }
 
+async function runMaxWait(browser) {
+  console.log('(x) MAX WAIT — the app never starts...');
+  const { context, page } = await openPage(browser, { scenario: 'no-app' });
+  await page.goto(`${APP_URL}/?boot=full${VIEW}`);
+  await overlayGone(page, 20_000);
+  const qa = await qaState(page);
+  const late = (id) =>
+    qa.rows[id]?.state === 'timeout' && qa.rows[id]?.at >= 8800;
+  record(
+    'GLOBE ENGINE and DATA LAYERS are NO RESPONSE at 9 s',
+    late('globe') && late('layers') && qa.rows.globe?.value === 'NO RESPONSE',
+    `globe ${qa.rows.globe?.state}@${qa.rows.globe?.at} ms, layers ${qa.rows.layers?.state}@${qa.rows.layers?.at} ms`,
+  );
+  const cover = await page.evaluate(
+    () => !!document.getElementById('spectre-boot-cover'),
+  );
+  record(
+    'The overlay and the cover still leave',
+    qa.overlayGone != null && !cover,
+  );
+  await context.close();
+}
+
 async function main() {
   try {
     await fetch(APP_URL);
@@ -611,6 +644,7 @@ async function main() {
   });
   try {
     await run(browser);
+    await runMaxWait(browser);
   } finally {
     await browser.close();
   }
