@@ -2908,5 +2908,6 @@
   "voice: heard in {heard} s": "语音：{heard} 秒内识别",
   "voice: heard in {heard} s, first word after {first} s": "语音：{heard} 秒内识别，{first} 秒后开始朗读",
   "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri 仅授权在 Esri 软件中或凭 ArcGIS Online 订阅使用此底图",
-  "Opening the microphone…": "正在打开麦克风…"
+  "Opening the microphone…": "正在打开麦克风…",
+  "Local voice works only on the computer running SKYNET.": "本地语音只能在运行 SKYNET 的计算机上使用。"
 }

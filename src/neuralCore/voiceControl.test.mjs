@@ -189,6 +189,16 @@ test('voice state, microphone failures and timings read plainly', () => {
     voiceState({ state: 'ready' }, { supported: false }).reason,
     /cannot record/,
   );
+  // A LAN page over http, or the proxy refusing voice off this machine.
+  const localOnly = /only on the computer running SKYNET/;
+  assert.match(
+    voiceState(null, { supported: false, secure: false }).reason,
+    localOnly,
+  );
+  assert.match(
+    voiceState(null, { failureCode: 'voice_local_only' }).reason,
+    localOnly,
+  );
   assert.equal(micFailure({ name: 'NotAllowedError' }), 'mic_denied');
   assert.equal(micFailure({ name: 'NotFoundError' }), 'no_mic');
   assert.equal(micFailure(new Error('x')), 'mic_failed');

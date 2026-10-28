@@ -163,3 +163,24 @@ def test_a_stopped_turn_frees_the_gate_even_if_closing_fails(tmp_path: Path) -> 
         assert not state.chat_gate.busy()
         again = client.post("/api/intel/chat", json={"message": "hi again"}, headers=HEADERS)
         assert again.status_code == 200
+
+
+def test_status_never_echoes_a_configured_key(tmp_path: Path) -> None:
+    secret = "sk-test-0123456789abcdef"
+    settings = make_settings(
+        tmp_path, FEEDS_YAML, search_provider="brave", brave_api_key=secret, tavily_api_key=secret
+    )
+    app = create_app(
+        settings,
+        geoparser=StubParser(),  # type: ignore[arg-type]
+        start_scheduler=False,
+        ollama_transport=httpx.MockTransport(FakeOllama([], offline=True)),
+        tool_registry=ToolRegistry(CLIENT_TOOLS),
+    )
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        chat = client.get("/api/intel/chat/status", headers={"host": "127.0.0.1"})
+        voice = client.get("/api/intel/voice/status", headers={"host": "127.0.0.1"})
+        for response in (chat, voice):
+            assert response.status_code == 200
+            assert secret not in response.text
+        assert chat.json()["search"]["provider"] == "brave"

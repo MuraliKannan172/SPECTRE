@@ -3052,5 +3052,6 @@
   "voice: heard in {heard} s": "voz: entendida en {heard} s",
   "voice: heard in {heard} s, first word after {first} s": "voz: entendida en {heard} s, primera palabra a los {first} s",
   "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri concede la licencia de este mapa base para usarlo con software de Esri o con una suscripción a ArcGIS Online",
-  "Opening the microphone…": "Abriendo el micrófono…"
+  "Opening the microphone…": "Abriendo el micrófono…",
+  "Local voice works only on the computer running SKYNET.": "La voz local solo funciona en el ordenador que ejecuta SKYNET."
 }
