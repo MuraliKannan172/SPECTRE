@@ -18,6 +18,15 @@ dependencies = [
   "trafilatura>=2.0",
 ]
 
+[project.optional-dependencies]
+# Local voice for the Neural Core (opt-in: uv sync --project intel --extra voice).
+# kokoro-onnx pulls in phonemizer and espeak-ng, which are GPL-3.0; see NOTICE.md.
+voice = [
+  "faster-whisper>=1.2,<2",
+  "av>=16,<19",  # av 19 dropped an argument faster-whisper 1.2 passes to av.open
+  "kokoro-onnx>=0.6,<0.7",
+]
+
 [dependency-groups]
 dev = ["pytest>=8.3", "ruff>=0.8"]
 
