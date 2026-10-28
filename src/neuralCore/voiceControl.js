@@ -17,7 +17,7 @@ import { MIN_RECORDING_MS } from './voice.js';
  *   isBusy: () => boolean,
  *   onQuestion: (question: {text: string, language: string, releasedAt: number,
  *     recordedAt: number, transcribedAt: number, sttSeconds: number}) => void,
- *   now?: () => number}} options
+ *   now?: () => number, secure?: boolean}} options
  */
 export function mountVoiceControl({
   document,
@@ -27,6 +27,7 @@ export function mountVoiceControl({
   isBusy,
   onQuestion,
   now = () => performance.now(),
+  secure = globalThis.isSecureContext !== false,
 }) {
   const mic = document.createElement('button');
   mic.type = 'button';
@@ -37,7 +38,8 @@ export function mountVoiceControl({
   hint.setAttribute('aria-live', 'polite');
   hint.hidden = true;
 
-  let state = voiceState(null, { supported: Boolean(recorder && speaker) });
+  const supported = Boolean(recorder && speaker);
+  let state = voiceState(null, { supported, secure });
   let pressed = false;
   let working = false;
   const listeners = [];
@@ -150,7 +152,8 @@ export function mountVoiceControl({
     /** New status from the service, or the code of the failure to get it. */
     update(status, failureCode = null) {
       state = voiceState(status, {
-        supported: Boolean(recorder && speaker),
+        supported,
+        secure,
         failureCode,
       });
       render();

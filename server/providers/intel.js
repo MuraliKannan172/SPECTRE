@@ -7,7 +7,9 @@ import http from 'node:http';
  *
  * - News routes are read-only: GET and HEAD on news, story, stream, health.
  * - Neural Core routes (/chat..., /voice...) answer only requests from this
- *   machine, unless SKYNET_CHAT_ALLOW_LAN=1 opts LAN viewers in. Writes must
+ *   machine. SKYNET_CHAT_ALLOW_LAN=1 opts LAN viewers in to chat, never to
+ *   voice: a LAN page over http cannot use a microphone, so all the flag
+ *   would do there is feed untrusted audio to the decoder. Writes must
  *   come from this page's own origin and carry a body of the route's type and
  *   size: JSON of at most 64 KB, or for /voice/transcribe one recorded
  *   question (audio, at most 2 MB).
@@ -54,11 +56,17 @@ const ROUTES = Object.freeze([
     body: JSON_BODY,
     stream: /^\/chat$/,
   },
-  { methods: ['GET'], pattern: /^\/voice\/status$/, chat: true },
+  {
+    methods: ['GET'],
+    pattern: /^\/voice\/status$/,
+    chat: true,
+    localOnly: true,
+  },
   {
     methods: ['POST'],
     pattern: /^\/voice\/transcribe$/,
     chat: true,
+    localOnly: true,
     write: true,
     body: AUDIO_BODY,
   },
@@ -66,6 +74,7 @@ const ROUTES = Object.freeze([
     methods: ['POST'],
     pattern: /^\/voice\/speak$/,
     chat: true,
+    localOnly: true,
     write: true,
     body: JSON_BODY,
   },
@@ -173,10 +182,12 @@ export function createIntelHandler({
     }
     if (
       route.chat &&
-      !allowLan &&
+      (route.localOnly || !allowLan) &&
       !isLoopbackAddress(req.socket?.remoteAddress)
     ) {
-      sendJson(res, 403, { error: 'chat_local_only' });
+      sendJson(res, 403, {
+        error: route.localOnly ? 'voice_local_only' : 'chat_local_only',
+      });
       return;
     }
     if (route.write && !sameOrigin(req)) {

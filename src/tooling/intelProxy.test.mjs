@@ -375,4 +375,25 @@ test('voice refuses other sites, the wrong type, oversize audio and the LAN', as
   );
   assert.equal(res.status, 403);
   assert.equal(reached, 0);
+
+  // Opting LAN viewers in to chat never opens voice to them.
+  const lanChat = createIntelHandler({
+    target: upstream.url,
+    env: { SKYNET_CHAT_ALLOW_LAN: '1' },
+  });
+  const refused = { status: 0, body: '' };
+  refused.writeHead = (code) => (refused.status = code);
+  refused.end = (text = '') => (refused.body = String(text));
+  await lanChat(
+    {
+      method: 'GET',
+      url: '/voice/status',
+      headers: {},
+      socket: { remoteAddress: '192.168.1.40' },
+    },
+    refused,
+  );
+  assert.equal(refused.status, 403);
+  assert.match(refused.body, /voice_local_only/);
+  assert.equal(reached, 0);
 });

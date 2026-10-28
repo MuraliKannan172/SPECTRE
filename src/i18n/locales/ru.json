@@ -3124,5 +3124,6 @@
   "voice: heard in {heard} s": "голос: распознан за {heard} с",
   "voice: heard in {heard} s, first word after {first} s": "голос: распознан за {heard} с, первое слово через {first} с",
   "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri лицензирует эту подложку для использования с ПО Esri или с подпиской ArcGIS Online",
-  "Opening the microphone…": "Открываю микрофон…"
+  "Opening the microphone…": "Открываю микрофон…",
+  "Local voice works only on the computer running SKYNET.": "Локальный голос работает только на компьютере, где запущен SKYNET."
 }

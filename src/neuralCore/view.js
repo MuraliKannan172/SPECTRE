@@ -185,6 +185,9 @@ const VOICE_TEXT = Object.freeze({
   voice_loading: msg('Local voice is loading…'),
   voice_failed: msg('Local voice failed to load; see the intel service log.'),
   voice_unavailable: msg('Local voice is not available.'),
+  voice_local_only: msg(
+    'Local voice works only on the computer running SKYNET.',
+  ),
   opening: msg('Opening the microphone…'),
   listening: msg('Listening… release to send'),
   transcribing: msg('Transcribing…'),
@@ -216,10 +219,14 @@ export function voiceText(code) {
  */
 export function voiceState(
   status,
-  { supported = true, failureCode = null } = {},
+  { supported = true, secure = true, failureCode = null } = {},
 ) {
-  if (!supported) return { ready: false, reason: voiceText('unsupported') };
-  if (failureCode) return { ready: false, reason: errorText(failureCode) };
+  if (!supported)
+    return {
+      ready: false,
+      reason: voiceText(secure ? 'unsupported' : 'voice_local_only'),
+    };
+  if (failureCode) return { ready: false, reason: voiceText(failureCode) };
   if (status?.state === 'ready') return { ready: true, reason: '' };
   if (status?.state === 'unavailable')
     return { ready: false, reason: voiceText(status.reason) };
