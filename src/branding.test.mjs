@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { BRANDING, brandUserAgent } from './branding.js';
 import { applyBrandHtml } from '../build/branding-html.js';
@@ -26,19 +26,29 @@ test('the Pinokio launcher is pinned to src/branding.js', () => {
   assert.match(read('pinokio/pinokio.js'), new RegExp(`Open ${BRANDING.name}`));
 });
 
-test('the logo names the product and keeps the parts the gaze animation moves', () => {
-  const logo = read('public/logo.svg');
-  assert.match(
-    logo,
-    new RegExp(`<title id="logo-title">${BRANDING.name}</title>`),
-  );
-  assert.match(logo, /id="globe"/);
-  assert.match(logo, /id="globe_cage"/);
+const publicFile = (href) => new URL(`../public${href}`, import.meta.url);
+
+test('the header and loader show the emblem mark shipped in public/brand', () => {
+  for (const template of ['scene-chrome', 'hud-loading']) {
+    const src = read(`src/ui/templates/${template}.html`).match(
+      /class="[^"]*brand-logo[^"]*"[^>]*><img src="([^"]+)"/,
+    )?.[1];
+    assert.match(src ?? '', /^\/brand\/spectre-mark-\d+\.png$/, template);
+    assert.ok(existsSync(publicFile(src)), src);
+  }
+  assert.ok(existsSync(publicFile(BRANDING.logo)), BRANDING.logo);
+  // The opaque master is for docs only, never the shipped bundle.
+  assert.ok(existsSync(new URL('../docs/brand/spectre-logo-source.png', import.meta.url)));
+  assert.ok(!existsSync(publicFile('/brand/spectre-logo-source.png')));
 });
 
 test('index.html takes its product name and colour from branding tokens', () => {
   const html = applyBrandHtml(read('index.html'));
-  assert.match(html, new RegExp(`<title>${BRANDING.name}</title>`));
+  assert.match(html, new RegExp(`<title>${BRANDING.title}</title>`));
+  for (const [, href] of html.matchAll(
+    /<meta (?:property="og:image"|name="twitter:image") content="([^"]+)"/g,
+  ))
+    assert.ok(existsSync(publicFile(href)), href);
   assert.match(
     html,
     new RegExp(`name="theme-color" content="${BRANDING.colors.background}"`),
@@ -61,7 +71,6 @@ test('no shipped page surface names the upstream product', () => {
   for (const path of [
     'index.html',
     'public/manifest.webmanifest',
-    'public/logo.svg',
     'pinokio/pinokio.js',
     ...templates,
   ])

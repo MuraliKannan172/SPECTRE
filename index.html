@@ -3,17 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{brand.name}}</title>
+  <title>{{brand.title}}</title>
   <meta name="description" content="{{brand.description}}" />
-  <!-- Raster fallbacks: Safari ignores an SVG apple-touch-icon and falls back to a
-       screenshot of the page, so an installed app needs a real PNG. Regenerate
-       these from the logo with `node scripts/generate-icons.mjs`. -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
-  <!-- Listed after the PNG: browsers that use the last usable icon keep the SVG
-       for the tab. -->
-  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+  <!-- SPECTRE emblem icons from public/brand/ (drawn by hand; only the
+       maskable install icon is generated, by `node scripts/generate-icons.mjs`).
+       Safari ignores an SVG apple-touch-icon, so the installed app gets a PNG. -->
+  <link rel="icon" href="/brand/favicon.ico" sizes="48x48" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="{{brand.title}}" />
+  <meta property="og:description" content="{{brand.description}}" />
+  <meta property="og:image" content="/brand/spectre-social-1280x640.png" />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="640" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="/brand/spectre-social-1280x640.png" />
   <meta name="theme-color" content="{{brand.background}}" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />

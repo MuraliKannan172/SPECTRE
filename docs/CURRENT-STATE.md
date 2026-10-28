@@ -1688,20 +1688,22 @@ existing modules.
 
 `public/manifest.webmanifest` declares the installable app: standalone display,
 `#0a0a0f` background and theme, and 192/512 icons plus a 512 maskable variant.
-`index.html` links the manifest, a 180px `apple-touch-icon` and a 32px PNG
-favicon; the existing SVG favicon still serves the browser tab. Safari ignores an
-SVG apple-touch-icon and substitutes a page screenshot, so the raster is what
-makes an installed icon appear at all.
+`index.html` links the manifest, a 180px `apple-touch-icon` and the favicons
+(`.ico` plus 16 and 32px PNGs). Safari ignores an SVG apple-touch-icon and
+substitutes a page screenshot, so the raster is what makes an installed icon
+appear at all. (SPECTRE: the icons are the SPECTRE emblem's, in `public/brand/`,
+and the background and theme colour are `#000000`.)
 
 Manifest `start_url`, `scope` and icon paths are relative to the manifest, and
 Vite rewrites the `index.html` links under `base`, so a build served from a path
 prefix installs and launches inside that prefix.
 
-`node scripts/generate-icons.mjs` renders every raster from `public/logo.svg` and
-writes `public/icons/`. Output is committed, so building needs no image
-toolchain; re-run the script after changing the logo. Ordinary icons inset the
-mark to 78% of the canvas and the maskable variant to 54%, keeping it inside the
-circle Android may crop to. `src/tooling/webAppIcons.test.mjs` checks the links,
+The SPECTRE icons are drawn by hand and committed as they are; only the maskable
+variant is generated, by `node scripts/generate-icons.mjs` from
+`public/brand/spectre-mark.png`, because the hand-drawn icons reach past the
+maskable safe zone. Output is committed, so building needs no image toolchain;
+re-run the script after changing the mark. The maskable variant insets the mark
+to 54% of the canvas, keeping it inside the circle Android may crop to. `src/tooling/webAppIcons.test.mjs` checks the links,
 the manifest fields and that each committed PNG is square at its declared size.
 It also builds the install links under `base: '/example/'` and asserts every
 emitted link and manifest URL stays inside that base.

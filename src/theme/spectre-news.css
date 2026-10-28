@@ -230,6 +230,10 @@
   background: var(--sp-surface-2);
 }
 
+.spectre-news-item.is-selected .spectre-news-outlet {
+  color: var(--sp-red-on-raised);
+}
+
 .spectre-news-headline {
   display: block;
   width: 100%;

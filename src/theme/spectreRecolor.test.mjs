@@ -26,7 +26,7 @@ test("upstream's cyan accent maps exactly to the brand red", () => {
   assert.equal(recolorValue('#00d4ff'), hex);
   assert.equal(
     recolorValue('rgba(0, 212, 255, 0.15)'),
-    'rgba(255, 40, 0, 0.15)',
+    'rgba(248, 0, 0, 0.15)',
   );
   assert.equal(
     recolorValue('1px solid #00D4FF !important'),
@@ -59,7 +59,7 @@ test('recoloured text stays WCAG AA on black, raising opacity then lightness', (
   // Non-text uses (borders, fills, glows) keep the original opacity.
   assert.equal(
     recolorValue('rgba(0, 212, 255, 0.35)'),
-    'rgba(255, 40, 0, 0.35)',
+    'rgba(248, 0, 0, 0.35)',
   );
 });
 

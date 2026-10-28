@@ -71,14 +71,24 @@ function hslToRgb([hue, saturation, lightness]) {
   return [r, g, b].map((channel) => Math.round((channel + m) * 255));
 }
 
-const BRAND_HUE = rgbToHsl(hexToRgb(BRANDING.colors.accent))[0];
+/** Upstream's accent cyan; it maps exactly onto the brand accent. */
+const UPSTREAM_ACCENT = '#00d4ff';
+const [BRAND_HUE, , BRAND_LIGHTNESS] = rgbToHsl(
+  hexToRgb(BRANDING.colors.accent),
+);
+const LIGHTNESS_SCALE =
+  BRAND_LIGHTNESS / rgbToHsl(hexToRgb(UPSTREAM_ACCENT))[2];
 
 /** The brand-red equivalent of a cyan-family colour, or null to keep it. */
 export function recolor([r, g, b]) {
   const [hue, saturation, lightness] = rgbToHsl([r, g, b]);
   if (hue < CYAN_HUE[0] || hue > CYAN_HUE[1] || saturation < MIN_SATURATION)
     return null;
-  return hslToRgb([BRAND_HUE, saturation, lightness]);
+  return hslToRgb([
+    BRAND_HUE,
+    saturation,
+    Math.min(1, lightness * LIGHTNESS_SCALE),
+  ]);
 }
 
 const HEX = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;

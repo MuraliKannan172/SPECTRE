@@ -11,6 +11,7 @@ const escapeHtml = (text) =>
 export const BRAND_HTML_TOKENS = Object.freeze({
   'brand.name': BRANDING.name,
   'brand.shortName': BRANDING.shortName,
+  'brand.title': BRANDING.title,
   'brand.description': BRANDING.description,
   'brand.background': BRANDING.colors.background,
 });
