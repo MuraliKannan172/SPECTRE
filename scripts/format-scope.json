@@ -1160,5 +1160,13 @@
   "src/neuralCore/view.js",
   "src/neuralCore/panel.js",
   "src/neuralCore/neuralCore.test.mjs",
-  "src/theme/skynet-neural-core.css"
+  "src/theme/skynet-neural-core.css",
+  "scripts/bench-local-voice.mjs",
+  "scripts/qa-neural-core.mjs",
+  "scripts/skynet-doctor.mjs",
+  "src/neuralCore/voice.js",
+  "src/neuralCore/voice.test.mjs",
+  "src/neuralCore/voiceControl.js",
+  "src/neuralCore/voiceControl.test.mjs",
+  "src/skynetDoctor.test.mjs"
 ]
