@@ -493,7 +493,7 @@ export function openSkyProxy() {
           process.env.OPENSKY_AUTH_MODE,
         );
         if (!nonCommercialSourcesEnabled()) {
-          // SKYNET: OpenSky's API is for research and non-commercial use, so
+          // SPECTRE: OpenSky's API is for research and non-commercial use, so
           // flights default to adsb.lol's regional snapshot around the view.
           res.setHeader('X-Feed-Source', 'adsb.lol');
           if (

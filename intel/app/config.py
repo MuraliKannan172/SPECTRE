@@ -1,12 +1,17 @@
 """Service settings from the environment and the repository's `.env`.
 
 Process environment wins over `.env`. The Non-commercial sources switch
-(SKYNET_NONCOMMERCIAL_SOURCES, written to `.env` by the app's Provider
+(SPECTRE_NONCOMMERCIAL_SOURCES, written to `.env` by the app's Provider
 Settings) is re-read on every poll cycle, so toggling it needs no restart.
+
+SPECTRE was called SKYNET until 2026-10-28: a setting still named `SKYNET_*`
+is read when its `SPECTRE_*` name is absent from the same source, with one
+deprecation warning per name. Remove the fallback in the release after next.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from collections.abc import Mapping
@@ -17,7 +22,7 @@ INTEL_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = INTEL_DIR.parent
 BRANDING_JS = REPO_ROOT / "src" / "branding.js"
 
-NON_COMMERCIAL_SOURCES_ENV = "SKYNET_NONCOMMERCIAL_SOURCES"
+NON_COMMERCIAL_SOURCES_ENV = "SPECTRE_NONCOMMERCIAL_SOURCES"
 # Chosen by the Phase 4 eval (docs/phase4/neural-core-eval.md): qwen3.5 made no
 # model errors in two runs; bonsai, fully on the GPU and about twice as fast,
 # is the low-resource choice.
@@ -25,6 +30,29 @@ DEFAULT_MODEL = "qwen3.5-9b-64k-gpu:latest"
 LOW_RESOURCE_MODEL = "bonsai-2:9b"
 _TRUTHY = {"1", "true", "yes", "on"}
 MIN_POLL_SECONDS = 30
+BRAND_PREFIX = "SPECTRE_"
+DEFAULT_DB = INTEL_DIR / "data" / "spectre.db"
+DEFAULT_LOGS = REPO_ROOT / ".spectre-logs"
+LEGACY_PREFIX = "SKYNET_"
+
+log = logging.getLogger("spectre.intel")
+_warned_legacy: set[str] = set()
+
+
+def lookup(name: str, *sources: Mapping[str, str]) -> str | None:
+    """`name` from the first source that has it. Within one source the
+    `SPECTRE_*` name beats its old `SKYNET_*` name; the process environment
+    is passed first, so it beats `.env` whichever name each uses."""
+    legacy = LEGACY_PREFIX + name[len(BRAND_PREFIX) :] if name.startswith(BRAND_PREFIX) else None
+    for source in sources:
+        if name in source:
+            return source[name]
+        if legacy and legacy in source:
+            if legacy not in _warned_legacy:
+                _warned_legacy.add(legacy)
+                log.warning("%s is deprecated: rename it to %s (works for one more release)", legacy, name)
+            return source[legacy]
+    return None
 
 
 def read_env_file(path: Path) -> dict[str, str]:
@@ -52,10 +80,10 @@ def _brand() -> tuple[str, str]:
     try:
         text = BRANDING_JS.read_text(encoding="utf-8")
     except OSError:
-        return "SKYNET", "0.1"
+        return "SPECTRE", "0.1"
     name = re.search(r"\bname:\s*'([^']+)'", text)
     version = re.search(r"\bversion:\s*'([^']+)'", text)
-    return (name.group(1) if name else "SKYNET", version.group(1) if version else "0.1")
+    return (name.group(1) if name else "SPECTRE", version.group(1) if version else "0.1")
 
 
 BRAND_NAME, BRAND_VERSION = _brand()
@@ -103,7 +131,7 @@ class Settings:
     brave_api_key: str | None = None
     tavily_api_key: str | None = None
     chat_turns_per_minute: int = 12
-    logs_dir: Path = REPO_ROOT / ".skynet-logs"
+    logs_dir: Path = DEFAULT_LOGS
     # Local voice (Phase 5): opt-in install, see intel/app/voice/models.py.
     voice_enabled: bool = True
     voice_dir: Path = INTEL_DIR / "data" / "voice"
@@ -128,9 +156,8 @@ class Settings:
 
     def env(self, name: str, environ: Mapping[str, str] | None = None) -> str | None:
         environ = os.environ if environ is None else environ
-        if name in environ:
-            return environ[name]
-        return read_env_file(self.env_file).get(name)
+        value = lookup(name, environ)
+        return value if value is not None else lookup(name, read_env_file(self.env_file))
 
     def noncommercial_enabled(self, environ: Mapping[str, str] | None = None) -> bool:
         value = self.env(NON_COMMERCIAL_SOURCES_ENV, environ)
@@ -139,11 +166,12 @@ class Settings:
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     environ = os.environ if environ is None else environ
-    env_file = Path(environ.get("SKYNET_ENV_FILE", REPO_ROOT / ".env"))
+    env_file = Path(lookup("SPECTRE_ENV_FILE", environ) or REPO_ROOT / ".env")
     file_values = read_env_file(env_file)
 
     def get(name: str, default: str) -> str:
-        return environ.get(name, file_values.get(name, default))
+        value = lookup(name, environ, file_values)
+        return default if value is None else value
 
     def get_int(name: str, default: int, minimum: int) -> int:
         try:
@@ -151,16 +179,16 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         except ValueError as error:
             raise ValueError(f"{name} must be a whole number") from error
 
-    hosts = tuple(h.strip() for h in get("SKYNET_INTEL_ALLOWED_HOSTS", "").split(",") if h.strip())
-    low_resource = get("SKYNET_LOW_RESOURCE", "0").strip().lower() in _TRUTHY
+    hosts = tuple(h.strip() for h in get("SPECTRE_INTEL_ALLOWED_HOSTS", "").split(",") if h.strip())
+    low_resource = get("SPECTRE_LOW_RESOURCE", "0").strip().lower() in _TRUTHY
     return Settings(
-        db_path=Path(get("SKYNET_INTEL_DB", str(INTEL_DIR / "data" / "skynet.db"))),
-        feeds_default=Path(get("SKYNET_INTEL_FEEDS", str(INTEL_DIR / "feeds.default.yaml"))),
-        feeds_local=Path(get("SKYNET_INTEL_FEEDS_LOCAL", str(INTEL_DIR / "feeds.local.yaml"))),
+        db_path=Path(get("SPECTRE_INTEL_DB", str(DEFAULT_DB))),
+        feeds_default=Path(get("SPECTRE_INTEL_FEEDS", str(INTEL_DIR / "feeds.default.yaml"))),
+        feeds_local=Path(get("SPECTRE_INTEL_FEEDS_LOCAL", str(INTEL_DIR / "feeds.local.yaml"))),
         env_file=env_file,
-        poll_seconds=get_int("SKYNET_INTEL_POLL_SECONDS", 300, MIN_POLL_SECONDS),
-        retention_days=get_int("SKYNET_INTEL_RETENTION_DAYS", 30, 1),
-        gdelt_enabled=get("SKYNET_INTEL_GDELT", "1").strip().lower() in _TRUTHY,
+        poll_seconds=get_int("SPECTRE_INTEL_POLL_SECONDS", 300, MIN_POLL_SECONDS),
+        retention_days=get_int("SPECTRE_INTEL_RETENTION_DAYS", 30, 1),
+        gdelt_enabled=get("SPECTRE_INTEL_GDELT", "1").strip().lower() in _TRUTHY,
         allowed_hosts=hosts or Settings.allowed_hosts,
         ollama_host=ollama_base_url(get("OLLAMA_HOST", "")),
         ollama_model=get("OLLAMA_MODEL", "").strip()
@@ -169,13 +197,13 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         ollama_keep_alive=get("OLLAMA_KEEP_ALIVE", Settings.ollama_keep_alive).strip() or "5m",
         ollama_think=get("OLLAMA_THINK", "0").strip().lower() in _TRUTHY,
         low_resource=low_resource,
-        search_provider=get("SKYNET_SEARCH_PROVIDER", "ddgs").strip().lower() or "ddgs",
+        search_provider=get("SPECTRE_SEARCH_PROVIDER", "ddgs").strip().lower() or "ddgs",
         searxng_url=get("SEARXNG_URL", "").strip() or None,
         brave_api_key=get("BRAVE_API_KEY", "").strip() or None,
         tavily_api_key=get("TAVILY_API_KEY", "").strip() or None,
-        chat_turns_per_minute=get_int("SKYNET_CHAT_TURNS_PER_MINUTE", 12, 1),
-        voice_enabled=get("SKYNET_VOICE", "1").strip().lower() in _TRUTHY,
-        voice_dir=Path(get("SKYNET_VOICE_DIR", str(Settings.voice_dir))),
-        voice_threads=min(get_int("SKYNET_VOICE_THREADS", Settings.voice_threads, 1), 32),
-        tts_voice=get("SKYNET_TTS_VOICE", Settings.tts_voice).strip() or Settings.tts_voice,
+        chat_turns_per_minute=get_int("SPECTRE_CHAT_TURNS_PER_MINUTE", 12, 1),
+        voice_enabled=get("SPECTRE_VOICE", "1").strip().lower() in _TRUTHY,
+        voice_dir=Path(get("SPECTRE_VOICE_DIR", str(Settings.voice_dir))),
+        voice_threads=min(get_int("SPECTRE_VOICE_THREADS", Settings.voice_threads, 1), 32),
+        tts_voice=get("SPECTRE_TTS_VOICE", Settings.tts_voice).strip() or Settings.tts_voice,
     )

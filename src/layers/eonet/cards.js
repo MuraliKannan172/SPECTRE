@@ -1,4 +1,4 @@
-/** SKYNET: card model and colors for NASA EONET events. Pure — no Cesium. */
+/** SPECTRE: card model and colors for NASA EONET events. Pure — no Cesium. */
 import { formatNumber, formatUtcDayMonth, msg, t } from '../../i18n/index.js';
 
 export const EONET_OVERLAY_SOURCE_ID = 'natural-events';

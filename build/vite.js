@@ -28,7 +28,7 @@ const REPO_ROOT_GLOB = escapeFsDenyPath(REPO_ROOT);
 /**
  * Content-Security-Policy for every document the dev/preview server serves.
  * No inline script is permitted, and the only foreign script origin is the
- * Maps JavaScript API that Street Level's Google Street View runs on. SKYNET
+ * Maps JavaScript API that Street Level's Google Street View runs on. SPECTRE
  * removed the Bhote Koshi event's YouTube, Facebook and X embeds with that
  * event's CC BY-NC data, and their script and frame origins. 'unsafe-eval' is
  * required: Knockout (bundled inside @cesium/widgets) resolves the global
@@ -43,7 +43,7 @@ export const BROWSER_CSP = [
   "default-src 'self'",
   // The Maps JavaScript API that Street Level's Google Street View runs on.
   "script-src 'self' 'unsafe-eval' blob: https://maps.googleapis.com",
-  // SKYNET bundles its fonts (src/theme/skynet-fonts.css).
+  // SPECTRE bundles its fonts (src/theme/spectre-fonts.css).
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob: https:",

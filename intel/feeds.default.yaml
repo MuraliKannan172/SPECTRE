@@ -1,11 +1,11 @@
-# SKYNET intel: shipped news sources.
+# SPECTRE intel: shipped news sources.
 #
 # terms: open      polled by default. Only sources whose reuse terms were
 #                  checked and allow it: US federal works (public domain),
 #                  GOV.UK (Open Government Licence v3.0), European Commission
 #                  (reuse policy, CC BY 4.0), GDELT (open, citation required).
 # terms: personal  polled only while "Non-commercial sources" is on in
-#                  Provider Settings (SKYNET_NONCOMMERCIAL_SOURCES=1): terms
+#                  Provider Settings (SPECTRE_NONCOMMERCIAL_SOURCES=1): terms
 #                  that say personal or non-commercial use, or that have not
 #                  been checked ("not checked" in terms_note).
 #
@@ -299,7 +299,7 @@ feeds:
 
 # GDELT DOC 2.0: worldwide coverage by keyword. On by default (ADR Q5);
 # switch it off with `gdelt: {enabled: false}` in feeds.local.yaml or
-# SKYNET_INTEL_GDELT=0. On 2026-10-24 it answered HTTP 429 to this service
+# SPECTRE_INTEL_GDELT=0. On 2026-10-24 it answered HTTP 429 to this service
 # from the development machine; while that lasts, health shows http_429 and
 # each query backs off to at most one request an hour.
 gdelt:

@@ -51,7 +51,7 @@ export const CATALOG_SOURCE_CONTRACTS = Object.freeze({
   's2-ghostmaps': contract(['s2-ghostmaps'], ['getCatalog', 'getFile']),
   cables: contract(['telegeography-submarine-cables'], ['fetch']),
   transit: contract(['transit'], ['requestSnapshot', 'getHistory']),
-  // SKYNET
+  // SPECTRE
   news: contract(['news'], ['getSnapshot', 'search', 'getStory']),
   'natural-events': contract(['natural-events'], ['getSnapshot']),
 });

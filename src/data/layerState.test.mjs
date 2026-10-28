@@ -202,7 +202,7 @@ function encode(state) {
 
 test('production registry is exact, canonical, and rejects incomplete contracts', async () => {
   assert.equal(validateLayerStateRegistry(), true);
-  // SKYNET drops the two Bhote Koshi layers and adds News and Natural Events (upstream: 32).
+  // SPECTRE drops the two Bhote Koshi layers and adds News and Natural Events (upstream: 32).
   assert.equal(REGISTERED_LAYER_IDS.length, 32);
   assert.equal(new Set(REGISTERED_LAYER_IDS).size, 32);
   assert.ok(REGISTERED_LAYER_IDS.includes('transit'));
@@ -243,7 +243,7 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
   for (const [id, token] of Object.entries(LEGACY_LAYER_STATE_TOKENS)) {
     assert.equal(LAYER_STATE_TOKEN_RESERVATIONS[id], token);
   }
-  // SKYNET's tokens (0y, 0z) sit outside upstream's next allocations.
+  // SPECTRE's tokens (0y, 0z) sit outside upstream's next allocations.
   assert.equal(nextLayerStateToken(), '6');
   assert.equal(
     nextLayerStateToken({
@@ -306,7 +306,7 @@ test('production registry is exact, canonical, and rejects incomplete contracts'
     ),
     true,
   );
-  // SKYNET holds 5 and 6, so the next free digits here are 7 and 8.
+  // SPECTRE holds 5 and 6, so the next free digits here are 7 and 8.
   assert.equal(
     validateLayerStateAllocations(LAYER_STATE_TOKEN_RESERVATIONS, {
       ...LAYER_STATE_TOKEN_RESERVATIONS,
@@ -524,7 +524,7 @@ test('malformed enabled-layer lists reject the entire payload', () => {
 });
 
 test('retired Nepal event tokens stay reserved and are rejected like unknown tokens', () => {
-  // SKYNET removed the Bhote Koshi layers with their CC BY-NC data. A link
+  // SPECTRE removed the Bhote Koshi layers with their CC BY-NC data. A link
   // that still names them has unreadable layer state, and the tokens must
   // never be reallocated to another layer.
   assert.equal(

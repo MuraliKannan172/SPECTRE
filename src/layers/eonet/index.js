@@ -22,7 +22,7 @@ const CARD_HOST_OPTIONS = Object.freeze({
 const STALE = msg('Cached natural events · EONET unavailable');
 
 /**
- * SKYNET: open NASA EONET natural events (last 30 days), one point each,
+ * SPECTRE: open NASA EONET natural events (last 30 days), one point each,
  * colored by category. Click a point for its card; click the card to open
  * the source EONET lists.
  */

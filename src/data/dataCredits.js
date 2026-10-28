@@ -208,7 +208,7 @@ export const DATA_CREDITS = [
     html: 'Earthquakes: Data courtesy of the U.S. Geological Survey',
   },
   {
-    // SKYNET: the keyless default basemap.
+    // SPECTRE: the keyless default basemap.
     key: 'nasa-blue-marble',
     html:
       'Basemap: NASA Blue Marble (NASA Earth Observatory), served by ' +
@@ -264,7 +264,7 @@ export const DATA_CREDITS = [
       '<a href="https://www.gdeltproject.org/" target="_blank" rel="noopener">The GDELT Project</a> ' +
       '(location-matched article links; publisher terms apply)',
   },
-  // SKYNET: the News layer and NASA EONET (DATA_SOURCES.md, "SKYNET layers").
+  // SPECTRE: the News layer and NASA EONET (DATA_SOURCES.md, "SPECTRE layers").
   {
     key: 'intel-news',
     html:
@@ -583,7 +583,7 @@ export const DATA_CREDITS = [
     html:
       'Submarine cables, only when you install the optional personal-use dataset: © TeleGeography — ' +
       '<a href="https://www.submarinecablemap.com" target="_blank" rel="noopener">submarinecablemap.com</a> ' +
-      '(CC BY-NC-SA 3.0 — NonCommercial; not shipped with SKYNET)',
+      '(CC BY-NC-SA 3.0 — NonCommercial; not shipped with SPECTRE)',
   },
   MODEL_CREDIT,
 ];

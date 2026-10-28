@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core: run one globe tool the model asked for, in the browser.
+ * SPECTRE Neural Core: run one globe tool the model asked for, in the browser.
  *
  * Only tools in the shared registry run, and only with arguments that match
  * their schema (the intel service has already checked both; this is the second

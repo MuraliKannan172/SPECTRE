@@ -3,7 +3,7 @@
 Only places are extracted and stored. Text spaCy labels as a person is used
 for nothing except an exact match on a country, province or large city name
 (the small model often tags "Kharkiv" or "Sri Lanka" as PERSON); the person
-text itself is never kept. SKYNET does not build an index of people.
+text itself is never kept. SPECTRE does not build an index of people.
 
 Scoring is deterministic. Each place mention gets candidates from the
 gazetteer; a candidate's score starts from its kind (country, province, city

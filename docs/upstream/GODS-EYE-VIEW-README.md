@@ -1,4 +1,4 @@
-> **Archived upstream README.** This is God's Eye View's README as of the fork (upstream `main` @ 7be5937f), kept as feature reference. SKYNET removed its demo GIFs and images (no reuse grant), so the image embeds are gone. Commands and paths still apply unless SKYNET's [README](../../README.md) or [NOTICE](../../NOTICE.md) says otherwise.
+> **Archived upstream README.** This is God's Eye View's README as of the fork (upstream `main` @ 7be5937f), kept as feature reference. SPECTRE removed its demo GIFs and images (no reuse grant), so the image embeds are gone. Commands and paths still apply unless SPECTRE's [README](../../README.md) or [NOTICE](../../NOTICE.md) says otherwise.
 
 <div align="center">
 

@@ -244,7 +244,7 @@ def test_personal_use_feeds_follow_the_noncommercial_switch(tmp_path: Path, pars
 
     async def scenario() -> tuple[list[str], list[str]]:
         off = await run_tick(scheduler)
-        env.write_text("SKYNET_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
+        env.write_text("SPECTRE_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
         clock.now += 400
         on = await run_tick(scheduler)
         await client.aclose()

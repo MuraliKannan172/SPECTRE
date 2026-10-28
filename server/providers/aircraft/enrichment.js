@@ -16,7 +16,7 @@ const ADSBDB_MAX_RESPONSE_BYTES = 1024 * 1024;
  * cached. Adapted from skylight
  * (MIT) server/src/enrich/routes.ts.
  *
- * SKYNET: adsbdb's route data may not be copied into other databases, so
+ * SPECTRE: adsbdb's route data may not be copied into other databases, so
  * routes stay in memory only and are looked up only when the owner turned on
  * non-commercial sources. Aircraft type/registration lookups are unchanged.
  */

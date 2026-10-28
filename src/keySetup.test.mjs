@@ -145,7 +145,7 @@ test('the first Google key strips ONLY the keyless OSM basemap from the share ha
   assert.equal(params.get('map'), null, 'osm basemap removed');
   assert.equal(params.get('lat'), '30.2', 'camera survives');
   assert.equal(params.get('style'), 'normal', 'style survives');
-  // SKYNET: its keyless default, NASA Blue Marble, gives way to Google 3D too.
+  // SPECTRE: its keyless default, NASA Blue Marble, gives way to Google 3D too.
   assert.equal(new URLSearchParams(stripKeylessBasemapFromHash('map=nasa-gibs&lat=1')).get('map'), null);
   // A stack under any other name was chosen or shared on purpose.
   assert.equal(stripKeylessBasemapFromHash('map=bing-aerial&lat=1'), null);

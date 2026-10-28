@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core: what the model is told about the map each turn
+ * SPECTRE Neural Core: what the model is told about the map each turn
  * (ADR-001 D5, "Map context, no round trip"). Plain data, bounded in size;
  * duck-typed against Cesium so it runs without importing it.
  */

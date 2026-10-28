@@ -45,7 +45,7 @@ test('the complete Realtime tool payload pins the manifest-generated layer relea
     // S2 GhostMaps extends the generated layer enums.
     // Panel adds named voice targets and timeout; shared Panel/Cockpit guidance
     // is consolidated without changing either feature's arguments.
-    // SKYNET: three descriptions name "the globe" instead of the product
+    // SPECTRE: three descriptions name "the globe" instead of the product
     // (upstream pins 9ee82c42…), and set_map_stack adds 'nasa-gibs'.
     '3aca94a0cb06f5e2aca84aa25de7ccabe99c8020d77dbfc0c97fb547ca6b56b7',
   );
@@ -168,7 +168,7 @@ test('all legacy action arguments are byte-identical after removing the delibera
     delete center.properties[axis].minimum;
     delete center.properties[axis].maximum;
   }
-  // SKYNET adds NASA Blue Marble, its keyless default map stack.
+  // SPECTRE adds NASA Blue Marble, its keyless default map stack.
   const stacks = property('set_map_stack').stack;
   stacks.enum = stacks.enum.filter((id) => id !== 'nasa-gibs');
   // Cyber adds one HUD layout.

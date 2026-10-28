@@ -455,8 +455,8 @@ function chipIds() {
 test('a dependency owner hiding the points surrenders the whole row', async () => {
   try {
     _setDenseCatalogStateForTest({});
-    // SKYNET: the FOOTPRINT option follows the DENSE chip.
-    assert.deepEqual(chipIds(), ['catalog', 'skynet-footprint']);
+    // SPECTRE: the FOOTPRINT option follows the DENSE chip.
+    assert.deepEqual(chipIds(), ['catalog', 'spectre-footprint']);
 
     // Space Missions borrows this layer for TLE lookup with showPoints:false.
     satellitesLayer.setParams({ showPoints: false });
@@ -467,7 +467,7 @@ test('a dependency owner hiding the points surrenders the whole row', async () =
     satellitesLayer.setParams({ showPoints: true });
     assert.deepEqual(
       chipIds(),
-      ['catalog', 'skynet-footprint'],
+      ['catalog', 'spectre-footprint'],
       'released on restore',
     );
   } finally {

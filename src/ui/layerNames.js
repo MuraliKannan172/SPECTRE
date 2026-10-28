@@ -43,7 +43,7 @@ export const LAYER_NAME_KEYS = Object.freeze({
   'air-quality': msg('Air quality'),
   directions: msg('Directions'),
   'alpr-cameras': msg('ALPR Cameras'),
-  // SKYNET
+  // SPECTRE
   news: msg('News'),
   'natural-events': msg('Natural Events (EONET)'),
 });

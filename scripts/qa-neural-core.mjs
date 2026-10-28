@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-neural-core.mjs — SKYNET Phase 4 browser smoke test for the Neural Core
+ * qa-neural-core.mjs — SPECTRE Phase 4 browser smoke test for the Neural Core
  * panel (docs/ADR-001.md, phase 4; brief §9 "sends a chat message against a
  * mock").
  *
@@ -118,7 +118,7 @@ const TURN = {
       },
     ],
     ['tool_status', { tool: 'fly_to_location', state: 'done' }],
-    // A SKYNET layer that only the Neural Core's copy of the enum names.
+    // A SPECTRE layer that only the Neural Core's copy of the enum names.
     ['tool_status', { tool: 'set_layer_visibility', state: 'start' }],
     [
       'client_tool',
@@ -268,7 +268,7 @@ async function boot(page) {
   await page.waitForFunction(
     () =>
       window.__godsEyeView?.viewer &&
-      document.querySelector('.skynet-nc-launcher'),
+      document.querySelector('.spectre-nc-launcher'),
     { timeout: 90_000 },
   );
   await sleep(3000);
@@ -277,50 +277,50 @@ async function boot(page) {
 
 async function openPanel(page) {
   await page.evaluate(() => {
-    const panel = document.getElementById('skynet-neural-core');
-    if (panel.hidden) document.querySelector('.skynet-nc-launcher').click();
+    const panel = document.getElementById('spectre-neural-core');
+    if (panel.hidden) document.querySelector('.spectre-nc-launcher').click();
   });
   await page.waitForFunction(
     () =>
-      document.querySelector('.skynet-nc-status')?.textContent.includes('·') ||
-      document.querySelector('.skynet-nc-status')?.dataset.tone === 'offline',
+      document.querySelector('.spectre-nc-status')?.textContent.includes('·') ||
+      document.querySelector('.spectre-nc-status')?.dataset.tone === 'offline',
     { timeout: 15_000 },
   );
 }
 
 async function ask(page, text) {
   await page.evaluate((message) => {
-    const panel = document.getElementById('skynet-neural-core');
-    panel.querySelector('.skynet-nc-input').value = message;
-    panel.querySelector('.skynet-nc-composer').requestSubmit();
+    const panel = document.getElementById('spectre-neural-core');
+    panel.querySelector('.spectre-nc-input').value = message;
+    panel.querySelector('.spectre-nc-composer').requestSubmit();
   }, text);
   await page.waitForFunction(
     () =>
-      document.getElementById('skynet-neural-core').dataset.busy === 'false',
+      document.getElementById('spectre-neural-core').dataset.busy === 'false',
     { timeout: 30_000 },
   );
   return page.evaluate(() => {
-    const panel = document.getElementById('skynet-neural-core');
+    const panel = document.getElementById('spectre-neural-core');
     const answer = [
-      ...panel.querySelectorAll('.skynet-nc-msg.is-assistant'),
+      ...panel.querySelectorAll('.spectre-nc-msg.is-assistant'),
     ].at(-1);
     const visible = (selector) => {
       const node = answer.querySelector(selector);
       return node && !node.hidden ? node.textContent : null;
     };
     return {
-      text: answer.querySelector('.skynet-nc-text').textContent,
-      chips: [...answer.querySelectorAll('a.skynet-nc-cite')].map((a) => ({
+      text: answer.querySelector('.spectre-nc-text').textContent,
+      chips: [...answer.querySelectorAll('a.spectre-nc-cite')].map((a) => ({
         n: a.textContent,
         href: a.href,
         rel: a.rel,
         target: a.target,
       })),
-      sources: answer.querySelectorAll('.skynet-nc-source').length,
-      asOf: visible('.skynet-nc-asof'),
-      error: visible('.skynet-nc-error'),
-      meta: visible('.skynet-nc-meta'),
-      tools: [...answer.querySelectorAll('.skynet-nc-tool')].map(
+      sources: answer.querySelectorAll('.spectre-nc-source').length,
+      asOf: visible('.spectre-nc-asof'),
+      error: visible('.spectre-nc-error'),
+      meta: visible('.spectre-nc-meta'),
+      tools: [...answer.querySelectorAll('.spectre-nc-tool')].map(
         (chip) => `${chip.dataset.state}:${chip.textContent}`,
       ),
     };
@@ -333,14 +333,14 @@ async function ask(page, text) {
  * (it can take a moment to open), then for `ms` more, as a person would.
  */
 async function holdMic(page, ms, { untilListening = false } = {}) {
-  const box = await (await page.$('.skynet-nc-mic')).boundingBox();
+  const box = await (await page.$('.spectre-nc-mic')).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   if (untilListening)
     await page
       .waitForFunction(
         () =>
-          document.querySelector('.skynet-nc-voice')?.dataset.code ===
+          document.querySelector('.spectre-nc-voice')?.dataset.code ===
           'listening',
         { timeout: 10_000 },
       )
@@ -352,9 +352,9 @@ async function holdMic(page, ms, { untilListening = false } = {}) {
 
 function header(page) {
   return page.evaluate(() => ({
-    status: document.querySelector('.skynet-nc-status').textContent,
-    tone: document.querySelector('.skynet-nc-status').dataset.tone,
-    search: document.querySelector('.skynet-nc-search').textContent,
+    status: document.querySelector('.spectre-nc-status').textContent,
+    tone: document.querySelector('.spectre-nc-status').dataset.tone,
+    search: document.querySelector('.spectre-nc-search').textContent,
   }));
 }
 
@@ -415,7 +415,7 @@ async function run(page) {
     window.__godsEyeView.dataManager.isEnabled('news'),
   );
   record(
-    'The Neural Core can turn on the News layer (a SKYNET layer)',
+    'The Neural Core can turn on the News layer (a SPECTRE layer)',
     layerResult?.ok === true && newsOn === true,
     JSON.stringify({ ok: layerResult?.ok, newsOn }),
   );
@@ -443,24 +443,24 @@ async function run(page) {
   );
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
   await page.screenshot({
-    path: path.join(SHOTS_DIR, 'skynet-neural-core.png'),
+    path: path.join(SHOTS_DIR, 'spectre-neural-core.png'),
   });
 
   // Regenerate replaces the answer; it does not add a second one.
   await page.evaluate(() =>
-    [...document.querySelectorAll('.skynet-nc-regenerate')]
+    [...document.querySelectorAll('.spectre-nc-regenerate')]
       .find((button) => !button.hidden)
       .click(),
   );
   await page.waitForFunction(
     () =>
-      document.getElementById('skynet-neural-core').dataset.busy === 'false',
+      document.getElementById('spectre-neural-core').dataset.busy === 'false',
     { timeout: 30_000 },
   );
   await sleep(300);
   const afterRegenerate = await page.evaluate(() => ({
-    answers: document.querySelectorAll('.skynet-nc-msg.is-assistant').length,
-    questions: document.querySelectorAll('.skynet-nc-msg.is-user').length,
+    answers: document.querySelectorAll('.spectre-nc-msg.is-assistant').length,
+    questions: document.querySelectorAll('.spectre-nc-msg.is-user').length,
   }));
   record(
     'Regenerate re-asks the same question and replaces the answer',
@@ -472,20 +472,20 @@ async function run(page) {
 
   // Clear needs two clicks, then empties the conversation.
   await page.evaluate(() => {
-    const clear = document.querySelector('.skynet-nc-header .skynet-nc-icon');
+    const clear = document.querySelector('.spectre-nc-header .spectre-nc-icon');
     clear.click();
   });
   const armed = await page.evaluate(() => ({
-    label: document.querySelector('.skynet-nc-header .skynet-nc-icon')
+    label: document.querySelector('.spectre-nc-header .spectre-nc-icon')
       .textContent,
-    messages: document.querySelectorAll('.skynet-nc-msg').length,
+    messages: document.querySelectorAll('.spectre-nc-msg').length,
   }));
   await page.evaluate(() =>
-    document.querySelector('.skynet-nc-header .skynet-nc-icon').click(),
+    document.querySelector('.spectre-nc-header .spectre-nc-icon').click(),
   );
   await sleep(500);
   const cleared = await page.evaluate(
-    () => document.querySelectorAll('.skynet-nc-msg').length,
+    () => document.querySelectorAll('.spectre-nc-msg').length,
   );
   record(
     'Clear history asks once more, then deletes and empties the list',
@@ -523,18 +523,18 @@ async function run(page) {
   await page.waitForFunction(
     () =>
       document
-        .querySelector('.skynet-nc-mic')
+        .querySelector('.spectre-nc-mic')
         ?.getAttribute('aria-disabled') === 'true',
     { timeout: 10_000 },
   );
   await holdMic(page, 400);
   const missing = await page.evaluate(() => ({
-    title: document.querySelector('.skynet-nc-mic').title,
-    hint: document.querySelector('.skynet-nc-voice').textContent,
+    title: document.querySelector('.spectre-nc-mic').title,
+    hint: document.querySelector('.spectre-nc-voice').textContent,
   }));
   record(
     'Without the models the mic stays visible and says how to install them',
-    /scripts\\skynet\.ps1 -Voice/.test(missing.title) &&
+    /scripts\\spectre\.ps1 -Voice/.test(missing.title) &&
       missing.hint === missing.title &&
       transcribed.length === 0,
     JSON.stringify(missing),
@@ -546,7 +546,7 @@ async function run(page) {
   await page.waitForFunction(
     () =>
       document
-        .querySelector('.skynet-nc-mic')
+        .querySelector('.spectre-nc-mic')
         ?.getAttribute('aria-disabled') === 'false',
     { timeout: 15_000 },
   );
@@ -567,10 +567,10 @@ async function run(page) {
       question: users[users.length - 1]?.textContent,
       firstAudioMs: answer?.dataset.voiceFirstAudioMs,
       heardMs: answer?.dataset.voiceHeardMs,
-      meta: [...(answer?.querySelectorAll('.skynet-nc-meta') || [])]
+      meta: [...(answer?.querySelectorAll('.spectre-nc-meta') || [])]
         .map((node) => node.textContent)
         .join(' | '),
-      hint: document.querySelector('.skynet-nc-voice').textContent,
+      hint: document.querySelector('.spectre-nc-voice').textContent,
     };
   });
   record(
@@ -600,7 +600,7 @@ async function run(page) {
   await holdMic(page, 50);
   await sleep(SPEAK_DELAY_MS * 3 + 2500);
   const stopped = await page.evaluate(
-    () => document.querySelector('.skynet-nc-voice').textContent,
+    () => document.querySelector('.spectre-nc-voice').textContent,
   );
   record(
     'A press while it speaks stops it, and the rest is never requested',
@@ -608,7 +608,7 @@ async function run(page) {
     JSON.stringify({ spokenTexts, hint: stopped }),
   );
   await page.screenshot({
-    path: path.join(SHOTS_DIR, 'skynet-neural-core-voice.png'),
+    path: path.join(SHOTS_DIR, 'spectre-neural-core-voice.png'),
   });
 
   console.log('(v) PHONE...');
@@ -618,7 +618,7 @@ async function run(page) {
   await openPanel(page);
   const phone = await page.evaluate(() => {
     const panel = document
-      .getElementById('skynet-neural-core')
+      .getElementById('spectre-neural-core')
       .getBoundingClientRect();
     const tabs = document
       .getElementById('mobile-tab-bar')
@@ -642,7 +642,7 @@ async function run(page) {
     JSON.stringify(phone),
   );
   await page.screenshot({
-    path: path.join(SHOTS_DIR, 'skynet-neural-core-375px.png'),
+    path: path.join(SHOTS_DIR, 'spectre-neural-core-375px.png'),
   });
 
   const ours = pageErrors.filter((stack) => /neuralCore\//.test(stack));

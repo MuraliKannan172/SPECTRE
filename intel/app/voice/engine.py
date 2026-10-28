@@ -93,7 +93,7 @@ class KokoroSpeaker:
 
         self.lang = english_lang(voice)
         if self.lang is None:
-            raise ValueError(f"SKYNET_TTS_VOICE must be an English Kokoro voice (af_, bm_, ...), not {voice}")
+            raise ValueError(f"SPECTRE_TTS_VOICE must be an English Kokoro voice (af_, bm_...), not {voice}")
         options = ort.SessionOptions()
         options.intra_op_num_threads = threads
         session = ort.InferenceSession(
@@ -101,7 +101,7 @@ class KokoroSpeaker:
         )
         self.kokoro = Kokoro.from_session(session, str(voice_dir / KOKORO_VOICES))
         if voice not in self.kokoro.get_voices():
-            raise ValueError(f"SKYNET_TTS_VOICE is not in the voice pack: {voice}")
+            raise ValueError(f"SPECTRE_TTS_VOICE is not in the voice pack: {voice}")
         self.voice = voice
 
     def speak(self, text: str) -> bytes:

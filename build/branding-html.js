@@ -27,7 +27,7 @@ export function applyBrandHtml(html) {
 /** Fill the document head's product name and colours before Vite runs. */
 export function brandingHtmlPlugin() {
   return {
-    name: 'skynet-branding-html',
+    name: 'spectre-branding-html',
     transformIndexHtml: { order: 'pre', handler: applyBrandHtml },
   };
 }

@@ -1,5 +1,5 @@
 /**
- * SKYNET: the ground area from which a satellite is in line of sight at or
+ * SPECTRE: the ground area from which a satellite is in line of sight at or
  * above a minimum elevation angle. Geometry only: it says nothing about what
  * the satellite's instruments can see, which is not public for most of them.
  * Spherical Earth (mean radius); at globe scale the error is far below the

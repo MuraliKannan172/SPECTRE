@@ -68,7 +68,7 @@ test('no shipped page surface names the upstream product', () => {
     assert.doesNotMatch(read(path), UPSTREAM_NAMES, path);
 });
 
-test('user agents identify SKYNET, never the upstream project', () => {
+test('user agents identify SPECTRE, never the upstream project', () => {
   assert.equal(
     brandUserAgent('cctv-proxy'),
     `${BRANDING.name}-cctv-proxy/${BRANDING.version}`,

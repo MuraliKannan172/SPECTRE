@@ -1,6 +1,6 @@
 /**
- * SKYNET: how the News layer's settings travel in share links and the stored
- * layer state (src/data/layerState.js, SKYNET block). Each spec follows that
+ * SPECTRE: how the News layer's settings travel in share links and the stored
+ * layer state (src/data/layerState.js, SPECTRE block). Each spec follows that
  * codec's contract: key, token, defaultValue, normalize, encode, decode, and
  * patchRequested for a value a request changes without naming it.
  *

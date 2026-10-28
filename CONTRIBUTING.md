@@ -1,17 +1,17 @@
 # Contributing to God's Eye View
 
-> **SKYNET.** This repository is SKYNET, a fork of God's Eye View. The upstream guide below still applies. Where it differs, SKYNET's rules win, and [CLAUDE.md](CLAUDE.md) has the full list:
+> **SPECTRE.** This repository is SPECTRE, a fork of God's Eye View. The upstream guide below still applies. Where it differs, SPECTRE's rules win, and [CLAUDE.md](CLAUDE.md) has the full list:
 >
-> - **Start:** `.\scripts\skynet.ps1` (intel service and web app), then `npm run doctor`. The keyless default basemap is NASA Blue Marble, not Esri ([docs/ADR-001.md](docs/ADR-001.md) D12).
+> - **Start:** `.\scripts\spectre.ps1` (intel service and web app), then `npm run doctor`. The keyless default basemap is NASA Blue Marble, not Esri ([docs/ADR-001.md](docs/ADR-001.md) D12).
 > - **JavaScript checks before a commit:** `npm test`, `npm run check:boundaries`, `npm run format:check`, and `npm run build` for changes that affect the build.
 > - **Intel service checks before a commit:** `uv run --project intel pytest intel/tests`, then from `intel/`, `uv run ruff check .` and `uv run ruff format --check .`.
-> - **UI changes:** run `npm run qa:skynet-news` and `npm run qa:neural-core` against `npm run dev`.
-> - **Upstream files:** keep changes to them to registration points marked `SKYNET`, so `git merge upstream/main` stays tractable. Run Prettier only on files inside the repository's format scope (`scripts/format-scope.json`).
+> - **UI changes:** run `npm run qa:spectre-news` and `npm run qa:neural-core` against `npm run dev`.
+> - **Upstream files:** keep changes to them to registration points marked `SPECTRE`, so `git merge upstream/main` stays tractable. Run Prettier only on files inside the repository's format scope (`scripts/format-scope.json`).
 > - **Text and translations:** every product name comes from `src/branding.js`. UI text goes through `t()` or `msg()`, with es, ru and zh-CN translations (`npm run i18n`).
 > - **Data:** register a new data source in `src/data/dataCredits.js` and `DATA_SOURCES.md`. Non-commercial or unchecked data never ships in the default build.
 > - **Hard lines:** no named-person search, face recognition or tracking of individuals. No shell, file or code tools for the model. Not for safety-critical use.
 >
-> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) shows where SKYNET's code lives.
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) shows where SPECTRE's code lives.
 
 Thanks for being here. God's Eye View is an open foundation for live spatial intelligence in the browser, and it gets better when more people run it, break it, and extend it.
 

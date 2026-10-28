@@ -2,7 +2,7 @@
 
 The intel service (`intel/`, FastAPI) ingests news and serves it to the app. It listens on `127.0.0.1:8100` only. From Phase 3 the app's dev server proxies `/api/intel/*` to it, so the browser stays same-origin.
 
-- **Start it:** run `.\scripts\skynet.ps1` in PowerShell from the repository root.
+- **Start it:** run `.\scripts\spectre.ps1` in PowerShell from the repository root.
 - **Live schema:** OpenAPI at `/api/intel/openapi.json`, interactive docs at `/api/intel/docs`. This page explains the parts a schema can't: states, codes and stream semantics.
 - **Host header:** requests must name `127.0.0.1`, `localhost` or `[::1]`; anything else gets a 400. This guards against DNS rebinding. The service sends no CORS headers.
 
@@ -58,7 +58,7 @@ A Server-Sent Events stream.
 
 ```json
 {
-  "service": "SKYNET-intel/0.1",
+  "service": "SPECTRE-intel/0.1",
   "now": "...", "started_at": "...",
   "freshness": Freshness,
   "noncommercial_sources": false,
@@ -73,7 +73,7 @@ A Server-Sent Events stream.
 
 ## Neural Core (`/api/intel/chat`)
 
-The app's proxy (`server/providers/intel.js`) answers these only for requests from this machine (unless `SKYNET_CHAT_ALLOW_LAN=1`). Writes need a same-origin JSON body of at most 64 KB. The service itself refuses any request that carries an `Origin` header, so only the proxy can write to it. One turn runs at a time (`409 {"detail": {"code": "busy"}}`), at most `SKYNET_CHAT_TURNS_PER_MINUTE` a minute (`429`).
+The app's proxy (`server/providers/intel.js`) answers these only for requests from this machine (unless `SPECTRE_CHAT_ALLOW_LAN=1`). Writes need a same-origin JSON body of at most 64 KB. The service itself refuses any request that carries an `Origin` header, so only the proxy can write to it. One turn runs at a time (`409 {"detail": {"code": "busy"}}`), at most `SPECTRE_CHAT_TURNS_PER_MINUTE` a minute (`429`).
 
 ### `POST /api/intel/chat`
 
@@ -204,13 +204,13 @@ Tool schemas live in `shared/tools/neural-core.tools.json`. `npm run tools:expor
 }
 ```
 
-`disabled_noncommercial` means the source's terms allow only personal use, or have not been checked. It is polled only while **Non-commercial sources** is on in Provider Settings (`SKYNET_NONCOMMERCIAL_SOURCES=1` in `.env`). The switch is re-read on every poll cycle, so no restart is needed.
+`disabled_noncommercial` means the source's terms allow only personal use, or have not been checked. It is polled only while **Non-commercial sources** is on in Provider Settings (`SPECTRE_NONCOMMERCIAL_SOURCES=1` in `.env`). The switch is re-read on every poll cycle, so no restart is needed.
 
 While the switch is off, the API also stops serving what such sources reported, including stories collected while it was on. `/news`, `/news/{id}` and the stream serve only stories whose first (primary) source is an open feed, and list only the open sources in `sources`. A hidden story answers `404`. Turning the switch back on shows them again; nothing is deleted.
 
 ## Polling
 
-- **Interval:** every source has its own clock, polled every `SKYNET_INTEL_POLL_SECONDS` (default 300, minimum 30) with ±10% jitter. GDELT queries run every 15 minutes at most and are spaced at least 5.5 s apart.
+- **Interval:** every source has its own clock, polled every `SPECTRE_INTEL_POLL_SECONDS` (default 300, minimum 30) with ±10% jitter. GDELT queries run every 15 minutes at most and are spaced at least 5.5 s apart.
 - **Conditional requests:** feeds are fetched with `If-None-Match` / `If-Modified-Since`, and responses are capped at 5 MB.
 - **Failures:** retries back off exponentially from the source's own interval (1×, 2×, 4× …, ±20%, capped at 1 hour), and `Retry-After` is honoured. A failing GDELT query therefore waits at least 15 minutes.
 
@@ -218,22 +218,22 @@ While the switch is off, the API also stops serving what such sources reported, 
 
 | Variable | Default | |
 |---|---|---|
-| `SKYNET_INTEL_POLL_SECONDS` | `300` | Poll interval per source. |
-| `SKYNET_INTEL_RETENTION_DAYS` | `30` | Stories older than this are deleted every 6 hours. |
-| `SKYNET_INTEL_GDELT` | `1` | `0` switches GDELT off. |
-| `SKYNET_INTEL_DB` | `intel/data/skynet.db` | SQLite file (gitignored). |
-| `SKYNET_INTEL_FEEDS_LOCAL` | `intel/feeds.local.yaml` | Your own feed additions and overrides (gitignored). |
-| `SKYNET_NONCOMMERCIAL_SOURCES` | off | Shared with the app's Provider Settings switch. |
+| `SPECTRE_INTEL_POLL_SECONDS` | `300` | Poll interval per source. |
+| `SPECTRE_INTEL_RETENTION_DAYS` | `30` | Stories older than this are deleted every 6 hours. |
+| `SPECTRE_INTEL_GDELT` | `1` | `0` switches GDELT off. |
+| `SPECTRE_INTEL_DB` | `intel/data/spectre.db` | SQLite file (gitignored). |
+| `SPECTRE_INTEL_FEEDS_LOCAL` | `intel/feeds.local.yaml` | Your own feed additions and overrides (gitignored). |
+| `SPECTRE_NONCOMMERCIAL_SOURCES` | off | Shared with the app's Provider Settings switch. |
 | `OLLAMA_HOST` | `127.0.0.1:11434` | Ollama's address. |
 | `OLLAMA_MODEL` | `qwen3.5-9b-64k-gpu:latest` (`bonsai-2:9b` in low-resource mode) | The chat model, chosen by the Phase 4 eval; it must list the `tools` capability for native tool calls. |
 | `OLLAMA_NUM_CTX` | `16384` | Context window. |
 | `OLLAMA_KEEP_ALIVE` | `5m` | How long the model stays loaded after a turn. |
-| `SKYNET_LOW_RESOURCE` | off | 8k context and smaller history and web budgets. |
-| `SKYNET_SEARCH_PROVIDER` | `ddgs` | `ddgs`, `searxng` (with `SEARXNG_URL`), `brave` (`BRAVE_API_KEY`) or `tavily` (`TAVILY_API_KEY`). |
-| `SKYNET_CHAT_TURNS_PER_MINUTE` | `12` | Chat rate limit. |
-| `SKYNET_VOICE` | on when installed | `0` turns local voice off. |
-| `SKYNET_VOICE_THREADS` | `8` | CPU threads for speech to text, and again for text to speech. |
-| `SKYNET_TTS_VOICE` | `af_heart` | An English Kokoro voice (`af_*`, `am_*`, `bf_*`, `bm_*`). |
-| `SKYNET_VOICE_DIR` | `intel/data/voice` | Where `fetch_voice_models.py` puts the models. |
+| `SPECTRE_LOW_RESOURCE` | off | 8k context and smaller history and web budgets. |
+| `SPECTRE_SEARCH_PROVIDER` | `ddgs` | `ddgs`, `searxng` (with `SEARXNG_URL`), `brave` (`BRAVE_API_KEY`) or `tavily` (`TAVILY_API_KEY`). |
+| `SPECTRE_CHAT_TURNS_PER_MINUTE` | `12` | Chat rate limit. |
+| `SPECTRE_VOICE` | on when installed | `0` turns local voice off. |
+| `SPECTRE_VOICE_THREADS` | `8` | CPU threads for speech to text, and again for text to speech. |
+| `SPECTRE_TTS_VOICE` | `af_heart` | An English Kokoro voice (`af_*`, `am_*`, `bf_*`, `bm_*`). |
+| `SPECTRE_VOICE_DIR` | `intel/data/voice` | Where `fetch_voice_models.py` puts the models. |
 
 `intel/feeds.local.yaml` uses the same shape as `intel/feeds.default.yaml`. Entries merge by `id`, so `- {id: bbc-world, enabled: false}` turns one off, and a new id adds a feed. `gdelt: {enabled: false}` switches GDELT off.

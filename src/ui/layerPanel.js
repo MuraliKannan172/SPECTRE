@@ -68,7 +68,7 @@ const PANEL_GROUPS = [
   {
     label: msg('Events'),
     ids: [
-      // SKYNET
+      // SPECTRE
       'news',
       'natural-events',
       'rocket-launches',

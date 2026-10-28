@@ -1,5 +1,5 @@
 /**
- * SKYNET: one freshness label for every news surface (layer row, drawer,
+ * SPECTRE: one freshness label for every news surface (layer row, drawer,
  * ticker), so all three say "updated X ago" and show the same stale and
  * offline states. Pure; the tone is a CSS hook, the text is translated.
  */
@@ -11,7 +11,7 @@ export const NEWS_OFFLINE_BADGE = msg('OFFLINE');
 
 /** source.js's error texts, marked here for the catalog; a test keeps them equal. */
 export const NEWS_ERROR_TEXTS = Object.freeze([
-  msg('Intel service offline: run scripts\\skynet.ps1 to start it'),
+  msg('Intel service offline: run scripts\\spectre.ps1 to start it'),
   msg('News unavailable'),
 ]);
 

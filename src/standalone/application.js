@@ -89,7 +89,7 @@ export function createStandaloneApplication({
         placeSearch,
         voice,
       });
-      // SKYNET: the News drawer and ticker, shown while the News layer is on,
+      // SPECTRE: the News drawer and ticker, shown while the News layer is on,
       // and the Neural Core chat, whose globe tools run through the voice
       // runner. The two share the right edge, so opening one closes the other.
       let newsPanel = null;

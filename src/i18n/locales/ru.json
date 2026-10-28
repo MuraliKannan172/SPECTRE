@@ -2872,7 +2872,6 @@
   "WEATHER OFF · PERSONAL-USE SOURCE": "ПОГОДА ВЫКЛ. · ИСТОЧНИК ДЛЯ ЛИЧНОГО ИСПОЛЬЗОВАНИЯ",
   "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "Бесплатный API Open-Meteo разрешает только личное некоммерческое использование. Чтобы показывать погоду, включите «Некоммерческие источники» в настройках провайдеров.",
   "Tip: the MIC button in the dock lets you talk to the map.": "Совет: кнопка «МИК» в доке позволяет говорить с картой.",
-  "GLOBAL INTELLIGENCE GLOBE": "ГЛОБУС ГЛОБАЛЬНОЙ РАЗВЕДКИ",
   "S2 GhostMaps": "S2 GhostMaps",
   "Intel Picture": "Разведкартина",
   "Kinetic 30d": "Боевые 30 дн.",
@@ -3014,7 +3013,7 @@
     "other": "Ещё {count} новости в этом месте · см. панель новостей"
   },
   "News panel": "Панель новостей",
-  "Intel service offline: run scripts\\skynet.ps1 to start it": "Сервис разведки не запущен: выполните scripts\\skynet.ps1, чтобы запустить его",
+  "Intel service offline: run scripts\\spectre.ps1 to start it": "Сервис разведки не запущен: выполните scripts\\spectre.ps1, чтобы запустить его",
   "News unavailable": "Новости недоступны",
   "World affairs": "Международные события",
   "Cybersecurity": "Кибербезопасность",
@@ -3101,9 +3100,9 @@
   "Web search: {provider}": "Веб-поиск: {provider}",
   "Hold to talk": "Удерживайте, чтобы говорить",
   "This browser cannot record audio.": "Этот браузер не может записывать звук.",
-  "Local voice is turned off (SKYNET_VOICE=0).": "Локальный голос отключён (SKYNET_VOICE=0).",
-  "Local voice is not installed: run scripts\\skynet.ps1 -Voice": "Локальный голос не установлен: выполните scripts\\skynet.ps1 -Voice",
-  "Local voice models are missing: run scripts\\skynet.ps1 -Voice": "Нет моделей локального голоса: выполните scripts\\skynet.ps1 -Voice",
+  "Local voice is turned off (SPECTRE_VOICE=0).": "Локальный голос отключён (SPECTRE_VOICE=0).",
+  "Local voice is not installed: run scripts\\spectre.ps1 -Voice": "Локальный голос не установлен: выполните scripts\\spectre.ps1 -Voice",
+  "Local voice models are missing: run scripts\\spectre.ps1 -Voice": "Нет моделей локального голоса: выполните scripts\\spectre.ps1 -Voice",
   "Local voice is starting…": "Локальный голос запускается…",
   "Local voice is loading…": "Локальный голос загружается…",
   "Local voice failed to load; see the intel service log.": "Не удалось загрузить локальный голос; см. журнал сервиса разведки.",
@@ -3125,5 +3124,10 @@
   "voice: heard in {heard} s, first word after {first} s": "голос: распознан за {heard} с, первое слово через {first} с",
   "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri лицензирует эту подложку для использования с ПО Esri или с подпиской ArcGIS Online",
   "Opening the microphone…": "Открываю микрофон…",
-  "Local voice works only on the computer running SKYNET.": "Локальный голос работает только на компьютере, где запущен SKYNET."
+  "Local voice works only on the computer running SPECTRE.": "Локальный голос работает только на компьютере, где запущен SPECTRE.",
+  "GLOBAL INTELLIGENCE DASHBOARD": "ПАНЕЛЬ ГЛОБАЛЬНОЙ РАЗВЕДКИ",
+  "REAL-TIME": "В РЕАЛЬНОМ ВРЕМЕНИ",
+  "ANALYZE": "АНАЛИЗ",
+  "PREDICT": "ПРОГНОЗ",
+  "GLOBAL INSIGHTS": "ГЛОБАЛЬНЫЙ ОБЗОР"
 }

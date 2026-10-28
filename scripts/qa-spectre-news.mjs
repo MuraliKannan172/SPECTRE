@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-skynet-news.mjs — SKYNET Phase 3 smoke test (docs/ADR-001.md, phase 3).
+ * qa-spectre-news.mjs — SPECTRE Phase 3 smoke test (docs/ADR-001.md, phase 3).
  *
  * Drives the real app in headless Chromium against a running dev server
  * (`npm run dev`, default :4173). Every /api/intel/* and /api/eonet request
@@ -20,7 +20,7 @@
  *         turning News back on redraws it.
  *
  * Screenshot saved to qa-shots/ (gitignored). Exits non-zero on any FAIL.
- * Run:  node scripts/qa-skynet-news.mjs [--url http://localhost:4173] [--headful]
+ * Run:  node scripts/qa-spectre-news.mjs [--url http://localhost:4173] [--headful]
  */
 
 import puppeteer from 'puppeteer';
@@ -229,7 +229,7 @@ function layerState(page) {
           }
         : null;
     };
-    const ticker = document.getElementById('skynet-news-ticker');
+    const ticker = document.getElementById('spectre-news-ticker');
     const hash = new URLSearchParams(location.hash.slice(1));
     return {
       news: {
@@ -243,7 +243,7 @@ function layerState(page) {
       },
       ticker: ticker ? { hidden: ticker.hidden, text: ticker.innerText } : null,
       drawerHidden:
-        document.getElementById('skynet-news-drawer')?.hidden ?? null,
+        document.getElementById('spectre-news-drawer')?.hidden ?? null,
       layerTokens: (hash.get('l') || '').split('.').filter(Boolean),
       newsOptions: (hash.get('lo') || '')
         .split('_')
@@ -308,14 +308,14 @@ function pickStory(page, storyId, lon, lat) {
 
 function drawerState(page) {
   return page.evaluate(() => {
-    const drawer = document.getElementById('skynet-news-drawer');
-    const rows = [...drawer.querySelectorAll('.skynet-news-item')];
-    const links = [...drawer.querySelectorAll('.skynet-news-item a')];
+    const drawer = document.getElementById('spectre-news-drawer');
+    const rows = [...drawer.querySelectorAll('.spectre-news-item')];
+    const links = [...drawer.querySelectorAll('.spectre-news-item a')];
     return {
       hidden: drawer.hidden,
       rows: rows.length,
       unplaced: [
-        ...drawer.querySelectorAll('.skynet-news-headline:disabled'),
+        ...drawer.querySelectorAll('.spectre-news-headline:disabled'),
       ].map((button) => button.textContent),
       linksSafe:
         links.length > 0 &&
@@ -326,7 +326,7 @@ function drawerState(page) {
             a.href.startsWith('https://'),
         ),
       gdelt: links.some((a) => a.href === 'https://www.gdeltproject.org/'),
-      status: drawer.querySelector('.skynet-news-status')?.textContent ?? '',
+      status: drawer.querySelector('.spectre-news-status')?.textContent ?? '',
       focus:
         document.activeElement?.id || document.activeElement?.className || '',
     };
@@ -387,7 +387,7 @@ async function run(browser) {
       state.ticker.text.includes(STORIES[0].title),
     JSON.stringify(state.ticker),
   );
-  await page.click('#skynet-news-toggle');
+  await page.click('#spectre-news-toggle');
   await sleep(1500);
   let drawer = await drawerState(page);
   record(
@@ -405,7 +405,7 @@ async function run(browser) {
     drawer.linksSafe,
   );
   record('GDELT stories carry the GDELT link', drawer.gdelt);
-  await page.type('.skynet-news-search', 'Nairobi');
+  await page.type('.spectre-news-search', 'Nairobi');
   await sleep(1500);
   drawer = await drawerState(page);
   record('Search narrows the list', drawer.rows === 1, `rows=${drawer.rows}`);
@@ -414,7 +414,7 @@ async function run(browser) {
   drawer = await drawerState(page);
   record(
     'Escape closes the drawer and returns focus to the toggle',
-    drawer.hidden && drawer.focus === 'skynet-news-toggle',
+    drawer.hidden && drawer.focus === 'spectre-news-toggle',
     `focus=${drawer.focus}`,
   );
 
@@ -468,7 +468,7 @@ async function run(browser) {
     `l=${state.layerTokens.join('.')}`,
   );
   fs.mkdirSync(SHOTS_DIR, { recursive: true });
-  await page.screenshot({ path: path.join(SHOTS_DIR, 'skynet-news.png') });
+  await page.screenshot({ path: path.join(SHOTS_DIR, 'spectre-news.png') });
   const shareUrl = page.url();
   await page.close();
   const fresh = await browser.createBrowserContext();
@@ -542,7 +542,7 @@ async function run(browser) {
     /layers\/(news|eonet|satelliteFootprint)\//.test(stack),
   );
   record(
-    'No page errors from the SKYNET layers',
+    'No page errors from the SPECTRE layers',
     ours.length === 0,
     ours[0] ?? `${pageErrors.length} page errors elsewhere`,
   );

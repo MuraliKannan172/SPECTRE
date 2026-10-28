@@ -131,7 +131,7 @@ def test_personal_use_stories_are_hidden_while_the_switch_is_off(tmp_path: Path,
     )
     routes.on("api.gdeltproject.org", httpx.Response(200, content=gdelt()))
     settings = make_settings(tmp_path, FEEDS_YAML)
-    settings.env_file.write_text("SKYNET_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
+    settings.env_file.write_text("SPECTRE_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
     app = create_app(settings, transport=routes.transport(), geoparser=parser, start_scheduler=False)
     with TestClient(app, base_url="http://127.0.0.1:8100") as client:
         scheduler = app.state.scheduler
@@ -149,7 +149,7 @@ def test_personal_use_stories_are_hidden_while_the_switch_is_off(tmp_path: Path,
         assert client.get("/api/intel/news").json()["items"] == []
         assert client.get(f"/api/intel/news/{story_id}").status_code == 404
 
-        settings.env_file.write_text("SKYNET_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
+        settings.env_file.write_text("SPECTRE_NONCOMMERCIAL_SOURCES=1\n", encoding="utf-8")
         assert client.get(f"/api/intel/news/{story_id}").status_code == 200
 
 

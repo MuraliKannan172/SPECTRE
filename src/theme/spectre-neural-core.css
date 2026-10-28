@@ -1,10 +1,10 @@
 /* ═══════════════════════════════════════════════
-   SKYNET — Neural Core chat (src/neuralCore/panel.js).
-   Loaded after skynet.css; uses its --sk-* tokens. Animation only marks
+   SPECTRE — Neural Core chat (src/neuralCore/panel.js).
+   Loaded after spectre.css; uses its --sk-* tokens. Animation only marks
    real state: streaming text and running tools.
    ═══════════════════════════════════════════════ */
 
-.skynet-nc-launcher {
+.spectre-nc-launcher {
   position: fixed;
   right: calc(env(safe-area-inset-right, 0px) + 16px);
   bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
@@ -13,32 +13,32 @@
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
-  border: 1px solid var(--sk-red-deep);
+  border: 1px solid var(--sp-red-deep);
   border-radius: 999px;
   background: rgba(5, 5, 7, 0.9);
-  color: var(--sk-text);
+  color: var(--sp-text);
   font: 700 11px/1 var(--font-display);
   letter-spacing: 0.18em;
   cursor: pointer;
 }
 
-.skynet-nc-launcher:hover,
-.skynet-nc-launcher[aria-expanded='true'] {
-  border-color: var(--sk-red);
-  box-shadow: 0 0 12px var(--sk-red-glow);
+.spectre-nc-launcher:hover,
+.spectre-nc-launcher[aria-expanded='true'] {
+  border-color: var(--sp-red);
+  box-shadow: 0 0 12px var(--sp-red-glow);
 }
 
-.skynet-nc-launcher-mark {
-  color: var(--sk-red);
+.spectre-nc-launcher-mark {
+  color: var(--sp-red);
   font-size: 13px;
   letter-spacing: 0;
 }
 
-.skynet-nc-launcher[data-tone='offline'] .skynet-nc-launcher-mark {
-  color: var(--sk-text-dim);
+.spectre-nc-launcher[data-tone='offline'] .spectre-nc-launcher-mark {
+  color: var(--sp-text-dim);
 }
 
-.skynet-nc {
+.spectre-nc {
   position: fixed;
   right: 16px;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
@@ -47,149 +47,149 @@
   flex-direction: column;
   width: min(420px, calc(100vw - 32px));
   height: min(640px, calc(100vh - 220px));
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 10px;
   background: rgba(8, 8, 10, 0.97);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
-  color: var(--sk-text);
+  color: var(--sp-text);
   font: 400 13px/1.45 var(--font-sans);
 }
 
-.skynet-nc[hidden],
-.skynet-nc [hidden] {
+.spectre-nc[hidden],
+.spectre-nc [hidden] {
   display: none;
 }
 
-.skynet-nc-header {
+.spectre-nc-header {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 10px 12px 4px;
 }
 
-.skynet-nc-brand {
+.spectre-nc-brand {
   display: flex;
   align-items: baseline;
   gap: 8px;
   margin-right: auto;
 }
 
-.skynet-nc-wordmark {
+.spectre-nc-wordmark {
   font: 700 15px/1 var(--font-display);
   letter-spacing: 0.3em;
 }
 
-.skynet-nc-accent {
-  color: var(--sk-red);
+.spectre-nc-accent {
+  color: var(--sp-red);
 }
 
-.skynet-nc-sublabel {
-  color: var(--sk-text-dim);
+.spectre-nc-sublabel {
+  color: var(--sp-text-dim);
   font: 500 11px/1 var(--font-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.skynet-nc-icon {
+.spectre-nc-icon {
   min-width: 28px;
   height: 28px;
   padding: 0 6px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 4px;
   background: transparent;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
 }
 
-.skynet-nc-icon:hover {
-  border-color: var(--sk-red-deep);
-  color: var(--sk-text);
+.spectre-nc-icon:hover {
+  border-color: var(--sp-red-deep);
+  color: var(--sp-text);
 }
 
-.skynet-nc-status,
-.skynet-nc-search {
+.spectre-nc-status,
+.spectre-nc-search {
   margin: 0;
   padding: 0 12px;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font: 400 11px/1.4 var(--font-mono);
 }
 
-.skynet-nc-status::before {
+.spectre-nc-status::before {
   content: '';
   display: inline-block;
   width: 7px;
   height: 7px;
   margin-right: 6px;
   border-radius: 50%;
-  background: var(--sk-text-faint);
+  background: var(--sp-text-faint);
   vertical-align: 1px;
 }
 
-.skynet-nc-status[data-tone='ready']::before {
-  background: var(--sk-ok);
+.spectre-nc-status[data-tone='ready']::before {
+  background: var(--sp-ok);
 }
 
-.skynet-nc-status[data-tone='degraded']::before {
-  background: var(--sk-warn);
+.spectre-nc-status[data-tone='degraded']::before {
+  background: var(--sp-warn);
 }
 
-.skynet-nc-status[data-tone='offline'] {
-  color: var(--sk-text);
+.spectre-nc-status[data-tone='offline'] {
+  color: var(--sp-text);
 }
 
-.skynet-nc-status[data-tone='offline']::before {
-  background: var(--sk-red-deep);
+.spectre-nc-status[data-tone='offline']::before {
+  background: var(--sp-red-deep);
 }
 
-.skynet-nc-messages {
+.spectre-nc-messages {
   flex: 1;
   min-height: 0;
   margin: 8px 0 0;
   padding: 0 12px;
   overflow-y: auto;
   list-style: none;
-  border-top: 1px solid var(--sk-border);
+  border-top: 1px solid var(--sp-border);
 }
 
-.skynet-nc-empty {
+.spectre-nc-empty {
   margin: 0;
   padding: 16px 12px;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
 }
 
 /* Before the first message the hint, not an empty list, fills the space. */
-.skynet-nc-messages:empty {
+.spectre-nc-messages:empty {
   flex: 0;
 }
 
-.skynet-nc-messages:empty + .skynet-nc-empty {
+.spectre-nc-messages:empty + .spectre-nc-empty {
   flex: 1;
 }
 
-.skynet-nc-msg {
+.spectre-nc-msg {
   margin: 12px 0;
 }
 
-.skynet-nc-msg.is-user {
+.spectre-nc-msg.is-user {
   margin-left: 15%;
   padding: 8px 10px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 8px;
-  background: var(--sk-surface-2);
+  background: var(--sp-surface-2);
 }
 
-.skynet-nc-msg.is-user .skynet-nc-text {
+.spectre-nc-msg.is-user .spectre-nc-text {
   margin: 0;
   white-space: pre-wrap;
 }
 
-.skynet-nc-text {
+.spectre-nc-text {
   overflow-wrap: anywhere;
 }
 
-.skynet-nc-tools {
+.spectre-nc-tools {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -198,156 +198,156 @@
   list-style: none;
 }
 
-.skynet-nc-tool {
+.spectre-nc-tool {
   padding: 2px 8px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 999px;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font: 400 11px/1.5 var(--font-mono);
 }
 
-.skynet-nc-tool[data-state='start'] {
-  border-color: var(--sk-red-deep);
-  color: var(--sk-text);
-  animation: skynet-nc-working 1.2s ease-in-out infinite;
+.spectre-nc-tool[data-state='start'] {
+  border-color: var(--sp-red-deep);
+  color: var(--sp-text);
+  animation: spectre-nc-working 1.2s ease-in-out infinite;
 }
 
-.skynet-nc-tool[data-state='error'] {
-  border-color: var(--sk-warn);
-  color: var(--sk-warn);
+.spectre-nc-tool[data-state='error'] {
+  border-color: var(--sp-warn);
+  color: var(--sp-warn);
 }
 
-@keyframes skynet-nc-working {
+@keyframes spectre-nc-working {
   50% {
-    border-color: var(--sk-red);
+    border-color: var(--sp-red);
   }
 }
 
-.skynet-nc-cite {
+.spectre-nc-cite {
   display: inline-block;
   min-width: 18px;
   margin: 0 2px;
   padding: 0 4px;
-  border: 1px solid var(--sk-red-deep);
+  border: 1px solid var(--sp-red-deep);
   border-radius: 4px;
-  color: var(--sk-red);
+  color: var(--sp-red);
   font: 600 10px/16px var(--font-mono);
   text-align: center;
   text-decoration: none;
   vertical-align: 1px;
 }
 
-a.skynet-nc-cite:hover {
+a.spectre-nc-cite:hover {
   background: var(--accent-dim);
 }
 
-.skynet-nc-sources {
+.spectre-nc-sources {
   margin: 8px 0 0;
   padding-left: 22px;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font-size: 11px;
 }
 
-.skynet-nc-sources a {
-  color: var(--sk-text);
+.spectre-nc-sources a {
+  color: var(--sp-text);
 }
 
-.skynet-nc-outlet {
+.spectre-nc-outlet {
   margin-left: 6px;
-  color: var(--sk-text-faint);
+  color: var(--sp-text-faint);
 }
 
-.skynet-nc-asof,
-.skynet-nc-error {
+.spectre-nc-asof,
+.spectre-nc-error {
   margin: 6px 0 0;
   font: 400 11px/1.4 var(--font-mono);
 }
 
-.skynet-nc-asof {
-  color: var(--sk-text-dim);
+.spectre-nc-asof {
+  color: var(--sp-text-dim);
 }
 
-.skynet-nc-error {
-  color: var(--sk-warn);
+.spectre-nc-error {
+  color: var(--sp-warn);
 }
 
-.skynet-nc-footer {
+.spectre-nc-footer {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-top: 6px;
 }
 
-.skynet-nc-meta {
+.spectre-nc-meta {
   margin-right: auto;
-  color: var(--sk-text-faint);
+  color: var(--sp-text-faint);
   font: 400 10px/1.4 var(--font-mono);
 }
 
-.skynet-nc-action {
+.spectre-nc-action {
   padding: 2px 8px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 4px;
   background: transparent;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font: 400 11px/1.5 var(--font-sans);
   cursor: pointer;
 }
 
-.skynet-nc-action:hover {
-  border-color: var(--sk-red-deep);
-  color: var(--sk-text);
+.spectre-nc-action:hover {
+  border-color: var(--sp-red-deep);
+  color: var(--sp-text);
 }
 
-.skynet-nc-composer {
+.spectre-nc-composer {
   display: flex;
   align-items: flex-end;
   gap: 6px;
   padding: 8px 12px;
-  border-top: 1px solid var(--sk-border);
+  border-top: 1px solid var(--sp-border);
 }
 
-.skynet-nc-input {
+.spectre-nc-input {
   flex: 1;
   min-height: 34px;
   max-height: 160px;
   padding: 7px 9px;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 6px;
-  background: var(--sk-surface);
-  color: var(--sk-text);
+  background: var(--sp-surface);
+  color: var(--sp-text);
   font: inherit;
   resize: none;
 }
 
-.skynet-nc-send,
-.skynet-nc-stop {
+.spectre-nc-send,
+.spectre-nc-stop {
   height: 34px;
   padding: 0 14px;
-  border: 1px solid var(--sk-red-deep);
+  border: 1px solid var(--sp-red-deep);
   border-radius: 6px;
-  background: var(--sk-red-deep);
+  background: var(--sp-red-deep);
   color: #fff;
   font: 700 11px/1 var(--font-display);
   letter-spacing: 0.14em;
   cursor: pointer;
 }
 
-.skynet-nc-stop {
+.spectre-nc-stop {
   background: transparent;
-  color: var(--sk-text);
+  color: var(--sp-text);
 }
 
 /* Push-to-talk (Phase 5): held to record; marked, not disabled, when local
    voice cannot run, so a press can still say why. */
-.skynet-nc-mic {
+.spectre-nc-mic {
   width: 34px;
   height: 34px;
   flex: none;
-  border: 1px solid var(--sk-border);
+  border: 1px solid var(--sp-border);
   border-radius: 6px;
   background: transparent;
-  color: var(--sk-text);
+  color: var(--sp-text);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
@@ -355,36 +355,36 @@ a.skynet-nc-cite:hover {
   user-select: none;
 }
 
-.skynet-nc-mic:hover {
-  border-color: var(--sk-red-deep);
+.spectre-nc-mic:hover {
+  border-color: var(--sp-red-deep);
 }
 
-.skynet-nc-mic[data-state='recording'] {
-  border-color: var(--sk-red);
-  background: var(--sk-red-deep);
-  animation: skynet-nc-working 1.2s ease-in-out infinite;
+.spectre-nc-mic[data-state='recording'] {
+  border-color: var(--sp-red);
+  background: var(--sp-red-deep);
+  animation: spectre-nc-working 1.2s ease-in-out infinite;
 }
 
-.skynet-nc-mic[aria-disabled='true'] {
+.spectre-nc-mic[aria-disabled='true'] {
   opacity: 0.45;
   cursor: help;
 }
 
-.skynet-nc-voice {
+.spectre-nc-voice {
   margin: 0;
   padding: 0 12px 6px;
-  color: var(--sk-text-dim);
+  color: var(--sp-text-dim);
   font-size: 11px;
 }
 
-.skynet-nc-disclaimer {
+.spectre-nc-disclaimer {
   margin: 0;
   padding: 0 12px 10px;
-  color: var(--sk-text-faint);
+  color: var(--sp-text-faint);
   font-size: 10px;
 }
 
-.skynet-nc-sr {
+.spectre-nc-sr {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -393,37 +393,37 @@ a.skynet-nc-cite:hover {
   white-space: nowrap;
 }
 
-.skynet-nc :focus-visible,
-.skynet-nc-launcher:focus-visible {
-  outline: 2px solid var(--sk-red);
+.spectre-nc :focus-visible,
+.spectre-nc-launcher:focus-visible {
+  outline: 2px solid var(--sp-red);
   outline-offset: 1px;
 }
 
 /* Clean view, recording and cockpit hide the app's chrome; these follow. */
-body.ui-clean-view .skynet-nc-launcher,
-body.ui-clean-view .skynet-nc,
-body.recording-mode .skynet-nc-launcher,
-body.recording-mode .skynet-nc,
-body.cockpit-mode .skynet-nc-launcher,
-body.cockpit-mode .skynet-nc {
+body.ui-clean-view .spectre-nc-launcher,
+body.ui-clean-view .spectre-nc,
+body.recording-mode .spectre-nc-launcher,
+body.recording-mode .spectre-nc,
+body.cockpit-mode .spectre-nc-launcher,
+body.cockpit-mode .spectre-nc {
   display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skynet-nc-tool[data-state='start'],
-  .skynet-nc-mic[data-state='recording'] {
+  .spectre-nc-tool[data-state='start'],
+  .spectre-nc-mic[data-state='recording'] {
     animation: none;
   }
 }
 
 /* Phone shell: a sheet above the tab bar that gives way to the shell's own
    sheets; the launcher sits just above the tab bar. */
-body.mobile-shell .skynet-nc-launcher {
+body.mobile-shell .spectre-nc-launcher {
   right: 12px;
   bottom: calc(var(--mobile-tab-space) + 12px);
 }
 
-body.mobile-shell .skynet-nc {
+body.mobile-shell .spectre-nc {
   right: 0;
   bottom: var(--mobile-tab-space);
   left: 0;
@@ -432,6 +432,6 @@ body.mobile-shell .skynet-nc {
   border-radius: 12px 12px 0 0;
 }
 
-body.mobile-shell[data-mobile-sheet] .skynet-nc {
+body.mobile-shell[data-mobile-sheet] .spectre-nc {
   display: none;
 }

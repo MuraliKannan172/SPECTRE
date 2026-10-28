@@ -388,6 +388,7 @@
     "exports": ["./server/standalone/key-setup"],
     "modules": [
       "src/i18n/marker.js",
+      "server/providers/common/legacyBrandEnv.js",
       "scripts/pinokio-environment.mjs",
       "server/providers/common/source-root.js",
       "server/standalone/key-setup.js",

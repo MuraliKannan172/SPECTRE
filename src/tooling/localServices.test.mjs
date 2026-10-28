@@ -122,12 +122,12 @@ test('standalone service guards run in development and preview without upstream 
 });
 
 test('weather-only requests share upstream work and retain fresh and stale responses', async (t) => {
-  // Open-Meteo's free API is behind SKYNET's non-commercial sources switch.
-  const before = process.env.SKYNET_NONCOMMERCIAL_SOURCES;
-  process.env.SKYNET_NONCOMMERCIAL_SOURCES = '1';
+  // Open-Meteo's free API is behind SPECTRE's non-commercial sources switch.
+  const before = process.env.SPECTRE_NONCOMMERCIAL_SOURCES;
+  process.env.SPECTRE_NONCOMMERCIAL_SOURCES = '1';
   t.after(() => {
-    if (before === undefined) delete process.env.SKYNET_NONCOMMERCIAL_SOURCES;
-    else process.env.SKYNET_NONCOMMERCIAL_SOURCES = before;
+    if (before === undefined) delete process.env.SPECTRE_NONCOMMERCIAL_SOURCES;
+    else process.env.SPECTRE_NONCOMMERCIAL_SOURCES = before;
   });
   let now = Date.now();
   t.mock.method(Date, 'now', () => now);
@@ -708,9 +708,9 @@ test('key setup writes only the supplied application root, retains request guard
 });
 
 test('the non-commercial sources switch saves 1 and removes it through key setup', async (t) => {
-  // SKYNET's Provider Settings switch row posts 1 to turn on, null to turn off.
+  // SPECTRE's Provider Settings switch row posts 1 to turn on, null to turn off.
   const sourceRoot = root(t);
-  env(t, 'SKYNET_NONCOMMERCIAL_SOURCES', undefined);
+  env(t, 'SPECTRE_NONCOMMERCIAL_SOURCES', undefined);
   const handler = install(keySetupEndpoint({ sourceRoot })).get(
     '/api/setup/keys',
   );
@@ -722,19 +722,19 @@ test('the non-commercial sources switch saves 1 and removes it through key setup
 
   const on = await request(handler, {
     method: 'POST',
-    body: JSON.stringify({ SKYNET_NONCOMMERCIAL_SOURCES: '1' }),
+    body: JSON.stringify({ SPECTRE_NONCOMMERCIAL_SOURCES: '1' }),
   });
   assert.equal(on.status, 200);
-  assert.match(dotenv(), /^SKYNET_NONCOMMERCIAL_SOURCES=1$/m);
+  assert.match(dotenv(), /^SPECTRE_NONCOMMERCIAL_SOURCES=1$/m);
   assert.equal(row(on).kind, 'switch');
   assert.equal(row(on).set, true);
 
   const off = await request(handler, {
     method: 'POST',
-    body: JSON.stringify({ SKYNET_NONCOMMERCIAL_SOURCES: null }),
+    body: JSON.stringify({ SPECTRE_NONCOMMERCIAL_SOURCES: null }),
   });
   assert.equal(off.status, 200);
-  assert.doesNotMatch(dotenv(), /^SKYNET_NONCOMMERCIAL_SOURCES=1$/m);
+  assert.doesNotMatch(dotenv(), /^SPECTRE_NONCOMMERCIAL_SOURCES=1$/m);
   assert.equal(row(off).set, false);
 });
 

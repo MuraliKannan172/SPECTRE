@@ -135,7 +135,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
     envVars: Object.freeze(['LL2_API_TOKEN']),
     tier: 'paid',
   }),
-  // SKYNET: one on/off switch, not a key, for free APIs whose terms allow only
+  // SPECTRE: one on/off switch, not a key, for free APIs whose terms allow only
   // personal, non-commercial use (server/providers/common/non-commercial.js).
   // Switches stay out of the missing-key count.
   Object.freeze({
@@ -145,7 +145,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
       'Personal use only: worldwide OpenSky flights, Open-Meteo cockpit weather, Google News headlines, adsbdb flight routes and S2 GhostMaps intel maps. Their terms forbid commercial use, so they stay off until you turn them on.',
     ),
     getUrl: '',
-    envVars: Object.freeze(['SKYNET_NONCOMMERCIAL_SOURCES']),
+    envVars: Object.freeze(['SPECTRE_NONCOMMERCIAL_SOURCES']),
     tier: 'free',
     kind: 'switch',
   }),

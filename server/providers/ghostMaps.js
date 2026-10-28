@@ -427,7 +427,7 @@ export function ghostMapsProxy({
     const match = /^\/file\/([a-z0-9-]{1,40})$/.exec(url.pathname);
     if (!['/catalog', '/events'].includes(url.pathname) && !match)
       return json(res, 404, { error: 'unknown_route' });
-    // SKYNET: S2's products are CC BY-NC-SA 4.0 (non-commercial), so they sit
+    // SPECTRE: S2's products are CC BY-NC-SA 4.0 (non-commercial), so they sit
     // behind the Non-commercial sources switch. While it is off the watcher
     // never starts, and the layer shows the reason from an empty catalog.
     if (!sourcesEnabled()) return disabled(url.pathname, res);

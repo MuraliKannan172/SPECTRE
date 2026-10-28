@@ -14,7 +14,7 @@ import { keySetupRequirementEnvVars } from './keySetupCore.mjs';
 import { msg, t } from './i18n/index.js';
 
 export const MAP_STACK_CHIP_CLASS = 'map-stack-chip';
-// SKYNET: a stack's licence terms, shown where it is chosen (ADR-001 D12).
+// SPECTRE: a stack's licence terms, shown where it is chosen (ADR-001 D12).
 const STACK_TERMS = Object.freeze({
   'esri-imagery': msg(
     'Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription',
@@ -24,7 +24,7 @@ export const PRESENTED_MAP_STACK_IDS = Object.freeze([
   'photoreal',
   'bing-aerial',
   'bing-labels',
-  'nasa-gibs', // SKYNET
+  'nasa-gibs', // SPECTRE
   'esri-imagery',
   'osm',
 ]);

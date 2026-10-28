@@ -46,9 +46,9 @@ Street Level viewer; the complete resolved dependency inventory remains in
 - License: MIT
 - License text: <https://github.com/mrdoob/three.js/blob/dev/LICENSE>
 
-## Fonts bundled by SKYNET
+## Fonts bundled by SPECTRE
 
-SKYNET serves these fonts from its own build instead of Google Fonts. Each
+SPECTRE serves these fonts from its own build instead of Google Fonts. Each
 package ships its full licence text as `LICENSE`; a release build must carry
 those texts with the font files.
 

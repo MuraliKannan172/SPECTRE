@@ -40,7 +40,7 @@ test('catalogs construct distinct layers and classification from their supplied 
     signal: b.signal,
     surface: fixtureSurface(b.signal),
   });
-  // SKYNET drops the two Bhote Koshi layers and adds News and Natural Events (upstream: 33).
+  // SPECTRE drops the two Bhote Koshi layers and adds News and Natural Events (upstream: 33).
   assert.equal(first.layers.length, 33);
   assert.ok(first.get('local-adsb'), 'Local ADS-B is registered');
   assert.deepEqual(
@@ -69,7 +69,7 @@ test('catalogs construct distinct layers and classification from their supplied 
     order.slice(order.indexOf('traffic'), order.indexOf('directions') + 1),
     ['traffic', 'cctv', 'radio', 'transit', 'bikeshare', 'directions'],
   );
-  // SKYNET removed the Bhote Koshi event layers with their CC BY-NC data.
+  // SPECTRE removed the Bhote Koshi event layers with their CC BY-NC data.
   assert.equal(first.get('bhote-koshi-2026'), undefined);
   assert.equal(first.get('bhote-koshi-locator'), undefined);
   const lifecycle = new LayerLifecycle({});
@@ -148,7 +148,7 @@ test('Mapillary can be omitted or replaced without changing catalog membership',
     surface: fixtureSurface(lifetime.signal),
   };
   const catalog = createApplicationCatalog(options);
-  assert.equal(catalog.layers.length, 33); // SKYNET: -2 +2 (upstream: 33)
+  assert.equal(catalog.layers.length, 33); // SPECTRE: -2 +2 (upstream: 33)
   assert.deepEqual(catalog.get('street-level').providerIds, []);
   assert.equal(
     catalogControlServices(catalog).streetLevelLayer,

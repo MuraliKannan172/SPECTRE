@@ -40,7 +40,7 @@ GEONAMES = {
     "cities15000": "https://download.geonames.org/export/dump/cities15000.zip",
     "countryInfo": "https://download.geonames.org/export/dump/countryInfo.txt",
 }
-USER_AGENT = "SKYNET-intel-gazetteer-build/0.1"
+USER_AGENT = "SPECTRE-intel-gazetteer-build/0.1"
 
 REGION_CLASSES = {
     "Island",
@@ -380,7 +380,7 @@ def build(cache: Path) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--cache", type=Path, default=Path(tempfile.gettempdir()) / "skynet-geonames")
+    parser.add_argument("--cache", type=Path, default=Path(tempfile.gettempdir()) / "spectre-geonames")
     parser.add_argument("--out", type=Path, default=OUT)
     args = parser.parse_args()
     gazetteer = build(args.cache)

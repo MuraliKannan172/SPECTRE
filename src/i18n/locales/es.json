@@ -2807,7 +2807,6 @@
   "WEATHER OFF · PERSONAL-USE SOURCE": "TIEMPO DESACTIVADO · FUENTE DE USO PERSONAL",
   "Open-Meteo’s free API allows personal, non-commercial use only. Turn on Non-commercial sources in Provider Settings to show weather.": "La API gratuita de Open-Meteo solo permite uso personal y no comercial. Activa Fuentes no comerciales en la configuración de proveedores para mostrar el tiempo.",
   "Tip: the MIC button in the dock lets you talk to the map.": "Consejo: el botón MIC del dock te permite hablar con el mapa.",
-  "GLOBAL INTELLIGENCE GLOBE": "GLOBO DE INTELIGENCIA GLOBAL",
   "S2 GhostMaps": "S2 GhostMaps",
   "Intel Picture": "Panorama de inteligencia",
   "Kinetic 30d": "Cinético 30 d",
@@ -2942,7 +2941,7 @@
     "other": "{count} noticias más en este lugar · ver el panel de noticias"
   },
   "News panel": "Panel de noticias",
-  "Intel service offline: run scripts\\skynet.ps1 to start it": "Servicio de inteligencia sin conexión: ejecuta scripts\\skynet.ps1 para iniciarlo",
+  "Intel service offline: run scripts\\spectre.ps1 to start it": "Servicio de inteligencia sin conexión: ejecuta scripts\\spectre.ps1 para iniciarlo",
   "News unavailable": "Noticias no disponibles",
   "World affairs": "Asuntos internacionales",
   "Cybersecurity": "Ciberseguridad",
@@ -3029,9 +3028,9 @@
   "Web search: {provider}": "Búsqueda web: {provider}",
   "Hold to talk": "Mantén pulsado para hablar",
   "This browser cannot record audio.": "Este navegador no puede grabar audio.",
-  "Local voice is turned off (SKYNET_VOICE=0).": "La voz local está desactivada (SKYNET_VOICE=0).",
-  "Local voice is not installed: run scripts\\skynet.ps1 -Voice": "La voz local no está instalada: ejecuta scripts\\skynet.ps1 -Voice",
-  "Local voice models are missing: run scripts\\skynet.ps1 -Voice": "Faltan los modelos de voz local: ejecuta scripts\\skynet.ps1 -Voice",
+  "Local voice is turned off (SPECTRE_VOICE=0).": "La voz local está desactivada (SPECTRE_VOICE=0).",
+  "Local voice is not installed: run scripts\\spectre.ps1 -Voice": "La voz local no está instalada: ejecuta scripts\\spectre.ps1 -Voice",
+  "Local voice models are missing: run scripts\\spectre.ps1 -Voice": "Faltan los modelos de voz local: ejecuta scripts\\spectre.ps1 -Voice",
   "Local voice is starting…": "La voz local se está iniciando…",
   "Local voice is loading…": "La voz local se está cargando…",
   "Local voice failed to load; see the intel service log.": "La voz local no se pudo cargar; consulta el registro del servicio de inteligencia.",
@@ -3053,5 +3052,10 @@
   "voice: heard in {heard} s, first word after {first} s": "voz: entendida en {heard} s, primera palabra a los {first} s",
   "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri concede la licencia de este mapa base para usarlo con software de Esri o con una suscripción a ArcGIS Online",
   "Opening the microphone…": "Abriendo el micrófono…",
-  "Local voice works only on the computer running SKYNET.": "La voz local solo funciona en el ordenador que ejecuta SKYNET."
+  "Local voice works only on the computer running SPECTRE.": "La voz local solo funciona en el ordenador que ejecuta SPECTRE.",
+  "GLOBAL INTELLIGENCE DASHBOARD": "PANEL DE INTELIGENCIA GLOBAL",
+  "REAL-TIME": "TIEMPO REAL",
+  "ANALYZE": "ANALIZAR",
+  "PREDICT": "PREDECIR",
+  "GLOBAL INSIGHTS": "VISIÓN GLOBAL"
 }

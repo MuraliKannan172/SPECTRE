@@ -43,7 +43,7 @@ function regionalBriefProxy({ placeProvider = fetchRegionalPlace } = {}) {
   }
 
   async function refresh(point, key, nonCommercial) {
-    // SKYNET: Open-Meteo's free API and Google News RSS are non-commercial.
+    // SPECTRE: Open-Meteo's free API and Google News RSS are non-commercial.
     const [placeResult, weatherResult] = await Promise.allSettled([
       placeProvider(point),
       nonCommercial ? fetchRegionalWeather(point) : null,

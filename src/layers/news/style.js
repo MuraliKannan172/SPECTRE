@@ -1,5 +1,5 @@
 /**
- * SKYNET: how a news story looks on the globe. Pure numbers and CSS colors,
+ * SPECTRE: how a news story looks on the globe. Pure numbers and CSS colors,
  * so it is testable without Cesium.
  *
  * - Color names the category. No category uses the brand red: red is kept

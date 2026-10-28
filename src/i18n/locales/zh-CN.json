@@ -2679,7 +2679,6 @@
   "Search": "搜索",
   "More": "更多",
   "Panels": "面板",
-  "GLOBAL INTELLIGENCE GLOBE": "全球情报地球仪",
   "Turned on and saved to {store}. Restarting — this page reloads itself.": "已开启并保存到 {store}。正在重启——本页面将自动重新加载。",
   "Turned off in {store}. Restarting — this page reloads itself.": "已在 {store} 中关闭。正在重启——本页面将自动重新加载。",
   "NON-COMMERCIAL SOURCES": "非商业数据源",
@@ -2775,7 +2774,7 @@
     "other": "此处还有 {count} 条新闻 · 请查看新闻面板"
   },
   "News panel": "新闻面板",
-  "Intel service offline: run scripts\\skynet.ps1 to start it": "情报服务离线：运行 scripts\\skynet.ps1 以启动它",
+  "Intel service offline: run scripts\\spectre.ps1 to start it": "情报服务离线：运行 scripts\\spectre.ps1 以启动它",
   "News unavailable": "新闻不可用",
   "World affairs": "国际时事",
   "Cybersecurity": "网络安全",
@@ -2885,9 +2884,9 @@
   "Web search: {provider}": "网络搜索：{provider}",
   "Hold to talk": "按住说话",
   "This browser cannot record audio.": "此浏览器无法录制音频。",
-  "Local voice is turned off (SKYNET_VOICE=0).": "本地语音已关闭（SKYNET_VOICE=0）。",
-  "Local voice is not installed: run scripts\\skynet.ps1 -Voice": "本地语音未安装：运行 scripts\\skynet.ps1 -Voice",
-  "Local voice models are missing: run scripts\\skynet.ps1 -Voice": "缺少本地语音模型：运行 scripts\\skynet.ps1 -Voice",
+  "Local voice is turned off (SPECTRE_VOICE=0).": "本地语音已关闭（SPECTRE_VOICE=0）。",
+  "Local voice is not installed: run scripts\\spectre.ps1 -Voice": "本地语音未安装：运行 scripts\\spectre.ps1 -Voice",
+  "Local voice models are missing: run scripts\\spectre.ps1 -Voice": "缺少本地语音模型：运行 scripts\\spectre.ps1 -Voice",
   "Local voice is starting…": "本地语音正在启动…",
   "Local voice is loading…": "本地语音正在加载…",
   "Local voice failed to load; see the intel service log.": "本地语音加载失败；请查看情报服务日志。",
@@ -2909,5 +2908,10 @@
   "voice: heard in {heard} s, first word after {first} s": "语音：{heard} 秒内识别，{first} 秒后开始朗读",
   "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri 仅授权在 Esri 软件中或凭 ArcGIS Online 订阅使用此底图",
   "Opening the microphone…": "正在打开麦克风…",
-  "Local voice works only on the computer running SKYNET.": "本地语音只能在运行 SKYNET 的计算机上使用。"
+  "Local voice works only on the computer running SPECTRE.": "本地语音只能在运行 SPECTRE 的计算机上使用。",
+  "GLOBAL INTELLIGENCE DASHBOARD": "全球情报仪表板",
+  "REAL-TIME": "实时",
+  "ANALYZE": "分析",
+  "PREDICT": "预测",
+  "GLOBAL INSIGHTS": "全球洞察"
 }

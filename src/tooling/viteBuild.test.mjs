@@ -29,8 +29,8 @@ test('explicit build inputs preserve browser-only defines, plugin order and loop
   assert.equal(config.plugins[0].enforce, 'pre');
   assert.equal(config.plugins[1].name, 'host-check');
   assert.equal(config.plugins[1].enforce, 'pre');
-  // SKYNET fills the page head from src/branding.js after the templates.
-  assert.equal(config.plugins[4].name, 'skynet-branding-html');
+  // SPECTRE fills the page head from src/branding.js after the templates.
+  assert.equal(config.plugins[4].name, 'spectre-branding-html');
   assert.equal(config.plugins[5], plugin);
   assert.equal(config.server.host, 'localhost');
   assert.equal(config.server.port, 4173);
@@ -106,7 +106,7 @@ test('build helper does not discover environment values or construct local provi
     );
     assert.deepEqual(
       config.plugins.slice(4).map((plugin) => plugin.name),
-      ['skynet-branding-html', 'embed-framing', 'panel-build'],
+      ['spectre-branding-html', 'embed-framing', 'panel-build'],
     );
   } finally {
     if (before === undefined) delete process.env.GOOGLE_MAPS_API_KEY;
@@ -158,6 +158,7 @@ test('directories the server writes while it runs are kept out of the dev watche
     '**/.gev-logs/**',
     '**/intel/data/**',
     '**/intel/.venv/**',
+    '**/.spectre-logs/**',
     '**/.skynet-logs/**',
   ]);
 });
@@ -254,7 +255,7 @@ test('the CSP admits only the Maps JavaScript API as a foreign script origin and
       .slice(1) ?? [];
   const scripts = directive('script-src');
   // Google Street View's Maps JavaScript API, never a wildcard or a scheme.
-  // SKYNET removed the Bhote Koshi event's YouTube, Facebook and X embeds.
+  // SPECTRE removed the Bhote Koshi event's YouTube, Facebook and X embeds.
   assert.deepEqual(
     scripts.filter(
       (source) => source.startsWith('http') || source === 'https:',

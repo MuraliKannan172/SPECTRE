@@ -93,7 +93,7 @@ test('the local fetch serves bundled data files and nothing outside them', async
     apiBase: 'http://127.0.0.1:1',
     fetchImpl: async () => assert.fail('no network'),
   });
-  // SKYNET does not ship the CC BY-NC-SA cable data, so check the local fetch
+  // SPECTRE does not ship the CC BY-NC-SA cable data, so check the local fetch
   // against a dataset that always ships.
   const bundled = await fetchImpl(
     new URL(

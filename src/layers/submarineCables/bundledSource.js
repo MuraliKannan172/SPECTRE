@@ -1,4 +1,4 @@
-// This dataset is CC BY-NC-SA 3.0, not the project's MIT license, so SKYNET
+// This dataset is CC BY-NC-SA 3.0, not the project's MIT license, so SPECTRE
 // does not ship it. scripts/fetch-optional-data.ps1 downloads it into this
 // gitignored folder for personal, non-commercial use. See DATA_SOURCES.md.
 // Resolved when read, so importing this module never needs a module URL.

@@ -16,7 +16,7 @@ from ..config import Settings
 from .engine import KokoroSpeaker, Transcript, VoiceError, WhisperTranscriber, english_lang
 from .models import unavailable_reason
 
-log = logging.getLogger("skynet.intel.voice")
+log = logging.getLogger("spectre.intel.voice")
 
 
 class Transcriber(Protocol):

@@ -100,7 +100,7 @@ test('real dev and built-preview servers serve provider JSON and terminate unkno
     const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
     try {
       for (const [route, status] of [
-        // SKYNET's default flight path: adsb.lol around the view.
+        // SPECTRE's default flight path: adsb.lol around the view.
         ['/api/flights?lat=30.27&lon=-97.74', 200],
         ['/api/military', 200],
         ['/api/adsbdb/type/invalid', 400],

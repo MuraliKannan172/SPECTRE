@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BROWSER_CSP } from '../build/vite.js';
 
-// SKYNET bundles the whole Material Symbols Outlined font (material-symbols,
+// SPECTRE bundles the whole Material Symbols Outlined font (material-symbols,
 // Apache-2.0) instead of requesting an icon_names subset from Google Fonts, so
 // every glyph a source names renders, offline, with no list to keep in sync.
 const read = (path) =>
@@ -12,11 +12,11 @@ const read = (path) =>
 test('the icon font and text fonts are bundled, not fetched from Google Fonts', () => {
   const html = read('index.html');
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
-  const fonts = read('src/theme/skynet-fonts.css');
+  const fonts = read('src/theme/spectre-fonts.css');
   assert.match(fonts, /@import 'material-symbols\/outlined\.css';/);
   for (const family of ['jetbrains-mono', 'inter', 'rajdhani'])
     assert.match(fonts, new RegExp(`@import '@fontsource/${family}/`));
-  assert.match(html, /href="\/src\/theme\/skynet-fonts\.css"/);
+  assert.match(html, /href="\/src\/theme\/spectre-fonts\.css"/);
   assert.doesNotMatch(
     BROWSER_CSP,
     /fonts\.googleapis\.com|fonts\.gstatic\.com/,

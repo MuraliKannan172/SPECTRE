@@ -78,7 +78,7 @@ function clusterImage(cache, count) {
 }
 
 /**
- * SKYNET: news stories from the local intel service on the globe.
+ * SPECTRE: news stories from the local intel service on the globe.
  * Markers are colored by category, sized by outlet count and faded by age;
  * nearby markers cluster. Click a marker for its card (the card opens the
  * article); the News drawer lists every outlet.
@@ -351,7 +351,7 @@ export function createNewsLayer({
     id: 'news',
     name: 'News',
     icon: '📰',
-    source: 'SKYNET intel',
+    source: 'SPECTRE intel',
     updateInterval: 120_000,
 
     init(nextViewer) {
@@ -615,7 +615,7 @@ export function createNewsLayer({
         loading,
         error,
         stale: Boolean(freshness?.stale),
-        source: 'SKYNET intel',
+        source: 'SPECTRE intel',
       };
     },
   };

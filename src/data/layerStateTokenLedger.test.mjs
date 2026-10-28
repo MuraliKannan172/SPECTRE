@@ -43,25 +43,25 @@ const productionRows = JSON.parse(
     'utf8',
   ),
 );
-// SKYNET: the allocation simulations below model upstream's ledger, so
-// SKYNET's own reservations are taken out of their fixtures (rows here, the
+// SPECTRE: the allocation simulations below model upstream's ledger, so
+// SPECTRE's own reservations are taken out of their fixtures (rows here, the
 // marked registry block in writeCodecFixture) and pinned separately.
-const SKYNET_RESERVATIONS = Object.freeze({
+const SPECTRE_RESERVATIONS = Object.freeze({
   news: '0z',
   'natural-events': '0y',
 });
 const reservationRows = productionRows.filter(
-  ([id]) => !Object.hasOwn(SKYNET_RESERVATIONS, id),
+  ([id]) => !Object.hasOwn(SPECTRE_RESERVATIONS, id),
 );
 const UPSTREAM_RESERVATIONS = Object.fromEntries(
   Object.entries(LAYER_STATE_TOKEN_RESERVATIONS).filter(
-    ([id]) => !Object.hasOwn(SKYNET_RESERVATIONS, id),
+    ([id]) => !Object.hasOwn(SPECTRE_RESERVATIONS, id),
   ),
 );
-// Every SKYNET-marked block (imports, registry rows, option groups): the
+// Every SPECTRE-marked block (imports, registry rows, option groups): the
 // fixtures below run upstream's codec alone.
-const SKYNET_BLOCKS =
-  /\n *\/\/ SKYNET ([a-z]+):start[\s\S]*?\/\/ SKYNET \1:end/g;
+const SPECTRE_BLOCKS =
+  /\n *\/\/ SPECTRE ([a-z]+):start[\s\S]*?\/\/ SPECTRE \1:end/g;
 
 test('pre-ledger published ownership is independent of the candidate mapping', () => {
   assert.notStrictEqual(
@@ -124,7 +124,7 @@ function writeCodecFixture(cwd, rows, entries) {
     readFileSync(new URL('./idSwitches.js', import.meta.url)),
   );
   const source = readFileSync(CODEC_SOURCE_PATH, 'utf8').replace(
-    SKYNET_BLOCKS,
+    SPECTRE_BLOCKS,
     '',
   );
   const registryEnd = ']);\n\nexport const REGISTERED_LAYER_IDS';
@@ -150,8 +150,8 @@ test('reservation ledger is complete, pinned, and rejects duplicate or malformed
     { ...parseLayerStateTokenReservations(productionRows) },
     { ...LAYER_STATE_TOKEN_RESERVATIONS },
   );
-  // SKYNET's reservations, then upstream's 32 exactly as published.
-  for (const [id, token] of Object.entries(SKYNET_RESERVATIONS))
+  // SPECTRE's reservations, then upstream's 32 exactly as published.
+  for (const [id, token] of Object.entries(SPECTRE_RESERVATIONS))
     assert.equal(LAYER_STATE_TOKEN_RESERVATIONS[id], token, id);
   assert.equal(Object.keys(UPSTREAM_RESERVATIONS).length, 32);
   assert.deepEqual(
@@ -399,7 +399,7 @@ test('an isolated valid two-character fixture round-trips an l field beyond the 
     const params = new URLSearchParams([['v', '2']]);
     codec.encodeLayerStateParams(params, state);
     assert.ok(params.get('l').length > 64, 'fixture must cross the old cap');
-    // SKYNET's codec has no Bhote Koshi rows: upstream's 75 less 'h.' and 'z.'.
+    // SPECTRE's codec has no Bhote Koshi rows: upstream's 75 less 'h.' and 'z.'.
     assert.equal(params.get('l').length, 71);
     const restored = codec.decodeLayerStateParams(params);
     assert.deepEqual(restored?.enabledLayerIds, expectedLayerIds);

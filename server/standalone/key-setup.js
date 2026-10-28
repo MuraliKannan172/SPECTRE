@@ -7,6 +7,10 @@ import {
   upsertDotenvValues,
 } from '../../src/keySetupCore.mjs';
 import { defaultSourceRoot } from '../providers/common/source-root.js';
+import {
+  adoptLegacyBrandEnv,
+  withLegacyRetired,
+} from '../providers/common/legacyBrandEnv.js'; // SPECTRE
 import path from 'node:path';
 import { readEnvironmentSource as readPinokioEnvironmentSource } from '../../scripts/pinokio-environment.mjs';
 import fs from 'node:fs';
@@ -127,7 +131,10 @@ function keySetupEndpoint({ sourceRoot = defaultSourceRoot } = {}) {
   // attribution. Persistence uses readStore() directly and refuses instead.
   const storeValues = () => {
     try {
-      return parseDotenvText(readStore());
+      // SPECTRE: a store still holding SKYNET_* names reads as the new names.
+      const values = parseDotenvText(readStore());
+      adoptLegacyBrandEnv(values, { warn() {} });
+      return values;
     } catch {
       return {};
     }
@@ -308,8 +315,10 @@ function keySetupEndpoint({ sourceRoot = defaultSourceRoot } = {}) {
               });
             }
           }
+          // SPECTRE: writing SPECTRE_X also comments out an old SKYNET_X line.
+          const updates = withLegacyRetired(verdict.updates);
           try {
-            persistStore(upsertDotenvValues(readStore(), verdict.updates));
+            persistStore(upsertDotenvValues(readStore(), updates));
           } catch (error) {
             // The hardening failure carries its own honest, path-free message —
             // "saved world-readable" must never be reported as a generic write
@@ -338,7 +347,7 @@ function keySetupEndpoint({ sourceRoot = defaultSourceRoot } = {}) {
           // Removal sets '' rather than deleting: an empty value stays falsy
           // through loadEnv after restart, matching the Pinokio launcher's own
           // blank-field semantics.
-          for (const [name, value] of Object.entries(verdict.updates)) {
+          for (const [name, value] of Object.entries(updates)) {
             process.env[name] = value === null ? '' : value;
           }
           respond(res, 200, {

@@ -1,5 +1,5 @@
 /**
- * SKYNET branding: every product name, wordmark, tagline and brand colour the
+ * SPECTRE branding: every product name, wordmark, tagline and brand colour the
  * app shows or sends lives here, so a rename is a one-file change.
  *
  * Pure data plus one helper; it imports only the msg() marker, so the page,
@@ -16,15 +16,27 @@
 import { msg } from './i18n/marker.js';
 
 export const BRANDING = Object.freeze({
-  name: 'SKYNET',
-  shortName: 'SKYNET',
-  /** Shown as `lead` + accented `accent` in the title bar and loader. */
-  wordmark: Object.freeze({ lead: 'SKY', accent: 'NET' }),
-  tagline: msg('GLOBAL INTELLIGENCE GLOBE'),
+  name: 'SPECTRE',
+  shortName: 'SPECTRE',
+  /** Lower-case name for file, package and plugin names. */
+  slug: 'spectre',
+  /**
+   * Shown as `lead` + accented `accent` in the title bar and loader. The
+   * emblem's wordmark is one colour, so nothing is accented.
+   */
+  wordmark: Object.freeze({ lead: 'SPECTRE', accent: '' }),
+  tagline: msg('GLOBAL INTELLIGENCE DASHBOARD'),
+  /** The emblem's sub-line, in its order. */
+  subline: Object.freeze([
+    msg('REAL-TIME'),
+    msg('ANALYZE'),
+    msg('PREDICT'),
+    msg('GLOBAL INSIGHTS'),
+  ]),
   description:
-    'A local-first global intelligence globe: live flights, satellites, weather and news on a 3D Earth.',
+    'A local-first global intelligence dashboard: live flights, satellites, weather and news on a 3D Earth.',
   /** Name the voice assistant and AI clients use for the app's assistant. */
-  assistantName: 'SKYNET',
+  assistantName: 'SPECTRE',
   /** Sub-label of the local chat panel. */
   neuralCoreLabel: 'Neural Core',
   logo: '/logo.svg',
@@ -42,7 +54,7 @@ export const BRANDING = Object.freeze({
  * (for example the OSMF and NOAA usage policies).
  * @param {string} component e.g. `cctv-proxy`
  * @param {string} [purpose] optional note shown in parentheses
- * @returns {string} e.g. `SKYNET-cctv-proxy/0.1`
+ * @returns {string} e.g. `SPECTRE-cctv-proxy/0.1`
  */
 export function brandUserAgent(component, purpose) {
   const product = `${BRANDING.name}-${component}/${BRANDING.version}`;

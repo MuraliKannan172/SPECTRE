@@ -1,19 +1,19 @@
 import http from 'node:http';
 
 /**
- * SKYNET: same-origin proxy from /api/intel/* to the local intel service
+ * SPECTRE: same-origin proxy from /api/intel/* to the local intel service
  * (intel/, FastAPI on 127.0.0.1:8100). The browser never talks to the service
  * directly, so the app's CSP stays same-origin.
  *
  * - News routes are read-only: GET and HEAD on news, story, stream, health.
  * - Neural Core routes (/chat..., /voice...) answer only requests from this
- *   machine. SKYNET_CHAT_ALLOW_LAN=1 opts LAN viewers in to chat, never to
+ *   machine. SPECTRE_CHAT_ALLOW_LAN=1 opts LAN viewers in to chat, never to
  *   voice: a LAN page over http cannot use a microphone, so all the flag
  *   would do there is feed untrusted audio to the decoder. Writes must
  *   come from this page's own origin and carry a body of the route's type and
  *   size: JSON of at most 64 KB, or for /voice/transcribe one recorded
  *   question (audio, at most 2 MB).
- * - The target is loopback only. SKYNET_INTEL_URL may move the port, never
+ * - The target is loopback only. SPECTRE_INTEL_URL may move the port, never
  *   the host off this machine.
  * - Host is set to the target's, which the service's DNS-rebinding allowlist
  *   accepts; only Accept, Last-Event-ID and Content-Type are forwarded, never
@@ -88,9 +88,9 @@ const FORWARD_RESPONSE_HEADERS = [
 ];
 const REQUEST_TIMEOUT_MS = 15_000;
 
-/** The service base URL: SKYNET_INTEL_URL when it is http on loopback. */
+/** The service base URL: SPECTRE_INTEL_URL when it is http on loopback. */
 export function intelTarget(env = process.env) {
-  const raw = String(env.SKYNET_INTEL_URL || '').trim();
+  const raw = String(env.SPECTRE_INTEL_URL || '').trim();
   if (!raw) return DEFAULT_TARGET;
   try {
     const url = new URL(raw);
@@ -101,7 +101,7 @@ export function intelTarget(env = process.env) {
     /* fall back below */
   }
   console.warn(
-    '[intel proxy] SKYNET_INTEL_URL must be http:// on 127.0.0.1 or localhost; using the default',
+    '[intel proxy] SPECTRE_INTEL_URL must be http:// on 127.0.0.1 or localhost; using the default',
   );
   return DEFAULT_TARGET;
 }
@@ -172,7 +172,7 @@ export function createIntelHandler({
   env = process.env,
 } = {}) {
   const base = new URL(target);
-  const allowLan = String(env.SKYNET_CHAT_ALLOW_LAN || '') === '1';
+  const allowLan = String(env.SPECTRE_CHAT_ALLOW_LAN || '') === '1';
   return async function intelHandler(req, res) {
     const path = req.url || '/';
     const { route, status, error } = routeFor(path, req.method);
@@ -280,7 +280,7 @@ export function createIntelHandler({
 export function intelProxy(options = {}) {
   const handler = createIntelHandler(options);
   return {
-    name: 'skynet-intel',
+    name: 'spectre-intel',
     configureServer({ middlewares }) {
       middlewares.use('/api/intel', handler);
     },

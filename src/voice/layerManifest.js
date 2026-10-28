@@ -418,13 +418,13 @@ const layers = [
 ];
 
 /**
- * Catalog layers deliberately outside voice, with the reason. (SKYNET removed
+ * Catalog layers deliberately outside voice, with the reason. (SPECTRE removed
  * the scene-driven Bhote Koshi pair with their CC BY-NC data.)
  */
 export const VOICE_OFF_LAYERS = Object.freeze({
-  news: 'SKYNET: reached through the Neural Core tool registry (Phase 4), not the upstream voice tools',
+  news: 'SPECTRE: reached through the Neural Core tool registry (Phase 4), not the upstream voice tools',
   'natural-events':
-    'SKYNET: reached through the Neural Core tool registry (Phase 4), not the upstream voice tools',
+    'SPECTRE: reached through the Neural Core tool registry (Phase 4), not the upstream voice tools',
 });
 
 const TYPE_NAMES = Object.freeze({

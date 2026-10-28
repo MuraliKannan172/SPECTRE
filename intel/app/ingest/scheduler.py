@@ -21,7 +21,7 @@ from .fetch import fetch
 from .parse import FeedParseError, gdelt_params, parse_feed, parse_gdelt
 from .pipeline import FeedInfo, Pipeline
 
-log = logging.getLogger("skynet.intel.scheduler")
+log = logging.getLogger("spectre.intel.scheduler")
 
 TICK_SECONDS = 5.0
 MAX_BACKOFF_SECONDS = 3600

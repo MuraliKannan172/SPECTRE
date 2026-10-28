@@ -11,6 +11,7 @@ import {
   NON_COMMERCIAL_SOURCES_ENV,
   nonCommercialSourcesEnabled,
 } from '../server/providers/common/non-commercial.js';
+import { legacyNameFor } from '../server/providers/common/legacyBrandEnv.js'; // SPECTRE
 
 const ROOT = projectRoot(import.meta.url);
 const OPENSKY_AUTH_MODE_DEFAULT = 'oauth';
@@ -170,7 +171,7 @@ export function resolveCredential(spec, {
 }
 
 /**
- * SKYNET: whether the owner turned on personal-use-only sources, read like
+ * SPECTRE: whether the owner turned on personal-use-only sources, read like
  * OPENSKY_AUTH_MODE (environment first, then the dotenv ladder).
  */
 export function resolveNonCommercialSources({
@@ -180,11 +181,15 @@ export function resolveNonCommercialSources({
 } = {}) {
   const name = NON_COMMERCIAL_SOURCES_ENV;
   const defined = Object.prototype.hasOwnProperty.call(environment, name);
+  // SPECTRE: the switch's pre-rename name still counts for one release.
+  const legacy = legacyNameFor(name);
   const value =
     String(environment[name] || '').trim() ||
+    (defined ? '' : String(environment[legacy] || '').trim()) ||
     (authoritativeEnvironment && defined
       ? ''
-      : readDoctorDotenvValue(name, rootDir));
+      : readDoctorDotenvValue(name, rootDir) ||
+        readDoctorDotenvValue(legacy, rootDir));
   return nonCommercialSourcesEnabled({ [name]: value });
 }
 
@@ -319,12 +324,18 @@ export function formatSetupReport(report, { readyMessage } = {}) {
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (invokedPath === fileURLToPath(import.meta.url)) {
   const report = inspectSetup();
-  // SKYNET: its local services. Information only: never changes `ready`.
-  const { inspectServices, formatServicesReport } = await import('./skynet-doctor.mjs');
+  // SPECTRE: its local services. Information only: never changes `ready`.
+  const { inspectServices, formatServicesReport } = await import('./spectre-doctor.mjs');
   const services = await inspectServices({
-    readEnv: (name) => String(process.env[name] || '').trim() || readDoctorDotenvValue(name),
+    readEnv: (name) => {
+      const legacy = legacyNameFor(name);
+      return String(process.env[name] || '').trim() ||
+        (legacy && String(process.env[legacy] || '').trim()) ||
+        readDoctorDotenvValue(name) ||
+        (legacy ? readDoctorDotenvValue(legacy) : '');
+    },
   });
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ...report, skynet: services }, null, 2));
+  if (process.argv.includes('--json')) console.log(JSON.stringify({ ...report, spectre: services }, null, 2));
   else console.log(`${formatSetupReport(report)}\n\n${formatServicesReport(services)}`);
   if (!report.ready) process.exitCode = 1;
 }

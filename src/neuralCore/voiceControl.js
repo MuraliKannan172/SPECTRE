@@ -1,5 +1,5 @@
 /**
- * SKYNET Neural Core: the push-to-talk mic button. Hold it (pointer, or Space
+ * SPECTRE Neural Core: the push-to-talk mic button. Hold it (pointer, or Space
  * or Enter on the focused button) to record; release to transcribe on this
  * machine and hand the text to the panel as an ordinary question. Pressing it
  * also silences a reply being spoken. When local voice cannot run, the button
@@ -31,10 +31,10 @@ export function mountVoiceControl({
 }) {
   const mic = document.createElement('button');
   mic.type = 'button';
-  mic.className = 'skynet-nc-mic';
+  mic.className = 'spectre-nc-mic';
   mic.textContent = '🎙';
   const hint = document.createElement('p');
-  hint.className = 'skynet-nc-voice';
+  hint.className = 'spectre-nc-voice';
   hint.setAttribute('aria-live', 'polite');
   hint.hidden = true;
 

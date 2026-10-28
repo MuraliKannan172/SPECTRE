@@ -1,4 +1,4 @@
-/* SKYNET bundles its fonts so the app never calls Google Fonts at runtime and
+/* SPECTRE bundles its fonts so the app never calls Google Fonts at runtime and
    works offline. JetBrains Mono (data/HUD), Inter (body) and Rajdhani
    (headings/wordmark) are OFL-1.1; Material Symbols is Apache-2.0. Each
    @fontsource sheet carries Latin, Latin Extended and Cyrillic subsets as

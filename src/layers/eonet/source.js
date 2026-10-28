@@ -1,7 +1,7 @@
 import { readResponseJsonCapped } from '../../sources/httpBody.js';
 
 /**
- * SKYNET: NASA EONET natural events through the app's /api/eonet proxy. The
+ * SPECTRE: NASA EONET natural events through the app's /api/eonet proxy. The
  * proxy has already reduced each event to one point; this side re-validates
  * every field because the browser renders them.
  */

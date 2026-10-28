@@ -40,7 +40,7 @@ test('every client tool is one the browser runner can run', () => {
   }
 });
 
-test('chat-only arguments are pruned and the SKYNET layers can be toggled', () => {
+test('chat-only arguments are pruned and the SPECTRE layers can be toggled', () => {
   const byName = Object.fromEntries(
     neuralCoreClientTools().map((tool) => [tool.function.name, tool.function]),
   );

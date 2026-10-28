@@ -1,4 +1,4 @@
-"""Shared fixtures. Tests never touch the network or intel/data/skynet.db."""
+"""Shared fixtures. Tests never touch the network or intel/data/spectre.db."""
 
 from __future__ import annotations
 

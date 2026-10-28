@@ -100,7 +100,7 @@ test('malformed v2 layer lists mark the whole incoming share payload invalid', (
 });
 
 test('a retired Nepal locator token rejects only the layer state', () => {
-  // SKYNET removed the Bhote Koshi layers; the camera still opens.
+  // SPECTRE removed the Bhote Koshi layers; the camera still opens.
   const parsed = makeManager('#v=2&lat=10&lon=20&l=z').parseInitialHash();
   assert.equal(parsed.layerState, null);
   assert.equal(parsed.layerStateInvalid, true);
