@@ -319,7 +319,12 @@ export function formatSetupReport(report, { readyMessage } = {}) {
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (invokedPath === fileURLToPath(import.meta.url)) {
   const report = inspectSetup();
-  if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatSetupReport(report));
+  // SKYNET: its local services. Information only: never changes `ready`.
+  const { inspectServices, formatServicesReport } = await import('./skynet-doctor.mjs');
+  const services = await inspectServices({
+    readEnv: (name) => String(process.env[name] || '').trim() || readDoctorDotenvValue(name),
+  });
+  if (process.argv.includes('--json')) console.log(JSON.stringify({ ...report, skynet: services }, null, 2));
+  else console.log(`${formatSetupReport(report)}\n\n${formatServicesReport(services)}`);
   if (!report.ready) process.exitCode = 1;
 }
