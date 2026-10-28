@@ -20,6 +20,7 @@ def make_settings(tmp_path: Path, feeds_yaml: str, **overrides: object) -> Setti
         feeds_local=tmp_path / "feeds.local.yaml",
         env_file=tmp_path / ".env",
         poll_seconds=300,
+        voice_dir=tmp_path / "voice",  # never intel/data/voice: no real models in tests
     )
     fields.update(overrides)
     return Settings(**fields)  # type: ignore[arg-type]

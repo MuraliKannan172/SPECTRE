@@ -14,14 +14,24 @@
   Port for the intel service. The app's dev server expects 8100.
 
 .PARAMETER Sync
-  Re-sync the Python environment before starting.
+  Re-sync the Python environment before starting. Packages installed with
+  -Voice are kept.
+
+.PARAMETER Voice
+  Install local voice for the Neural Core (push-to-talk) and fetch its pinned
+  models (about 270 MB) into intel\data\voice. The voice packages include
+  espeak-ng and phonemizer, which are GPL-3.0; see NOTICE.md.
 
 .EXAMPLE
   .\scripts\skynet.ps1
+
+.EXAMPLE
+  .\scripts\skynet.ps1 -Voice
 #>
 param(
   [int]$Port = 8100,
-  [switch]$Sync
+  [switch]$Sync,
+  [switch]$Voice
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,9 +43,16 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
   exit 1
 }
 
-if ($Sync -or -not (Test-Path (Join-Path $intel '.venv'))) {
+if ($Voice -or $Sync -or -not (Test-Path (Join-Path $intel '.venv'))) {
   Write-Host 'Setting up the intel Python environment (first run takes a minute)...'
-  & uv sync --project "$intel" --frozen
+  # --inexact keeps an earlier -Voice install; -Voice adds the voice extra.
+  $extra = if ($Voice) { @('--extra', 'voice') } else { @('--inexact') }
+  & uv sync --project "$intel" --frozen @extra
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
+if ($Voice) {
+  & uv run --project "$intel" --frozen python (Join-Path $intel 'scripts\fetch_voice_models.py')
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 

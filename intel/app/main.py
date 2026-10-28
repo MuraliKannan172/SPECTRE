@@ -19,6 +19,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from .api.chat import ChatGate
 from .api.chat import router as chat_router
 from .api.routes import router
+from .api.voice import router as voice_router
 from .chat.agent import Agent
 from .chat.ollama import OllamaClient
 from .chat.tools import ToolRegistry
@@ -31,6 +32,7 @@ from .ingest.pipeline import Pipeline
 from .ingest.scheduler import Scheduler
 from .store.chat import ChatStore
 from .store.news import NewsStore
+from .voice.service import VoiceService
 from .web.fetch import TIMEOUT_SECONDS as FETCH_TIMEOUT
 from .web.fetch import PageFetcher
 from .web.guard import guarded_client
@@ -49,6 +51,7 @@ def create_app(
     fetch_transport: httpx.AsyncBaseTransport | None = None,
     search: SearchService | None = None,
     tool_registry: ToolRegistry | None = None,
+    voice: VoiceService | None = None,
 ) -> FastAPI:
     settings = settings or load_settings()
 
@@ -114,6 +117,10 @@ def create_app(
             if registry is not None
             else None
         )
+        voice_service = voice or VoiceService(settings)
+        app.state.voice = voice_service
+        # Loads in the background; requests get 503 voice_loading until it is ready.
+        voice_task = asyncio.create_task(voice_service.load()) if voice_service.state == "idle" else None
         task = asyncio.create_task(scheduler.run()) if start_scheduler else None
         log.info(
             "intel ready: %d sources, %d recent stories indexed, poll %ds",
@@ -128,6 +135,8 @@ def create_app(
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
+            if voice_task is not None and not voice_task.done():
+                voice_task.cancel()  # the loader thread finishes on its own; nothing waits on it
             await scheduler.drain()
             await client.aclose()
             await ollama_http.aclose()
@@ -147,6 +156,7 @@ def create_app(
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(settings.allowed_hosts))
     app.include_router(router)
     app.include_router(chat_router)
+    app.include_router(voice_router)
     return app
 
 

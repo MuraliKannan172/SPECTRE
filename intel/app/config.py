@@ -104,6 +104,11 @@ class Settings:
     tavily_api_key: str | None = None
     chat_turns_per_minute: int = 12
     logs_dir: Path = REPO_ROOT / ".skynet-logs"
+    # Local voice (Phase 5): opt-in install, see intel/app/voice/models.py.
+    voice_enabled: bool = True
+    voice_dir: Path = INTEL_DIR / "data" / "voice"
+    voice_threads: int = 8
+    tts_voice: str = "af_heart"
 
     @property
     def num_ctx(self) -> int:
@@ -169,4 +174,8 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         brave_api_key=get("BRAVE_API_KEY", "").strip() or None,
         tavily_api_key=get("TAVILY_API_KEY", "").strip() or None,
         chat_turns_per_minute=get_int("SKYNET_CHAT_TURNS_PER_MINUTE", 12, 1),
+        voice_enabled=get("SKYNET_VOICE", "1").strip().lower() in _TRUTHY,
+        voice_dir=Path(get("SKYNET_VOICE_DIR", str(Settings.voice_dir))),
+        voice_threads=min(get_int("SKYNET_VOICE_THREADS", Settings.voice_threads, 1), 32),
+        tts_voice=get("SKYNET_TTS_VOICE", Settings.tts_voice).strip() or Settings.tts_voice,
     )
