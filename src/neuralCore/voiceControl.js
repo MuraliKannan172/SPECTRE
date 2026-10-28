@@ -76,9 +76,12 @@ export function mountVoiceControl({
     speaker.unlock(); // inside the gesture, so the reply may play later
     pressed = true;
     render();
-    show('listening');
+    // "Listening" only once the microphone is really recording, so nobody
+    // starts speaking into a microphone that is still opening.
+    show('opening');
     try {
-      await recorder.start({ onLimit: () => void release() });
+      const started = await recorder.start({ onLimit: () => void release() });
+      if (started && pressed) show('listening');
     } catch (error) {
       pressed = false;
       render();

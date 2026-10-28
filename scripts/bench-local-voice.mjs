@@ -178,6 +178,15 @@ async function spokenRun(page, clip) {
   const box = await (await page.$('.skynet-nc-mic')).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
+  // The fake microphone plays the clip from when it opens: hold from there.
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector('.skynet-nc-voice')?.dataset.code ===
+        'listening',
+      { timeout: 10_000 },
+    )
+    .catch(() => {});
   await sleep(clip.speechMs + 400);
   await page.mouse.up();
   await settle(page, { spoken: true });
