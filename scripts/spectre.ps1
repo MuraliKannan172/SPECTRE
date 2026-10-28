@@ -6,8 +6,9 @@
   Starts the intel service (news, the Neural Core and local voice) on
   127.0.0.1, then the web app (Vite) on http://localhost:4173. The intel
   service logs to .spectre-logs\intel.err.log (its requests to intel.log).
-  Ctrl+C stops both; closing the window instead can leave the intel service
-  running (stop it with taskkill or by its port).
+  Ctrl+C or closing the window stops both: the intel service shares this
+  window's console. An intel service from this checkout that an earlier start
+  left running (its window gone) is stopped before starting a new one.
 
   Ollama is not started here: run the Ollama app yourself (npm run doctor
   checks it).
@@ -51,9 +52,41 @@ $root = Split-Path -Parent $PSScriptRoot
 $intel = Join-Path $root 'intel'
 $webPort = 4173
 
-function Stop-IfPortBusy([int]$port, [string]$what) {
-  $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+function Get-Listener([int]$port) {
+  Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
     Select-Object -First 1
+}
+
+# The root (uv) of an intel service from this checkout whose launcher is gone,
+# or $null. Anything else on the port, or a service a live window still owns,
+# is left alone.
+function Get-OrphanedIntel([int]$processId) {
+  $chain = @()
+  $current = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" -ErrorAction SilentlyContinue
+  while ($current -and $current.CommandLine -and
+    $current.CommandLine.IndexOf($intel, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+    $chain += $current
+    $current = Get-CimInstance Win32_Process -Filter "ProcessId=$($current.ParentProcessId)" -ErrorAction SilentlyContinue
+  }
+  if (-not $chain -or $chain[0].CommandLine -notmatch 'app\.main:create_default_app') { return $null }
+  $root = $chain[-1]
+  # A launcher still running owns it. A "parent" younger than its child is a
+  # reused PID: the real launcher is gone.
+  if ($current -and $current.CreationDate -le $root.CreationDate) { return $null }
+  return $root
+}
+
+function Stop-IfPortBusy([int]$port, [string]$what) {
+  $listener = Get-Listener $port
+  if ($listener) {
+    $orphan = Get-OrphanedIntel $listener.OwningProcess
+    if ($orphan) {
+      Write-Host "Stopping the intel service an earlier start left running (PID $($orphan.ProcessId))..."
+      & taskkill.exe /T /F /PID $orphan.ProcessId | Out-Null
+      for ($i = 0; $i -lt 40 -and (Get-Listener $port); $i++) { Start-Sleep -Milliseconds 250 }
+      $listener = Get-Listener $port
+    }
+  }
   if ($listener) {
     $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
     $name = if ($process) { $process.ProcessName } else { 'an unknown process' }
@@ -110,9 +143,11 @@ $intelLog = Join-Path $logs 'intel.log'
 $intelErr = Join-Path $logs 'intel.err.log'
 # Windows PowerShell joins -ArgumentList without quoting, so quote paths with
 # spaces. uv starts Python as a child; stopping it later takes the whole tree.
+# -NoNewWindow keeps it on this console, so closing the window ends it too
+# (its output goes to the log files, not the window).
 $argumentLine = ($uvicorn | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
 $intelProcess = Start-Process -FilePath 'uv' -ArgumentList $argumentLine -WorkingDirectory $root `
-  -RedirectStandardOutput $intelLog -RedirectStandardError $intelErr -WindowStyle Hidden -PassThru
+  -RedirectStandardOutput $intelLog -RedirectStandardError $intelErr -NoNewWindow -PassThru
 Write-Host "SPECTRE intel:   http://127.0.0.1:$Port/api/intel/health  (log: $intelErr)"
 Write-Host "SPECTRE web app: http://localhost:$webPort  (Ctrl+C stops both)"
 
