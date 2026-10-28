@@ -48,7 +48,7 @@ SKYNET is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-vi
      ```
      then set `SKYNET_LOW_RESOURCE=1`.
 
-   The built-in default, `qwen3.5-9b-64k-gpu:latest`, is the developer's local build of Qwen 3.5 9B, so set `OLLAMA_MODEL` on any other machine.
+   The built-in default, `qwen3.5-9b-64k-gpu:latest`, is the developer's local build of Qwen 3.5 9B, so set `OLLAMA_MODEL` on any other machine. The public `qwen3.5:9b` and `bonsai-2:9b` tags exist in the Ollama library, but the developer measured only the local build and `bonsai-2:9b` ([eval](docs/phase4/neural-core-eval.md)). Check yours with `npm run doctor`: it reports whether the model is installed and can call tools.
 3. **Check the setup.** It reports Node, the keys you have, the intel service, Ollama and your model, web search, local voice, GPU memory, and any service reachable from your network:
 
    ```powershell
