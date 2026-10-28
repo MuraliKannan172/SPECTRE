@@ -12,6 +12,10 @@
 # Shell launchers must stay LF to run at all.
 *.sh text eol=lf
 
+# Windows batch launchers stay CRLF: cmd.exe misreads labels in LF files.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 # Assets Git must never rewrite.
 *.gif binary
 *.png binary
