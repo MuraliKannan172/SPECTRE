@@ -148,3 +148,86 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
+
+  # SKYNET: the intel service (news, the Neural Core and local voice). The
+  # optional voice extra is not installed, so its real-engine tests skip.
+  intel:
+    name: SKYNET intel service (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: intel/uv.lock
+
+      - name: Install locked dependencies
+        run: uv sync --project intel --frozen
+
+      - name: Lint
+        working-directory: intel
+        run: uv run ruff check .
+
+      - name: Check formatting
+        working-directory: intel
+        run: uv run ruff format --check .
+
+      - name: Check the shared tool schemas are current
+        run: uv run --project intel python intel/scripts/export_tools.py --check
+
+      - name: Run tests (no network)
+        run: uv run --project intel pytest intel/tests
+
+  # SKYNET: the News, Natural Events, share-link and Neural Core panel smoke
+  # tests. Hermetic: every /api/intel and /api/eonet request is answered by
+  # fixtures, so no intel service, Ollama or network is needed.
+  skynet-browser:
+    name: SKYNET browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GEV_REQUIRE_ALLOCATION_GATE: '0'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked dependencies and headless Chrome
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Start the preview server
+        run: |
+          npx vite preview --port 4173 --strictPort > preview.log 2>&1 &
+          for attempt in $(seq 1 90); do
+            curl -sf http://localhost:4173/ > /dev/null && exit 0
+            sleep 2
+          done
+          cat preview.log
+          exit 1
+
+      - name: News, Natural Events and share links
+        run: npm run qa:skynet-news -- --url http://localhost:4173
+
+      - name: Neural Core panel
+        run: npm run qa:neural-core -- --url http://localhost:4173
+
+      - name: Preview server log
+        if: failure()
+        run: cat preview.log
