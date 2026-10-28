@@ -4,6 +4,23 @@ import * as Cesium from 'cesium';
 export const ESRI_ATTRIBUTION_HTML =
   '<a href="https://www.esri.com" target="_blank" rel="noopener">Powered by Esri</a>';
 
+// SKYNET: Blue Marble shaded relief and bathymetry from NASA GIBS. Cloud-free
+// and public domain, but only to zoom 8 (about 600 m per pixel at the
+// equator), so city close-ups are soft.
+export const GIBS_BASEMAP_URL =
+  'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg';
+export const GIBS_ATTRIBUTION_HTML =
+  '<a href="https://earthobservatory.nasa.gov/features/BlueMarble" target="_blank" rel="noopener">NASA Blue Marble</a> via <a href="https://gibs.earthdata.nasa.gov" target="_blank" rel="noopener">NASA GIBS</a>';
+
+export function createGibsImagery() {
+  return new Cesium.UrlTemplateImageryProvider({
+    url: GIBS_BASEMAP_URL,
+    maximumLevel: 8,
+    credit: 'NASA GIBS',
+    enablePickFeatures: false,
+  });
+}
+
 export function createOsmImagery() {
   return new Cesium.OpenStreetMapImageryProvider({
     url: 'https://tile.openstreetmap.org/',

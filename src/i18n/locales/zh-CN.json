@@ -2906,5 +2906,6 @@
   "Spoken replies are in English only; this answer is shown as text.": "语音回复仅支持英语；此回答以文本显示。",
   "The answer could not be spoken.": "无法朗读该回答。",
   "voice: heard in {heard} s": "语音：{heard} 秒内识别",
-  "voice: heard in {heard} s, first word after {first} s": "语音：{heard} 秒内识别，{first} 秒后开始朗读"
+  "voice: heard in {heard} s, first word after {first} s": "语音：{heard} 秒内识别，{first} 秒后开始朗读",
+  "Esri licenses this basemap for use with Esri software or an ArcGIS Online subscription": "Esri 仅授权在 Esri 软件中或凭 ArcGIS Online 订阅使用此底图"
 }

@@ -1,12 +1,14 @@
-import { MAP_STACKS } from './catalog.js';
+import { KEYLESS_DEFAULT_STACK_ID, MAP_STACKS } from './catalog.js';
 import { photorealUnavailableReason } from './availability.js';
 import { keySetupRequirementEnvVars } from '../keySetupCore.mjs';
 import { t } from '../i18n/index.js';
 import {
   createOsmImagery,
   createEsriImagery,
+  createGibsImagery,
   createIonImagery,
   ESRI_ATTRIBUTION_HTML,
+  GIBS_ATTRIBUTION_HTML,
 } from './imagery.js';
 import { createWorldTerrain, createKeylessTerrain } from './terrain.js';
 
@@ -26,7 +28,7 @@ export function createDefaultMapSources({
       : createKeylessTerrain,
   };
   return {
-    defaultId: googleTileset ? 'photoreal' : 'esri-imagery',
+    defaultId: googleTileset ? 'photoreal' : KEYLESS_DEFAULT_STACK_ID,
     unknownId: 'photoreal',
     recoveryId: googleTileset ? 'photoreal' : null,
     state: { hasCesiumIonToken: hasIon },
@@ -52,7 +54,9 @@ export function createDefaultMapSources({
           ? () => createIonImagery(descriptor.style, ionToken)
           : descriptor.id === 'osm'
             ? createOsmImagery
-            : createEsriImagery;
+            : descriptor.kind === 'gibs'
+              ? createGibsImagery
+              : createEsriImagery;
       return {
         ...common,
         imagery,
@@ -68,6 +72,20 @@ export function createDefaultMapSources({
                 id: 'osm',
                 threshold: 2,
                 message: 'Esri Satellite tile requests failed; using OSM',
+              },
+            }
+          : {}),
+        ...(descriptor.kind === 'gibs'
+          ? {
+              credit: GIBS_ATTRIBUTION_HTML,
+              constructionFallback: {
+                id: 'osm',
+                message: 'NASA Blue Marble is unavailable; using OSM',
+              },
+              tileFailureFallback: {
+                id: 'osm',
+                threshold: 2,
+                message: 'NASA Blue Marble tile requests failed; using OSM',
               },
             }
           : {}),

@@ -7,6 +7,7 @@ import {
 import { registerDataCredits } from '../data/dataCredits.js';
 import { configureCreditKeyboardAccess } from '../creditKeyboard.js';
 import { MapStackController } from '../mapStackController.js';
+import { KEYLESS_DEFAULT_STACK_ID } from '../maps/catalog.js'; // SKYNET
 import { loadPhotorealisticTileset } from '../mapStartup.js';
 import { initLogoGaze } from '../logoGaze.js';
 import {
@@ -108,7 +109,7 @@ export async function createApplicationScene({
     ...mapOptions,
     googleTileset: tileset,
     cesiumToken,
-    initialStack: tileset ? 'photoreal' : 'esri-imagery',
+    initialStack: tileset ? 'photoreal' : KEYLESS_DEFAULT_STACK_ID,
     // Task 5 (height-datum fix): rebroadcast stack changes as a window
     // CustomEvent so data layers (CCTV per-regime ground resolution) can
     // react without coupling MapStackController to layer modules. Fires on
@@ -122,9 +123,12 @@ export async function createApplicationScene({
     onError: (message) => console.warn('[MapStack]', message),
   });
   defer(() => mapStackController.destroy());
-  await mapStackController.setStack(tileset ? 'photoreal' : 'esri-imagery', {
-    silent: true,
-  });
+  await mapStackController.setStack(
+    tileset ? 'photoreal' : KEYLESS_DEFAULT_STACK_ID,
+    {
+      silent: true,
+    },
+  );
 
   signal.throwIfAborted();
   return { viewer, tileset, mapStackController, operations };

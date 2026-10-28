@@ -63,7 +63,7 @@ bashTest('CCTV preset starts keyless on localhost through the normal launcher', 
   assert.equal(result.env.GEV_LAUNCHER, 'dev-fresh');
   assert.equal(result.env.GEV_KEY_SETUP_EXTERNAL_KEYS, '');
   assert.equal(result.env.GOOGLE_MAPS_API_KEY, undefined);
-  assert.match(result.output, /Startup map: Esri World Imagery/);
+  assert.match(result.output, /Startup map: NASA Blue Marble/);
   assert.doesNotMatch(result.output, /!! WARNING/);
 });
 

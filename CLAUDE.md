@@ -39,8 +39,8 @@ code.
 - Personal-use-only APIs go behind the Non-commercial sources switch
   (`server/providers/common/non-commercial.js`, off by default).
 - Register every new source in `src/data/dataCredits.js` and `DATA_SOURCES.md`.
-  Keep the on-globe Google, Cesium and Esri credits and the Data attribution
-  link visible at all times.
+  Keep the on-globe credits of whatever is drawn (Google, Cesium, NASA GIBS,
+  Esri when chosen) and the Data attribution link visible at all times.
 - News: store headline, short summary, source, URL and timestamp only.
 
 ## SKYNET conventions
