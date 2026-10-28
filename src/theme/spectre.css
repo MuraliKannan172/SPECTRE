@@ -12,9 +12,16 @@
   --sp-surface: #0b0b0e;
   --sp-surface-2: #121217;
   --sp-border: #22222a;
-  --sp-red: #ff2800; /* Ferrari red: text, icons, active states (5.56:1 on black) */
-  --sp-red-deep: #d40000; /* Rosso Corsa: fills and borders only (3.8:1, not small text) */
-  --sp-red-glow: rgba(255, 40, 0, 0.35);
+  /* The emblem's reds. Before SPECTRE: --sp-red #ff2800, --sp-red-deep
+     #d40000, --sp-red-rgb 255, 40, 0 (revert these three lines together with
+     BRANDING.colors in src/branding.js, then regenerate spectre-recolor.css). */
+  --sp-red: #f80000; /* text, icons, active states: 4.99:1 on black, 4.67:1 on --sp-surface */
+  --sp-red-deep: #c80000; /* fills and borders only (3.46:1, never small text) */
+  --sp-red-rgb: 248, 0, 0; /* --sp-red as an RGB triple for translucent tints */
+  /* Red text on raised or red-tinted surfaces, where --sp-red drops below AA
+     (4.44:1 on --sp-surface-2): this is 4.81:1 there. */
+  --sp-red-on-raised: #ff1a1a;
+  --sp-red-glow: rgba(var(--sp-red-rgb), 0.35);
   --sp-text: #ececef;
   --sp-text-dim: #8b8b94; /* 6.2:1 on black */
   --sp-text-faint: #7c7c84; /* dimmest text allowed: 4.74:1 on --sp-surface, 4.51:1 on --sp-surface-2 */
@@ -25,9 +32,9 @@
   --bg-dark: var(--sp-bg);
   --glass-bg: rgba(8, 8, 10, 0.8);
   --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-border-hover: rgba(255, 40, 0, 0.4);
+  --glass-border-hover: rgba(var(--sp-red-rgb), 0.4);
   --accent: var(--sp-red);
-  --accent-dim: rgba(255, 40, 0, 0.14);
+  --accent-dim: rgba(var(--sp-red-rgb), 0.14);
   --accent-glow: var(--sp-red-glow);
   --text-primary: var(--sp-text);
   --text-secondary: var(--sp-text-dim);
@@ -45,11 +52,12 @@ body {
 }
 
 /* The HUD draws its text in --hud-color; red at upstream's 60% opacity is
-   2.5:1 on black, so SPECTRE uses a lighter red that stays AA (5.7:1). */
+   2.5:1 on black, so SPECTRE uses a lighter red that stays AA (5.21:1; before
+   the emblem reds it was rgba(255, 74, 46, 0.95), 5.7:1). */
 #intel-hud {
-  --hud-color: rgba(255, 74, 46, 0.95);
-  --hud-glow: rgba(255, 40, 0, 0.4);
-  --hud-border: rgba(255, 40, 0, 0.18);
+  --hud-color: rgba(255, 48, 48, 0.95);
+  --hud-glow: rgba(var(--sp-red-rgb), 0.4);
+  --hud-border: rgba(var(--sp-red-rgb), 0.18);
 }
 
 /* Wordmark and headings: Rajdhani, with the red reserved for the accent. */
@@ -67,6 +75,35 @@ body {
 
 #title-bar .subtitle {
   color: var(--sp-text-dim);
+}
+
+/* The emblem's mark is about 1.96:1, wider than the logo upstream sized these
+   boxes for. Its transparent PNG is luminance-keyed, so it keeps its own
+   colours in every HUD variant (the cyber variant greys logo images). */
+.brand-logo {
+  aspect-ratio: 1065 / 542;
+}
+
+:root[data-ui-theme='cyber'] .brand-logo img {
+  filter: none;
+}
+
+/* The voice dock's status line is tiny text on the dock's own red tint, where
+   --sp-red is 4.43:1. The listening/executing/error colours still win. */
+#command-dock #gev-voice-status,
+#command-dock
+  #gev-voice-control[data-speaker='ai']
+  :is(#gev-voice-status, #gev-voice-detail) {
+  color: var(--sp-red-on-raised);
+}
+
+/* Upstream marks an active control with accent text on its own accent tint
+   (--accent-dim), where --sp-red is 4.46:1. Inside those controls the accent is
+   the lighter red (4.80:1 on the tint); everywhere else it stays --sp-red. The
+   cyber HUD variant keeps its own accent. */
+:root:not([data-ui-theme='cyber'])
+  :is(.active, .ri-card.focused, .panel-surface-control:hover) {
+  --accent: var(--sp-red-on-raised);
 }
 
 #loading-screen {
@@ -87,7 +124,7 @@ body {
    pulse is reserved for true alerts, which also carry an icon or label. */
 :where(button, [role='button']).active,
 :where(button, [role='button'])[aria-pressed='true'] {
-  box-shadow: inset 0 0 0 1px rgba(255, 40, 0, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(var(--sp-red-rgb), 0.55);
 }
 
 :where(button, [role='button'], a[href]):hover {
@@ -145,7 +182,7 @@ body {
 
 .key-setup-switch input[type='checkbox']:checked {
   border-color: var(--sp-red);
-  background: rgba(255, 40, 0, 0.18);
+  background: rgba(var(--sp-red-rgb), 0.18);
 }
 
 .key-setup-switch input[type='checkbox']:checked::after {

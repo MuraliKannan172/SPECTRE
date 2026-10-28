@@ -107,6 +107,11 @@ export function mountNeuralCorePanel({
 
   const header = element(document, 'header', 'spectre-nc-header');
   const brand = element(document, 'div', 'spectre-nc-brand');
+  const emblem = element(document, 'img', 'spectre-nc-emblem');
+  emblem.src = `${import.meta.env?.BASE_URL || '/'}brand/spectre-mark-128.png`;
+  emblem.alt = '';
+  emblem.width = 128;
+  emblem.height = 65;
   const mark = element(document, 'span', 'spectre-nc-wordmark');
   mark.setAttribute('translate', 'no');
   mark.append(
@@ -114,6 +119,7 @@ export function mountNeuralCorePanel({
     element(document, 'span', 'spectre-nc-accent', BRANDING.wordmark.accent),
   );
   brand.append(
+    emblem,
     mark,
     element(document, 'span', 'spectre-nc-sublabel', BRANDING.neuralCoreLabel),
   );

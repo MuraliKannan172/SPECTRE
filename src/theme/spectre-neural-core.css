@@ -74,6 +74,12 @@
   margin-right: auto;
 }
 
+.spectre-nc-emblem {
+  align-self: center;
+  width: 32px;
+  height: auto;
+}
+
 .spectre-nc-wordmark {
   font: 700 15px/1 var(--font-display);
   letter-spacing: 0.3em;
@@ -88,6 +94,12 @@
   font: 500 11px/1 var(--font-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+/* Reads SPECTRE · NEURAL CORE; the dot is decoration, not announced. */
+.spectre-nc-sublabel::before {
+  content: '·' / '';
+  margin-right: 8px;
 }
 
 .spectre-nc-icon {

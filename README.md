@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/brand/spectre-logo-source.png" alt="SPECTRE: Global Intelligence Dashboard" width="640" /></p>
+
 # SPECTRE
 
 **A local-first global intelligence globe.** Live flights, satellites, weather, cameras and public data on a 3D Earth, with real-time news intelligence and a local AI analyst, the Neural Core, all running on your own machine with no paid keys required.
@@ -6,7 +8,7 @@
 
 SPECTRE is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © Bilawal Sidhu), rebranded in a Vanta-black and Ferrari-red theme. It keeps God's Eye View's layers and tools, except where their data could not be redistributed. [NOTICE.md](NOTICE.md) lists every change from upstream.
 
-> **Status: v0.1.0** (tagged locally as `spectre-v0.1.0`). All six phases of [docs/ADR-001.md](docs/ADR-001.md) are done. What was verified and what was not is in [docs/VERIFY.md](docs/VERIFY.md).
+> **Status: v0.1.0** (tagged locally as `skynet-v0.1.0`, under the product's earlier name). All six phases of [docs/ADR-001.md](docs/ADR-001.md) are done. What was verified and what was not is in [docs/VERIFY.md](docs/VERIFY.md).
 
 ## What it does
 

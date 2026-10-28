@@ -1,0 +1,35 @@
+{
+  "aspect": 1.65212,
+  "width": 1363,
+  "height": 825,
+  "parts": {
+    "mark": {
+      "file": "spectre-mark.png",
+      "left": 10.1247,
+      "top": 0.0,
+      "width": 78.1365,
+      "height": 65.697
+    },
+    "wordmark": {
+      "file": "spectre-wordmark.png",
+      "left": 0.0,
+      "top": 68.0,
+      "width": 100.0,
+      "height": 17.697
+    },
+    "subtitle": {
+      "file": "spectre-subtitle.png",
+      "left": 0.5869,
+      "top": 87.1515,
+      "width": 99.4131,
+      "height": 6.5455
+    },
+    "tagline": {
+      "file": "spectre-tagline.png",
+      "left": 7.3368,
+      "top": 95.3939,
+      "width": 85.62,
+      "height": 4.6061
+    }
+  }
+}

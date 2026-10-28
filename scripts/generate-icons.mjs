@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Renders the home-screen and favicon rasters from `public/logo.svg`.
+// Renders the maskable home-screen icon from the SPECTRE mark. The other icons
+// in `public/brand/` (favicons, apple-touch-icon, icon-192/512) are drawn by
+// hand and copied as they are; their art reaches past the maskable safe zone.
 //
-// Re-run after changing the logo: `node scripts/generate-icons.mjs`. The output
+// Re-run after changing the mark: `node scripts/generate-icons.mjs`. The output
 // is committed, because the install icons have to exist in a plain `vite build`
 // and contributors should not need an image toolchain to ship the app.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -14,8 +16,8 @@ const REPO_ROOT = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
   '..',
 );
-const LOGO = path.join(REPO_ROOT, 'public', 'logo.svg');
-const OUT_DIR = path.join(REPO_ROOT, 'public', 'icons');
+const LOGO = path.join(REPO_ROOT, 'public', 'brand', 'spectre-mark.png');
+const OUT_DIR = path.join(REPO_ROOT, 'public', 'brand');
 
 /** The brand background (src/branding.js), so the tile matches the app. */
 const BACKGROUND = BRANDING.colors.background;
@@ -24,26 +26,21 @@ const BACKGROUND = BRANDING.colors.background;
  * Fraction of the canvas the mark is allowed to occupy.
  *
  * A maskable icon may be cropped to a circle inscribed in the middle 80% of the
- * square, so its mark stays well inside that circle; the other icons are shown
- * as drawn and only need optical breathing room.
+ * square, so its mark stays well inside that circle.
  */
-const INSET = { normal: 0.78, maskable: 0.54 };
+const INSET = { maskable: 0.54 };
 
 const TARGETS = [
-  { file: 'icon-32.png', size: 32, inset: INSET.normal },
-  { file: 'icon-180.png', size: 180, inset: INSET.normal },
-  { file: 'icon-192.png', size: 192, inset: INSET.normal },
-  { file: 'icon-512.png', size: 512, inset: INSET.normal },
   { file: 'icon-512-maskable.png', size: 512, inset: INSET.maskable },
 ];
 
-/** Fit the logo inside `size * inset` and centre it on an opaque square. */
-async function render(svg, { size, inset }) {
+/** Fit the mark inside `size * inset` and centre it on an opaque square. */
+async function render(source, { size, inset }) {
   const box = Math.round(size * inset);
-  // The logo's viewBox is wider than it is tall, so `contain` bounds it by
+  // The mark is about twice as wide as it is tall, so `contain` bounds it by
   // width and leaves the vertical padding uneven — centring is done by the
   // composite below rather than by the resize.
-  const mark = await sharp(svg, { density: 384 })
+  const mark = await sharp(source)
     .resize(box, box, {
       fit: 'contain',
       background: { r: 0, g: 0, b: 0, alpha: 0 },
@@ -63,9 +60,12 @@ async function render(svg, { size, inset }) {
     .toBuffer();
 }
 
-const svg = await readFile(LOGO);
+const source = await readFile(LOGO);
 await mkdir(OUT_DIR, { recursive: true });
 for (const target of TARGETS) {
-  await writeFile(path.join(OUT_DIR, target.file), await render(svg, target));
+  await writeFile(
+    path.join(OUT_DIR, target.file),
+    await render(source, target),
+  );
   console.log(`icons: wrote ${target.file} (${target.size}px)`);
 }

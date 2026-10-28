@@ -33,18 +33,25 @@ export const BRANDING = Object.freeze({
     msg('PREDICT'),
     msg('GLOBAL INSIGHTS'),
   ]),
+  /** The browser tab and window title, baked into index.html at build time. */
+  // i18n-ignore
+  title: 'SPECTRE — Global Intelligence Dashboard',
   description:
     'A local-first global intelligence dashboard: live flights, satellites, weather and news on a 3D Earth.',
   /** Name the voice assistant and AI clients use for the app's assistant. */
   assistantName: 'SPECTRE',
   /** Sub-label of the local chat panel. */
   neuralCoreLabel: 'Neural Core',
-  logo: '/logo.svg',
+  /** The emblem's mark (luminance-keyed: for dark backgrounds only). */
+  logo: '/brand/spectre-mark-256.png',
   colors: Object.freeze({
     background: '#000000',
     surface: '#0B0B0E',
-    accent: '#FF2800',
-    accentDeep: '#D40000',
+    // The emblem's measured reds. Before SPECTRE they were '#FF2800' and
+    // '#D40000'; to revert, restore those two values here and the RGB triple
+    // in src/theme/spectre.css, then run scripts/generate-spectre-recolor.mjs.
+    accent: '#F80000',
+    accentDeep: '#C80000',
   }),
   version: '0.1',
 });

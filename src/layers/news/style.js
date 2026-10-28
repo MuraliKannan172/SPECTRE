@@ -20,7 +20,7 @@ export const NEWS_CATEGORY_COLORS = Object.freeze({
   politics: '#60A5FA',
   world: '#E5E7EB',
 });
-export const NEWS_ALERT_RING = '#FF2800';
+export const NEWS_ALERT_RING = '#F80000'; // BRANDING.colors.accent (was '#FF2800')
 export const NEWS_CLUSTER_COLOR = '#E5E7EB';
 
 const BASE_PIXELS = 8;
