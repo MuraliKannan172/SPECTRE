@@ -1,5 +1,15 @@
 # Changelog
 
+- **Production build loads the boot overlay first and defers Cesium.js.**
+  `build/spectreBootHtml.js` (build only, not the MCP panel build) gives
+  `src/boot/entry.js` its own small chunk ahead of Cesium and adds `defer` to
+  the `cesium/Cesium.js` script vite-plugin-cesium injects, which blocked
+  every paint until it had run. Deferred and module scripts run in order, so
+  Cesium still runs before the app. Measured on the preview build (headless
+  Chrome, GPU, median of 5): first paint 708 → 144 ms, overlay on screen
+  898 → 139 ms, globe's first frame 940 → 622 ms. This changes how upstream
+  loads Cesium in production; remove the plugin from `build/vite.js` to go
+  back.
 - **SPECTRE boot overlay and brand glitch.** The emblem assembles on black
   while the app loads behind it, with four status rows fed by real signals:
   the globe's first frame, the layer catalog, `/api/intel/health` and

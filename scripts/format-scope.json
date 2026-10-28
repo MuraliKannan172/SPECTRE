@@ -1178,5 +1178,6 @@
   "src/boot/settings.test.mjs",
   "src/boot/entry.js",
   "src/theme/spectre-boot.css",
-  "scripts/qa-spectre-boot.mjs"
+  "scripts/qa-spectre-boot.mjs",
+  "build/spectreBootHtml.js"
 ]
