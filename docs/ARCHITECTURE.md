@@ -79,6 +79,12 @@ Tests on both sides fail when the shared file is stale.
 3. **Speak.** The streamed answer is split into sentences. Each goes to `POST /api/intel/voice/speak` (Kokoro-82M on the CPU), with at most two requests out at once. The WAV is played with Web Audio.
 4. **Load.** The models load once, in the background, when the service starts. They are fetched only by `scripts\spectre.ps1 -Voice`, checked against pinned SHA-256 hashes.
 
+### Boot overlay
+
+1. **First paint.** `index.html` paints black with a cover; `src/boot/entry.js` runs before `src/main.js` and swaps the cover for the overlay. In a build, `build/spectreBootHtml.js` gives the entry its own small chunk ahead of a deferred `Cesium.js`, so the overlay is up in about 140 ms instead of after Cesium.
+2. **Rows.** The entry probes `GET /api/intel/health` and `GET /api/intel/chat/status`; the application reports the globe (the viewer's first frame and the map stack's basemap) and the layer catalog through `src/boot/appSignals.js`. Each probe gives up after 3 s and a late reply still updates its row.
+3. **Exit.** Once every row has a state (or 9 s have passed) and the minimum hold is over, the overlay fades and is removed from the DOM. It never delays the application, which starts behind it.
+
 ## Trust boundaries
 
 | Boundary | Guard |
@@ -125,6 +131,7 @@ SPECTRE keeps its own code apart so that `git merge upstream/main` stays tractab
 | News and Natural Events layers | `src/layers/news/`, `src/layers/eonet/` |
 | Neural Core panel | `src/neuralCore/` |
 | Tool registry | `src/tools/registry.js`, `shared/tools/` |
-| Branding and theme | `src/branding.js`, `src/theme/` |
+| Branding and theme | `src/branding.js`, `src/theme/`, `public/brand/` ([BRANDING.md](BRANDING.md)) |
+| Boot overlay and brand glitch | `src/boot/`, `src/theme/spectre-boot.css`, `build/spectreBootHtml.js` |
 | Basemap default | `src/maps/catalog.js` (`KEYLESS_DEFAULT_STACK_ID`), `src/maps/imagery.js` |
-| Scripts | `scripts/spectre.ps1`, `scripts/spectre-doctor.mjs`, `scripts/qa-spectre-news.mjs`, `scripts/qa-neural-core.mjs`, `scripts/bench-local-voice.mjs` |
+| Scripts | `scripts/spectre.ps1`, `scripts/spectre-doctor.mjs`, `scripts/qa-spectre-news.mjs`, `scripts/qa-neural-core.mjs`, `scripts/qa-spectre-boot.mjs`, `scripts/bench-local-voice.mjs` |

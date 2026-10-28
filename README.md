@@ -1,14 +1,16 @@
 <p align="center"><img src="docs/brand/spectre-logo-source.png" alt="SPECTRE: Global Intelligence Dashboard" width="640" /></p>
 
-# SPECTRE
+# SPECTRE — Global Intelligence Dashboard
 
-**A local-first global intelligence globe.** Live flights, satellites, weather, cameras and public data on a 3D Earth, with real-time news intelligence and a local AI analyst, the Neural Core, all running on your own machine with no paid keys required.
+**A local-first global intelligence dashboard.** Live flights, satellites, weather, cameras and public data on a 3D Earth, with real-time news intelligence and a local AI analyst, the Neural Core, all running on your own machine with no paid keys required.
 
 ![SPECTRE on the keyless NASA Blue Marble basemap, with the news and natural-events layers on](docs/images/spectre-globe.jpg)
 
-SPECTRE is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © Bilawal Sidhu), rebranded in a Vanta-black and Ferrari-red theme. It keeps God's Eye View's layers and tools, except where their data could not be redistributed. [NOTICE.md](NOTICE.md) lists every change from upstream.
+SPECTRE is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © Bilawal Sidhu), rebranded with the SPECTRE emblem in black and red. It keeps God's Eye View's layers and tools, except where their data could not be redistributed. [NOTICE.md](NOTICE.md) lists every change from upstream.
 
 > **Status: v0.1.0** (tagged locally as `skynet-v0.1.0`, under the product's earlier name). All six phases of [docs/ADR-001.md](docs/ADR-001.md) are done. What was verified and what was not is in [docs/VERIFY.md](docs/VERIFY.md).
+
+> **Renamed.** SPECTRE was called SKYNET until 2026-10-28. Settings named `SKYNET_*` and `scripts\skynet.ps1` still work for one release, with a warning, and the intel database and tool logs are copied to their new names on the first start. [CHANGELOG.md](CHANGELOG.md) lists every change.
 
 ## What it does
 
@@ -21,7 +23,10 @@ SPECTRE is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-v
   - **What it refuses.** It will not locate or profile people.
   - **When Ollama is not running,** the panel says so.
 
-  ![The Neural Core answering a news question with numbered sources](docs/images/spectre-neural-core.jpg)
+  ![The Neural Core panel with an earlier answer and its numbered sources; Ollama is stopped here, and the panel says so](docs/images/spectre-neural-core.jpg)
+- **Boot overlay.** While the app loads, the emblem shows four status rows from real checks: the globe's first frame, the layer catalog, the intel service and the Neural Core. Any key or click skips it; Display ▸ Boot animation makes it short or turns it off.
+
+  ![The boot overlay: emblem, wordmark and four status rows](docs/images/spectre-boot.jpg)
 - **Local voice (optional).** Hold the mic in the Neural Core panel and ask. Speech is recognised and spoken on your computer (faster-whisper and Kokoro); the answer is read aloud in English as it arrives.
 
 ## Quick start (Windows 11, PowerShell)
@@ -150,6 +155,7 @@ It is not for navigation, emergency response or any other safety-critical use. D
 - [docs/VERIFY.md](docs/VERIFY.md): manual verification steps and their results.
 - [docs/API.md](docs/API.md): the intel service API.
 - [docs/ADR-001.md](docs/ADR-001.md): the design and its decisions.
+- [docs/BRANDING.md](docs/BRANDING.md): the SPECTRE emblem, its files and how to use them.
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to change SPECTRE.
 - [DATA_SOURCES.md](DATA_SOURCES.md): data sources and their terms.
 - Measurements:
