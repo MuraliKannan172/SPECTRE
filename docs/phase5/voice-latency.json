@@ -1,0 +1,379 @@
+{
+  "when": "2026-10-28T02:08:06.052Z",
+  "host": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cores": 24,
+    "ramGb": 17
+  },
+  "model": "qwen3.5-9b-64k-gpu:latest",
+  "modelLoadedAtStart": true,
+  "voice": {
+    "stt": {
+      "model": "whisper-base",
+      "device": "cpu"
+    },
+    "tts": {
+      "model": "kokoro-82m",
+      "voice": "af_heart",
+      "lang": "en-us"
+    }
+  },
+  "headful": false,
+  "prompts": [
+    {
+      "id": "globe",
+      "text": "Fly to Nairobi and turn on the earthquakes layer.",
+      "clipSpeechMs": 2752,
+      "warmUp": "qwen3.5-9b-64k-gpu:latest · 41.8 tokens/s",
+      "runs": [
+        {
+          "transcript": "Fly to Nairobi and turn on the earthquakes layer.",
+          "recorded": 5,
+          "heard": 1120,
+          "firstToken": 6426,
+          "firstSentence": 7260,
+          "firstAudio": 8625,
+          "sttSeconds": 1.109,
+          "ttsSeconds": 1.346,
+          "tools": [
+            "Flying the camera",
+            "Switching a layer"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 23.3 tokens/s",
+          "answerChars": 135
+        },
+        {
+          "transcript": "Fly to Nairobi and turn on the earthquakes layer.",
+          "recorded": 7,
+          "heard": 1183,
+          "firstToken": 5038,
+          "firstSentence": 5592,
+          "firstAudio": 6526,
+          "sttSeconds": 1.17,
+          "ttsSeconds": 0.919,
+          "tools": [
+            "Flying the camera",
+            "Switching a layer"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 26.4 tokens/s",
+          "answerChars": 115
+        },
+        {
+          "transcript": "Fly to Nairobi and turn on the earthquakes layer.",
+          "recorded": 8,
+          "heard": 966,
+          "firstToken": 5200,
+          "firstSentence": 5736,
+          "firstAudio": 6375,
+          "sttSeconds": 0.951,
+          "ttsSeconds": 0.627,
+          "tools": [
+            "Flying the camera",
+            "Switching a layer"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 28.2 tokens/s",
+          "answerChars": 72
+        }
+      ],
+      "typedTokensPerSecond": [
+        26.3,
+        24.4,
+        26.6
+      ],
+      "summary": {
+        "recorded": {
+          "median": 7,
+          "min": 5,
+          "max": 8,
+          "n": 3
+        },
+        "heard": {
+          "median": 1120,
+          "min": 966,
+          "max": 1183,
+          "n": 3
+        },
+        "firstToken": {
+          "median": 5200,
+          "min": 5038,
+          "max": 6426,
+          "n": 3
+        },
+        "firstSentence": {
+          "median": 5736,
+          "min": 5592,
+          "max": 7260,
+          "n": 3
+        },
+        "firstAudio": {
+          "median": 6526,
+          "min": 6375,
+          "max": 8625,
+          "n": 3
+        },
+        "sttSeconds": {
+          "median": 1.109,
+          "min": 0.951,
+          "max": 1.17,
+          "n": 3
+        },
+        "ttsSeconds": {
+          "median": 0.919,
+          "min": 0.627,
+          "max": 1.346,
+          "n": 3
+        },
+        "spokenTokensPerSecond": {
+          "median": 26.4,
+          "min": 23.3,
+          "max": 28.2,
+          "n": 3
+        },
+        "typedTokensPerSecond": {
+          "median": 26.3,
+          "min": 24.4,
+          "max": 26.6,
+          "n": 3
+        }
+      }
+    },
+    {
+      "id": "news",
+      "text": "What are the top news stories right now?",
+      "clipSpeechMs": 2005,
+      "warmUp": "qwen3.5-9b-64k-gpu:latest · 37.7 tokens/s",
+      "runs": [
+        {
+          "transcript": "What are the top news stories right now?",
+          "recorded": 9,
+          "heard": 1024,
+          "firstToken": 3849,
+          "firstSentence": 4195,
+          "firstAudio": 4820,
+          "sttSeconds": 1.009,
+          "ttsSeconds": 0.597,
+          "tools": [
+            "Searching the news store"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 25 tokens/s",
+          "answerChars": 819
+        },
+        {
+          "transcript": "What are the top news stories right now?",
+          "recorded": 9,
+          "heard": 1012,
+          "firstToken": 3413,
+          "firstSentence": 3792,
+          "firstAudio": 4467,
+          "sttSeconds": 0.995,
+          "ttsSeconds": 0.648,
+          "tools": [
+            "Searching the news store"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 24.7 tokens/s",
+          "answerChars": 854
+        },
+        {
+          "transcript": "What are the top news stories right now?",
+          "recorded": 12,
+          "heard": 1168,
+          "firstToken": 3521,
+          "firstSentence": 3895,
+          "firstAudio": 4665,
+          "sttSeconds": 1.149,
+          "ttsSeconds": 0.743,
+          "tools": [
+            "Searching the news store"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 24.6 tokens/s",
+          "answerChars": 821
+        }
+      ],
+      "typedTokensPerSecond": [
+        28.2,
+        27.9,
+        26.1
+      ],
+      "summary": {
+        "recorded": {
+          "median": 9,
+          "min": 9,
+          "max": 12,
+          "n": 3
+        },
+        "heard": {
+          "median": 1024,
+          "min": 1012,
+          "max": 1168,
+          "n": 3
+        },
+        "firstToken": {
+          "median": 3521,
+          "min": 3413,
+          "max": 3849,
+          "n": 3
+        },
+        "firstSentence": {
+          "median": 3895,
+          "min": 3792,
+          "max": 4195,
+          "n": 3
+        },
+        "firstAudio": {
+          "median": 4665,
+          "min": 4467,
+          "max": 4820,
+          "n": 3
+        },
+        "sttSeconds": {
+          "median": 1.009,
+          "min": 0.995,
+          "max": 1.149,
+          "n": 3
+        },
+        "ttsSeconds": {
+          "median": 0.648,
+          "min": 0.597,
+          "max": 0.743,
+          "n": 3
+        },
+        "spokenTokensPerSecond": {
+          "median": 24.7,
+          "min": 24.6,
+          "max": 25,
+          "n": 3
+        },
+        "typedTokensPerSecond": {
+          "median": 27.9,
+          "min": 26.1,
+          "max": 28.2,
+          "n": 3
+        }
+      }
+    },
+    {
+      "id": "web",
+      "text": "Who won the most recent Formula One race?",
+      "clipSpeechMs": 2304,
+      "warmUp": "qwen3.5-9b-64k-gpu:latest · 39.6 tokens/s",
+      "runs": [
+        {
+          "transcript": "who won the most recent Formula 1 race.",
+          "recorded": 5,
+          "heard": 1329,
+          "firstToken": 7227,
+          "firstSentence": 8330,
+          "firstAudio": 11209,
+          "sttSeconds": 1.316,
+          "ttsSeconds": 2.85,
+          "tools": [
+            "Searching the web"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 25.2 tokens/s",
+          "answerChars": 226
+        },
+        {
+          "transcript": "who won the most recent Formula 1 race.",
+          "recorded": 6,
+          "heard": 1080,
+          "firstToken": 7892,
+          "firstSentence": 8880,
+          "firstAudio": 10449,
+          "sttSeconds": 1.067,
+          "ttsSeconds": 1.547,
+          "tools": [
+            "Searching the web"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 29.3 tokens/s",
+          "answerChars": 144
+        },
+        {
+          "transcript": "who won the most recent Formula 1 race.",
+          "recorded": 3,
+          "heard": 1052,
+          "firstToken": 8202,
+          "firstSentence": 9508,
+          "firstAudio": 11962,
+          "sttSeconds": 1.043,
+          "ttsSeconds": 2.427,
+          "tools": [
+            "Searching the web"
+          ],
+          "error": null,
+          "meta": "qwen3.5-9b-64k-gpu:latest · 26.3 tokens/s",
+          "answerChars": 115
+        }
+      ],
+      "typedTokensPerSecond": [
+        26.5,
+        24.7,
+        23.9
+      ],
+      "summary": {
+        "recorded": {
+          "median": 5,
+          "min": 3,
+          "max": 6,
+          "n": 3
+        },
+        "heard": {
+          "median": 1080,
+          "min": 1052,
+          "max": 1329,
+          "n": 3
+        },
+        "firstToken": {
+          "median": 7892,
+          "min": 7227,
+          "max": 8202,
+          "n": 3
+        },
+        "firstSentence": {
+          "median": 8880,
+          "min": 8330,
+          "max": 9508,
+          "n": 3
+        },
+        "firstAudio": {
+          "median": 11209,
+          "min": 10449,
+          "max": 11962,
+          "n": 3
+        },
+        "sttSeconds": {
+          "median": 1.067,
+          "min": 1.043,
+          "max": 1.316,
+          "n": 3
+        },
+        "ttsSeconds": {
+          "median": 2.427,
+          "min": 1.547,
+          "max": 2.85,
+          "n": 3
+        },
+        "spokenTokensPerSecond": {
+          "median": 26.3,
+          "min": 25.2,
+          "max": 29.3,
+          "n": 3
+        },
+        "typedTokensPerSecond": {
+          "median": 24.7,
+          "min": 23.9,
+          "max": 26.5,
+          "n": 3
+        }
+      }
+    }
+  ],
+  "renderer": "ANGLE (Intel, Intel(R) Graphics (0x00007D67) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+}

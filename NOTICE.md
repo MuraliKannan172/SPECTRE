@@ -53,6 +53,9 @@ Every change below is in the git history; the design is in
 | material-symbols (Material Symbols Outlined font) | Apache License 2.0 |
 | Intel service Python packages (installed by uv from `intel/uv.lock`, not committed): FastAPI, Starlette, Pydantic, Uvicorn, HTTPX, feedparser, RapidFuzz, PyYAML, spaCy and its `en_core_web_sm` model | See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 | GeoNames `cities15000` and `countryInfo`, in `intel/app/geo/data/gazetteer.json.gz` | CC BY 4.0, "GeoNames, https://www.geonames.org/" |
+| Local voice, opt-in only (`scripts\skynet.ps1 -Voice`; not installed or bundled by default): faster-whisper, CTranslate2, ONNX Runtime, kokoro-onnx, PyAV | MIT (faster-whisper, CTranslate2, ONNX Runtime, kokoro-onnx); BSD-3-Clause (PyAV, whose wheels bundle FFmpeg libraries under FFmpeg's own licence) |
+| Local voice, opt-in only: phonemizer and espeak-ng (through espeakng-loader, MIT), pulled in by kokoro-onnx | **GPL-3.0** (phonemizer GPL-3.0-or-later). SKYNET's code stays MIT and never ships these; the person who opts in installs them on their own machine. Piper, the brief's other text-to-speech option, is GPL-3.0 itself. |
+| Voice models fetched by `intel/scripts/fetch_voice_models.py`: faster-whisper `base`, Kokoro-82M and its voices | MIT (Whisper base); Apache-2.0 (Kokoro-82M) |
 
 Data sources, their terms and required attribution are listed in
 [DATA_SOURCES.md](DATA_SOURCES.md).

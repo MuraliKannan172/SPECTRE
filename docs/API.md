@@ -120,6 +120,14 @@ The current conversation as `{"conversation_id", "messages": [{"role", "content"
 
 `loaded` comes from Ollama's `/api/ps` and is `null` until the first answer loads the model.
 
+### Local voice (`/api/intel/voice`, opt-in)
+
+Push-to-talk for the Neural Core. The routes answer this machine only and, like the chat routes, refuse any request carrying an Origin header or a cross-site fetch marker.
+
+- `GET /api/intel/voice/status`: `{"state": "unavailable" | "idle" | "loading" | "ready" | "failed", "reason": "disabled" | "not_installed" | "models_missing" | null, "error", "stt": {"model": "whisper-base", "device": "cpu"}, "tts": {"model": "kokoro-82m", "voice", "lang"}, "speaks": ["en"]}`. The engines load once, in the background, when the service starts; until then the other routes answer `503` with `voice_loading`.
+- `POST /api/intel/voice/transcribe`: the body is one recording (`audio/webm`, `audio/ogg`, `audio/wav` or `audio/mp4`, at most 2 MB and 60 s). Returns `{"text", "language", "language_probability", "audio_seconds", "speech_seconds", "seconds"}`. Silence or under 0.4 s of speech is `422 no_speech`; unreadable audio is `422 bad_audio`. Audio is never stored or logged.
+- `POST /api/intel/voice/speak`: `{"text"}` (at most 1000 characters; citation numbers, markdown, links and an "As of" line are dropped first) returns `audio/wav`, with the synthesis time in `X-Voice-Seconds`. Nothing left to say is `422 nothing_to_say`.
+
 Tool schemas live in `shared/tools/neural-core.tools.json`. `npm run tools:export` writes its client half from `src/tools/registry.js`, and `uv run --project intel python intel/scripts/export_tools.py` writes the server half.
 
 ## Shapes
@@ -223,5 +231,9 @@ While the switch is off, the API also stops serving what such sources reported, 
 | `SKYNET_LOW_RESOURCE` | off | 8k context and smaller history and web budgets. |
 | `SKYNET_SEARCH_PROVIDER` | `ddgs` | `ddgs`, `searxng` (with `SEARXNG_URL`), `brave` (`BRAVE_API_KEY`) or `tavily` (`TAVILY_API_KEY`). |
 | `SKYNET_CHAT_TURNS_PER_MINUTE` | `12` | Chat rate limit. |
+| `SKYNET_VOICE` | on when installed | `0` turns local voice off. |
+| `SKYNET_VOICE_THREADS` | `8` | CPU threads for speech to text, and again for text to speech. |
+| `SKYNET_TTS_VOICE` | `af_heart` | An English Kokoro voice (`af_*`, `am_*`, `bf_*`, `bm_*`). |
+| `SKYNET_VOICE_DIR` | `intel/data/voice` | Where `fetch_voice_models.py` puts the models. |
 
 `intel/feeds.local.yaml` uses the same shape as `intel/feeds.default.yaml`. Entries merge by `id`, so `- {id: bbc-world, enabled: false}` turns one off, and a new id adds a feed. `gdelt: {enabled: false}` switches GDELT off.
