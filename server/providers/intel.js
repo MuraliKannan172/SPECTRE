@@ -6,9 +6,11 @@ import http from 'node:http';
  * directly, so the app's CSP stays same-origin.
  *
  * - News routes are read-only: GET and HEAD on news, story, stream, health.
- * - Neural Core routes (/chat...) answer only requests from this machine,
- *   unless SKYNET_CHAT_ALLOW_LAN=1 opts LAN viewers in. Writes must come from
- *   this page's own origin and carry a JSON body of at most 64 KB.
+ * - Neural Core routes (/chat..., /voice...) answer only requests from this
+ *   machine, unless SKYNET_CHAT_ALLOW_LAN=1 opts LAN viewers in. Writes must
+ *   come from this page's own origin and carry a body of the route's type and
+ *   size: JSON of at most 64 KB, or for /voice/transcribe one recorded
+ *   question (audio, at most 2 MB).
  * - The target is loopback only. SKYNET_INTEL_URL may move the port, never
  *   the host off this machine.
  * - Host is set to the target's, which the service's DNS-rebinding allowlist
@@ -23,6 +25,14 @@ import http from 'node:http';
 
 const DEFAULT_TARGET = 'http://127.0.0.1:8100';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
+const JSON_BODY = Object.freeze({
+  types: ['application/json'],
+  limit: 64 * 1024,
+});
+const AUDIO_BODY = Object.freeze({
+  types: ['audio/webm', 'audio/ogg', 'audio/wav', 'audio/x-wav', 'audio/mp4'],
+  limit: 2 * 1024 * 1024,
+});
 const ROUTES = Object.freeze([
   {
     methods: ['GET', 'HEAD'],
@@ -41,8 +51,23 @@ const ROUTES = Object.freeze([
     pattern: /^\/chat(?:\/tool-result|\/stop)?$/,
     chat: true,
     write: true,
-    body: true,
+    body: JSON_BODY,
     stream: /^\/chat$/,
+  },
+  { methods: ['GET'], pattern: /^\/voice\/status$/, chat: true },
+  {
+    methods: ['POST'],
+    pattern: /^\/voice\/transcribe$/,
+    chat: true,
+    write: true,
+    body: AUDIO_BODY,
+  },
+  {
+    methods: ['POST'],
+    pattern: /^\/voice\/speak$/,
+    chat: true,
+    write: true,
+    body: JSON_BODY,
   },
 ]);
 const FORWARD_REQUEST_HEADERS = ['accept', 'last-event-id'];
@@ -50,9 +75,9 @@ const FORWARD_RESPONSE_HEADERS = [
   'content-type',
   'cache-control',
   'retry-after',
+  'x-voice-seconds',
 ];
 const REQUEST_TIMEOUT_MS = 15_000;
-const MAX_BODY_BYTES = 64 * 1024;
 
 /** The service base URL: SKYNET_INTEL_URL when it is http on loopback. */
 export function intelTarget(env = process.env) {
@@ -169,12 +194,14 @@ export function createIntelHandler({
         .split(';', 1)[0]
         .trim()
         .toLowerCase();
-      if (type !== 'application/json') {
-        sendJson(res, 415, { error: 'json_only' });
+      if (!route.body.types.includes(type)) {
+        sendJson(res, 415, {
+          error: route.body === JSON_BODY ? 'json_only' : 'audio_only',
+        });
         return;
       }
       try {
-        body = await readBody(req, MAX_BODY_BYTES);
+        body = await readBody(req, route.body.limit);
       } catch (failure) {
         const tooLarge = failure.code === 'TOO_LARGE';
         res.setHeader('Connection', 'close');
@@ -183,7 +210,7 @@ export function createIntelHandler({
         });
         return;
       }
-      headers['content-type'] = 'application/json';
+      headers['content-type'] = type;
       headers['content-length'] = String(body.length);
     }
     const streaming = Boolean(route.stream?.test(path));

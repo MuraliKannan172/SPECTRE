@@ -279,3 +279,100 @@ test('chat answers this machine only unless LAN is opted in', async () => {
   await open(lan, reply());
   assert.equal(calls.length, 2);
 });
+
+test('voice uploads keep their audio type, and replies keep their timing', async (t) => {
+  const seen = [];
+  const upstream = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    seen.push({
+      url: req.url,
+      headers: req.headers,
+      body: Buffer.concat(chunks),
+    });
+    if (req.url === '/api/intel/voice/speak') {
+      res.writeHead(200, {
+        'Content-Type': 'audio/wav',
+        'X-Voice-Seconds': '0.812',
+      });
+      res.end(Buffer.from('RIFF'));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{"text":"Fly to Nairobi."}');
+  });
+  const proxy = await proxyFor(upstream.url);
+  t.after(() => closeAll(upstream.server, proxy.server));
+  const audio = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3]);
+
+  const heard = await fetch(`${proxy.url}/api/intel/voice/transcribe`, {
+    method: 'POST',
+    headers: { 'content-type': 'audio/webm;codecs=opus', origin: proxy.url },
+    body: audio,
+  });
+  assert.equal(heard.status, 200);
+  assert.deepEqual(await heard.json(), { text: 'Fly to Nairobi.' });
+  assert.equal(seen[0].headers['content-type'], 'audio/webm');
+  assert.equal(seen[0].headers.origin, undefined);
+  assert.deepEqual(seen[0].body, audio);
+
+  const spoken = await fetch(`${proxy.url}/api/intel/voice/speak`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: proxy.url },
+    body: '{"text":"Done."}',
+  });
+  assert.equal(spoken.headers.get('content-type'), 'audio/wav');
+  assert.equal(spoken.headers.get('x-voice-seconds'), '0.812');
+  assert.equal(Buffer.from(await spoken.arrayBuffer()).toString(), 'RIFF');
+});
+
+test('voice refuses other sites, the wrong type, oversize audio and the LAN', async (t) => {
+  let reached = 0;
+  const upstream = await listen((_req, res) => {
+    reached += 1;
+    res.writeHead(200).end('{}');
+  });
+  const proxy = await proxyFor(upstream.url);
+  t.after(() => closeAll(upstream.server, proxy.server));
+  const transcribe = (headers, body = 'x') =>
+    fetch(`${proxy.url}/api/intel/voice/transcribe`, {
+      method: 'POST',
+      headers,
+      body,
+    });
+  const webm = { 'content-type': 'audio/webm' };
+  assert.equal(
+    (await transcribe({ ...webm, origin: 'https://evil.example' })).status,
+    403,
+  );
+  const json = await transcribe({ 'content-type': 'application/json' }, '{}');
+  assert.equal(json.status, 415);
+  assert.match(await json.text(), /audio_only/);
+  const speakAudio = await fetch(`${proxy.url}/api/intel/voice/speak`, {
+    method: 'POST',
+    headers: webm,
+    body: 'x',
+  });
+  assert.equal(speakAudio.status, 415);
+  assert.equal(
+    (await transcribe(webm, Buffer.alloc(2 * 1024 * 1024 + 1))).status,
+    413,
+  );
+  assert.equal(reached, 0);
+
+  const handler = createIntelHandler({ target: upstream.url, env: {} });
+  const res = { status: 0, body: '' };
+  res.writeHead = (code) => (res.status = code);
+  res.end = (text = '') => (res.body = String(text));
+  await handler(
+    {
+      method: 'GET',
+      url: '/voice/status',
+      headers: {},
+      socket: { remoteAddress: '192.168.1.40' },
+    },
+    res,
+  );
+  assert.equal(res.status, 403);
+  assert.equal(reached, 0);
+});
