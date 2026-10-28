@@ -170,3 +170,80 @@ function searchNote(search) {
     return t('Web search: DuckDuckGo via ddgs (best effort)');
   return t('Web search: {provider}', { provider: search.provider });
 }
+
+const VOICE_TEXT = Object.freeze({
+  ready: msg('Hold to talk'),
+  unsupported: msg('This browser cannot record audio.'),
+  disabled: msg('Local voice is turned off (SKYNET_VOICE=0).'),
+  not_installed: msg(
+    'Local voice is not installed: run scripts\\skynet.ps1 -Voice',
+  ),
+  models_missing: msg(
+    'Local voice models are missing: run scripts\\skynet.ps1 -Voice',
+  ),
+  voice_idle: msg('Local voice is starting…'),
+  voice_loading: msg('Local voice is loading…'),
+  voice_failed: msg('Local voice failed to load; see the intel service log.'),
+  voice_unavailable: msg('Local voice is not available.'),
+  listening: msg('Listening… release to send'),
+  transcribing: msg('Transcribing…'),
+  speaking: msg('Speaking… press the mic to stop'),
+  too_short: msg('Hold the button while you speak.'),
+  no_speech: msg('No speech heard. Hold the button while you speak.'),
+  bad_audio: msg('The recording could not be read.'),
+  too_long: msg('That recording was too long.'),
+  mic_denied: msg('Microphone access was denied.'),
+  no_mic: msg('No microphone was found.'),
+  mic_failed: msg('The microphone could not be opened.'),
+  busy: msg('Wait for the answer, or press Stop.'),
+  english_only: msg(
+    'Spoken replies are in English only; this answer is shown as text.',
+  ),
+  speech_failed: msg('The answer could not be spoken.'),
+});
+
+/** The text for a local voice state or failure code. */
+export function voiceText(code) {
+  const template = VOICE_TEXT[code];
+  return template ? t(template) : errorText(code);
+}
+
+/**
+ * Whether the mic can be used, from GET /api/intel/voice/status (or the
+ * failure to get it), and the reason when it cannot.
+ * @returns {{ready: boolean, reason: string}}
+ */
+export function voiceState(
+  status,
+  { supported = true, failureCode = null } = {},
+) {
+  if (!supported) return { ready: false, reason: voiceText('unsupported') };
+  if (failureCode) return { ready: false, reason: errorText(failureCode) };
+  if (status?.state === 'ready') return { ready: true, reason: '' };
+  if (status?.state === 'unavailable')
+    return { ready: false, reason: voiceText(status.reason) };
+  return {
+    ready: false,
+    reason: voiceText(`voice_${status?.state || 'unavailable'}`),
+  };
+}
+
+/** The microphone failure code for a getUserMedia error. */
+export function micFailure(error) {
+  if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError')
+    return 'mic_denied';
+  if (error?.name === 'NotFoundError' || error?.name === 'OverconstrainedError')
+    return 'no_mic';
+  return 'mic_failed';
+}
+
+/** Footer note for a spoken turn: seconds from release to transcript and to the first word. */
+export function voiceTimingText({ heardMs, firstWordMs }) {
+  const seconds = (ms) => (ms / 1000).toFixed(1);
+  if (!Number.isFinite(firstWordMs))
+    return t('voice: heard in {heard} s', { heard: seconds(heardMs) });
+  return t('voice: heard in {heard} s, first word after {first} s', {
+    heard: seconds(heardMs),
+    first: seconds(firstWordMs),
+  });
+}

@@ -18,7 +18,12 @@
  *         question; Clear asks once more before deleting the history.
  *   (iii) OFFLINE — with Ollama reported unreachable, the header and the turn
  *         both say so plainly.
- *   (iv)  PHONE — at 375 px the panel is a sheet above the tab bar with no
+ *   (iv)  VOICE — push-to-talk with Chrome's fake microphone: without the
+ *         models the mic says how to install them; held and released, the
+ *         recording is transcribed (mocked), sent as the question and the
+ *         answer is spoken sentence by sentence; a press while it speaks
+ *         stops it, and the rest of the answer is never requested.
+ *   (v)   PHONE — at 375 px the panel is a sheet above the tab bar with no
  *         horizontal scroll.
  *
  * Screenshots go to qa-shots/ (gitignored). Exits non-zero on any FAIL.
@@ -147,12 +152,55 @@ const TURN = {
   ]),
 };
 
+// Local voice (shapes from intel/app/api/voice.py).
+const VOICE_STATUS = {
+  missing: {
+    state: 'unavailable',
+    reason: 'models_missing',
+    error: null,
+    speaks: ['en'],
+  },
+  ready: { state: 'ready', reason: null, error: null, speaks: ['en'] },
+};
+const SPOKEN_QUESTION = 'Fly to Tokyo and show me the news.';
+const SPOKEN_TURN = sse([
+  ['turn', { turn_id: TURN_ID, conversation_id: 1 }],
+  ['token', { text: 'The first sentence is about Tokyo. ' }],
+  ['token', { text: 'The second one names the layer. ' }],
+  ['token', { text: 'The third one would end it.' }],
+  ['done', { model: 'bonsai-2:9b', tokens_per_s: 60, citations: [] }],
+]);
+const SPEAK_DELAY_MS = 600;
+
+/** `seconds` of silence as a 16 kHz mono 16-bit WAV file. */
+function silentWav(seconds) {
+  const samples = Math.round(16_000 * seconds);
+  const wav = Buffer.alloc(44 + samples * 2);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(36 + samples * 2, 4);
+  wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(16_000, 24);
+  wav.writeUInt32LE(32_000, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(samples * 2, 40);
+  return wav;
+}
+const CLIP = silentWav(2);
+
 let mode = 'ready';
+let voiceMode = 'missing';
+const transcribed = [];
+const spokenTexts = [];
 const toolResults = [];
 const turnBodies = [];
 let historyCleared = 0;
 
-function intercept(request) {
+async function intercept(request) {
   const url = new URL(request.url());
   const json = (body, status = 200) =>
     request.respond({
@@ -178,12 +226,37 @@ function intercept(request) {
   if (url.pathname === '/api/intel/news')
     return json({ items: [], next_cursor: null, freshness: NEWS_FRESHNESS });
   if (url.pathname === '/api/intel/health') return json({ state: 'live' });
+  if (url.pathname === '/api/intel/voice/status')
+    return json(VOICE_STATUS[voiceMode]);
+  if (url.pathname === '/api/intel/voice/transcribe') {
+    // A binary body is not in postData(); fetch it to see it was sent.
+    const body = request.hasPostData()
+      ? await request.fetchPostData().catch(() => '')
+      : '';
+    transcribed.push({
+      type: request.headers()['content-type'] || '',
+      bytes: body?.length ?? 0,
+    });
+    return json({ text: SPOKEN_QUESTION, language: 'en', seconds: 0.4 });
+  }
+  if (url.pathname === '/api/intel/voice/speak') {
+    spokenTexts.push(JSON.parse(request.postData() || '{}').text);
+    return sleep(SPEAK_DELAY_MS).then(() =>
+      request.respond({
+        status: 200,
+        contentType: 'audio/wav',
+        headers: { 'X-Voice-Seconds': '0.2' },
+        body: CLIP,
+      }),
+    );
+  }
   if (url.pathname === '/api/intel/chat' && request.method() === 'POST') {
-    turnBodies.push(JSON.parse(request.postData() || '{}'));
+    const body = JSON.parse(request.postData() || '{}');
+    turnBodies.push(body);
     return request.respond({
       status: 200,
       contentType: 'text/event-stream',
-      body: TURN[mode],
+      body: body.message === SPOKEN_QUESTION ? SPOKEN_TURN : TURN[mode],
     });
   }
   return request.continue();
@@ -252,6 +325,16 @@ async function ask(page, text) {
       ),
     };
   });
+}
+
+/** Hold the mic button down for `ms` with the mouse (a real gesture). */
+async function holdMic(page, ms) {
+  const box = await (await page.$('.skynet-nc-mic')).boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await sleep(ms);
+  await page.mouse.up();
+  await sleep(300);
 }
 
 function header(page) {
@@ -419,7 +502,103 @@ async function run(page) {
     JSON.stringify(failed.error),
   );
 
-  console.log('(iv) PHONE...');
+  console.log('(iv) VOICE...');
+  mode = 'ready';
+  voiceMode = 'missing';
+  await boot(page);
+  await openPanel(page);
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('.skynet-nc-mic')
+        ?.getAttribute('aria-disabled') === 'true',
+    { timeout: 10_000 },
+  );
+  await holdMic(page, 400);
+  const missing = await page.evaluate(() => ({
+    title: document.querySelector('.skynet-nc-mic').title,
+    hint: document.querySelector('.skynet-nc-voice').textContent,
+  }));
+  record(
+    'Without the models the mic stays visible and says how to install them',
+    /scripts\\skynet\.ps1 -Voice/.test(missing.title) &&
+      missing.hint === missing.title &&
+      transcribed.length === 0,
+    JSON.stringify(missing),
+  );
+
+  voiceMode = 'ready';
+  await boot(page);
+  await openPanel(page);
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('.skynet-nc-mic')
+        ?.getAttribute('aria-disabled') === 'false',
+    { timeout: 15_000 },
+  );
+  const turnsBefore = turnBodies.length;
+  await holdMic(page, 1500);
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector('.is-assistant:last-child')?.dataset
+          .voiceFirstAudioMs,
+      { timeout: 20_000 },
+    )
+    .catch(() => {});
+  const spoken = await page.evaluate(() => {
+    const answer = document.querySelector('.is-assistant:last-child');
+    const users = document.querySelectorAll('.is-user');
+    return {
+      question: users[users.length - 1]?.textContent,
+      firstAudioMs: answer?.dataset.voiceFirstAudioMs,
+      heardMs: answer?.dataset.voiceHeardMs,
+      meta: [...(answer?.querySelectorAll('.skynet-nc-meta') || [])]
+        .map((node) => node.textContent)
+        .join(' | '),
+      hint: document.querySelector('.skynet-nc-voice').textContent,
+    };
+  });
+  record(
+    'Held and released, the recording is sent once as audio',
+    transcribed.length === 1 &&
+      /^audio\//.test(transcribed[0].type) &&
+      transcribed[0].bytes > 0,
+    JSON.stringify(transcribed),
+  );
+  record(
+    'The transcript is asked as an ordinary question',
+    spoken.question === SPOKEN_QUESTION &&
+      turnBodies.length === turnsBefore + 1 &&
+      turnBodies.at(-1).message === SPOKEN_QUESTION,
+    JSON.stringify({ question: spoken.question }),
+  );
+  record(
+    'The answer is spoken sentence by sentence, with its timing shown',
+    spokenTexts[0] === 'The first sentence is about Tokyo.' &&
+      Number(spoken.firstAudioMs) > 0 &&
+      /first word after/.test(spoken.meta) &&
+      spoken.hint.startsWith('Speaking'),
+    JSON.stringify({ spokenTexts, ...spoken }),
+  );
+  // A press while it speaks silences it: the second sentence's request is
+  // aborted and the third is never made.
+  await holdMic(page, 50);
+  await sleep(SPEAK_DELAY_MS * 3 + 2500);
+  const stopped = await page.evaluate(
+    () => document.querySelector('.skynet-nc-voice').textContent,
+  );
+  record(
+    'A press while it speaks stops it, and the rest is never requested',
+    spokenTexts.length === 2 && !stopped.startsWith('Speaking'),
+    JSON.stringify({ spokenTexts, hint: stopped }),
+  );
+  await page.screenshot({
+    path: path.join(SHOTS_DIR, 'skynet-neural-core-voice.png'),
+  });
+
+  console.log('(v) PHONE...');
   mode = 'ready';
   await page.setViewport({ width: 375, height: 812, isMobile: true });
   await boot(page);
@@ -484,6 +663,9 @@ async function main() {
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--window-size=1440,900',
+      // A fake microphone (a tone) granted without a prompt, for section (iv).
+      '--use-fake-ui-for-media-stream',
+      '--use-fake-device-for-media-stream',
     ],
   });
   try {

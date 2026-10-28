@@ -1,9 +1,11 @@
 /**
- * SKYNET Neural Core: the browser side of /api/intel/chat, through the app's
- * same-origin proxy (server/providers/intel.js). Transport only, no DOM.
+ * SKYNET Neural Core: the browser side of /api/intel/chat and /voice, through
+ * the app's same-origin proxy (server/providers/intel.js). Transport only, no
+ * DOM.
  */
 
 const BASE = '/api/intel/chat';
+const VOICE = '/api/intel/voice';
 
 /** A failed call; `code` is the service's or proxy's own reason. */
 export class NeuralCoreError extends Error {
@@ -72,9 +74,13 @@ export function createSseParser(onEvent) {
 export function createNeuralCoreClient({
   fetchImpl = (...args) => globalThis.fetch(...args),
 } = {}) {
-  async function json(path, init = {}) {
-    const response = await fetchImpl(`${BASE}${path}`, init);
+  async function call(url, init = {}) {
+    const response = await fetchImpl(url, init);
     if (!response.ok) throw await failure(response);
+    return response;
+  }
+  async function json(path, init = {}, base = BASE) {
+    const response = await call(`${base}${path}`, init);
     return response.status === 204 ? null : response.json();
   }
 
@@ -94,6 +100,32 @@ export function createNeuralCoreClient({
           error: ok ? null : String(error ?? 'failed').slice(0, 500),
         }),
       ),
+
+    /** Local voice: whether it can run, and why not. */
+    voiceStatus: ({ signal } = {}) => json('/status', { signal }, VOICE),
+    /** One recorded question as text: {text, language, seconds, ...}. */
+    transcribe: (audio, { signal } = {}) =>
+      json(
+        '/transcribe',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': audio.type || 'audio/webm' },
+          body: audio,
+          signal,
+        },
+        VOICE,
+      ),
+    /** One sentence as WAV audio, and the seconds the service took. */
+    async speak(text, { signal } = {}) {
+      const response = await call(`${VOICE}/speak`, {
+        ...post({ text }),
+        signal,
+      });
+      return {
+        audio: await response.arrayBuffer(),
+        seconds: Number(response.headers.get('x-voice-seconds')) || null,
+      };
+    },
 
     /**
      * Run one turn; resolves when the stream ends. Events arrive through
