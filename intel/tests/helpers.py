@@ -7,8 +7,30 @@ from collections.abc import Callable
 from pathlib import Path
 
 import httpx
+from keyring.backend import KeyringBackend
+from keyring.errors import PasswordDeleteError
 
 from app.config import Settings
+
+
+class MemoryKeyring(KeyringBackend):
+    """A keyring in a dict: tests never touch the OS credential store."""
+
+    priority = 1  # type: ignore[assignment]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.values: dict[tuple[str, str], str] = {}
+
+    def get_password(self, service: str, username: str) -> str | None:
+        return self.values.get((service, username))
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        self.values[(service, username)] = password
+
+    def delete_password(self, service: str, username: str) -> None:
+        if self.values.pop((service, username), None) is None:
+            raise PasswordDeleteError(username)
 
 
 def make_settings(tmp_path: Path, feeds_yaml: str, **overrides: object) -> Settings:

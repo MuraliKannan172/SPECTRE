@@ -11,6 +11,8 @@ from __future__ import annotations
 import email.utils
 import time
 
+from ...redact import redact
+
 AUTH_FAILED = "auth_failed"
 RATE_LIMITED = "rate_limited"
 QUOTA_EXCEEDED = "quota_exceeded"
@@ -48,10 +50,11 @@ class ProviderError(RuntimeError):
     ) -> None:
         if code not in CODES:
             raise ValueError(f"unknown provider error code: {code}")
-        super().__init__(message or code)
+        # Providers echo keys in error bodies; nothing past here may carry one.
+        super().__init__(redact(message) or code)
         self.code = code
         self.provider = provider
-        self.detail = detail
+        self.detail = redact(detail)
         self.status = status
         self.retry_after = retry_after
 
