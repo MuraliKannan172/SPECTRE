@@ -1,0 +1,19 @@
+# Neural Core chat providers (ADR-002 D1). No keys, ever: keys live in the
+# environment, the OS keyring or the owner-only .env (ADR-002 D5).
+#
+#   id        stable identifier, stored with conversations and messages
+#   label     what the panel shows
+#   adapter   the adapter class in app/chat/providers/
+#   kind      local | remote | cloud: the badge before any per-model rule
+#   base_url  default endpoint; a user override wins (OLLAMA_HOST for ollama)
+#   key_env   environment variables that may hold its key
+#   docs      where its API is documented
+
+providers:
+  - id: ollama
+    label: Ollama
+    adapter: ollama
+    kind: local
+    base_url: http://127.0.0.1:11434
+    key_env: []
+    docs: https://docs.ollama.com/api

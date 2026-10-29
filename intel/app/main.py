@@ -21,7 +21,7 @@ from .api.chat import router as chat_router
 from .api.routes import router
 from .api.voice import router as voice_router
 from .chat.agent import Agent
-from .chat.ollama import OllamaClient
+from .chat.providers.registry import ProviderConfigError, default_providers
 from .chat.tools import ToolRegistry
 from .config import BRAND_NAME, DEFAULT_DB, DEFAULT_LOGS, Settings, load_settings
 from .geo.gazetteer import Gazetteer
@@ -111,18 +111,25 @@ def create_app(
                 app.state.chat_problem = (
                     f"tool artifact unreadable ({type(error).__name__}): run npm run tools:export"
                 )
+        providers = None
+        try:
+            providers = default_providers(ollama_http=ollama_http, ollama_host=settings.ollama_host)
+        except (OSError, ValueError, ProviderConfigError) as error:
+            app.state.chat_problem = f"providers.default.yaml unreadable ({type(error).__name__}): {error}"
+        ollama = providers["ollama"] if providers else None
         app.state.agent = (
             Agent(
                 settings=settings,
-                ollama=OllamaClient(settings.ollama_host, ollama_http),
+                ollama=ollama.client,
                 news=store,
                 chats=chats,
                 search=search_service,
                 fetcher=PageFetcher(fetch_http, user_agent_token=settings.user_agent.split("/", 1)[0]),
                 registry=registry,
                 open_only=lambda: not settings.noncommercial_enabled(),
+                provider=ollama,
             )
-            if registry is not None
+            if registry is not None and ollama is not None
             else None
         )
         voice_service = voice or VoiceService(settings)

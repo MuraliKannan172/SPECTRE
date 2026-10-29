@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..chat.agent import Turn
 from ..chat.ollama import OllamaError
+from ..chat.providers.errors import ProviderError
 
 router = APIRouter(prefix="/api/intel/chat")
 
@@ -234,8 +235,8 @@ async def status(request: Request) -> dict[str, Any]:
         capabilities = await agent.capabilities()
         result["model_present"] = True
         result["tools"] = "tools" in capabilities
-    except OllamaError as error:
-        result["model_present"] = False if error.code == "not_found" else None
+    except ProviderError as error:
+        result["model_present"] = False if error.detail == "not_found" else None
     try:
         for model in await agent.ollama.ps():
             if model.get("name") == settings.ollama_model or model.get("model") == settings.ollama_model:
