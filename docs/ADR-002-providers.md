@@ -286,6 +286,16 @@ validation before every tool call, `<untrusted_web_content>` wrapping, the web b
 SSRF guard. What moves out of `agent.py` into adapters is the wire format: payload building,
 chunk parsing, tool-call extraction and statistics.
 
+- **The forced final answer keeps its behaviour, with a mechanism per adapter.** The loop's last
+  round must produce an answer, not another call. Some APIs reject tool history without tools
+  (OpenRouter documents that `tools` must be sent on every request), so:
+  - Ollama keeps today's request without `tools`.
+  - Chat Completions and Responses providers send the same tools with `tool_choice: "none"`.
+  - Anthropic does the same (`tool_choice: {type: "none"}`). **UNVERIFIED:** whether it would
+    accept `tool_use` / `tool_result` history without `tools` was not confirmed; P3 settles it
+    with a fixture and a live check.
+
+  A quirk test asserts the final request of a 4-round turn per adapter.
 - **Parallel tool calls:** run every call of a round, then return all results in one
   provider-correct step. For Anthropic that is one `user` message holding every `tool_result`;
   for OpenAI-style APIs one `tool` message per call id after the assistant's tool-call message.
@@ -347,13 +357,16 @@ New numbered migration; `0001` and `0002` are untouched and existing conversatio
 
 - **Server side only.** Keys live in the intel service and never reach the browser, SSE, logs,
   history, error bodies or URLs.
-- **Precedence:**
-  1. Conventional env vars (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
-     `NVIDIA_API_KEY`, `DEEPSEEK_API_KEY`): read-only, shown as "configured externally".
-  2. The OS keyring: Windows Credential Manager through the `keyring` package (new dependency).
-  3. An owner-only `.env` entry, only where no keyring backend is available.
-- **`OPENAI_API_KEY` is shared** with God's Eye View's voice: a value already in `.env` from the
-  POWER UP panel is used for ChatGPT, not asked for twice.
+- **Precedence (reading):**
+  1. The process environment at boot (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+     `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`, `DEEPSEEK_API_KEY`): read-only, shown as "configured
+     externally".
+  2. The OS keyring (Windows Credential Manager through the `keyring` package, a new
+     dependency). **This is where SPECTRE writes.**
+  3. The repo's owner-only `.env`. It is always read, but **written only when no keyring backend
+     is available**.
+- **`OPENAI_API_KEY` is shared** with God's Eye View's voice: a value the POWER UP panel already
+  saved to `.env` is found at step 3 and used for ChatGPT, not asked for twice.
 - **API** (intel service, behind new proxy routes marked local-only and write):
   `GET /api/intel/providers` → per provider `{configured, source, last4?}`; `PUT …/{id}/key`
   (write-only), `DELETE …/{id}/key`, `POST …/{id}/test`, `GET …/{id}/models`,
@@ -444,11 +457,16 @@ today.
 
 ### D9. Context budget
 
-The window comes from model metadata: Anthropic `max_input_tokens`, OpenRouter `context_length`,
-DeepSeek `context_window`, Ollama `context_length` with the requested `num_ctx` (default 8192
-when unknown). The existing per-turn budgets scale with it. When over budget, the oldest tool
-results are trimmed first, then the oldest history. The 4-characters-per-token estimate is
-corrected with the provider's reported usage.
+- **Where the window comes from:** model metadata (Anthropic `max_input_tokens`, OpenRouter
+  `context_length`, DeepSeek `context_window`, Ollama `context_length` with the requested
+  `num_ctx`; 8192 when unknown).
+- **Ollama:** budgets scale with `num_ctx` as today.
+- **Cloud providers:** **today's budgets (the 16k-context set) are a fixed ceiling**. A model's
+  window only ever lowers them; a 1M-token window does not raise them, because every token is
+  billed. The user can raise the ceiling explicitly in Settings → Neural Core, next to the cost
+  guards (D10).
+- **When over budget:** the oldest tool results are trimmed first, then the oldest history.
+- **The estimate:** 4 characters per token, corrected with the provider's reported usage.
 
 ### D10. Usage and cost
 
@@ -464,8 +482,12 @@ corrected with the provider's reported usage.
     token (shown ×1,000,000 as USD per 1M); its own `cost` field is in credits and is not shown.
   - Everything else: an optional price per 1M tokens that the user types.
   - No built-in price tables; with no price known, tokens only.
-- **Guards:** per-turn `max_output_tokens`, the 4-round cap, and a per-session soft budget
-  (suggested 100k tokens, configurable) that pauses with a "continue" confirmation.
+- **Guards:**
+  - per-turn `max_output_tokens`;
+  - the 4-round cap;
+  - the fixed per-turn input ceiling for cloud providers (D9);
+  - a per-session soft budget (suggested 100k tokens, configurable) that pauses with a "continue"
+    confirmation.
 
 ### D11. UI plan
 
@@ -526,8 +548,9 @@ the picker, a default that is not installed sends the user to the picker instead
     the history database or browser storage; the test greps the captured artefacts.
   - Key routes reject non-loopback, cross-origin and missing-token requests.
   - Model output cannot inject markup.
-- **Browser smoke test** `scripts/qa-neural-core-providers.mjs` (Puppeteer, like the existing QA
-  scripts, mocked endpoints): configure a provider against a fake, search and pick a model, the
+- **Browser smoke test** `scripts/qa-neural-core-providers.mjs` (mocked endpoints).
+  **Deviation:** the brief says Playwright; this uses Puppeteer, like every existing QA script in
+  `scripts/`. It covers: configure a provider against a fake, search and pick a model, the
   consent flow, local-only blocking cloud, no silent fallback, 390 px layout.
 - **Regression:** `npm test`, intel `pytest`, `npm run build`, `qa:neural-core`,
   `qa:spectre-boot` and the 15-prompt eval after each phase, against §1.1.
@@ -553,7 +576,7 @@ the picker, a default that is not installed sends the user to the picker instead
 | Refactoring the loop changes Ollama behaviour | P1 is a no-behaviour-change refactor gated on the 15/15 eval and the existing tests |
 | Dependency weight (`anthropic`, `openai`, `keyring`) | Pinned; no new browser dependencies; the intel service already ships `httpx` and `pydantic` |
 | Costs run away | Per-turn output cap, 4-round cap, session soft budget with a confirmation |
-| Anthropic thinking across turns: on 5.5 models, replayed thinking blocks need append-only history, while our history replays earlier turns as final text only | Thinking blocks are kept within a turn's tool loop. Whether earlier turns may drop them is UNVERIFIED and is settled by Murali's live run; if not, the final answer's blocks are persisted in `provider_state` and replayed |
+| Reasoning passback across turns (Anthropic thinking blocks with append-only history on 5.5 models, OpenAI reasoning items, DeepSeek `reasoning_content` with reasoning on): our history replays earlier turns as final text only and drops their tool-call messages | Passback is complete within a turn's tool loop. Whether earlier turns may be replayed as text is UNVERIFIED per provider and settled by fixtures and Murali's live runs. If a provider needs each turn's full transcript, that is a **new migration** (`0004`, since `0003` lands in P2), not an edit |
 | Error shapes some providers do not document (input too long, unknown model, NIM 401/429) | The mapping falls back on HTTP status; fixtures and live runs fill in the rest |
 | NIM models that answer asynchronously (202) | Shown as `unsupported_feature` in v1, not polled |
 
@@ -571,9 +594,15 @@ Each phase: run the tests, commit, give a 5-line status, and stop on any red tes
 
 ## 6. Decisions needed from Murali
 
-1. **Q1 Where keys are typed.** Recommended: new rows in the existing POWER UP / Provider
-   Settings panel that store through the intel service (keyring), as the brief asks for one key
-   UI. Alternative: key fields inside Settings → Neural Core, with POWER UP only linking there.
+1. **Q1 Where keys are typed.**
+   - **Recommended:** new rows in the existing POWER UP / Provider Settings panel that store
+     through the intel service (keyring), as the brief asks for one key UI.
+   - **Tradeoffs:**
+     - POWER UP exists only on the dev server, which is how `spectre.ps1` and `run.bat` run the
+       app; `vite preview` and builds have no key UI at all.
+     - POWER UP's own save restarts the dev server; the new intel-backed rows must not.
+   - **Alternative:** key fields inside Settings → Neural Core (available in every mode), with
+     POWER UP only linking there.
 2. **Q2 `last4`.** The brief's `GET` returns the last four characters; POWER UP's existing rule is
    "never a value or suffix". Recommended: follow POWER UP and show none, for one consistent
    rule. Alternative: show `…abcd` for keys stored by SPECTRE (never for env-var keys).
