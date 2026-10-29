@@ -1,4 +1,5 @@
-"""Shared fixtures. Tests never touch the network or intel/data/spectre.db."""
+"""Shared fixtures. Tests never touch the network, the OS keyring or
+intel/data/spectre.db."""
 
 from __future__ import annotations
 
@@ -12,6 +13,9 @@ import pytest
 INTEL_DIR = Path(__file__).resolve().parents[1]
 if str(INTEL_DIR) not in sys.path:
     sys.path.insert(0, str(INTEL_DIR))
+
+import keyring  # noqa: E402
+from helpers import MemoryKeyring  # noqa: E402
 
 from app.store.news import NewsStore  # noqa: E402
 
@@ -46,6 +50,28 @@ def _no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)
     monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+
+
+PROVIDER_KEY_ENV = (
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "NVIDIA_API_KEY",
+    "DEEPSEEK_API_KEY",
+)
+
+
+@pytest.fixture(autouse=True)
+def memory_keyring(monkeypatch: pytest.MonkeyPatch) -> MemoryKeyring:
+    """No test reads or writes the OS keyring (Windows Credential Manager), and
+    no provider key from the shell running the tests is visible."""
+    for name in PROVIDER_KEY_ENV:
+        monkeypatch.delenv(name, raising=False)
+    previous = keyring.get_keyring()
+    backend = MemoryKeyring()
+    keyring.set_keyring(backend)
+    yield backend
+    keyring.set_keyring(previous)
 
 
 @pytest.fixture

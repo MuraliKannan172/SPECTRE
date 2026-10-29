@@ -34,6 +34,7 @@ from .ingest.feeds import load_feed_config
 from .ingest.pipeline import Pipeline
 from .ingest.scheduler import Scheduler
 from .legacy import migrate_defaults
+from .redact import install_log_redaction
 from .store.chat import ChatStore
 from .store.news import NewsStore
 from .voice.service import VoiceService
@@ -59,6 +60,7 @@ def create_app(
     providers_file: Path = PROVIDERS_FILE,
 ) -> FastAPI:
     settings = settings or load_settings()
+    install_log_redaction()  # every log record, from every logger, before anything runs
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
