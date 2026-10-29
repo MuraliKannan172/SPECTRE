@@ -102,9 +102,13 @@ class _ClosableStream(httpx.AsyncByteStream):
         for line in self.lines:
             yield line
             await asyncio.sleep(0)
+        self.harness.completed += 1
 
     async def aclose(self) -> None:
-        self.harness.closed += 1
+        # httpx closes every response stream, also after reading it all: an
+        # abort is a close before the last line was read.
+        if not self.harness.completed:
+            self.harness.closed += 1
 
 
 class OllamaHarness:

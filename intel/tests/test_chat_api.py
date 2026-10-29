@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from helpers import FEEDS_YAML, make_settings
 from test_chat_agent import CLIENT_TOOLS, FakeOllama, say
@@ -21,6 +22,8 @@ HEADERS = {"content-type": "application/json", "host": "127.0.0.1"}
 
 class StubParser:
     nlp = None
+    model_name = "stub"
+    gazetteer: tuple[()] = ()
 
     def locate(self, *args: Any, **kwargs: Any) -> None:
         return None
@@ -133,6 +136,35 @@ def test_status_reports_model_and_load_state(tmp_path: Path) -> None:
         status = client.get("/api/intel/chat/status").json()
     assert status["ollama"] == {"reachable": True, "version": "0.40.11"}
     assert status["tools"] is True and status["loaded"]["size_vram"] == 3_400_000_000
+
+
+@pytest.mark.parametrize(
+    ("body", "problem"),
+    [
+        ("providers: [unclosed\n", "unreadable (ProviderConfigError)"),
+        ("providers: []\n", "has no ollama entry"),
+    ],
+)
+def test_a_bad_provider_file_disables_chat_but_not_the_service(
+    tmp_path: Path, body: str, problem: str
+) -> None:
+    providers_file = tmp_path / "providers.yaml"
+    providers_file.write_text(body, encoding="utf-8")
+    app = create_app(
+        make_settings(tmp_path, FEEDS_YAML),
+        geoparser=StubParser(),  # type: ignore[arg-type]
+        start_scheduler=False,
+        ollama_transport=httpx.MockTransport(FakeOllama([])),
+        search=SearchService(None),
+        tool_registry=ToolRegistry(CLIENT_TOOLS),
+        providers_file=providers_file,
+    )
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        assert client.get("/api/intel/health").status_code == 200
+        status = client.get("/api/intel/chat/status").json()
+        turn = client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS)
+    assert problem in status["chat_problem"]
+    assert turn.status_code == 503 and turn.json()["detail"]["code"] == "chat_unavailable"
 
 
 class StoppingAgent:

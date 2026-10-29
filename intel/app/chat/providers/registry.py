@@ -68,7 +68,12 @@ def _spec(entry: Any, adapters: Mapping[str, object]) -> ProviderSpec:
 
 
 def load_specs(path: Path, adapters: Mapping[str, object]) -> list[ProviderSpec]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as error:
+        raise ProviderConfigError(f"{path.name} is not valid YAML: {error}") from error
+    if not isinstance(data, dict) or not isinstance(data.get("providers") or [], list):
+        raise ProviderConfigError(f"{path.name} must map `providers` to a list")
     specs = [_spec(entry, adapters) for entry in data.get("providers") or []]
     ids = [spec.id for spec in specs]
     if len(ids) != len(set(ids)):
