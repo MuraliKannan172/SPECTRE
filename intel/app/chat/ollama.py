@@ -14,9 +14,13 @@ MAX_LINE_BYTES = 1024 * 1024
 
 
 class OllamaError(RuntimeError):
-    def __init__(self, code: str, detail: str = "") -> None:
+    def __init__(
+        self, code: str, detail: str = "", *, status: int | None = None, retry_after: str | None = None
+    ) -> None:
         super().__init__(f"{code}: {detail}" if detail else code)
         self.code = code
+        self.status = status
+        self.retry_after = retry_after
 
 
 class OllamaClient:
@@ -34,9 +38,14 @@ class OllamaClient:
         except httpx.HTTPError as error:
             raise OllamaError("unavailable", type(error).__name__) from error
         if response.status_code == 404:
-            raise OllamaError("not_found", path)
+            raise OllamaError("not_found", path, status=404)
         if response.status_code >= 400:
-            raise OllamaError("http_status", str(response.status_code))
+            raise OllamaError(
+                "http_status",
+                str(response.status_code),
+                status=response.status_code,
+                retry_after=response.headers.get("retry-after"),
+            )
         try:
             return response.json()
         except ValueError as error:
@@ -44,6 +53,9 @@ class OllamaClient:
 
     async def version(self) -> str:
         return str((await self._json("GET", "/api/version", timeout=3)).get("version", ""))
+
+    async def tags(self) -> list[dict[str, Any]]:
+        return list((await self._json("GET", "/api/tags", timeout=10)).get("models", []))
 
     async def show(self, model: str) -> dict[str, Any]:
         return await self._json("POST", "/api/show", json={"model": model}, timeout=10)
@@ -59,10 +71,15 @@ class OllamaClient:
                 "POST", f"{self.base_url}/api/chat", json=body, timeout=httpx.Timeout(300, connect=5)
             ) as response:
                 if response.status_code == 404:
-                    raise OllamaError("model_missing", str(payload.get("model")))
+                    raise OllamaError("model_missing", str(payload.get("model")), status=404)
                 if response.status_code >= 400:
                     detail = (await response.aread())[:300].decode("utf-8", "replace")
-                    raise OllamaError("http_status", f"{response.status_code} {detail}")
+                    raise OllamaError(
+                        "http_status",
+                        f"{response.status_code} {detail}",
+                        status=response.status_code,
+                        retry_after=response.headers.get("retry-after"),
+                    )
                 async for line in response.aiter_lines():
                     if not line.strip():
                         continue

@@ -11,12 +11,16 @@ CLIENT_TOOL_TIMEOUT seconds before telling the model the call timed out.
 
 Events are (name, data) pairs, sent to the panel as SSE: turn, token,
 tool_status, client_tool, citation, done, error.
+
+The loop is provider-agnostic (ADR-002 D3): it speaks the canonical types in
+providers/base.py, and an adapter (Ollama by default) owns the wire format.
 """
 
 from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import functools
 import json
 import math
 import time
@@ -33,8 +37,22 @@ from ..store.news import NewsQuery, NewsStore
 from ..web.fetch import FetchError, PageFetcher
 from ..web.guard import BlockedURL
 from ..web.search import SearchError, SearchService
-from .ollama import OllamaClient, OllamaError
+from .ollama import OllamaClient
 from .policy import REFUSAL, person_lookup, system_prompt, wrap_untrusted
+from .providers.base import (
+    ChatProvider,
+    ChatRequest,
+    Done,
+    Message,
+    TextDelta,
+    ToolCall,
+    ToolCallEvent,
+    Usage,
+    normalize_args,
+)
+from .providers.errors import ProviderError
+from .providers.ollama import OllamaProvider
+from .providers.retry import stream_with_retries
 from .tools import ToolRegistry
 
 MAX_TOOL_ROUNDS = 4
@@ -118,9 +136,12 @@ class Agent:
         registry: ToolRegistry,
         open_only: Callable[[], bool] = lambda: True,
         clock: Callable[[], float] = time.time,
+        provider: ChatProvider | None = None,
     ) -> None:
         self.settings = settings
+        # The status route and the eval still read Ollama directly.
         self.ollama = ollama
+        self.provider = provider or OllamaProvider(ollama)
         self.news = news
         self.chats = chats
         self.search = search
@@ -129,7 +150,6 @@ class Agent:
         self.open_only = open_only
         self.clock = clock
         self._pending: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
-        self._capabilities: dict[str, frozenset[str]] = {}
 
     # -- client tools ------------------------------------------------------------
 
@@ -141,20 +161,17 @@ class Agent:
         return True
 
     async def capabilities(self) -> frozenset[str]:
-        model = self.settings.ollama_model
-        if model not in self._capabilities:
-            shown = await self.ollama.show(model)
-            self._capabilities[model] = frozenset(shown.get("capabilities") or [])
-        return self._capabilities[model]
+        """The selected model's capabilities (the provider caches them)."""
+        return (await self.provider.model_caps(self.settings.ollama_model)).capabilities
 
     # -- the turn --------------------------------------------------------------
 
     def _now_local(self) -> str:
         return dt.datetime.fromtimestamp(self.clock()).astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
-    def _history(self, history: list[dict[str, Any]]) -> list[dict[str, str]]:
+    def _history(self, history: list[dict[str, Any]]) -> list[Message]:
         budget = self.settings.budgets["history"] * CHARS_PER_TOKEN
-        kept: list[dict[str, str]] = []
+        kept: list[Message] = []
         for message in reversed(history):
             content = str(message.get("content") or "")
             if message.get("role") not in ("user", "assistant") or not content:
@@ -162,24 +179,27 @@ class Agent:
             if len(content) > budget:
                 break
             budget -= len(content)
-            kept.append({"role": message["role"], "content": content})
+            kept.append(Message(message["role"], content))
         return list(reversed(kept))
 
-    def _payload(
-        self, messages: list[dict[str, Any]], *, tools: bool, fallback: bool = False
-    ) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "model": self.settings.ollama_model,
-            "messages": messages,
-            "think": self.settings.ollama_think,
-            "keep_alive": self.settings.ollama_keep_alive,
-            "options": {"num_ctx": self.settings.num_ctx, "temperature": 0.2},
-        }
-        if tools:
-            payload["tools"] = self.registry.all_tools
-        if fallback:
-            payload["format"] = FALLBACK_FORMAT
-        return payload
+    def _request(self, messages: list[Message], *, native: bool, allow_tools: bool) -> ChatRequest:
+        """One round's request. A native model always gets the tool list; the
+        last round asks for an answer with tool_choice "none" (the adapter
+        decides how its API takes that). A model without native tools gets
+        the JSON fallback format instead, except in the last round."""
+        return ChatRequest(
+            model=self.settings.ollama_model,
+            messages=tuple(messages),
+            tools=tuple(self.registry.all_tools) if native else (),
+            tool_choice="auto" if allow_tools else "none",
+            json_schema=FALLBACK_FORMAT if allow_tools and not native else None,
+            params={
+                "think": self.settings.ollama_think,
+                "keep_alive": self.settings.ollama_keep_alive,
+                "num_ctx": self.settings.num_ctx,
+                "temperature": 0.2,
+            },
+        )
 
     async def run(self, turn: Turn) -> AsyncIterator[Event]:
         started = self.clock()
@@ -194,45 +214,49 @@ class Agent:
             return
         try:
             capabilities = await self.capabilities()
-        except OllamaError as error:
-            yield "error", {"code": f"ollama_{error.code}", "message": str(error)}
+        except ProviderError as error:
+            yield "error", _error_event(error)
             return
         native = "tools" in capabilities
-        messages: list[dict[str, Any]] = [
-            {
-                "role": "system",
-                "content": system_prompt(
-                    now_local=self._now_local(), viewport=turn.viewport, layer_state=turn.layer_state
-                ),
-            },
-            *self._history(turn.history),
-            {"role": "user", "content": turn.message},
-        ]
+        system = system_prompt(
+            now_local=self._now_local(), viewport=turn.viewport, layer_state=turn.layer_state
+        )
         if not native:
-            messages[0]["content"] += _fallback_instructions(self.registry)
+            system += _fallback_instructions(self.registry)
+        messages: list[Message] = [
+            Message("system", system),
+            *self._history(turn.history),
+            Message("user", turn.message),
+        ]
         sources = Sources()
         state = {"web_chars": 0, "info": False}
         answer: list[str] = []
-        stats: dict[str, Any] = {}
+        usage = Usage(0, 0)
         rounds = 0
+        provider = self.provider
         try:
             for rounds in range(1, MAX_TOOL_ROUNDS + 2):
                 allow_tools = rounds <= MAX_TOOL_ROUNDS
                 think = ThinkFilter()
                 content, calls = "", []
-                payload = self._payload(
-                    messages, tools=allow_tools and native, fallback=allow_tools and not native
+                provider_state: dict[str, Any] | None = None
+                request = self._request(messages, native=native, allow_tools=allow_tools)
+                events = stream_with_retries(
+                    functools.partial(provider.stream, request), attempts=provider.max_attempts
                 )
-                async for chunk in self.ollama.chat(payload):
-                    message = chunk.get("message") or {}
-                    piece = think.feed(message.get("content") or "")
-                    if piece:
-                        content += piece
-                        if native:
-                            yield "token", {"text": piece}
-                    calls.extend(message.get("tool_calls") or [])
-                    if chunk.get("done"):
-                        stats = chunk
+                async for event in events:
+                    if isinstance(event, TextDelta):
+                        piece = think.feed(event.text)
+                        if piece:
+                            content += piece
+                            if native:
+                                yield "token", {"text": piece}
+                    elif isinstance(event, ToolCallEvent):
+                        calls.append(event.call)
+                    elif isinstance(event, Usage):
+                        usage = event
+                    elif isinstance(event, Done):
+                        provider_state = event.provider_state
                 if not native:
                     content, calls = _parse_fallback(content)
                     if content:
@@ -240,27 +264,35 @@ class Agent:
                 answer.append(content)
                 if not calls or not allow_tools:
                     break
-                messages.append({"role": "assistant", "content": content, "tool_calls": calls})
+                messages.append(
+                    Message(
+                        "assistant",
+                        content,
+                        tool_calls=tuple(calls),
+                        provider_id=provider.id,
+                        model=request.model,
+                        provider_state=provider_state,
+                    )
+                )
                 for call in calls:
-                    name, args = _call_parts(call)
                     result = ""
-                    async for kind, data in self._run_tool(name, args, turn, sources, state):
+                    async for kind, data in self._run_tool(call.name, call.args, turn, sources, state):
                         if kind == "result":
                             result = data["text"]
                         else:
                             yield kind, data
-                    messages.append({"role": "tool", "content": result, "tool_name": name})
-        except OllamaError as error:
-            yield "error", {"code": f"ollama_{error.code}", "message": str(error)}
+                    messages.append(Message("tool", result, tool_call_id=call.id, name=call.name))
+        except ProviderError as error:
+            yield "error", _error_event(error)
             return
         text = "".join(answer).strip()
-        eval_count = int(stats.get("eval_count") or 0)
-        eval_seconds = (stats.get("eval_duration") or 0) / 1e9
+        eval_count = usage.output
+        eval_seconds = usage.output_seconds or 0
         as_of = self._now_local() if state["info"] else None
         done = {
             "model": self.settings.ollama_model,
             "eval_count": eval_count,
-            "prompt_eval_count": int(stats.get("prompt_eval_count") or 0),
+            "prompt_eval_count": usage.input,
             "tokens_per_s": round(eval_count / eval_seconds, 1) if eval_seconds else None,
             "as_of": as_of,
             "citations": sources.items,
@@ -430,15 +462,11 @@ class Agent:
         return wrap_untrusted("news store", "\n\n".join(lines)) + CITE_HINT, new
 
 
-def _call_parts(call: dict[str, Any]) -> tuple[str, Any]:
-    function = call.get("function") or {}
-    args = function.get("arguments", {})
-    if isinstance(args, str):
-        try:
-            args = json.loads(args) if args.strip() else {}
-        except ValueError:
-            args = {"_unparsed": args[:200]}
-    return str(function.get("name") or ""), args
+def _error_event(error: ProviderError) -> dict[str, Any]:
+    """The SSE error. Ollama keeps the `ollama_<code>` codes the panel knows;
+    other providers send the taxonomy code (ADR-002 D7)."""
+    code = f"ollama_{error.detail}" if error.provider == "ollama" and error.detail else error.code
+    return {"code": code, "message": str(error)}
 
 
 # -- constrained-JSON fallback (models without native tool calling) ----------
@@ -466,7 +494,7 @@ def _fallback_instructions(registry: ToolRegistry) -> str:
     )
 
 
-def _parse_fallback(content: str) -> tuple[str, list[dict[str, Any]]]:
+def _parse_fallback(content: str) -> tuple[str, list[ToolCall]]:
     try:
         data = json.loads(content.strip())
     except ValueError:
@@ -475,5 +503,5 @@ def _parse_fallback(content: str) -> tuple[str, list[dict[str, Any]]]:
         return content, []
     tool = data.get("tool")
     if tool and tool != "none":
-        return "", [{"function": {"name": str(tool), "arguments": data.get("arguments") or {}}}]
+        return "", [ToolCall(id="call_0", name=str(tool), args=normalize_args(data.get("arguments") or {}))]
     return str(data.get("answer") or ""), []
