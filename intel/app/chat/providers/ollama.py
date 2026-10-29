@@ -79,6 +79,20 @@ def host_kind(base_url: str) -> Kind:
         return "remote"
 
 
+def _tags_entry(entries: list[dict[str, Any]], model: str) -> dict[str, Any]:
+    """The /api/tags entry for a model name, `qwen` and `qwen:latest` alike."""
+
+    def canonical(name: object) -> str:
+        text = str(name or "")
+        return text if ":" in text else f"{text}:latest"
+
+    wanted = canonical(model)
+    for entry in entries:
+        if wanted in (canonical(entry.get("name")), canonical(entry.get("model"))):
+            return entry
+    return {}
+
+
 def _context_window(shown: dict[str, Any]) -> int | None:
     for key, value in (shown.get("model_info") or {}).items():
         if key.endswith(".context_length") and isinstance(value, int):
@@ -134,9 +148,13 @@ class OllamaProvider:
         if model not in self._caps:
             try:
                 shown = await self.client.show(model)
+                # /api/show has no remote_host (Ollama 0.40.13); only /api/tags
+                # says a model runs on ollama.com, and local-only mode needs that.
+                listed = _tags_entry(await self.client.tags(), model)
             except OllamaError as error:
                 raise provider_error(error) from error
-            self._caps[model] = self._info(model, shown, _context_window(shown))
+            remote = {key: listed[key] for key in ("remote_host", "remote_model") if listed.get(key)}
+            self._caps[model] = self._info(model, {**shown, **remote}, _context_window(shown))
         return self._caps[model]
 
     async def test(self) -> dict[str, Any]:
