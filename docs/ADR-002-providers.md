@@ -1,6 +1,8 @@
 # ADR-002: Neural Core multi-provider chat
 
-- **Status:** Proposed. Awaiting owner approval before P1.
+- **Status:** Accepted 2026-10-29, with the recommended answers to §6: Q1 POWER UP rows that store
+  through the intel service; Q2 no `last4`; Q3 Ollama `:cloud` models count as cloud; Q4 add the
+  pinned `anthropic`, `openai` and `keyring` packages.
 - **Date:** 2026-10-29
 - **Scope:** P0 recon only (`NEURAL_CORE_PROVIDERS_PROMPT.md` §7). No feature code has been written.
 - **Branch:** `feat/neural-core-providers` (from `main` @ `2141700a`).
