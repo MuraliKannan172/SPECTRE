@@ -217,6 +217,19 @@ def test_a_bad_provider_entry_is_an_error(tmp_path: Path, entry: str, message: s
         load_specs(_yaml(tmp_path, f"providers:\n  - {entry}\n"), ADAPTERS)
 
 
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        ("providers: [unclosed\n", "not valid YAML"),
+        ("- just a list\n", "must map `providers` to a list"),
+        ("providers: {id: x1}\n", "must map `providers` to a list"),
+    ],
+)
+def test_a_malformed_provider_file_is_a_config_error(tmp_path: Path, body: str, message: str) -> None:
+    with pytest.raises(ProviderConfigError, match=message):
+        load_specs(_yaml(tmp_path, body), ADAPTERS)
+
+
 def test_duplicate_provider_ids_are_an_error(tmp_path: Path) -> None:
     entry = "{id: x1, adapter: mock, kind: local, base_url: 'http://x'}"
     with pytest.raises(ProviderConfigError, match="unique"):

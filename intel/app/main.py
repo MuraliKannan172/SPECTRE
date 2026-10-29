@@ -11,6 +11,7 @@ import contextlib
 import logging
 import time
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
@@ -21,6 +22,8 @@ from .api.chat import router as chat_router
 from .api.routes import router
 from .api.voice import router as voice_router
 from .chat.agent import Agent
+from .chat.providers.base import ChatProvider
+from .chat.providers.registry import DEFAULT_PATH as PROVIDERS_FILE
 from .chat.providers.registry import ProviderConfigError, default_providers
 from .chat.tools import ToolRegistry
 from .config import BRAND_NAME, DEFAULT_DB, DEFAULT_LOGS, Settings, load_settings
@@ -53,6 +56,7 @@ def create_app(
     search: SearchService | None = None,
     tool_registry: ToolRegistry | None = None,
     voice: VoiceService | None = None,
+    providers_file: Path = PROVIDERS_FILE,
 ) -> FastAPI:
     settings = settings or load_settings()
 
@@ -111,12 +115,17 @@ def create_app(
                 app.state.chat_problem = (
                     f"tool artifact unreadable ({type(error).__name__}): run npm run tools:export"
                 )
-        providers = None
+        # A bad provider file disables chat only; news, events and voice keep running.
+        providers: dict[str, ChatProvider] = {}
         try:
-            providers = default_providers(ollama_http=ollama_http, ollama_host=settings.ollama_host)
+            providers = default_providers(
+                ollama_http=ollama_http, ollama_host=settings.ollama_host, path=providers_file
+            )
         except (OSError, ValueError, ProviderConfigError) as error:
-            app.state.chat_problem = f"providers.default.yaml unreadable ({type(error).__name__}): {error}"
-        ollama = providers["ollama"] if providers else None
+            app.state.chat_problem = f"{providers_file.name} unreadable ({type(error).__name__}): {error}"
+        ollama = providers.get("ollama")
+        if ollama is None and app.state.chat_problem is None:
+            app.state.chat_problem = f"{providers_file.name} has no ollama entry"
         app.state.agent = (
             Agent(
                 settings=settings,
