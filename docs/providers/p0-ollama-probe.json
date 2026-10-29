@@ -1,0 +1,245 @@
+{
+    "recorded":  "2026-10-29",
+    "ollama_version":  "0.40.13",
+    "api_tags_model_fields":  [
+                                  "capabilities",
+                                  "details",
+                                  "digest",
+                                  "model",
+                                  "modified_at",
+                                  "name",
+                                  "size"
+                              ],
+    "api_tags_details_fields":  [
+                                    "context_length",
+                                    "embedding_length",
+                                    "families",
+                                    "family",
+                                    "format",
+                                    "parameter_size",
+                                    "parent_model",
+                                    "quantization_level",
+                                    "runner"
+                                ],
+    "api_ps_model_fields":  [
+                                "context_length",
+                                "details",
+                                "digest",
+                                "expires_at",
+                                "model",
+                                "name",
+                                "runner",
+                                "size",
+                                "size_vram"
+                            ],
+    "api_ps":  [
+                   {
+                       "name":  "qwen3.5-9b-64k-gpu:latest",
+                       "size":  6687398293,
+                       "size_vram":  5597225285,
+                       "context_length":  16384,
+                       "expires_at":  "2026-10-29T14:05:33.2561856+05:30"
+                   }
+               ],
+    "models":  [
+                   {
+                       "name":  "nemotron-3.5-bolt:e4b",
+                       "size":  7908813050,
+                       "family":  "gemma4",
+                       "parameter_size":  "7.5B",
+                       "quantization_level":  "Q4_K_M",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "audio",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "tags_context_length":  65536,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "audio",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "show_context_length":  65536,
+                       "remote_host":  null,
+                       "remote_model":  null
+                   },
+                   {
+                       "name":  "beam:cloud",
+                       "size":  284,
+                       "family":  "",
+                       "parameter_size":  "501B",
+                       "quantization_level":  "",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools"
+                                             ],
+                       "tags_context_length":  1048576,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools"
+                                             ],
+                       "show_context_length":  1048576,
+                       "remote_host":  "https://ollama.com",
+                       "remote_model":  "beam"
+                   },
+                   {
+                       "name":  "bonsai-2-9b-64k:latest",
+                       "size":  3180880186,
+                       "family":  "qwen35",
+                       "parameter_size":  "9.0B",
+                       "quantization_level":  "Q2_0",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "tags_context_length":  262144,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "show_context_length":  262144,
+                       "remote_host":  null,
+                       "remote_model":  null
+                   },
+                   {
+                       "name":  "bonsai-2:9b",
+                       "size":  3180880170,
+                       "family":  "qwen35",
+                       "parameter_size":  "9.0B",
+                       "quantization_level":  "Q2_0",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "tags_context_length":  262144,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "show_context_length":  262144,
+                       "remote_host":  null,
+                       "remote_model":  null
+                   },
+                   {
+                       "name":  "d1-omni:600m",
+                       "size":  849660102,
+                       "family":  "lfm2",
+                       "parameter_size":  "380.73M",
+                       "quantization_level":  "Q8_0",
+                       "tags_capabilities":  [
+                                                 "decision",
+                                                 "vision"
+                                             ],
+                       "tags_context_length":  128000,
+                       "show_capabilities":  [
+                                                 "decision",
+                                                 "vision"
+                                             ],
+                       "show_context_length":  128000,
+                       "remote_host":  null,
+                       "remote_model":  null
+                   },
+                   {
+                       "name":  "gemma4:cloud",
+                       "size":  312,
+                       "family":  "",
+                       "parameter_size":  "32.7B",
+                       "quantization_level":  "BF16",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools",
+                                                 "vision"
+                                             ],
+                       "tags_context_length":  262144,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools",
+                                                 "vision"
+                                             ],
+                       "show_context_length":  262144,
+                       "remote_host":  "https://ollama.com",
+                       "remote_model":  "gemma4:31b"
+                   },
+                   {
+                       "name":  "qwen3.5-9b-64k-gpu:latest",
+                       "size":  6550825566,
+                       "family":  "qwen35",
+                       "parameter_size":  "9.0B",
+                       "quantization_level":  "Q4_K_M",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "tags_context_length":  262144,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "vision",
+                                                 "tools",
+                                                 "thinking"
+                                             ],
+                       "show_context_length":  262144,
+                       "remote_host":  null,
+                       "remote_model":  null
+                   },
+                   {
+                       "name":  "nemotron-3-super:cloud",
+                       "size":  315,
+                       "family":  "",
+                       "parameter_size":  "120B",
+                       "quantization_level":  "NVFP4",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools"
+                                             ],
+                       "tags_context_length":  262144,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools"
+                                             ],
+                       "show_context_length":  262144,
+                       "remote_host":  "https://ollama.com",
+                       "remote_model":  "nemotron-3-super"
+                   },
+                   {
+                       "name":  "nemotron-3-ultra:cloud",
+                       "size":  310,
+                       "family":  "",
+                       "parameter_size":  "550B",
+                       "quantization_level":  "",
+                       "tags_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools"
+                                             ],
+                       "tags_context_length":  262144,
+                       "show_capabilities":  [
+                                                 "completion",
+                                                 "thinking",
+                                                 "tools"
+                                             ],
+                       "show_context_length":  262144,
+                       "remote_host":  "https://ollama.com",
+                       "remote_model":  "nemotron-3-ultra"
+                   }
+               ]
+}
