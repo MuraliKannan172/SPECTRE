@@ -48,6 +48,7 @@ class FakeOllama:
         self.replies = list(replies)
         self.capabilities = ["completion", "tools"] if tools else ["completion"]
         self.offline = offline
+        self.tags: list[dict[str, Any]] = []  # /api/tags entries; empty means none are cloud
         self.requests: list[dict[str, Any]] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -55,6 +56,8 @@ class FakeOllama:
             raise httpx.ConnectError("refused", request=request)
         if request.url.path == "/api/show":
             return httpx.Response(200, json={"capabilities": self.capabilities})
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": self.tags})
         body = json.loads(request.content)
         self.requests.append(body)
         chunks = self.replies.pop(0)

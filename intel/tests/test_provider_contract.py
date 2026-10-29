@@ -347,6 +347,28 @@ def test_ollama_lists_chat_models_and_badges_cloud_ones() -> None:
     assert models["old:1"].supports_tools == "unknown"
 
 
+def test_ollama_model_caps_finds_cloud_models_in_tags_not_show() -> None:
+    # Shapes recorded from Ollama 0.40.13: /api/show has no remote_host.
+    tags = {
+        "models": [
+            {"name": "beam:cloud", "model": "beam:cloud", "remote_host": "https://ollama.com"},
+            {"name": "qwen:latest", "model": "qwen:latest"},
+        ]
+    }
+    shown = {"capabilities": ["completion", "thinking", "tools"], "details": {}, "model_info": {}}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=tags if request.url.path == "/api/tags" else shown)
+
+    provider = OllamaProvider(
+        OllamaClient("http://127.0.0.1:1", httpx.AsyncClient(transport=httpx.MockTransport(handle)))
+    )
+    cloud = asyncio.run(provider.model_caps("beam:cloud"))
+    local = asyncio.run(provider.model_caps("qwen"))
+    assert (cloud.kind, cloud.details["remote_host"]) == ("cloud", "https://ollama.com")
+    assert local.kind == "local" and "remote_host" not in local.details
+
+
 def test_ollama_answers_without_tools_when_asked_for_an_answer() -> None:
     harness = OllamaHarness()
     harness.answer("Final.")
