@@ -4,6 +4,7 @@ the loop's behaviour must not depend on Ollama."""
 from __future__ import annotations
 
 import asyncio
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from app.chat.providers.mock import MockProvider
 from app.chat.tools import ToolRegistry
 from app.config import Settings
 from app.store.chat import ChatStore
+from app.store.db import MIGRATIONS_DIR, connect, migrate
 from app.store.news import NewsStore
 
 MODEL = ModelInfo("m:1", "m:1", "cloud", "yes", capabilities=frozenset({"completion", "tools"}))
@@ -37,7 +39,9 @@ def calls(*names: str) -> list[Any]:
 def run_with(tmp_path: Path):  # type: ignore[no-untyped-def]
     stores: list[Any] = []
 
-    def go(provider: MockProvider, *, close_after: int | None = None) -> list[tuple[str, dict[str, Any]]]:
+    def go(
+        provider: MockProvider, *, close_after: int | None = None, history_of: int | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
         settings = Settings(
             db_path=tmp_path / "t.db",
             feeds_default=tmp_path / "f.yaml",
@@ -58,8 +62,13 @@ def run_with(tmp_path: Path):  # type: ignore[no-untyped-def]
             clock=lambda: 1_790_000_000.0,
             provider=provider,
         )
+        history = chats.messages(history_of) if history_of is not None else []
         turn = Turn(
-            chats.ensure_conversation(None), "What is on the map?", viewport={"lat": 1}, layer_state={}
+            chats.ensure_conversation(history_of),
+            "What is on the map?",
+            viewport={"lat": 1},
+            layer_state={},
+            history=history,
         )
 
         async def collect() -> list[tuple[str, dict[str, Any]]]:
@@ -114,6 +123,39 @@ def test_an_auth_failure_is_reported_once_with_its_taxonomy_code(run_with) -> No
     events = run_with(provider)
     assert events[-1] == ("error", {"code": "auth_failed", "message": "bad key"})
     assert provider.opened == 1
+
+
+def test_a_conversation_from_before_migration_0003_loads_and_continues(  # type: ignore[no-untyped-def]
+    tmp_path: Path, run_with
+) -> None:
+    old_migrations = tmp_path / "old-migrations"
+    old_migrations.mkdir()
+    for name in ("0001_init.sql", "0002_chat.sql"):
+        shutil.copy(MIGRATIONS_DIR / name, old_migrations / name)
+    conn = connect(tmp_path / "t.db")
+    assert migrate(conn, old_migrations) == [1, 2]
+    conn.execute("INSERT INTO conversations (id, created_at, updated_at) VALUES (7, 1, 1)")
+    conn.executemany(
+        "INSERT INTO messages (conversation_id, role, content, created_at) VALUES (7, ?, ?, 1)",
+        [("user", "Earlier question"), ("assistant", "Earlier answer")],
+    )
+    conn.close()
+
+    provider = MockProvider([answer("Continued.")], models=[MODEL])
+    events = run_with(provider, history_of=7)
+
+    assert [name for name, _ in events][-1] == "done"
+    replayed = provider.requests[0].messages[1:3]
+    assert [(m.role, m.content, m.provider_id) for m in replayed] == [
+        ("user", "Earlier question", None),
+        ("assistant", "Earlier answer", None),
+    ]
+    chats = ChatStore(str(tmp_path / "t.db"))
+    try:
+        latest = chats.messages(7)[-1]
+    finally:
+        chats.close()
+    assert (latest["content"], latest["provider_id"], latest["model"]) == ("Continued.", "mock", MODEL.id)
 
 
 def test_stopping_a_turn_closes_the_provider_stream(run_with) -> None:  # type: ignore[no-untyped-def]

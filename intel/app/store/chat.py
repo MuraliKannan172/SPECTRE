@@ -1,4 +1,4 @@
-"""Chat history and the tool log, in the intel database (migration 0002).
+"""Chat history and the tool log, in the intel database (migrations 0002, 0003).
 
 History is one running conversation per install: the panel shows the latest,
 and "clear history" deletes every conversation and message. The tool log is
@@ -60,18 +60,22 @@ class ChatStore:
         *,
         citations: list[dict[str, Any]] | None = None,
         meta: dict[str, Any] | None = None,
+        provider_id: str | None = None,
+        model: str | None = None,
     ) -> int:
         now = int(time.time())
         with self._lock:
             cursor = self._conn.execute(
-                "INSERT INTO messages (conversation_id, role, content, citations_json, meta_json, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO messages (conversation_id, role, content, citations_json, meta_json,"
+                " provider_id, model, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     conversation_id,
                     role,
                     content,
                     json.dumps(citations) if citations else None,
                     json.dumps(meta) if meta else None,
+                    provider_id,
+                    model,
                     now,
                 ),
             )
@@ -81,8 +85,8 @@ class ChatStore:
     def messages(self, conversation_id: int, limit: int = MAX_HISTORY_MESSAGES) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT id, role, content, citations_json, meta_json, created_at FROM messages"
-                " WHERE conversation_id = ? ORDER BY id DESC LIMIT ?",
+                "SELECT id, role, content, citations_json, meta_json, created_at, provider_id, model"
+                " FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?",
                 (conversation_id, limit),
             ).fetchall()
         return [
@@ -93,6 +97,8 @@ class ChatStore:
                 "citations": json.loads(row[3]) if row[3] else [],
                 "meta": json.loads(row[4]) if row[4] else {},
                 "created_at": row[5],
+                "provider_id": row[6],
+                "model": row[7],
             }
             for row in reversed(rows)
         ]

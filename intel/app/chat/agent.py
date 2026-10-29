@@ -179,7 +179,14 @@ class Agent:
             if len(content) > budget:
                 break
             budget -= len(content)
-            kept.append(Message(message["role"], content))
+            kept.append(
+                Message(
+                    message["role"],
+                    content,
+                    provider_id=message.get("provider_id"),
+                    model=message.get("model"),
+                )
+            )
         return list(reversed(kept))
 
     def _request(self, messages: list[Message], *, native: bool, allow_tools: bool) -> ChatRequest:
@@ -306,6 +313,8 @@ class Agent:
             text,
             citations=sources.items,
             meta={k: done[k] for k in ("model", "as_of", "degraded", "tokens_per_s")},
+            provider_id=provider.id,
+            model=self.settings.ollama_model,
         )
         yield "done", done
 
