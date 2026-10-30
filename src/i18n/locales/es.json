@@ -3088,5 +3088,21 @@
   "GLOBE ENGINE": "MOTOR DEL GLOBO",
   "INTEL SERVICE": "SERVICIO DE INTELIGENCIA",
   "PRESS ANY KEY OR CLICK TO SKIP": "PULSA CUALQUIER TECLA O HAZ CLIC PARA OMITIR",
-  "{name} startup status": "Estado de arranque de {name}"
+  "{name} startup status": "Estado de arranque de {name}",
+  "no API key": "sin clave de API",
+  "waiting for consent": "esperando consentimiento",
+  "blocked by local-only mode": "bloqueado por el modo solo local",
+  "provider unavailable": "proveedor no disponible",
+  "The provider refused the API key. Check it in POWER UP.": "El proveedor rechazó la clave de API. Revísala en POWER UP.",
+  "No API key is set for this provider. Add one in POWER UP.": "Este proveedor no tiene clave de API. Añade una en POWER UP.",
+  "The provider account is out of credit or over its spending limit.": "La cuenta del proveedor no tiene saldo o superó su límite de gasto.",
+  "The provider is rate-limiting requests. Wait a moment.": "El proveedor está limitando las solicitudes. Espera un momento.",
+  "The provider does not know the model {model}.": "El proveedor no conoce el modelo {model}.",
+  "This conversation is too long for the model. Clear the history and ask again.": "Esta conversación es demasiado larga para el modelo. Borra el historial y vuelve a preguntar.",
+  "The provider does not support this request.": "El proveedor no admite esta solicitud.",
+  "The provider is unavailable right now. Try again shortly.": "El proveedor no está disponible ahora. Inténtalo de nuevo en breve.",
+  "This provider has not been allowed to receive the conversation yet.": "Aún no se ha permitido que este proveedor reciba la conversación.",
+  "Local-only mode is on, so cloud models are blocked.": "El modo solo local está activado, así que los modelos en la nube están bloqueados.",
+  "The selected provider is not available.": "El proveedor seleccionado no está disponible.",
+  "{label} · ready": "{label} · listo"
 }

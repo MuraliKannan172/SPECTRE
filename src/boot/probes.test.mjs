@@ -76,6 +76,38 @@ test('chat status: Ollama and the model decide the Neural Core row', () => {
   );
 });
 
+test('chat status: an API provider is judged by ready/problem, not by Ollama', () => {
+  const api = {
+    provider: 'anthropic',
+    model: 'claude-x',
+    ollama: { reachable: false },
+  };
+  assert.deepEqual(classifyChatStatus({ ...api, ready: true }), {
+    state: 'ok',
+    detail: 'anthropic · claude-x',
+  });
+  assert.deepEqual(
+    classifyChatStatus({ ...api, ready: false, problem: 'no_key' }),
+    { state: 'degraded', detail: 'no API key' },
+  );
+  assert.deepEqual(
+    classifyChatStatus({ ...api, ready: false, problem: 'mystery' }),
+    { state: 'degraded', detail: 'provider unavailable' },
+  );
+  // An Ollama :cloud model under local-only mode is blocked, not ready.
+  assert.deepEqual(
+    classifyChatStatus({
+      provider: 'ollama',
+      model: 'm:cloud',
+      ollama: { reachable: true },
+      model_present: true,
+      ready: false,
+      problem: 'local_only',
+    }),
+    { state: 'degraded', detail: 'blocked by local-only mode' },
+  );
+});
+
 test('globe: the basemap in use, or the fallback the map stack took', () => {
   const stack = { activeStack: { label: 'NASA Blue Marble' } };
   assert.deepEqual(classifyGlobe(stack, '1.138.0'), {

@@ -3,7 +3,7 @@
  * state for `boot.mark(id, state, detail)`: `ok`, `degraded`, `offline` or
  * `timeout`. A probe never throws and gives up after its own timeout.
  */
-import { t, tn } from '../i18n/index.js';
+import { msg, t, tn } from '../i18n/index.js';
 
 export const PROBE_TIMEOUT_MS = 3000;
 
@@ -119,7 +119,29 @@ export function classifyIntelHealth(health) {
  * `/api/intel/chat/status`: Ollama reachable with the configured model is
  * `ok`; a missing model or no native tool calls is `degraded`.
  */
+const CHAT_PROBLEMS = Object.freeze({
+  no_key: msg('no API key'),
+  consent_required: msg('waiting for consent'),
+  local_only: msg('blocked by local-only mode'),
+  unknown_provider: msg('provider unavailable'),
+});
+
 export function classifyChatStatus(status) {
+  // ADR-002 D7: an API provider is judged by the provider-neutral pair, not by
+  // whether Ollama runs. Ollama, and a service that sends no `ready`, as before.
+  if (
+    status?.provider &&
+    status.provider !== 'ollama' &&
+    typeof status.ready === 'boolean'
+  ) {
+    if (status.ready)
+      return { state: 'ok', detail: `${status.provider} · ${status.model}` };
+    const problem =
+      CHAT_PROBLEMS[status.problem] || CHAT_PROBLEMS.unknown_provider;
+    return { state: 'degraded', detail: t(problem) };
+  }
+  if (status?.problem === 'local_only' && status?.ollama?.reachable)
+    return { state: 'degraded', detail: t(CHAT_PROBLEMS.local_only) };
   if (!status?.ollama?.reachable)
     return { state: 'offline', detail: t('Ollama not reachable') };
   const model = String(status.model || '');

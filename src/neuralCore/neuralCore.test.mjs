@@ -13,6 +13,7 @@ import {
   endsWithAsOf,
   errorText,
   statusSummary,
+  turnErrorCode,
   toolLabel,
 } from './view.js';
 
@@ -246,4 +247,24 @@ test('labels and errors describe real state', () => {
       .tone,
     'degraded',
   );
+  // A selected API provider is not judged by Ollama (ADR-002 D7).
+  const api = {
+    provider: 'deepseek',
+    model: 'd1',
+    ollama: { reachable: false },
+  };
+  assert.deepEqual(statusSummary({ ...api, ready: true }), {
+    tone: 'ready',
+    text: 'deepseek · d1 · ready',
+    search: null,
+  });
+  assert.equal(
+    statusSummary({ ...api, ready: false, problem: 'consent_required' }).text,
+    'deepseek · d1 · This provider has not been allowed to receive the conversation yet.',
+  );
+  assert.equal(
+    turnErrorCode({ code: 'rate_limited', provider: 'openai' }),
+    'provider_rate_limited',
+  );
+  assert.equal(turnErrorCode({ code: 'rate_limited' }), 'rate_limited');
 });

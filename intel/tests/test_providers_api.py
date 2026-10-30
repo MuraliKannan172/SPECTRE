@@ -17,6 +17,7 @@ from helpers import FEEDS_YAML, make_settings
 from test_chat_agent import CLIENT_TOOLS, FakeOllama, say
 from test_chat_api import HEADERS, StubParser, events_of
 
+from app.api.providers import parse_gpu
 from app.chat.providers import errors
 from app.chat.providers.base import ChatRequest, ModelInfo, StreamEvent
 from app.chat.providers.errors import ProviderError
@@ -383,3 +384,117 @@ def test_models_marked_for_chat_completions_are_saved(client: TestClient) -> Non
     )
     saved = client.app.state.provider_store.settings("acme")
     assert saved.chat_completions_models == ("older-1", "older-2")
+
+
+# -- P4a: status, parameters, test tool calling, GPU, budget --------------------------
+
+CLAUDE_YAML = PROVIDERS_YAML + (
+    "  - {id: claude, label: Claude, adapter: anthropic, kind: cloud, base_url: 'https://api.anthropic.com',"
+    " key_env: [ANTHROPIC_API_KEY]}\n"
+)
+STATUS = "/api/intel/chat/status"
+
+
+def test_status_for_a_cloud_selection_uses_local_facts_only(client: TestClient) -> None:
+    headers = writer(client)
+    acme = client.app.state.providers.get("acme")
+    default = client.get(STATUS).json()
+    assert (default["provider"], default["kind"], default["ready"], default["problem"]) == (
+        "ollama",
+        "local",
+        True,
+        None,
+    )
+    client.put(SELECTION, json={"provider": "acme", "model": "big-1"}, headers=headers)
+    seen = [client.get(STATUS).json()]
+    client.put("/api/intel/providers/acme/key", json={"key": CANARY}, headers=headers)
+    seen.append(client.get(STATUS).json())
+    client.put("/api/intel/providers/acme/consent", json={"granted": True}, headers=headers)
+    seen.append(client.get(STATUS).json())
+    client.put("/api/intel/providers/policy", json={"local_only": True}, headers=headers)
+    seen.append(client.get(STATUS).json())
+    assert (seen[0]["provider"], seen[0]["model"], seen[0]["kind"]) == ("acme", "big-1", "cloud")
+    assert [s["problem"] for s in seen] == ["no_key", "consent_required", None, "local_only"]
+    assert [s["ready"] for s in seen] == [False, False, True, False]
+    assert seen[2]["budget"] == {"spent": 0, "allowance": 100_000, "budget": 100_000}
+    assert acme.calls == [], "the status poll never calls a cloud API"
+
+
+def test_parameters_are_validated_per_provider_and_saved(tmp_path: Path) -> None:
+    with TestClient(make_app(tmp_path, providers_yaml=CLAUDE_YAML), base_url="http://127.0.0.1") as client:
+        headers = writer(client)
+
+        def put(provider: str, params: dict[str, Any]) -> Any:
+            return client.put(
+                f"/api/intel/providers/{provider}/settings", json={"params": params}, headers=headers
+            )
+
+        chosen = {"temperature": 0.7, "max_output_tokens": 800, "price_in": 3, "price_out": 15}
+        assert put("acme", chosen).status_code == 200
+        assert client.app.state.provider_store.settings("acme").params == {
+            "temperature": 0.7,
+            "max_output_tokens": 800,
+            "price_in": 3.0,
+            "price_out": 15.0,
+        }
+        assert put("acme", {"num_ctx": 8192}).json()["detail"] == {
+            "code": "unsupported_param",
+            "params": ["num_ctx"],
+        }
+        assert put("claude", {"temperature": 0.5}).json()["detail"]["params"] == ["temperature"]
+        assert put("acme", {"temperature": 3}).status_code == 422
+        assert put("ollama", {"num_ctx": 32768, "keep_alive": "10m"}).status_code == 200
+        assert put("ollama", {"keep_alive": "forever"}).status_code == 422
+        assert put("ollama", {"num_ctx": 1024}).status_code == 422
+
+
+def test_test_tool_calling_caches_its_answer_and_respects_local_only(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = writer(client)
+    url = "/api/intel/providers/acme/probe"
+
+    async def calls_the_tool(provider: Any, model: str) -> str:
+        return "yes"
+
+    assert client.post(url, json={"model": "big-1"}, headers=HEADERS).status_code == 403
+    assert (
+        client.post("/api/intel/providers/ollama/probe", json={"model": "m"}, headers=headers).status_code
+        == 400
+    )
+    failed = client.post(url, json={"model": "big-1"}, headers=headers).json()
+    assert (failed["ok"], failed["code"]) == (False, "auth_failed"), "the echo provider refuses the key"
+    monkeypatch.setattr("app.api.providers.probe_tools", calls_the_tool)
+    assert client.post(url, json={"model": "big-1"}, headers=headers).json() == {
+        "ok": True,
+        "supports_tools": "yes",
+    }
+    store = client.app.state.provider_store
+    assert store.known_tools("acme", "https://api.acme.test/v1", "big-1") == "yes"
+    client.put("/api/intel/providers/policy", json={"local_only": True}, headers=headers)
+    assert client.post(url, json={"model": "big-1"}, headers=headers).status_code == 409
+
+
+def test_the_gpu_reading_is_parsed_and_served(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    assert parse_gpu("NVIDIA GeForce RTX 5060 Laptop GPU, 8151\n") == {
+        "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+        "memory_mb": 8151,
+    }
+    assert parse_gpu("") is None and parse_gpu("no comma here") is None and parse_gpu(", 8151") is None
+
+    async def no_gpu() -> None:
+        return None
+
+    monkeypatch.setattr("app.api.providers.nvidia_gpu", no_gpu)
+    assert client.get("/api/intel/providers/ollama/gpu").json() == {"gpu": None}
+    assert client.get("/api/intel/providers/ollama/gpu", headers={"origin": "http://x"}).status_code == 403
+
+
+def test_continue_allows_one_more_budget_and_is_a_gated_write(client: TestClient) -> None:
+    url = "/api/intel/providers/budget/continue"
+    assert client.post(url, json={}, headers=HEADERS).status_code == 403
+    headers = writer(client)
+    assert client.post(url, json={}, headers=headers).status_code == 409, "no conversation yet"
+    client.put(SELECTION, json={"provider": "acme", "model": "big-1"}, headers=headers)
+    assert client.post(url, json={}, headers=headers).json() == {"allowance": 200_000}
+    assert client.get(STATUS).json()["budget"]["allowance"] == 200_000
