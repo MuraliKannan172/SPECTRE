@@ -9,22 +9,30 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
+import secrets
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
+from typing import Any
 
 import httpx
-from fastapi import FastAPI
+import keyring
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
+from keyring.backend import KeyringBackend
 
 from .api.chat import ChatGate
 from .api.chat import router as chat_router
+from .api.providers import router as providers_router
 from .api.routes import router
 from .api.voice import router as voice_router
 from .chat.agent import Agent
-from .chat.providers.base import ChatProvider
+from .chat.providers.keys import KeyStore
 from .chat.providers.registry import DEFAULT_PATH as PROVIDERS_FILE
-from .chat.providers.registry import ProviderConfigError, default_providers
+from .chat.providers.registry import Factory, ProviderConfigError, ProviderSet, default_providers
 from .chat.tools import ToolRegistry
 from .config import BRAND_NAME, DEFAULT_DB, DEFAULT_LOGS, Settings, load_settings
 from .geo.gazetteer import Gazetteer
@@ -34,9 +42,10 @@ from .ingest.feeds import load_feed_config
 from .ingest.pipeline import Pipeline
 from .ingest.scheduler import Scheduler
 from .legacy import migrate_defaults
-from .redact import install_log_redaction
+from .redact import install_log_redaction, redact
 from .store.chat import ChatStore
 from .store.news import NewsStore
+from .store.providers import ProviderStore
 from .voice.service import VoiceService
 from .web.fetch import TIMEOUT_SECONDS as FETCH_TIMEOUT
 from .web.fetch import PageFetcher
@@ -44,6 +53,38 @@ from .web.guard import guarded_client
 from .web.search import SearchService, make_search_service
 
 log = logging.getLogger("spectre.intel")
+
+
+def _load_providers(
+    *,
+    path: Path,
+    ollama_http: httpx.AsyncClient,
+    ollama_host: str,
+    keys: KeyStore,
+    store: ProviderStore,
+    factories: Mapping[str, Factory] | None,
+) -> tuple[ProviderSet | None, str | None]:
+    """The providers, or None and why chat is unavailable. A bad provider file
+    disables chat only; news, events and voice keep running."""
+    try:
+        providers = default_providers(
+            ollama_http=ollama_http,
+            ollama_host=ollama_host,
+            path=path,
+            key_for=keys.get,
+            factories=factories,
+        )
+        for spec_id in providers.specs:
+            saved = store.settings(spec_id).base_url
+            if spec_id != "ollama" and saved:
+                providers.rebuild(spec_id, saved)
+    except (OSError, ValueError, ProviderConfigError) as error:
+        return None, f"{path.name} unreadable ({type(error).__name__}): {error}"
+    for spec in providers.specs.values():
+        keys.status(spec)  # registers keys found in the environment or .env with the redactor
+    if providers.get("ollama") is None:
+        return providers, f"{path.name} has no ollama entry"
+    return providers, None
 
 
 def create_app(
@@ -58,8 +99,13 @@ def create_app(
     tool_registry: ToolRegistry | None = None,
     voice: VoiceService | None = None,
     providers_file: Path = PROVIDERS_FILE,
+    environ: Mapping[str, str] | None = None,
+    keyring_backend: KeyringBackend | None = None,
+    provider_factories: Mapping[str, Factory] | None = None,
 ) -> FastAPI:
     settings = settings or load_settings()
+    # Keys set in the environment count only as they were at start-up (ADR-002 D5).
+    boot_env = dict(os.environ if environ is None else environ)
     install_log_redaction()  # every log record, from every logger, before anything runs
 
     @contextlib.asynccontextmanager
@@ -117,17 +163,26 @@ def create_app(
                 app.state.chat_problem = (
                     f"tool artifact unreadable ({type(error).__name__}): run npm run tools:export"
                 )
-        # A bad provider file disables chat only; news, events and voice keep running.
-        providers: dict[str, ChatProvider] = {}
-        try:
-            providers = default_providers(
-                ollama_http=ollama_http, ollama_host=settings.ollama_host, path=providers_file
-            )
-        except (OSError, ValueError, ProviderConfigError) as error:
-            app.state.chat_problem = f"{providers_file.name} unreadable ({type(error).__name__}): {error}"
-        ollama = providers.get("ollama")
-        if ollama is None and app.state.chat_problem is None:
-            app.state.chat_problem = f"{providers_file.name} has no ollama entry"
+        keys = KeyStore(
+            boot_env=boot_env,
+            env_file=settings.env_file,
+            backend=keyring_backend if keyring_backend is not None else keyring.get_keyring(),
+        )
+        provider_store = ProviderStore(str(settings.db_path))
+        providers, problem = _load_providers(
+            path=providers_file,
+            ollama_http=ollama_http,
+            ollama_host=settings.ollama_host,
+            keys=keys,
+            store=provider_store,
+            factories=provider_factories,
+        )
+        app.state.chat_problem = app.state.chat_problem or problem
+        app.state.keys = keys
+        app.state.provider_store = provider_store
+        app.state.providers = providers
+        app.state.session_token = secrets.token_urlsafe(32)
+        ollama = providers.get("ollama") if providers else None
         app.state.agent = (
             Agent(
                 settings=settings,
@@ -139,6 +194,8 @@ def create_app(
                 registry=registry,
                 open_only=lambda: not settings.noncommercial_enabled(),
                 provider=ollama,
+                local_only=lambda: provider_store.policy().local_only,
+                consented=provider_store.consented,
             )
             if registry is not None and ollama is not None
             else None
@@ -168,6 +225,7 @@ def create_app(
             await ollama_http.aclose()
             await fetch_http.aclose()
             chats.close()
+            provider_store.close()
             store.close()
 
     app = FastAPI(
@@ -183,6 +241,22 @@ def create_app(
     app.include_router(router)
     app.include_router(chat_router)
     app.include_router(voice_router)
+    app.include_router(providers_router)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
+        # FastAPI's default body echoes the rejected input, which on
+        # /providers/{id}/key is an API key.
+        detail: list[dict[str, Any]] = [
+            {
+                "loc": [redact(str(part)) for part in item.get("loc", ())],
+                "msg": redact(str(item.get("msg", ""))),
+                "type": item.get("type"),
+            }
+            for item in error.errors()
+        ]
+        return JSONResponse(status_code=422, content={"detail": detail})
+
     return app
 
 

@@ -4,7 +4,8 @@
   through the intel service; Q2 no `last4`; Q3 Ollama `:cloud` models count as cloud; Q4 add the
   pinned `anthropic`, `openai` and `keyring` packages.
 - **Date:** 2026-10-29
-- **Scope:** P0 recon only (`NEURAL_CORE_PROVIDERS_PROMPT.md` §7). No feature code has been written.
+- **Scope:** the design for P0–P5 (`NEURAL_CORE_PROVIDERS_PROMPT.md` §7). P1 and P2 are built;
+  where they differ from the text below, §8 says how.
 - **Branch:** `feat/neural-core-providers` (from `main` @ `2141700a`).
 - **Evidence:** `docs/providers/p0-ollama-probe.json` (what this machine's Ollama returns),
   `docs/providers/p0-eval-qwen3.5-9b-64k-gpu_latest.json` (the Neural Core eval baseline).
@@ -67,7 +68,9 @@ What this changes against the brief:
   fallback for older Ollama versions.
 - **An Ollama model is not always local.** A `:cloud` model sends the conversation to ollama.com.
   It gets the `CLOUD · Ollama` badge and the same consent rule as any cloud provider (D6), and
-  local-only mode blocks it.
+  local-only mode blocks it. Only `/api/tags` says so (`remote_host`); `/api/show` has no such
+  field (checked live on 0.40.13 against `beam:cloud`), so a model's kind is read from its tags
+  entry.
 - `/api/ps` fields: `name`, `model`, `size`, `size_vram`, `context_length` (the requested
   `num_ctx`), `expires_at`, `details`, `digest`, `runner`.
 
@@ -351,6 +354,8 @@ New numbered migration; `0001` and `0002` are untouched and existing conversatio
     keyed by provider + model + base URL.
   - `consents(provider_id PK, granted_at, revoked_at)`.
   - `usage(id, ts, conversation_id, provider_id, model, input_tokens, output_tokens)`.
+  - `chat_settings(key PK, value_json, updated_at)`: the switches that are not per provider
+    (local-only mode, map context in cloud requests). Added in P2.
 - The CHECK on `messages.role` stays `user|assistant`: tool calls inside a turn are still not
   stored, so `provider_state` is the only per-turn data that survives, and only where a provider
   needs it.
@@ -369,10 +374,14 @@ New numbered migration; `0001` and `0002` are untouched and existing conversatio
      is available**.
 - **`OPENAI_API_KEY` is shared** with God's Eye View's voice: a value the POWER UP panel already
   saved to `.env` is found at step 3 and used for ChatGPT, not asked for twice.
-- **API** (intel service, behind new proxy routes marked local-only and write):
-  `GET /api/intel/providers` → per provider `{configured, source, last4?}`; `PUT …/{id}/key`
-  (write-only), `DELETE …/{id}/key`, `POST …/{id}/test`, `GET …/{id}/models`,
-  `PUT …/{id}/settings`.
+- **API** (intel service, behind new proxy routes marked local-only and write; as built in P2):
+  - `GET /api/intel/providers` → per provider `{id, label, kind, docs, base_url,
+    base_url_editable, workspace_id, key: {required, configured, source, env, writable},
+    consent}`, plus `policy` and whether a keyring exists. No `last4` (Q2).
+  - `GET …/session` → the session token; `GET …/{id}/models`.
+  - Writes, each with the token: `PUT …/{id}/key` `{key}` (write-only), `DELETE …/{id}/key`,
+    `PUT …/{id}/settings` `{base_url, workspace_id}`, `PUT …/{id}/consent` `{granted}`,
+    `PUT …/policy` `{local_only, map_context}`, `POST …/{id}/test`.
 - **Who may change keys:** the proxy runs the **same gate POWER UP uses**,
   `admitKeySetupRequest()` in `src/keySetupCore.mjs` (already unit-tested), before forwarding.
   - **Refused:** any request with forwarding headers, anything while a sharing tunnel is on, a
@@ -657,3 +666,28 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
     reset); the `/api/show` facts come from `openapi.yaml` and this machine (§1.3).
 - **Ollama on this machine:** `ollama list`, `/api/version`, `/api/tags`, `/api/show` per model and
   `/api/ps`, recorded in `docs/providers/p0-ollama-probe.json`.
+
+## 8. As built: where P1 and P2 differ from the text above
+
+- **`:cloud` detection (P1 fix).** `model_caps` read only `/api/show`, which has no `remote_host`,
+  so `:cloud` models came back `local`. It now merges `remote_host` from the model's `/api/tags`
+  entry (§1.3).
+- **`chat_settings` table** in `0003` for local-only mode and map context (D4).
+- **Factories take a key getter**, not a key: a key saved later is used on the next request, and
+  no adapter holds a key it could print.
+- **Local-only mode** blocks a cloud model at turn start, and also a cloud provider's connection
+  test and model list: no request reaches a cloud API while it is on.
+- **Consent** is enforced at turn start for every cloud provider except Ollama's `:cloud` models,
+  which wait for the P4 consent dialog; enforcing it now would lock out a `:cloud` user with no
+  way to consent. Until P4 they are blocked only by local-only mode.
+- **Ollama's address** stays `OLLAMA_HOST`; the settings route refuses a base URL for Ollama.
+- **Base URLs** must be `https`, or `http` on this machine, for every provider. A keyless
+  OpenAI-compatible server elsewhere on the LAN over `http` is revisited with the custom entry in
+  P3.
+- **Validation errors** (422) no longer echo the rejected input, which on `PUT …/key` would be the
+  key.
+- **The proxy gate** treats every provider write as a POST, so each needs an exact local Origin.
+  `DELETE …/key` has no body, so only its JSON check is skipped; that check exists to force a CORS
+  preflight, which a DELETE always triggers.
+- **Tests** run against an in-memory keyring with the provider key variables removed from the
+  environment (`intel/tests/conftest.py`).

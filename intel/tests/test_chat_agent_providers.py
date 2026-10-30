@@ -40,7 +40,12 @@ def run_with(tmp_path: Path):  # type: ignore[no-untyped-def]
     stores: list[Any] = []
 
     def go(
-        provider: MockProvider, *, close_after: int | None = None, history_of: int | None = None
+        provider: MockProvider,
+        *,
+        close_after: int | None = None,
+        history_of: int | None = None,
+        consented: bool = True,
+        local_only: bool = False,
     ) -> list[tuple[str, dict[str, Any]]]:
         settings = Settings(
             db_path=tmp_path / "t.db",
@@ -61,6 +66,8 @@ def run_with(tmp_path: Path):  # type: ignore[no-untyped-def]
             registry=ToolRegistry(CLIENT_TOOLS),
             clock=lambda: 1_790_000_000.0,
             provider=provider,
+            consented=lambda provider_id: consented,
+            local_only=lambda: local_only,
         )
         history = chats.messages(history_of) if history_of is not None else []
         turn = Turn(
@@ -156,6 +163,27 @@ def test_a_conversation_from_before_migration_0003_loads_and_continues(  # type:
     finally:
         chats.close()
     assert (latest["content"], latest["provider_id"], latest["model"]) == ("Continued.", "mock", MODEL.id)
+
+
+def test_a_cloud_provider_without_consent_gets_nothing(run_with) -> None:  # type: ignore[no-untyped-def]
+    provider = MockProvider([answer("Never sent.")], models=[MODEL])
+    events = run_with(provider, consented=False)
+    assert events[-1][0] == "error" and events[-1][1]["code"] == "consent_required"
+    assert provider.opened == 0
+
+
+def test_local_only_mode_blocks_a_cloud_model_even_with_consent(run_with) -> None:  # type: ignore[no-untyped-def]
+    provider = MockProvider([answer("Never sent.")], models=[MODEL])
+    events = run_with(provider, local_only=True)
+    assert events[-1][0] == "error" and events[-1][1]["code"] == "local_only"
+    assert provider.opened == 0
+
+
+def test_local_only_mode_leaves_a_local_model_alone(run_with) -> None:  # type: ignore[no-untyped-def]
+    local = ModelInfo("m:1", "m:1", "local", "yes", capabilities=frozenset({"completion", "tools"}))
+    provider = MockProvider([answer("Local answer.")], models=[local])
+    events = run_with(provider, consented=False, local_only=True)
+    assert ("token", {"text": "Local answer."}) in events
 
 
 def test_stopping_a_turn_closes_the_provider_stream(run_with) -> None:  # type: ignore[no-untyped-def]
