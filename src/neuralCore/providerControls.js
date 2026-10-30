@@ -149,7 +149,7 @@ export function mountProviderControls({
           },
         },
       ];
-    if (code === 'auth_failed' || code === 'no_key')
+    if (['auth_failed', 'no_key', 'key_not_sent'].includes(code))
       return [
         { label: t('Set the key in POWER UP'), run: openPowerUp },
         settingsAction,

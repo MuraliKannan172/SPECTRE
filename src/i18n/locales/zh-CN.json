@@ -3058,8 +3058,6 @@
   "Model id": "模型 ID",
   "Use this model id": "使用此模型 ID",
   "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "API 模型的上下文上限，以 token 计（默认 16384；更大会发送更多历史和网页文本，均计费）",
-  "Cloud models answer only on the computer running SPECTRE.": "云端模型只在运行 SPECTRE 的电脑上回答。",
-  "cloud models answer on the host only": "云端模型只在主机上回答",
   "cut off at the output limit": "在输出上限处被截断",
   "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "该密钥是为另一个地址保存的，因此不会发送到此地址。请在 POWER UP 中重新保存以在此使用。",
   "Thinking": "思考过程",
@@ -3074,5 +3072,11 @@
   "Pulled {model}.": "已拉取 {model}。",
   "Ollama could not pull it: {message}": "Ollama 无法拉取：{message}",
   "Stopped watching. Ollama may finish the download on its own.": "已停止跟踪。Ollama 可能会自行完成下载。",
-  "{status} · {percent}%": "{status} · {percent}%"
+  "{status} · {percent}%": "{status} · {percent}%",
+  "Cloud and network models answer only on the computer running SPECTRE.": "云端和网络模型只在运行 SPECTRE 的电脑上回答。",
+  "cloud and network models answer on the host only": "云端和网络模型只在主机上回答",
+  "The key was saved for another address, so it was not sent. Save it again in POWER UP for this address.": "该密钥是为另一个地址保存的，因此未发送。请在 POWER UP 中为此地址重新保存。",
+  "key saved for another address": "密钥是为另一个地址保存的",
+  "Without an OS keyring this would change OPENAI_API_KEY in .env, which voice also uses; change it there.": "没有操作系统钥匙串时，这会更改 .env 中语音也在使用的 OPENAI_API_KEY；请在那里修改。",
+  "This key comes from the environment and goes only to the provider's own address. To use this address, remove it there and save it in POWER UP.": "此密钥来自环境变量，只发送到提供商自己的地址。要使用此地址，请从环境中移除它并在 POWER UP 中保存。"
 }

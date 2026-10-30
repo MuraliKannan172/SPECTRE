@@ -73,7 +73,12 @@ const ERRORS = Object.freeze({
     'This provider has not been allowed to receive the conversation yet.',
   ),
   local_only: msg('Local-only mode is on, so cloud models are blocked.'),
-  lan_viewer: msg('Cloud models answer only on the computer running SPECTRE.'),
+  lan_viewer: msg(
+    'Cloud and network models answer only on the computer running SPECTRE.',
+  ),
+  key_not_sent: msg(
+    'The key was saved for another address, so it was not sent. Save it again in POWER UP for this address.',
+  ),
   unknown_provider: msg('The selected provider is not available.'),
 });
 
@@ -189,7 +194,11 @@ export function statusSummary(status, failureCode = null) {
       search,
     };
   // An Ollama :cloud model (or a remote Ollama): blocked, or waiting for consent.
-  if (['local_only', 'consent_required', 'lan_viewer'].includes(status.problem))
+  if (
+    ['local_only', 'consent_required', 'lan_viewer', 'key_not_sent'].includes(
+      status.problem,
+    )
+  )
     return {
       tone: 'offline',
       text: `${model} · ${errorText(status.problem)}`,

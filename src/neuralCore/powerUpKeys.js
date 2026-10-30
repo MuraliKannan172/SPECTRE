@@ -21,6 +21,9 @@ const SAVE_ERRORS = Object.freeze({
     'This server is on plain http on another machine; a key would travel unencrypted.',
   ),
   keyring_failed: msg('The OS keyring refused the key.'),
+  shared_key: msg(
+    'Without an OS keyring this would change OPENAI_API_KEY in .env, which voice also uses; change it there.',
+  ),
   session_required: msg('The intel service restarted; try again.'),
 });
 

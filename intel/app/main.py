@@ -31,7 +31,9 @@ from .api.providers import router as providers_router
 from .api.routes import router
 from .api.voice import router as voice_router
 from .chat.agent import Agent
+from .chat.providers import errors
 from .chat.providers.catalog import api_factories
+from .chat.providers.errors import ProviderError
 from .chat.providers.keys import KeyStore, key_reaches
 from .chat.providers.registry import DEFAULT_PATH as PROVIDERS_FILE
 from .chat.providers.registry import (
@@ -90,7 +92,11 @@ def load_providers(
         # Read at request time, so a later key or base URL change applies at once.
         key = keys.get(spec)
         address = store.settings(spec.id).base_url or spec.base_url
-        return key if key is None or key_reaches(spec, address, store.key_host(spec.id)) else None
+        if key is None or key_reaches(spec, address, store.key_host(spec.id)):
+            return key
+        # Withheld, and said so: a keyless request would come back as a
+        # misleading "rejected the key".
+        raise ProviderError(errors.KEY_NOT_SENT_CODE, errors.KEY_NOT_SENT, provider=spec.id)
 
     try:
         providers = default_providers(

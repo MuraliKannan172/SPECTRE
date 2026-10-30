@@ -286,7 +286,7 @@ test('labels and errors describe real state', () => {
       ready: false,
       problem: 'lan_viewer',
     }).text,
-    'beam:cloud · Cloud models answer only on the computer running SPECTRE.',
+    'beam:cloud · Cloud and network models answer only on the computer running SPECTRE.',
   );
   assert.equal(
     turnErrorCode({ code: 'rate_limited', provider: 'openai' }),

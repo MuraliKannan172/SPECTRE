@@ -665,3 +665,24 @@ test('provider routes stay closed to the LAN even with chat opened to it', async
   await open({ ...lan, url: '/chat/status' }, replyDouble());
   assert.equal(calls, 1, 'only the chat read reached the service');
 });
+
+test('a viewer arriving through a proxy on this machine is marked too', async () => {
+  const sent = [];
+  const handler = createIntelHandler({
+    request: (options) => {
+      sent.push(options.headers);
+      return { on() {}, once() {}, setTimeout() {}, end() {}, destroy() {} };
+    },
+    env: { SPECTRE_CHAT_ALLOW_LAN: '1' },
+  });
+  await handler(
+    {
+      method: 'GET',
+      url: '/chat/status',
+      headers: { 'x-forwarded-for': '203.0.113.9' },
+      socket: { remoteAddress: '127.0.0.1' },
+    },
+    { writeHead() {}, end() {}, once() {}, headersSent: false },
+  );
+  assert.equal(sent[0]['x-spectre-viewer'], 'lan');
+});

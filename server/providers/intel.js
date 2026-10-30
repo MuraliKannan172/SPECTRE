@@ -138,6 +138,7 @@ const SLOW_TIMEOUT_MS = 120_000;
 // Set on chat requests from another machine; the service then runs no cloud
 // model for them. Never copied from the client (not in the lists above).
 const VIEWER_HEADER = 'x-spectre-viewer';
+const FORWARDING_HEADERS = ['forwarded', 'x-forwarded-for', 'x-real-ip'];
 
 /** The service base URL: SPECTRE_INTEL_URL when it is http on loopback. */
 export function intelTarget(env = process.env) {
@@ -291,7 +292,12 @@ export function createIntelHandler({
       if (typeof req.headers[name] === 'string')
         headers[name] = req.headers[name];
     }
-    if (route.chat && !isLoopbackAddress(req.socket?.remoteAddress))
+    // Another machine, also when it arrives through a proxy on this one.
+    if (
+      route.chat &&
+      (!isLoopbackAddress(req.socket?.remoteAddress) ||
+        FORWARDING_HEADERS.some((name) => req.headers[name] !== undefined))
+    )
       headers[VIEWER_HEADER] = 'lan';
     let body = null;
     if (route.body) {

@@ -98,6 +98,8 @@ class OllamaClient:
                         chunk = json.loads(line)
                     except ValueError as error:
                         raise OllamaError("bad_response") from error
+                    if not isinstance(chunk, dict):
+                        raise OllamaError("bad_response", "not an object")
                     if chunk.get("error"):
                         raise OllamaError("model_error", str(chunk["error"])[:300])
                     yield chunk

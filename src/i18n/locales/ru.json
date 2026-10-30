@@ -3280,8 +3280,6 @@
   "Model id": "ID модели",
   "Use this model id": "Использовать этот ID",
   "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "Предел контекста для моделей API, в токенах (по умолчанию 16384; больше — больше истории и веб-текста, всё оплачивается)",
-  "Cloud models answer only on the computer running SPECTRE.": "Облачные модели отвечают только на компьютере, где запущен SPECTRE.",
-  "cloud models answer on the host only": "облачные модели отвечают только на основном компьютере",
   "cut off at the output limit": "обрезано на пределе вывода",
   "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "Ключ сохранён для другого адреса, поэтому сюда он не отправляется. Сохраните его снова в POWER UP, чтобы использовать здесь.",
   "Thinking": "Размышления",
@@ -3296,5 +3294,11 @@
   "Pulled {model}.": "Модель {model} загружена.",
   "Ollama could not pull it: {message}": "Ollama не смогла загрузить её: {message}",
   "Stopped watching. Ollama may finish the download on its own.": "Слежение остановлено. Ollama может закончить загрузку сама.",
-  "{status} · {percent}%": "{status} · {percent}%"
+  "{status} · {percent}%": "{status} · {percent}%",
+  "Cloud and network models answer only on the computer running SPECTRE.": "Облачные и сетевые модели отвечают только на компьютере, где запущен SPECTRE.",
+  "cloud and network models answer on the host only": "облачные и сетевые модели отвечают только на основном компьютере",
+  "The key was saved for another address, so it was not sent. Save it again in POWER UP for this address.": "Ключ сохранён для другого адреса, поэтому не был отправлен. Сохраните его снова в POWER UP для этого адреса.",
+  "key saved for another address": "ключ сохранён для другого адреса",
+  "Without an OS keyring this would change OPENAI_API_KEY in .env, which voice also uses; change it there.": "Без хранилища ключей ОС это изменило бы OPENAI_API_KEY в .env, который использует и голос; измените его там.",
+  "This key comes from the environment and goes only to the provider's own address. To use this address, remove it there and save it in POWER UP.": "Этот ключ задан в окружении и отправляется только на собственный адрес провайдера. Чтобы использовать этот адрес, удалите его оттуда и сохраните в POWER UP."
 }

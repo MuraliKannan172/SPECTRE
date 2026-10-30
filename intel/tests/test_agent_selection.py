@@ -217,7 +217,9 @@ def test_api_budgets_never_exceed_the_16k_set_and_shrink_with_a_small_window() -
 
 def test_a_raised_ceiling_grows_budgets_and_input_only_as_far_as_the_window() -> None:
     four_times = {name: tokens * 4 for name, tokens in FULL_BUDGETS.items()}
-    assert api_budgets(1_000_000, 65_536) == four_times == api_budgets(None, 65_536)
+    assert api_budgets(1_000_000, 65_536) == four_times
+    assert api_budgets(None, 65_536) == FULL_BUDGETS, "a window nobody listed stays at 16k"
+    assert api_input_limit(None, 4096, 65_536) == 12_288
     assert api_budgets(32_768, 65_536) == {name: tokens * 2 for name, tokens in FULL_BUDGETS.items()}
     assert api_input_limit(None, 4096) == api_input_limit(1_000_000, 8192) == 12_288, "today's ceiling"
     assert api_input_limit(1_000_000, 4096, 65_536) == 61_440

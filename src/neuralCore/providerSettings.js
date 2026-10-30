@@ -267,7 +267,22 @@ export function mountProviderSettings({
       node(document, 'p', 'spectre-nc-hint', keySourceText(provider.key)),
     );
     // The service sends a key only to the address it was saved for.
-    if (provider.key.configured && provider.key_reaches_address === false)
+    if (
+      provider.key.configured &&
+      provider.key_reaches_address === false &&
+      provider.key.source === 'environment'
+    )
+      detail.append(
+        node(
+          document,
+          'p',
+          'spectre-nc-hint',
+          t(
+            "This key comes from the environment and goes only to the provider's own address. To use this address, remove it there and save it in POWER UP.",
+          ),
+        ),
+      );
+    else if (provider.key.configured && provider.key_reaches_address === false)
       detail.append(
         node(
           document,

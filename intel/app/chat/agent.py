@@ -114,14 +114,14 @@ class Plan:
 def api_budgets(window: int | None, ceiling: int = BASE_WINDOW) -> dict[str, int]:
     """FULL_BUDGETS scaled to the context ceiling (16k unless the user changed
     it); a smaller context window lowers them (D9)."""
-    scale = min(window or ceiling, ceiling) / BASE_WINDOW
+    scale = min(window or BASE_WINDOW, ceiling) / BASE_WINDOW  # unknown window: 16k
     return {name: int(tokens * scale) for name, tokens in FULL_BUDGETS.items()}
 
 
 def api_input_limit(window: int | None, max_output: int, ceiling: int = BASE_WINDOW) -> int:
     """Input tokens per round for an API model: the ceiling less the default
     output guard, lowered by the model's own window less its output."""
-    return max(1024, min(ceiling - DEFAULT_MAX_OUTPUT, (window or ceiling) - max_output))
+    return max(1024, min(ceiling - DEFAULT_MAX_OUTPUT, (window or BASE_WINDOW) - max_output))
 
 
 class Sources:
@@ -250,9 +250,11 @@ class Agent:
         on the model's (an Ollama provider is local, its :cloud models are not)."""
         if kind == "local":
             return None
-        if kind == "cloud" and lan:
+        if lan:
             return _refusal(
-                "lan_viewer", "Cloud models answer only on the computer running SPECTRE.", provider
+                "lan_viewer",
+                "Cloud and network models answer only on the computer running SPECTRE.",
+                provider,
             )
         if kind == "cloud" and self.local_only():
             return _refusal("local_only", "Local-only mode is on, so cloud models are blocked.", provider)
@@ -288,8 +290,8 @@ class Agent:
         density = self._density.get((provider.id, model), CHARS_PER_TOKEN)
         if provider.id == "ollama":
             num_ctx = int(params.get("num_ctx") or self.settings.num_ctx)
-            thinks = bool(params["reasoning"]) if "reasoning" in params else self.settings.ollama_think
-            reserve = OLLAMA_THINKING_RESERVE if thinks else OLLAMA_OUTPUT_RESERVE
+            # Only the switch moves the reserve: without it, nothing changes.
+            reserve = OLLAMA_THINKING_RESERVE if params.get("reasoning") else OLLAMA_OUTPUT_RESERVE
             return Plan(
                 provider,
                 model,
@@ -297,7 +299,7 @@ class Agent:
                 budgets_for(num_ctx),
                 info.kind,
                 params,
-                input_limit=num_ctx - reserve,
+                input_limit=max(num_ctx // 2, num_ctx - reserve),
                 chars_per_token=density,
             )
         support = info.supports_tools
@@ -449,6 +451,7 @@ class Agent:
                 think = ThinkFilter()
                 content, calls = "", []
                 thought = 0
+                billed = False
                 provider_state: dict[str, Any] | None = None
                 messages = fit(messages, limit, fixed)
                 request = self._request(messages, plan, native=native, allow_tools=allow_tools)
@@ -478,6 +481,7 @@ class Agent:
                         elif isinstance(event, ToolCallEvent):
                             calls.append(event.call)
                         elif isinstance(event, Usage):
+                            billed = True
                             usage = event
                             spent[0] += event.input
                             spent[1] += event.output
@@ -487,6 +491,10 @@ class Agent:
                         elif isinstance(event, Done):
                             provider_state = event.provider_state
                             stop = event.stop_reason
+                if stop == "length" and not billed:
+                    # Cut before its usage arrived: count an estimate, never nothing.
+                    spent[0] += int(sent / plan.chars_per_token)
+                    spent[1] += int((len(content) + thought) / plan.chars_per_token)
                 if not native:
                     content, calls = _parse_fallback(content, rounds)
                     if content:
@@ -771,7 +779,7 @@ def _fallback_instructions(registry: ToolRegistry) -> str:
     )
 
 
-VIEW_KEYS = frozenset({"observer", "camera", "viewport", "view", "cameraPosition"})
+VIEW_KEYS = frozenset({"observer", "viewport", "cameraPosition"})
 
 
 def _without_view(value: Any) -> Any:

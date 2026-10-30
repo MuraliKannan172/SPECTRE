@@ -129,7 +129,10 @@ test('chat status: an API provider is judged by ready/problem, not by Ollama', (
         ready: false,
         problem: 'lan_viewer',
       }),
-      { state: 'degraded', detail: 'cloud models answer on the host only' },
+      {
+        state: 'degraded',
+        detail: 'cloud and network models answer on the host only',
+      },
     );
 });
 

@@ -30,7 +30,8 @@ from app.chat.tools import ARTIFACT_PATH, SERVER_TOOLS, ToolRegistry
         "street he lives on now.",
         "Daniel Ortiz moved away last year street address",
         "which road does she live on these days",
-        "What neighbourhood are they staying in now?",
+        "What neighbourhood does she live in now?",
+        "which street does he\nlive on now",
         "which apartment building does my ex live in",
     ],
 )
@@ -57,6 +58,7 @@ def test_person_lookups_are_caught(text: str) -> None:
         "Which building did they evacuate after the fire?",
         "Which street do they live-stream the parade from?",
         "Which neighbourhood are the protests in?",
+        "What building did they stay in during the earthquake?",
     ],
 )
 def test_events_assets_and_public_news_are_allowed(text: str) -> None:

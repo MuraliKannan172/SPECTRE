@@ -157,7 +157,7 @@ class OpenAIResponsesProvider:
         ladder: tuple[str | None, ...] = (self._effort[request.model],) if known else (*EFFORTS, None)
         if request.params.get("reasoning"):
             # Asked for: one fixed effort, and the learned lowest one stays as it was.
-            ladder = (REASONING_EFFORT,)
+            ladder = (REASONING_EFFORT, None)
         for effort in ladder:
             failure: ProviderError | None = None
             rejected = False

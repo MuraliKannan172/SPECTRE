@@ -83,3 +83,15 @@ def test_registry_names_are_accepted(tmp_path: Path, name: str) -> None:
     fake = PullingOllama([{"status": "success"}])
     with TestClient(make_app(tmp_path, fake), base_url="http://127.0.0.1") as client:
         assert client.post(URL, json={"model": name}, headers=writer(client)).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("lines", "code"),
+    [([{"status": "pulling manifest"}], "incomplete"), (["not an object"], "bad_response")],
+)
+def test_a_pull_that_never_says_success_is_an_error(tmp_path: Path, lines: list[object], code: str) -> None:
+    fake = PullingOllama(lines)  # type: ignore[arg-type]
+    with TestClient(make_app(tmp_path, fake), base_url="http://127.0.0.1") as client:
+        reply = client.post(URL, json={"model": "smollm2:135m"}, headers=writer(client))
+    name, data = events_of(reply.text)[-1]
+    assert (name, data["code"]) == ("error", code)
