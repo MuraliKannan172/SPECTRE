@@ -28,8 +28,11 @@ TRIMMED = "[trimmed: an earlier tool result, removed to fit the context budget]"
 
 
 def message_chars(message: Message) -> int:
-    return len(message.content) + sum(
-        len(call.name) + len(json.dumps(call.args, ensure_ascii=False)) for call in message.tool_calls
+    state = len(json.dumps(message.provider_state, ensure_ascii=False)) if message.provider_state else 0
+    return (
+        len(message.content)
+        + state  # replayed reasoning is sent too
+        + sum(len(call.name) + len(json.dumps(call.args, ensure_ascii=False)) for call in message.tool_calls)
     )
 
 

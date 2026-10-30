@@ -150,7 +150,9 @@ class OpenAIChatProvider:
     def client(self) -> openai.AsyncOpenAI:
         key = self._key()
         if not key and not self._key_optional:
-            raise ProviderError(errors.AUTH_FAILED, f"No API key is set for {self.label}", provider=self.id)
+            raise ProviderError(
+                errors.AUTH_FAILED, f"No API key is set for {self.label}", provider=self.id, ours=True
+            )
         if key and not key_may_travel(self.base_url):
             raise ProviderError(
                 errors.UNSUPPORTED_FEATURE,

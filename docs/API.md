@@ -89,7 +89,7 @@ The response is `text/event-stream`:
 | `client_tool` | `{"turn_id", "call_id", "name", "args"}`: a globe tool for the browser to run |
 | `citation` | `{"n", "url", "title", "source"}`: source `[n]` of this turn |
 | `done` | `{"model", "provider", "usage": {"input", "output"}, "stop_reason", "tokens_per_s", "eval_count", "prompt_eval_count", "as_of", "citations", "degraded", "rounds", "seconds", "refused"?}` |
-| `error` | `{"code", "message", "provider"?, "retryable"?}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped`, `consent_required`, `local_only`, `auth_failed`, `rate_limited` |
+| `error` | `{"code", "message", "provider"?, "retryable"?}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped`, `consent_required`, `local_only`, `lan_viewer`, `auth_failed`, `rate_limited`; a rejected key's message is always "The provider rejected the key." |
 | `budget` | `{"spent", "allowance", "budget"}`: the conversation reached its cloud token budget, and nothing was sent |
 
 At most 4 tool rounds run per turn, and the final request asks for an answer, not a call. `as_of` is set when news or web results were used. `usage` counts every round. The turn runs on the conversation's selected provider and model (`PUT /api/intel/providers/selection`); the chat body cannot change it, and a selection that cannot run is an `error`, never a switch. Before each round the request is trimmed to the model's input limit: the oldest tool results first, then the oldest history ([ADR-002](ADR-002-providers.md) D9).
@@ -121,15 +121,15 @@ The current conversation as `{"conversation_id", "messages": [{"role", "content"
 
 `loaded` comes from Ollama's `/api/ps` and is `null` until the first answer loads the model.
 
-The selection adds `provider`, `provider_label`, `kind` (`local`, `remote` or `cloud`), `ready`, `problem` (for example `no_key`, `consent_required`, `local_only`, `ollama_offline`), `usage` (`{"input", "output", "cloud"}` tokens for the conversation) and `budget` (`{"spent", "allowance", "budget"}`, or `null` when off). An API provider is judged from local facts only: the poll never calls a cloud API.
+The selection adds `provider`, `provider_label`, `kind` (`local`, `remote` or `cloud`), `ready`, `problem` (for example `no_key`, `consent_required`, `local_only`, `ollama_offline`), `usage` (`{"input", "output", "cloud"}` tokens for the conversation, and `priced`: the selected model's own `{"input", "output"}`, which a price applies to) and `budget` (`{"spent", "allowance", "budget"}`, or `null` when off). An API provider is judged from local facts only: the poll never calls a cloud API.
 
 ### Chat providers (`/api/intel/providers`)
 
-The proxy answers every route for this machine only, even with `SPECTRE_CHAT_ALLOW_LAN=1`, and refuses a `Sec-Fetch-Site` other than `same-origin` or `none`. Writes need the session token from `GET …/session` in `X-Spectre-Session`, an exact local `Origin` at the proxy, and a JSON body (`DELETE …/key` has none). No route ever returns a key.
+The proxy answers every route for this machine only, even with `SPECTRE_CHAT_ALLOW_LAN=1`, and refuses a `Sec-Fetch-Site` other than `same-origin` or `none`. The service itself refuses any `Origin`, and any `Sec-Fetch-Site` except `none`: the proxy forwards neither. On chat routes the proxy adds `X-Spectre-Viewer: lan` for a viewer on another machine; such a viewer never runs a cloud model (`lan_viewer`). Writes need the session token from `GET …/session` in `X-Spectre-Session`, an exact local `Origin` at the proxy, and a JSON body (`DELETE …/key` has none). No route ever returns a key.
 
 | Route | Does |
 |---|---|
-| `GET /api/intel/providers` | `{"providers": [{"id", "label", "kind", "adapter", "docs", "base_url", "base_url_editable", "workspace_id", "params", "chat_completions_models", "key": {"required", "configured", "source", "env", "writable"}, "consent"}], "policy", "keyring", "selection"}` |
+| `GET /api/intel/providers` | `{"providers": [{"id", "label", "kind", "adapter", "docs", "base_url", "base_url_editable", "workspace_id", "params", "chat_completions_models", "key": {"required", "configured", "source", "env", "writable"}, "key_reaches_address", "consent"}], "policy", "keyring", "selection"}` |
 | `GET /api/intel/providers/session` | `{"token"}` for writes |
 | `PUT /api/intel/providers/policy` | `{"local_only"?, "map_context"?, "session_budget"?, "context_ceiling"?}`: `session_budget` in cloud tokens, `0` off; `context_ceiling` in tokens (4096 to 1048576, default 16384) for API models |
 | `PUT /api/intel/providers/selection` | `{"provider", "model"}` for the current conversation and new ones |

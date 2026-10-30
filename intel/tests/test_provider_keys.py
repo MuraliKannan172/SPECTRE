@@ -13,12 +13,15 @@ from helpers import MemoryKeyring
 from keyring.backends import fail
 from keyring.errors import KeyringError
 
-from app.chat.providers.keys import SERVICE, KeyStore, KeyStoreError
+from app.chat.providers.keys import SERVICE, KeyStore, KeyStoreError, key_reaches
 from app.chat.providers.registry import ProviderSpec
 
 CANARY = "sk-test-CANARY-0123456789abcdef"
 OPENAI = ProviderSpec("openai", "ChatGPT", "mock", "cloud", "https://api.openai.com/v1", ("OPENAI_API_KEY",))
 OLLAMA = ProviderSpec("ollama", "Ollama", "mock", "local", "http://127.0.0.1:11434")
+DEEPSEEK = ProviderSpec(
+    "deepseek", "DeepSeek", "mock", "cloud", "https://api.deepseek.com", ("DEEPSEEK_API_KEY",)
+)
 
 
 def store_with(
@@ -113,15 +116,31 @@ def test_delete_removes_only_what_spectre_wrote(tmp_path: Path) -> None:
 @pytest.mark.parametrize("backend", [None, fail.Keyring()])
 def test_without_a_keyring_the_key_goes_to_env_and_keeps_other_lines(tmp_path: Path, backend: object) -> None:
     keys, _, env_file = store_with(
-        tmp_path, backend=backend, env="# mine\nBRAVE_API_KEY=x\nOPENAI_API_KEY=old\n"
+        tmp_path, backend=backend, env="# mine\nBRAVE_API_KEY=x\nDEEPSEEK_API_KEY=old\n"
     )
     assert not keys.keyring_available
-    assert keys.set(OPENAI, CANARY).source == "env_file"
-    assert env_file.read_text(encoding="utf-8") == f"# mine\nBRAVE_API_KEY=x\nOPENAI_API_KEY={CANARY}\n"
+    assert keys.set(DEEPSEEK, CANARY).source == "env_file"
+    assert env_file.read_text(encoding="utf-8") == f"# mine\nBRAVE_API_KEY=x\nDEEPSEEK_API_KEY={CANARY}\n"
     if os.name != "nt":
         assert env_file.stat().st_mode & 0o777 == 0o600
-    assert not keys.delete(OPENAI).configured
+    assert not keys.delete(DEEPSEEK).configured
     assert env_file.read_text(encoding="utf-8") == "# mine\nBRAVE_API_KEY=x\n"
+
+
+def test_without_a_keyring_the_shared_voice_key_is_never_rewritten(tmp_path: Path) -> None:
+    keys, _, env_file = store_with(tmp_path, backend=None, env="OPENAI_API_KEY=sk-voice-key-123\n")
+    for change in (lambda: keys.set(OPENAI, CANARY), lambda: keys.delete(OPENAI)):
+        with pytest.raises(KeyStoreError) as raised:
+            change()
+        assert raised.value.code == "shared_key"
+    assert env_file.read_text(encoding="utf-8") == "OPENAI_API_KEY=sk-voice-key-123\n"
+
+
+def test_a_key_goes_to_its_own_host_or_the_one_it_was_saved_for() -> None:
+    assert key_reaches(OPENAI, "https://api.openai.com/v1", None)
+    assert not key_reaches(OPENAI, "https://gateway.example.com/v1", None)
+    assert key_reaches(OPENAI, "https://gateway.example.com/v1", "gateway.example.com")
+    assert not key_reaches(OPENAI, "https://evil.example/v1", "gateway.example.com")
 
 
 def test_a_failing_keyring_reads_as_not_configured_and_logs_no_value(

@@ -118,6 +118,19 @@ test('chat status: an API provider is judged by ready/problem, not by Ollama', (
     }),
     { state: 'degraded', detail: 'waiting for consent' },
   );
+  // A LAN viewer sees that cloud models stay on the host, not the key state.
+  for (const provider of ['acme', 'ollama'])
+    assert.deepEqual(
+      classifyChatStatus({
+        provider,
+        model: 'm:cloud',
+        ollama: { reachable: true },
+        model_present: true,
+        ready: false,
+        problem: 'lan_viewer',
+      }),
+      { state: 'degraded', detail: 'cloud models answer on the host only' },
+    );
 });
 
 test('globe: the basemap in use, or the fallback the map stack took', () => {

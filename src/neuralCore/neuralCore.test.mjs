@@ -278,6 +278,17 @@ test('labels and errors describe real state', () => {
     /^beam:cloud · This provider has not been allowed/,
   );
   assert.equal(
+    statusSummary({
+      provider: 'ollama',
+      model: 'beam:cloud',
+      ollama: { reachable: true },
+      model_present: true,
+      ready: false,
+      problem: 'lan_viewer',
+    }).text,
+    'beam:cloud · Cloud models answer only on the computer running SPECTRE.',
+  );
+  assert.equal(
     turnErrorCode({ code: 'rate_limited', provider: 'openai' }),
     'provider_rate_limited',
   );

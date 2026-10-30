@@ -130,7 +130,12 @@ def test_an_auth_failure_is_reported_once_with_its_taxonomy_code(run_with) -> No
     events = run_with(provider)
     assert events[-1] == (
         "error",
-        {"code": "auth_failed", "message": "bad key", "provider": "mock", "retryable": False},
+        {
+            "code": "auth_failed",
+            "message": "The provider rejected the key.",
+            "provider": "mock",
+            "retryable": False,
+        },
     )
     assert provider.opened == 1
 

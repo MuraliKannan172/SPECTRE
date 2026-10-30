@@ -35,6 +35,7 @@ CODES = frozenset(
     }
 )
 RETRYABLE = frozenset({RATE_LIMITED, PROVIDER_UNAVAILABLE, NETWORK})
+AUTH_MESSAGE = "The provider rejected the key."
 
 
 class ProviderError(RuntimeError):
@@ -47,10 +48,16 @@ class ProviderError(RuntimeError):
         detail: str = "",
         status: int | None = None,
         retry_after: float | None = None,
+        ours: bool = False,
     ) -> None:
         if code not in CODES:
             raise ValueError(f"unknown provider error code: {code}")
         # Providers echo keys in error bodies; nothing past here may carry one.
+        # A rejected key's error is where they echo it, masked in ways no
+        # pattern can promise to catch, so its text is ours (ours=True: written
+        # here, such as "no key is set"), never theirs.
+        if code == AUTH_FAILED and not ours:
+            message, detail = AUTH_MESSAGE, ""
         super().__init__(redact(message) or code)
         self.code = code
         self.provider = provider

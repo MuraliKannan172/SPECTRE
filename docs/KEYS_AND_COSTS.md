@@ -45,12 +45,20 @@ The intel service looks for a key in this order:
 3. **The repository's `.env`**, read on every lookup.
 
 `OPENAI_API_KEY` in `.env` is also God's Eye View's voice key. A key saved in POWER UP's Neural
-Core section is used for chat only, so chat and voice can use different keys.
+Core section is used for chat only, so chat and voice can use different keys. Without an OS
+keyring, POWER UP refuses to change that shared line for chat; change it in `.env` itself.
+
+**A key goes only where it belongs.** A stored key is sent to its provider's own address, or to
+the address it was saved for in POWER UP. If you change a provider's base URL in Settings →
+Neural Core, save the key again for the new address; until then it is not sent there, and the
+settings view says so. A key from the environment or `.env` goes only to the provider's own
+address. Changing the address also asks for consent again.
 
 Keys stay in the intel service. They are never sent to the browser or written to the chat
 history, the logs, error messages or URLs; the API reports only whether a key is set and where it
 came from. Keys can be changed only from this machine, with the page's session token, never by a
-LAN viewer.
+LAN viewer. A LAN viewer (with `SPECTRE_CHAT_ALLOW_LAN=1`) can chat with local models only: a
+cloud model never runs for another machine, so nobody else spends your key.
 
 ## Do not put keys in your global Windows environment
 

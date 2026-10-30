@@ -107,10 +107,39 @@ class ProviderStore:
                 (provider_id, base_url, model, support, self._now()),
             )
 
-    def forget_tools(self, provider_id: str) -> None:
-        """For "Test tool calling" (P4) and a changed base URL: probe again."""
+    def forget_tools(self, provider_id: str, base_url: str | None = None, model: str | None = None) -> None:
+        """Probe again: every model of a provider (a changed base URL), or one
+        model whose "Test tool calling" proved nothing."""
+        query, args = "DELETE FROM model_caps WHERE provider_id = ?", [provider_id]
+        if base_url is not None and model is not None:
+            query += " AND base_url = ? AND model = ?"
+            args += [base_url, model]
         with self._lock:
-            self._conn.execute("DELETE FROM model_caps WHERE provider_id = ?", (provider_id,))
+            self._conn.execute(query, args)
+
+    # -- where a saved key may go ---------------------------------------------------
+
+    def key_host(self, provider_id: str) -> str | None:
+        """The host a key was saved for in the app (its base URL then)."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value_json FROM chat_settings WHERE key = ?", (f"key_host:{provider_id}",)
+            ).fetchone()
+        value = json.loads(row[0]) if row else None
+        return value if isinstance(value, str) else None
+
+    def set_key_host(self, provider_id: str, host: str | None) -> None:
+        key = f"key_host:{provider_id}"
+        with self._lock:
+            if host is None:
+                self._conn.execute("DELETE FROM chat_settings WHERE key = ?", (key,))
+                return
+            self._conn.execute(
+                "INSERT INTO chat_settings (key, value_json, updated_at) VALUES (?, ?, ?)"
+                " ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json,"
+                " updated_at = excluded.updated_at",
+                (key, json.dumps(host), self._now()),
+            )
 
     # -- consent -----------------------------------------------------------------
 

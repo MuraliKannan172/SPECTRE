@@ -137,7 +137,9 @@ class AnthropicProvider:
     def client(self) -> anthropic.AsyncAnthropic:
         key = self._key()
         if not key:
-            raise ProviderError(errors.AUTH_FAILED, f"No API key is set for {self.label}", provider=self.id)
+            raise ProviderError(
+                errors.AUTH_FAILED, f"No API key is set for {self.label}", provider=self.id, ours=True
+            )
         if not key_may_travel(self.base_url):
             raise ProviderError(
                 errors.UNSUPPORTED_FEATURE,

@@ -167,7 +167,11 @@ export function vramFit(sizeBytes, budgetGb) {
   };
 }
 
-/** Session tokens for the header, with a cost when a price is known. */
+/**
+ * Session tokens for the header, with a cost when a price is known. The cost
+ * covers only the current model's tokens (`usage.priced`), never another
+ * model's, local ones included.
+ */
 export function usageText(usage, price = null) {
   const tokens = (usage?.input || 0) + (usage?.output || 0);
   if (!tokens) return null;
@@ -175,10 +179,9 @@ export function usageText(usage, price = null) {
     tokens >= 1000
       ? `${formatNumber(Math.round(tokens / 100) / 10)}K`
       : formatNumber(tokens);
-  if (!price) return t('{count} tokens', { count });
-  const cost =
-    ((usage.input || 0) * price.input + (usage.output || 0) * price.output) /
-    1_000_000;
+  if (!price || !usage.priced) return t('{count} tokens', { count });
+  const { input = 0, output = 0 } = usage.priced;
+  const cost = (input * price.input + output * price.output) / 1_000_000;
   return t('{count} tokens · {cost}', { count, cost: money(cost) });
 }
 

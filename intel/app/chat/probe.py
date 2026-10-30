@@ -5,8 +5,9 @@ so a model they list starts as `unknown`. On its first turn, after consent,
 one tiny prompt with a dummy tool settles it:
 
 - the model calls the tool: `yes`, cached;
-- the API rejects the tool request (`unsupported_feature`, a 400 about the
-  feature): `no`, cached;
+- the API rejects the tool request (`unsupported_feature` with a message that
+  names tools or functions): `no`, cached; any other refusal is the turn's
+  error, never a cached `no`;
 - the model answers in text instead: proof of nothing. The turn uses native
   tools (the API accepted them) and nothing is cached, so a later turn asks
   again.
@@ -48,7 +49,14 @@ async def probe_tools(provider: ChatProvider, model: str) -> Support | None:
                 if isinstance(event, ToolCallEvent):
                     return "yes" if event.call.name == PROBE_NAME else None
     except ProviderError as error:
-        if error.code == errors.UNSUPPORTED_FEATURE:
+        if error.code == errors.UNSUPPORTED_FEATURE and _about_tools(error):
             return "no"
         raise
     return None
+
+
+def _about_tools(error: ProviderError) -> bool:
+    """Only a refusal that names tools proves "no": the same code also covers
+    any other 400, a pending NIM reply and a moderation refusal."""
+    text = f"{error} {error.detail}".lower()
+    return any(word in text for word in ("tool", "function"))

@@ -118,10 +118,14 @@ class OllamaProvider:
             details["remote_host"] = remote
         if isinstance(entry.get("size"), int):
             details["size"] = entry["size"]  # bytes on disk, for the VRAM estimate (D11)
+        # The name too: an Ollama that leaves remote_host out (or a model missing
+        # from /api/tags) must not make a :cloud model look local.
+        tag = name.rsplit(":", 1)[1] if ":" in name else ""
+        cloud = bool(remote) or tag == "cloud" or tag.endswith("-cloud")
         return ModelInfo(
             id=name,
             label=name,
-            kind="cloud" if remote else self.kind,
+            kind="cloud" if cloud else self.kind,
             supports_tools=("yes" if "tools" in capabilities else "no") if capabilities else "unknown",
             capabilities=capabilities,
             context_window=context,

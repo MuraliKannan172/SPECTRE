@@ -280,6 +280,45 @@ test('chat answers this machine only unless LAN is opted in', async () => {
   assert.equal(calls.length, 2);
 });
 
+test('a LAN viewer is marked for the service, and a client cannot forge the mark', async () => {
+  const sent = [];
+  const fakeRequest = (options) => {
+    sent.push(options.headers);
+    return { on() {}, once() {}, setTimeout() {}, end() {}, destroy() {} };
+  };
+  const reply = () => ({
+    writeHead() {},
+    end() {},
+    once() {},
+    headersSent: false,
+  });
+  const open = createIntelHandler({
+    request: fakeRequest,
+    env: { SPECTRE_CHAT_ALLOW_LAN: '1' },
+  });
+  const forged = { 'x-spectre-viewer': 'local' };
+  await open(
+    {
+      method: 'GET',
+      url: '/chat/status',
+      headers: forged,
+      socket: { remoteAddress: '192.168.1.40' },
+    },
+    reply(),
+  );
+  await open(
+    {
+      method: 'GET',
+      url: '/chat/status',
+      headers: { 'x-spectre-viewer': 'lan' },
+      socket: { remoteAddress: '127.0.0.1' },
+    },
+    reply(),
+  );
+  assert.equal(sent[0]['x-spectre-viewer'], 'lan');
+  assert.equal(sent[1]['x-spectre-viewer'], undefined);
+});
+
 test('voice uploads keep their audio type, and replies keep their timing', async (t) => {
   const seen = [];
   const upstream = await listen(async (req, res) => {

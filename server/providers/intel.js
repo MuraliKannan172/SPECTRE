@@ -90,6 +90,7 @@ const ROUTES = Object.freeze([
     pattern:
       /^\/providers(?:\/session|\/[a-z][a-z0-9_-]{1,31}\/(?:models|gpu))?$/,
     providers: true,
+    slow: true, // a cold provider's model list can take longer than 15 s
   },
   {
     methods: ['PUT'],
@@ -112,6 +113,7 @@ const ROUTES = Object.freeze([
     providers: true,
     write: true,
     body: JSON_BODY,
+    slow: true, // a probe may wait out a Retry-After before it answers
   },
 ]);
 const FORWARD_REQUEST_HEADERS = ['accept', 'last-event-id'];
@@ -123,6 +125,10 @@ const FORWARD_RESPONSE_HEADERS = [
   'x-voice-seconds',
 ];
 const REQUEST_TIMEOUT_MS = 15_000;
+const SLOW_TIMEOUT_MS = 120_000;
+// Set on chat requests from another machine; the service then runs no cloud
+// model for them. Never copied from the client (not in the lists above).
+const VIEWER_HEADER = 'x-spectre-viewer';
 
 /** The service base URL: SPECTRE_INTEL_URL when it is http on loopback. */
 export function intelTarget(env = process.env) {
@@ -276,6 +282,8 @@ export function createIntelHandler({
       if (typeof req.headers[name] === 'string')
         headers[name] = req.headers[name];
     }
+    if (route.chat && !isLoopbackAddress(req.socket?.remoteAddress))
+      headers[VIEWER_HEADER] = 'lan';
     let body = null;
     if (route.body) {
       const type = String(req.headers['content-type'] || '')
@@ -313,7 +321,7 @@ export function createIntelHandler({
     const closeUpstream = () => upstream.destroy();
     res.once('close', closeUpstream);
     if (!streaming) {
-      upstream.setTimeout(timeoutMs, () =>
+      upstream.setTimeout(route.slow ? SLOW_TIMEOUT_MS : timeoutMs, () =>
         upstream.destroy(
           Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }),
         ),
