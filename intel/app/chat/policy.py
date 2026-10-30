@@ -33,6 +33,13 @@ _PERSON_PATTERNS = [
     re.compile(r"\b(?:phone|mobile|cell)\s+number\s+(?:of|for)\b", re.I),
     re.compile(r"\bwhere\s+(?:does|do|did)\b.{1,60}\blives?\b", re.I),
     re.compile(r"\b(?:lives?|living|staying)\s+(?:at|on)\s+what\b", re.I),
+    # "which street he lives on": a pronoun or a relation, not a city's population
+    re.compile(
+        r"\b(?:which|what)\s+(?:\w+\s+)?(?:street|road|avenue|house|building|apartment|flat|address|"
+        rf"neighbou?rhood)\b.{{0,30}}?\b(?:he|she|they|{_RELATION})\b.{{0,15}}?"
+        r"\b(?:lives?|living|stays?|staying)\b(?!-)",
+        re.I,
+    ),
     # locating or tracking a person
     re.compile(
         rf"\b(?:locate|track|trace|find|follow|stalk|dox|surveil|spy\s+on)\b.{{0,40}}\b{_RELATION}\b", re.I
