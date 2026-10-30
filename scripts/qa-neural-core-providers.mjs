@@ -58,7 +58,12 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const state = {
   keys: { anthropic: false },
   consent: { anthropic: false },
-  policy: { local_only: false, map_context: true, session_budget: 100000 },
+  policy: {
+    local_only: false,
+    map_context: true,
+    session_budget: 100000,
+    context_ceiling: 16384,
+  },
   selection: null,
   turn: 'answer',
 };
@@ -624,6 +629,21 @@ async function run(page) {
     'Local-only mode is a gated policy write',
     writes.some(
       (w) => w.route === '/providers/policy' && w.body.local_only === true,
+    ),
+  );
+  await page.evaluate(() => {
+    const ceiling = document.querySelectorAll(
+      '.spectre-nc-policy input[type="number"]',
+    )[1];
+    ceiling.value = '65536';
+    ceiling.dispatchEvent(new Event('change'));
+  });
+  await sleep(500);
+  record(
+    'The context ceiling is a gated policy write',
+    writes.some(
+      (w) =>
+        w.route === '/providers/policy' && w.body.context_ceiling === 65536,
     ),
   );
   state.turn = 'local_only';

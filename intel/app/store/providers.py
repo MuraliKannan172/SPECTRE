@@ -28,11 +28,17 @@ class Policy:
     """local_only hard-blocks every cloud choice; map_context sends the
     viewport and active layers to non-local providers (on by default,
     disclosed); session_budget is the soft cap in cloud tokens per
-    conversation before a turn asks to continue (0 turns it off, D10)."""
+    conversation before a turn asks to continue (0 turns it off, D10);
+    context_ceiling is the window, in tokens, that a turn on an API model may
+    use at most (D9): 16k unless the user changes it."""
 
     local_only: bool = False
     map_context: bool = True
     session_budget: int = 100_000
+    context_ceiling: int = 16_384
+
+
+CONTEXT_CEILING_RANGE = (4096, 1_048_576)
 
 
 class ProviderStore:
@@ -136,14 +142,19 @@ class ProviderStore:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT key, value_json FROM chat_settings"
-                " WHERE key IN ('local_only', 'map_context', 'session_budget')"
+                " WHERE key IN ('local_only', 'map_context', 'session_budget', 'context_ceiling')"
             ).fetchall()
         values = {key: json.loads(value) for key, value in rows}
         budget = values.get("session_budget", Policy.session_budget)
+        ceiling = values.get("context_ceiling", Policy.context_ceiling)
+        low, high = CONTEXT_CEILING_RANGE
         return Policy(
             local_only=values.get("local_only", Policy.local_only) is True,
             map_context=values.get("map_context", Policy.map_context) is True,
             session_budget=budget if isinstance(budget, int) and budget >= 0 else Policy.session_budget,
+            context_ceiling=(
+                ceiling if isinstance(ceiling, int) and low <= ceiling <= high else Policy.context_ceiling
+            ),
         )
 
     def set_policy(
@@ -152,11 +163,13 @@ class ProviderStore:
         local_only: bool | None = None,
         map_context: bool | None = None,
         session_budget: int | None = None,
+        context_ceiling: int | None = None,
     ) -> Policy:
         changes: dict[str, bool | int | None] = {
             "local_only": None if local_only is None else bool(local_only),
             "map_context": None if map_context is None else bool(map_context),
             "session_budget": session_budget,
+            "context_ceiling": context_ceiling,
         }
         now = self._now()
         with self._lock:

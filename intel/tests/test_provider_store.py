@@ -40,6 +40,13 @@ def test_the_switches_default_to_cloud_allowed_with_map_context(providers: Provi
     assert providers.set_policy(map_context=False) == Policy(local_only=True, map_context=False)
 
 
+def test_the_context_ceiling_defaults_to_16k_and_ignores_a_bad_value(providers: ProviderStore) -> None:
+    assert providers.policy().context_ceiling == 16_384
+    assert providers.set_policy(context_ceiling=65_536).context_ceiling == 65_536
+    providers._conn.execute("UPDATE chat_settings SET value_json = '\"lots\"' WHERE key = 'context_ceiling'")
+    assert providers.policy().context_ceiling == 16_384
+
+
 def test_no_table_has_a_column_for_a_key(providers: ProviderStore) -> None:
     conn = providers._conn
     tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]

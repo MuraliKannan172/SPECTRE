@@ -102,16 +102,17 @@ class Plan:
     chars_per_token: float = CHARS_PER_TOKEN
 
 
-def api_budgets(window: int | None) -> dict[str, int]:
-    """FULL_BUDGETS as a ceiling; a smaller context window lowers them (D9)."""
-    scale = min(1.0, window / BASE_WINDOW) if window else 1.0
+def api_budgets(window: int | None, ceiling: int = BASE_WINDOW) -> dict[str, int]:
+    """FULL_BUDGETS scaled to the context ceiling (16k unless the user changed
+    it); a smaller context window lowers them (D9)."""
+    scale = min(window or ceiling, ceiling) / BASE_WINDOW
     return {name: int(tokens * scale) for name, tokens in FULL_BUDGETS.items()}
 
 
-def api_input_limit(window: int | None, max_output: int) -> int:
-    """Input tokens per round for an API model: the 16k window less the default
-    output guard as a ceiling, lowered by the model's own window less its output."""
-    return max(1024, min(BASE_WINDOW - DEFAULT_MAX_OUTPUT, (window or BASE_WINDOW) - max_output))
+def api_input_limit(window: int | None, max_output: int, ceiling: int = BASE_WINDOW) -> int:
+    """Input tokens per round for an API model: the ceiling less the default
+    output guard, lowered by the model's own window less its output."""
+    return max(1024, min(ceiling - DEFAULT_MAX_OUTPUT, (window or ceiling) - max_output))
 
 
 class Sources:
@@ -183,11 +184,13 @@ class Agent:
         map_context: Callable[[], bool] = lambda: True,
         session_budget: Callable[[], int] = lambda: 0,
         params_for: Callable[[str], dict[str, Any]] = lambda provider_id: {},
+        context_ceiling: Callable[[], int] = lambda: BASE_WINDOW,
     ) -> None:
         self.settings = settings
         self.map_context = map_context
         self.session_budget = session_budget
         self.params_for = params_for
+        self.context_ceiling = context_ceiling
         # The status route and the eval still read Ollama directly.
         self.ollama = ollama
         self.provider = provider or OllamaProvider(ollama)
@@ -300,14 +303,15 @@ class Agent:
                     self._unproven.add(key)
                 support = probed or "yes"
         max_output = int(params.get("max_output_tokens") or DEFAULT_MAX_OUTPUT)
+        ceiling = self.context_ceiling()
         return Plan(
             provider,
             model,
             support == "yes",
-            api_budgets(info.context_window),
+            api_budgets(info.context_window, ceiling),
             info.kind,
             params,
-            input_limit=api_input_limit(info.context_window, max_output),
+            input_limit=api_input_limit(info.context_window, max_output, ceiling),
             chars_per_token=density,
         )
 

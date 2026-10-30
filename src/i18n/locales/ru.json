@@ -3278,5 +3278,6 @@
   "Optional: only if your server asks for one.": "Необязательно: только если ваш сервер его требует.",
   "Or type a model id": "Или введите ID модели",
   "Model id": "ID модели",
-  "Use this model id": "Использовать этот ID"
+  "Use this model id": "Использовать этот ID",
+  "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "Предел контекста для моделей API, в токенах (по умолчанию 16384; больше — больше истории и веб-текста, всё оплачивается)"
 }
