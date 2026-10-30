@@ -17,6 +17,8 @@ dependencies = [
   "ddgs>=9.0",
   "trafilatura>=2.0",
   "keyring==25.7.0",
+  "anthropic==2.3.0",
+  "openai==3.41.0",
 ]
 
 [project.optional-dependencies]

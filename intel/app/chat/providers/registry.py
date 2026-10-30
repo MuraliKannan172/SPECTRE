@@ -40,6 +40,7 @@ class ProviderSpec:
     base_url: str
     key_env: tuple[str, ...] = ()
     docs: str = ""
+    key_optional: bool = False  # a custom server may take no key
 
 
 def _spec(entry: Any, adapters: Mapping[str, object]) -> ProviderSpec:
@@ -65,6 +66,7 @@ def _spec(entry: Any, adapters: Mapping[str, object]) -> ProviderSpec:
         base_url=base_url,
         key_env=tuple(str(name) for name in entry.get("key_env") or ()),
         docs=str(entry.get("docs") or ""),
+        key_optional=entry.get("key_optional") is True,
     )
 
 
