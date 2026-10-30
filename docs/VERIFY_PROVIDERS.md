@@ -48,6 +48,9 @@ Ollama 0.40.13 on this machine only:
 - **Ollama `:cloud` models**, which use your ollama.com account.
 - **Saving a key from POWER UP** into the real Windows Credential Manager. The tests use an
   in-memory keyring.
+- **Reasoning turned on** (Settings → Neural Core) for DeepSeek, OpenRouter and OpenAI: fakes
+  only. Turn it on and run a tool question in the app; DeepSeek with tools across several turns
+  is the case to watch (`reasoning_content` passback).
 - **Wire facts no fake can settle:**
   - Anthropic accepting `tool_choice: {type: none}`, and thinking replayed across turns;
   - each provider's context-too-long error shape;
@@ -114,8 +117,8 @@ Exit status:
   pass.
 - **NVIDIA NIM:** the list mixes model types and declares no capabilities. A step 3 failure where
   the model "did not call add_numbers" means that model does not call tools; try another.
-- **DeepSeek:** thinking is off (there is no reasoning toggle yet), so a live run does not
-  exercise the `reasoning_content` passback; only the fake tests do.
+- **DeepSeek:** thinking is off unless Reasoning is turned on in its settings; the check script
+  uses the saved setting, so turn it on to exercise the `reasoning_content` passback.
 - **Custom:** a server elsewhere on your network over plain `http` is checked only without a key;
   a key is never sent over `http` off this machine.
 

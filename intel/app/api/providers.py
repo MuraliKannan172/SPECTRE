@@ -61,9 +61,14 @@ class ParamsBody(BaseModel):
     keep_alive: str | None = Field(None, pattern=r"^(-1|0|\d{1,4}[smh])$")
     price_in: float | None = Field(None, ge=0, le=10000)  # USD per 1M input tokens, typed by the user
     price_out: float | None = Field(None, ge=0, le=10000)
+    reasoning: bool | None = None  # on where REASONING_PROVIDERS allow it (D11)
 
 
 OLLAMA_ONLY = ("num_ctx", "keep_alive")
+# Where turning reasoning on has a verified wire format and passback (D11).
+# Anthropic waits: thinking with tools needs its blocks kept across turns,
+# unverified until a live run. NIM and custom servers have no common switch.
+REASONING_PROVIDERS = frozenset({"ollama", "deepseek", "openrouter", "openai"})
 
 
 class ProbeBody(BaseModel):
@@ -265,6 +270,8 @@ async def put_settings(provider_id: str, body: SettingsBody, request: Request) -
     refused = [name for name in OLLAMA_ONLY if name in params and spec.id != "ollama"]
     if spec.adapter == "anthropic" and "temperature" in params:
         refused.append("temperature")
+    if "reasoning" in params and spec.id not in REASONING_PROVIDERS:
+        refused.append("reasoning")
     if refused:
         raise HTTPException(400, {"code": "unsupported_param", "params": refused})
     saved = ProviderSettings(base_url, body.workspace_id, tuple(body.chat_completions_models), params)

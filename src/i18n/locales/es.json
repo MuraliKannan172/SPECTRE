@@ -3209,5 +3209,9 @@
   "Cloud models answer only on the computer running SPECTRE.": "Los modelos en la nube solo responden en el ordenador que ejecuta SPECTRE.",
   "cloud models answer on the host only": "los modelos en la nube solo responden en el equipo anfitrión",
   "cut off at the output limit": "cortada en el límite de salida",
-  "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "La clave se guardó para otra dirección, así que no se envía a esta. Guárdala de nuevo en POWER UP para usarla aquí."
+  "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "La clave se guardó para otra dirección, así que no se envía a esta. Guárdala de nuevo en POWER UP para usarla aquí.",
+  "Thinking": "Razonamiento",
+  "Reasoning: the model thinks first (more tokens, slower)": "Razonamiento: el modelo piensa antes (más tokens, más lento)",
+  "Not in this version for Claude: thinking with tools needs its blocks kept across turns, which is not verified yet.": "No en esta versión para Claude: pensar con herramientas exige conservar sus bloques entre turnos, algo aún no verificado.",
+  "Not offered: this provider has no common switch for reasoning.": "No disponible: este proveedor no tiene un interruptor común de razonamiento."
 }

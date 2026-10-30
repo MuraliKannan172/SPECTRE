@@ -99,7 +99,8 @@ What drives the token count:
 
 The guards:
 
-- **Output per request:** 4,096 tokens by default (Max output tokens in Settings → Neural Core).
+- **Output per request:** 4,096 tokens by default (Max output tokens in Settings → Neural Core),
+  8,192 with Reasoning on. Thinking is billed as output, so a reasoning turn costs more.
 - **Rounds:** at most 4 tool rounds per turn.
 - **Input per request:** at most 12,288 tokens (a 16k context ceiling less the output guard),
   lower for models with a smaller window. Over it, the oldest tool results are trimmed first,

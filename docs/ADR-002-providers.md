@@ -750,7 +750,7 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **Parameters:** temperature, max output tokens, user prices per 1M, Ollama `num_ctx` and
   `keep_alive`, validated per provider and applied; Ollama's budgets follow its `num_ctx`.
 - **No reasoning toggle yet:** the D7 `thinking` event is not rendered, so the toggle would do
-  nothing visible; DeepSeek thinking stays off. Not built in P5 either.
+  nothing visible; DeepSeek thinking stays off. Built after P5 (below).
 - **`/chat/status` (D7)** reports the selection with `kind`, `ready`, `problem`, usage and
   budget; an API provider is judged from local facts only, so the poll never calls a cloud API.
   The boot overlay and the panel read that pair, and a service without it classifies as before.
@@ -767,8 +767,8 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **Keys are typed in POWER UP** (Q1): a NEURAL CORE CHAT KEYS section stores through the intel
   service (OS keyring), never through POWER UP's own `.env` save, and loads only when POWER UP
   opens. The settings view shows where each key comes from.
-- **Not built:** Pull model (stretch), the reasoning toggle and `thinking` rendering. D9's
-  trimming and usage correction followed in P5.
+- **Not built in P4:** Pull model (stretch), the reasoning toggle and `thinking` rendering
+  (both added after P5, below). D9's trimming and usage correction followed in P5.
 
 **P5 (verify and docs):**
 
@@ -811,6 +811,27 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
   1,048,576 tokens, default 16,384). The API budgets scale with min(window, ceiling) / 16,384
   and the input limit is min(ceiling - 4,096, window - max output); the default reproduces P5
   exactly. Ollama still follows `num_ctx`. Added after P5, with the follow-ups below.
+
+**After P5: the reasoning switch (D11) and the `thinking` event (D7):**
+
+- **A per-provider `reasoning` parameter,** off unless turned on. Without it every request is
+  byte-identical to before (Ollama's `think` still follows `OLLAMA_THINK`).
+- **Offered where the wire format and passback are verified:**
+  - Ollama: `think`.
+  - DeepSeek: thinking left on, `reasoning_content` passback.
+  - OpenRouter: `reasoning: {enabled: true}`, `reasoning_details` passback.
+  - OpenAI: effort `medium`, without touching the learned lowest effort.
+  - Anthropic, NIM and custom servers refuse it (`unsupported_param`). The settings view shows
+    the switch disabled with the reason. Claude waits for a verified thinking-with-tools replay.
+- **More room when reasoning is on:** API max output defaults to 8,192, and Ollama keeps 4,096
+  tokens of its window for the answer.
+- **The `thinking` SSE event** streams the model's thinking.
+  - The panel shows it collapsed, as text only. It is never stored, replayed as text or spoken.
+  - It counts toward the round's 60,000-character cap.
+  - OpenAI sends no thinking text: reasoning summaries are not requested (unverified).
+- **Live:** Ollama with `qwen3.5-9b-64k-gpu` streamed 726 characters of thinking with it on, and
+  none with it off.
+- **Unverified on every cloud provider until a live run.**
 
 **After P5: fixes from a code and a security review of `2141700a..392da429`:**
 

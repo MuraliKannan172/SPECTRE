@@ -135,3 +135,10 @@ def test_local_only_mode_stops_a_cloud_check_and_the_database_is_only_read(setti
     # A read-only open of a WAL database leaves SQLite's index and an empty log, no data.
     wal = settings.db_path.with_name("intel.db-wal")
     assert not wal.exists() or wal.stat().st_size == 0
+
+
+def test_a_saved_reasoning_switch_is_used_as_the_agent_uses_it(settings: Settings) -> None:
+    params = verify_provider.request_params(settings, {"reasoning": True})
+    assert (params["think"], params["max_output_tokens"]) == (True, 8192)
+    plain = verify_provider.request_params(settings, {})
+    assert (plain["think"], plain["max_output_tokens"]) == (settings.ollama_think, 1024)
