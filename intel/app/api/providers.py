@@ -10,6 +10,7 @@ including a connection test and a model list.
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 from dataclasses import asdict
 from typing import Annotated, Any
@@ -17,6 +18,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..chat.probe import probe_tools
 from ..chat.providers.base import ChatProvider, ModelInfo
 from ..chat.providers.errors import ProviderError
 from ..chat.providers.keys import KeyStoreError
@@ -45,6 +47,28 @@ class SettingsBody(BaseModel):
     base_url: str | None = Field(None, max_length=512)
     workspace_id: str | None = Field(None, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     chat_completions_models: list[ModelId] = Field(default_factory=list, max_length=20)
+    params: ParamsBody | None = None
+
+
+class ParamsBody(BaseModel):
+    """Per-provider parameters (D11). Ollama-only fields are refused for others,
+    and temperature for Anthropic (API version 2026-10-21 rejects it)."""
+
+    model_config = ConfigDict(extra="forbid")
+    temperature: float | None = Field(None, ge=0, le=2)
+    max_output_tokens: int | None = Field(None, ge=64, le=32768)
+    num_ctx: int | None = Field(None, ge=2048, le=262144)
+    keep_alive: str | None = Field(None, pattern=r"^(-1|0|\d{1,4}[smh])$")
+    price_in: float | None = Field(None, ge=0, le=10000)  # USD per 1M input tokens, typed by the user
+    price_out: float | None = Field(None, ge=0, le=10000)
+
+
+OLLAMA_ONLY = ("num_ctx", "keep_alive")
+
+
+class ProbeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: ModelId
 
 
 class SelectionBody(BaseModel):
@@ -62,6 +86,7 @@ class PolicyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     local_only: bool | None = None
     map_context: bool | None = None
+    session_budget: int | None = Field(None, ge=0, le=10_000_000)  # cloud tokens; 0 is off
 
 
 class TestBody(BaseModel):
@@ -142,7 +167,7 @@ async def list_providers(request: Request) -> dict[str, Any]:
     policy = state.provider_store.policy()
     return {
         "providers": [_view(state, spec) for spec in state.providers.specs.values()],
-        "policy": {"local_only": policy.local_only, "map_context": policy.map_context},
+        "policy": asdict(policy),
         "keyring": state.keys.keyring_available,
         "selection": _selection(state),
     }
@@ -174,10 +199,12 @@ async def session(request: Request) -> dict[str, str]:
 
 
 @router.put("/policy")
-async def set_policy(body: PolicyBody, request: Request) -> dict[str, bool]:
+async def set_policy(body: PolicyBody, request: Request) -> dict[str, Any]:
     state = _writer(request)
-    policy = state.provider_store.set_policy(local_only=body.local_only, map_context=body.map_context)
-    return {"local_only": policy.local_only, "map_context": policy.map_context}
+    policy = state.provider_store.set_policy(
+        local_only=body.local_only, map_context=body.map_context, session_budget=body.session_budget
+    )
+    return asdict(policy)
 
 
 @router.put("/{provider_id}/key")
@@ -216,7 +243,13 @@ async def put_settings(provider_id: str, body: SettingsBody, request: Request) -
         problem = base_url_problem(base_url, allow_lan_http=keyless)
         if problem:
             raise HTTPException(400, {"code": "bad_base_url", "message": f"The base URL {problem}"})
-    saved = ProviderSettings(base_url, body.workspace_id, tuple(body.chat_completions_models))
+    params = body.params.model_dump(exclude_none=True) if body.params else {}
+    refused = [name for name in OLLAMA_ONLY if name in params and spec.id != "ollama"]
+    if spec.adapter == "anthropic" and "temperature" in params:
+        refused.append("temperature")
+    if refused:
+        raise HTTPException(400, {"code": "unsupported_param", "params": refused})
+    saved = ProviderSettings(base_url, body.workspace_id, tuple(body.chat_completions_models), params)
     state.provider_store.save_settings(spec.id, saved)
     if spec.id != "ollama":
         state.providers.rebuild(spec.id, base_url or spec.base_url)
@@ -253,3 +286,76 @@ async def models(provider_id: str, request: Request) -> dict[str, Any]:
     except ProviderError as error:
         raise _provider_failure(error) from None
     return {"models": [_model(info) for info in listed]}
+
+
+@router.post("/{provider_id}/probe")
+async def probe(provider_id: str, body: ProbeBody, request: Request) -> dict[str, Any]:
+    """Test tool calling (D3): one tiny prompt with a dummy tool, cached."""
+    state = _writer(request)
+    spec = _spec(state, provider_id)
+    if spec.id == "ollama":
+        raise HTTPException(
+            400, {"code": "reported_by_ollama", "message": "Ollama reports tool support itself"}
+        )
+    _egress_allowed(state, spec)
+    provider = state.providers.get(spec.id)
+    try:
+        result = await probe_tools(provider, body.model)
+    except ProviderError as error:
+        return {"ok": False, "code": error.code, "message": str(error), "retryable": error.retryable}
+    base_url = _base_url(provider, spec)
+    if result:
+        state.provider_store.remember_tools(spec.id, base_url, body.model, result)
+    agent = getattr(state, "agent", None)
+    if agent is not None:
+        agent.forget_unproven(spec.id, base_url, body.model)
+    return {"ok": True, "supports_tools": result or "unknown"}
+
+
+@router.get("/ollama/gpu")
+async def gpu(request: Request) -> dict[str, Any]:
+    """The GPU's name and memory for the VRAM estimate, from nvidia-smi when
+    present. Fixed arguments, a timeout, and never a tool a model can call."""
+    _state(request)
+    return {"gpu": await nvidia_gpu()}
+
+
+@router.post("/budget/continue")
+async def continue_budget(body: TestBody, request: Request) -> dict[str, int]:
+    """Allow one more session budget of cloud tokens in this conversation (D10).
+    A gated write: a LAN viewer cannot keep spending the owner\'s key."""
+    state = _writer(request)
+    conversation = state.chats.current_conversation()
+    if conversation is None:
+        raise HTTPException(409, {"code": "no_conversation"})
+    budget = state.provider_store.policy().session_budget
+    extra = state.chats.raise_budget(conversation, max(budget, 1))
+    return {"allowance": budget + extra}
+
+
+GPU_QUERY = ("nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits")
+
+
+def parse_gpu(output: str) -> dict[str, Any] | None:
+    line = output.strip().splitlines()[0] if output.strip() else ""
+    name, _, memory = line.rpartition(",")
+    try:
+        megabytes = int(memory.strip())
+    except ValueError:
+        return None
+    return {"name": name.strip()[:80], "memory_mb": megabytes} if name.strip() else None
+
+
+async def nvidia_gpu() -> dict[str, Any] | None:
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *GPU_QUERY, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+        )
+    except OSError:
+        return None  # no NVIDIA driver here
+    try:
+        output, _ = await asyncio.wait_for(process.communicate(), timeout=3)
+    except TimeoutError:
+        process.kill()
+        return None
+    return parse_gpu(output.decode("utf-8", "replace"))

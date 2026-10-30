@@ -87,7 +87,8 @@ const ROUTES = Object.freeze([
   },
   {
     methods: ['GET'],
-    pattern: /^\/providers(?:\/session|\/[a-z][a-z0-9_-]{1,31}\/models)?$/,
+    pattern:
+      /^\/providers(?:\/session|\/[a-z][a-z0-9_-]{1,31}\/(?:models|gpu))?$/,
     providers: true,
   },
   {
@@ -106,7 +107,8 @@ const ROUTES = Object.freeze([
   },
   {
     methods: ['POST'],
-    pattern: /^\/providers\/[a-z][a-z0-9_-]{1,31}\/test$/,
+    pattern:
+      /^\/providers\/(?:[a-z][a-z0-9_-]{1,31}\/(?:test|probe)|budget\/continue)$/,
     providers: true,
     write: true,
     body: JSON_BODY,

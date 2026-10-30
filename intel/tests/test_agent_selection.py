@@ -13,6 +13,7 @@ from test_chat_agent import CLIENT_TOOLS, FakeFetcher, FakeSearch
 
 from app.chat.agent import Agent, Turn, api_budgets
 from app.chat.ollama import OllamaClient
+from app.chat.policy import MAP_WITHHELD
 from app.chat.probe import PROBE_NAME
 from app.chat.providers import errors
 from app.chat.providers.base import Done, ModelInfo, TextDelta, ToolCall, ToolCallEvent, Usage
@@ -53,6 +54,9 @@ class World:
         known: str | None = None,
         consented: bool = True,
         local_only: bool = False,
+        map_context: bool = True,
+        session_budget: int = 0,
+        params: dict[str, Any] | None = None,
     ) -> None:
         self.settings = Settings(
             db_path=tmp_path / "t.db",
@@ -76,6 +80,9 @@ class World:
             provider=MockProvider(),  # the default Ollama stand-in: must never be used here
             consented=lambda provider_id: consented,
             local_only=lambda: local_only,
+            map_context=lambda: map_context,
+            session_budget=lambda: session_budget,
+            params_for=lambda provider_id: params or {},
             providers=lambda provider_id: selected if provider_id == selected.id else None,
             known_tools=lambda *key: known,
             remember_tools=lambda *row: self.remembered.append(row),
@@ -219,3 +226,61 @@ def test_the_final_answer_keeps_its_provider_state_for_the_next_turn_only(world)
     ]
     public = made.chats.messages(made.conversation)
     assert all("provider_state" not in row for row in public), "the history route never sends it"
+
+
+# -- P4: map switch, usage, soft budget, parameters --------------------------------
+
+
+def calls_viewport() -> list[Any]:
+    return [ToolCallEvent(ToolCall("v1", "viewport", {})), Usage(7, 3), Done("tool_calls")]
+
+
+def test_with_the_map_switch_off_a_cloud_model_gets_no_map(world) -> None:  # type: ignore[no-untyped-def]
+    cloud = Cloud([calls_viewport(), answer("Withheld.")], models=[info("yes")])
+    world(cloud, map_context=False).turn()
+    system = cloud.requests[0].messages[0].content
+    assert MAP_WITHHELD in system and '"lat"' not in system
+    tool_result = [m for m in cloud.requests[1].messages if m.role == "tool"][0]
+    assert tool_result.content == MAP_WITHHELD
+
+
+def test_a_local_model_always_gets_the_map(world) -> None:  # type: ignore[no-untyped-def]
+    local = Cloud([answer("Here.")], models=[ModelInfo("big-1", "Big 1", "local", "yes")])
+    world(local, map_context=False).turn()
+    assert '"lat"' in local.requests[0].messages[0].content
+
+
+def test_usage_counts_every_round_and_is_recorded_with_its_kind(world) -> None:  # type: ignore[no-untyped-def]
+    cloud = Cloud([calls_viewport(), answer("Done.")], models=[info("yes")])
+    made = world(cloud)
+    done = made.turn()[-1][1]
+    assert done["usage"] == {"input": 17, "output": 7}, "7+10 in, 3+4 out over two rounds"
+    assert made.chats.usage_totals(made.conversation) == {"input": 17, "output": 7, "cloud": 24}
+
+
+def test_the_soft_budget_stops_cloud_turns_until_continue(world) -> None:  # type: ignore[no-untyped-def]
+    cloud = Cloud([answer("One."), answer("Three.")], models=[info("yes")])
+    made = world(cloud, session_budget=10)
+    made.turn()  # 14 tokens: over the budget of 10
+    blocked = made.turn()
+    assert blocked[-1] == ("budget", {"spent": 14, "allowance": 10, "budget": 10})
+    assert len(cloud.requests) == 1, "nothing was sent"
+    made.chats.raise_budget(made.conversation, 10)
+    assert made.turn()[-1][0] == "done" and len(cloud.requests) == 2
+
+
+def test_a_failed_turn_still_records_the_rounds_it_was_billed_for(world) -> None:  # type: ignore[no-untyped-def]
+    cloud = Cloud(
+        [calls_viewport(), [ProviderError(errors.PROVIDER_UNAVAILABLE, "down")]], models=[info("yes")]
+    )
+    cloud.max_attempts = 1
+    made = world(cloud)
+    assert made.turn()[-1][0] == "error"
+    assert made.chats.usage_totals(made.conversation)["cloud"] == 10
+
+
+def test_provider_parameters_reach_the_request(world) -> None:  # type: ignore[no-untyped-def]
+    cloud = Cloud([answer("ok")], models=[info("yes")])
+    world(cloud, params={"temperature": 0.9, "max_output_tokens": 500}).turn()
+    params = cloud.requests[0].params
+    assert (params["temperature"], params["max_output_tokens"]) == (0.9, 500)

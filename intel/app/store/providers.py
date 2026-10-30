@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .db import connect, migrate
@@ -18,15 +18,21 @@ class ProviderSettings:
     base_url: str | None = None
     workspace_id: str | None = None
     chat_completions_models: tuple[str, ...] = ()  # OpenAI models sent to Chat Completions
+    # Validated by the API: temperature, max_output_tokens, num_ctx, keep_alive,
+    # price_in / price_out (per 1M tokens, typed by the user, D10).
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class Policy:
     """local_only hard-blocks every cloud choice; map_context sends the
-    viewport and active layers to cloud providers (on by default, disclosed)."""
+    viewport and active layers to non-local providers (on by default,
+    disclosed); session_budget is the soft cap in cloud tokens per
+    conversation before a turn asks to continue (0 turns it off, D10)."""
 
     local_only: bool = False
     map_context: bool = True
+    session_budget: int = 100_000
 
 
 class ProviderStore:
@@ -54,11 +60,19 @@ class ProviderStore:
             ).fetchone()
         if not row:
             return ProviderSettings()
-        params = json.loads(row[2]) if row[2] else {}
-        return ProviderSettings(row[0], row[1], tuple(params.get("chat_completions_models") or ()))
+        stored = json.loads(row[2]) if row[2] else {}
+        return ProviderSettings(
+            row[0],
+            row[1],
+            tuple(stored.get("chat_completions_models") or ()),
+            dict(stored.get("params") or {}),
+        )
 
     def save_settings(self, provider_id: str, settings: ProviderSettings) -> None:
-        params = {"chat_completions_models": list(settings.chat_completions_models)}
+        params = {
+            "chat_completions_models": list(settings.chat_completions_models),
+            "params": settings.params,
+        }
         with self._lock:
             self._conn.execute(
                 "INSERT INTO provider_settings (provider_id, base_url, workspace_id, params_json, updated_at)"
@@ -121,16 +135,29 @@ class ProviderStore:
     def policy(self) -> Policy:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT key, value_json FROM chat_settings WHERE key IN ('local_only', 'map_context')"
+                "SELECT key, value_json FROM chat_settings"
+                " WHERE key IN ('local_only', 'map_context', 'session_budget')"
             ).fetchall()
         values = {key: json.loads(value) for key, value in rows}
+        budget = values.get("session_budget", Policy.session_budget)
         return Policy(
             local_only=values.get("local_only", Policy.local_only) is True,
             map_context=values.get("map_context", Policy.map_context) is True,
+            session_budget=budget if isinstance(budget, int) and budget >= 0 else Policy.session_budget,
         )
 
-    def set_policy(self, *, local_only: bool | None = None, map_context: bool | None = None) -> Policy:
-        changes = {"local_only": local_only, "map_context": map_context}
+    def set_policy(
+        self,
+        *,
+        local_only: bool | None = None,
+        map_context: bool | None = None,
+        session_budget: int | None = None,
+    ) -> Policy:
+        changes: dict[str, bool | int | None] = {
+            "local_only": None if local_only is None else bool(local_only),
+            "map_context": None if map_context is None else bool(map_context),
+            "session_budget": session_budget,
+        }
         now = self._now()
         with self._lock:
             for key, value in changes.items():
@@ -140,7 +167,7 @@ class ProviderStore:
                     "INSERT INTO chat_settings (key, value_json, updated_at) VALUES (?, ?, ?)"
                     " ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json,"
                     " updated_at = excluded.updated_at",
-                    (key, json.dumps(bool(value)), now),
+                    (key, json.dumps(value), now),
                 )
         return self.policy()
 
