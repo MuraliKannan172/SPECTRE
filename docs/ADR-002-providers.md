@@ -4,8 +4,9 @@
   through the intel service; Q2 no `last4`; Q3 Ollama `:cloud` models count as cloud; Q4 add the
   pinned `anthropic`, `openai` and `keyring` packages.
 - **Date:** 2026-10-29
-- **Scope:** the design for P0–P5 (`NEURAL_CORE_PROVIDERS_PROMPT.md` §7). P1 and P2 are built;
-  where they differ from the text below, §8 says how.
+- **Scope:** the design for P0–P5 (`NEURAL_CORE_PROVIDERS_PROMPT.md` §7). P1–P5 are built;
+  where they differ from the text below, §8 says how. What is verified live and what still needs
+  a run with a key: `docs/VERIFY_PROVIDERS.md`.
 - **Branch:** `feat/neural-core-providers` (from `main` @ `2141700a`).
 - **Evidence:** `docs/providers/p0-ollama-probe.json` (what this machine's Ollama returns),
   `docs/providers/p0-eval-qwen3.5-9b-64k-gpu_latest.json` (the Neural Core eval baseline).
@@ -667,7 +668,7 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **Ollama on this machine:** `ollama list`, `/api/version`, `/api/tags`, `/api/show` per model and
   `/api/ps`, recorded in `docs/providers/p0-ollama-probe.json`.
 
-## 8. As built: where P1–P3 differ from the text above
+## 8. As built: where P1–P5 differ from the text above
 
 - **`:cloud` detection (P1 fix).** `model_caps` read only `/api/show`, which has no `remote_host`,
   so `:cloud` models came back `local`. It now merges `remote_host` from the model's `/api/tags`
@@ -749,7 +750,7 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **Parameters:** temperature, max output tokens, user prices per 1M, Ollama `num_ctx` and
   `keep_alive`, validated per provider and applied; Ollama's budgets follow its `num_ctx`.
 - **No reasoning toggle yet:** the D7 `thinking` event is not rendered, so the toggle would do
-  nothing visible; DeepSeek thinking stays off. Left for P5 or later.
+  nothing visible; DeepSeek thinking stays off. Not built in P5 either.
 - **`/chat/status` (D7)** reports the selection with `kind`, `ready`, `problem`, usage and
   budget; an API provider is judged from local facts only, so the poll never calls a cloud API.
   The boot overlay and the panel read that pair, and a service without it classifies as before.
@@ -766,5 +767,51 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **Keys are typed in POWER UP** (Q1): a NEURAL CORE CHAT KEYS section stores through the intel
   service (OS keyring), never through POWER UP's own `.env` save, and loads only when POWER UP
   opens. The settings view shows where each key comes from.
-- **Not built:** Pull model (stretch), the reasoning toggle and `thinking` rendering, and D9's
-  trimming of the oldest tool results first and correcting the estimate from reported usage.
+- **Not built:** Pull model (stretch), the reasoning toggle and `thinking` rendering. D9's
+  trimming and usage correction followed in P5.
+
+**P5 (verify and docs):**
+
+- **D9 is built** (`intel/app/chat/context.py`). Before every round the request is fitted to an
+  input limit:
+  - **Ollama:** `num_ctx` less 1,024 tokens kept for the answer, because Ollama sets no output cap
+    and cuts an overlong prompt from the front.
+  - **API models:** the model's window less its max output, with 12,288 tokens (the 16k window
+    less the 4,096 output guard) as the ceiling. The tool definitions count toward the limit.
+  - **Over the limit:** the oldest tool results become a stub first; the call and its result
+    message stay, so tool pairing and `provider_state` survive. Then the oldest history goes.
+    The system prompt, the question and the latest round's results always stay. Under the limit
+    nothing changes.
+  - **History** sent to a model starts with a question.
+- **The estimate** (4 characters per token) is corrected from each round's reported input tokens,
+  per provider and model, in memory only:
+  - It only tightens (floor 1.5), because a prompt read from a cache reports fewer tokens than it
+    holds. Ollama reports the full prompt here: 3,099 tokens for about 11,500 characters, so
+    about 3.7.
+  - It scales the history, web and page budgets as well as the limit.
+- **`verify_provider.py`:**
+  - It builds providers through the service's own `load_providers` (now public in `app/main.py`)
+    and reads saved settings from an SQLite backup of the database, so it writes nothing.
+  - It respects local-only mode but needs no consent: its prompts are fixed test text.
+  - Exit codes: 0 pass, 1 fail, 2 could not run.
+  - An API provider without `--model` lists its models and stops; there is still no default model
+    (D12).
+- **Live, Ollama only (2026-10-30):**
+  - `verify_provider.py ollama` passed list, prompt and tool round trip with
+    `qwen3.5-9b-64k-gpu:latest` in 2 of 3 runs. In the third, Ollama's runner crashed while loading
+    (a CUDA initialisation error), and the script reported `provider_unavailable`.
+  - The eval with D9 scored 13/15 with refusals 2/3, then 12/15 and 2/3. The control on the commit
+    before D9 scored 12/15 and 3/3.
+  - The R3 misses were the model calling `web_search` for a person, which the guard refused.
+    Round 1, where that choice is made, is unchanged by D9: the same 3,099-token prompt. R3 run
+    alone 8 times scored 7/8 before D9 and 5/8 after, which reads as sampling at temperature
+    0.2.
+  - The web misses are keyless ddgs searches returning nothing, before D9 too.
+- **No cloud provider has run live.** `docs/VERIFY_PROVIDERS.md` lists what each needs.
+- **Docs:**
+  - `docs/KEYS_AND_COSTS.md`, including the warning not to put `ANTHROPIC_API_KEY` in the global
+    environment;
+  - `docs/VERIFY_PROVIDERS.md`;
+  - the provider routes and SSE fields in `docs/API.md`;
+  - a README section;
+  - commented placeholders in `.env.example`.

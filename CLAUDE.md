@@ -102,6 +102,11 @@ The Neural Core eval needs Ollama and network for web search:
 `uv run --project intel python intel/scripts/neural_core_eval.py --model <tag>`.
 It writes `docs/phase4/eval-<model>.json`; web prompts can fail when the
 keyless ddgs search returns nothing, which the answer itself should admit.
+The live check of one chat provider (list, prompt, tool round trip; writes
+nothing) is
+`uv run --project intel python intel/scripts/verify_provider.py <id> [--model <id>]`.
+Run it for Ollama; a cloud provider needs the owner's key and spends tokens,
+so leave those runs to the owner (`docs/VERIFY_PROVIDERS.md`).
 Local voice (Phase 5) is opt-in: `.\scripts\spectre.ps1 -Voice` installs the
 intel `voice` extra and fetches the pinned models into `intel/data/voice/`.
 A plain `uv sync --project intel` (without `--extra voice`) removes the voice

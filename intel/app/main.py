@@ -58,17 +58,27 @@ from .web.search import SearchService, make_search_service
 log = logging.getLogger("spectre.intel")
 
 
-def _load_providers(
+def load_providers(
     *,
     path: Path,
     ollama_http: httpx.AsyncClient,
     ollama_host: str,
     keys: KeyStore,
     store: ProviderStore,
-    factories: Mapping[str, Factory] | None,
+    sdk_http: httpx2.AsyncClient,
+    extra: Mapping[str, Factory] | None = None,
 ) -> tuple[ProviderSet | None, str | None]:
     """The providers, or None and why chat is unavailable. A bad provider file
-    disables chat only; news, events and voice keep running."""
+    disables chat only; news, events and voice keep running. The service and
+    scripts/verify_provider.py both build them here."""
+    factories = {
+        **api_factories(
+            sdk_http,
+            workspace_for=lambda pid: store.settings(pid).workspace_id,
+            chat_models_for=lambda pid: frozenset(store.settings(pid).chat_completions_models),
+        ),
+        **(extra or {}),
+    }
     try:
         providers = default_providers(
             ollama_http=ollama_http,
@@ -174,21 +184,14 @@ def create_app(
         provider_store = ProviderStore(str(settings.db_path))
         # One client for every API provider; no redirects, so a key never follows one.
         sdk_http = httpx2.AsyncClient(timeout=SDK_TIMEOUT, follow_redirects=False)
-        factories = {
-            **api_factories(
-                sdk_http,
-                workspace_for=lambda pid: provider_store.settings(pid).workspace_id,
-                chat_models_for=lambda pid: frozenset(provider_store.settings(pid).chat_completions_models),
-            ),
-            **(provider_factories or {}),
-        }
-        providers, problem = _load_providers(
+        providers, problem = load_providers(
             path=providers_file,
             ollama_http=ollama_http,
             ollama_host=settings.ollama_host,
             keys=keys,
             store=provider_store,
-            factories=factories,
+            sdk_http=sdk_http,
+            extra=provider_factories,
         )
         app.state.chat_problem = app.state.chat_problem or problem
         app.state.keys = keys

@@ -22,6 +22,7 @@ SPECTRE is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-v
   - **What it can do.** It moves the globe and switches layers, searches the local news store, and checks the web when a question needs it. Every news or web answer cites its sources and ends with "As of".
   - **What it refuses.** It will not locate or profile people.
   - **When Ollama is not running,** the panel says so.
+  - **Cloud models, if you choose.** A conversation can use Claude, ChatGPT, OpenRouter, NVIDIA NIM, DeepSeek or your own OpenAI-compatible server instead, with your API key and after you allow it. Local-only mode blocks them all. See [docs/KEYS_AND_COSTS.md](docs/KEYS_AND_COSTS.md).
 
   ![The Neural Core panel with an earlier answer and its numbered sources; Ollama is stopped here, and the panel says so](docs/images/spectre-neural-core.jpg)
 - **Boot overlay.** While the app loads, the emblem shows four status rows from real checks: the globe's first frame, the layer catalog, the intel service and the Neural Core. Any key or click skips it; Display ▸ Boot animation makes it short or turns it off.
@@ -82,7 +83,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ## Keyless and keyed
 
-Everything below "Without keys" works out of the box. Keys go in **Provider Settings** (the POWER UP chip, bottom right), which writes your local `.env`.
+Everything below "Without keys" works out of the box. Keys go in **Provider Settings** (the POWER UP chip, bottom right), which writes your local `.env`. Neural Core chat keys are the exception: its NEURAL CORE CHAT KEYS section stores them in the OS keyring.
 
 | Feature | Without keys | With a key |
 |---|---|---|
@@ -95,13 +96,15 @@ Everything below "Without keys" works out of the box. Keys go in **Provider Sett
 | Cloud voice (God's Eye View's) | off | OpenAI (`OPENAI_API_KEY`) or Gemini (`GEMINI_API_KEY`) |
 | Neural Core web search | DuckDuckGo results through `ddgs`, best effort | Your SearXNG (`SEARXNG_URL`), Brave (`BRAVE_API_KEY`) or Tavily (`TAVILY_API_KEY`) |
 | Neural Core and local voice | run on your machine | — |
+| Neural Core with a cloud model | — | Claude (`ANTHROPIC_API_KEY`), ChatGPT (`OPENAI_API_KEY`), OpenRouter (`OPENROUTER_API_KEY`), NVIDIA NIM (`NVIDIA_API_KEY`) or DeepSeek (`DEEPSEEK_API_KEY`), billed per token by them |
 
 ## Costs
 
-SPECTRE itself is free, and its default setup needs no paid service: the Neural Core and local voice run on your own hardware. Keyed providers have their own free tiers and prices, which change; check them before adding a key:
+SPECTRE itself is free, and its default setup needs no paid service: the Neural Core and local voice run on your own hardware. Keyed providers have their own free tiers and prices, which change; check them before adding a key. For the Neural Core's cloud models, [docs/KEYS_AND_COSTS.md](docs/KEYS_AND_COSTS.md) explains what a turn costs and the budget that guards it.
 - [Google Maps Platform](https://mapsplatform.google.com/pricing/)
 - [Cesium ion](https://cesium.com/pricing/)
 - [OpenAI API](https://openai.com/api/pricing/)
+- [Claude API](https://claude.com/pricing), [OpenRouter](https://openrouter.ai/models), [DeepSeek API](https://api-docs.deepseek.com/quick_start/pricing) and [NVIDIA's API catalog](https://build.nvidia.com/), for the Neural Core's cloud models
 - [Gemini API](https://ai.google.dev/pricing)
 - [TomTom](https://developer.tomtom.com/pricing)
 - [Brave Search API](https://brave.com/search/api/)
@@ -133,7 +136,7 @@ Some free sources allow only personal, non-commercial use, so SPECTRE leaves the
   - The intel service listens on 127.0.0.1 only; the web app on `localhost` unless you turn on LAN sharing.
   - The browser reaches the intel service only through the app's own proxy, which refuses other sites.
 - **What stays on your machine.**
-  - Chat history stays local.
+  - Chat history is stored locally. With a cloud model selected, each turn sends that provider the conversation, the tool results and, if you allow it, the map view; you consent per provider first.
   - The tool log in `.spectre-logs/` records which tools ran and which URLs were read, never page content.
   - Voice recordings are never stored.
 - **What the model can and cannot do.**
@@ -147,7 +150,7 @@ The full checklist, with evidence, is in [docs/phase6/security-checklist.md](doc
 
 SPECTRE models **events, assets, infrastructure and systems**: aircraft, vessels, satellites, fires, cameras, cities. It does not search for, recognise or track individual people, and contributions that cross that line will not be merged.
 
-It is not for navigation, emergency response or any other safety-critical use. Data comes from public feeds that can be late, incomplete or wrong, and the Neural Core is a local model whose answers can be wrong.
+It is not for navigation, emergency response or any other safety-critical use. Data comes from public feeds that can be late, incomplete or wrong, and the Neural Core's answers, from a local or a cloud model, can be wrong.
 
 ## Documentation
 
@@ -155,6 +158,9 @@ It is not for navigation, emergency response or any other safety-critical use. D
 - [docs/VERIFY.md](docs/VERIFY.md): manual verification steps and their results.
 - [docs/API.md](docs/API.md): the intel service API.
 - [docs/ADR-001.md](docs/ADR-001.md): the design and its decisions.
+- [docs/ADR-002-providers.md](docs/ADR-002-providers.md): the Neural Core's chat providers.
+- [docs/KEYS_AND_COSTS.md](docs/KEYS_AND_COSTS.md): chat provider keys, where they are kept, and what turns cost.
+- [docs/VERIFY_PROVIDERS.md](docs/VERIFY_PROVIDERS.md): how to check a chat provider live, and what has been verified.
 - [docs/BRANDING.md](docs/BRANDING.md): the SPECTRE emblem, its files and how to use them.
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to change SPECTRE.
 - [DATA_SOURCES.md](DATA_SOURCES.md): data sources and their terms.

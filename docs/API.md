@@ -83,15 +83,16 @@ The response is `text/event-stream`:
 
 | Event | Data |
 |---|---|
-| `turn` | `{"turn_id", "conversation_id"}` |
+| `turn` | `{"turn_id", "conversation_id", "provider", "model"}` |
 | `token` | `{"text"}`: the next piece of the answer |
 | `tool_status` | `{"tool", "state": "start" \| "done" \| "error", "host"?, "code"?}` |
 | `client_tool` | `{"turn_id", "call_id", "name", "args"}`: a globe tool for the browser to run |
 | `citation` | `{"n", "url", "title", "source"}`: source `[n]` of this turn |
-| `done` | `{"model", "tokens_per_s", "eval_count", "prompt_eval_count", "as_of", "citations", "degraded", "rounds", "seconds", "refused"?}` |
-| `error` | `{"code", "message"}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped` |
+| `done` | `{"model", "provider", "usage": {"input", "output"}, "stop_reason", "tokens_per_s", "eval_count", "prompt_eval_count", "as_of", "citations", "degraded", "rounds", "seconds", "refused"?}` |
+| `error` | `{"code", "message", "provider"?, "retryable"?}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped`, `consent_required`, `local_only`, `auth_failed`, `rate_limited` |
+| `budget` | `{"spent", "allowance", "budget"}`: the conversation reached its cloud token budget, and nothing was sent |
 
-At most 4 tool rounds run per turn, and the final request offers no tools. `as_of` is set when news or web results were used.
+At most 4 tool rounds run per turn, and the final request asks for an answer, not a call. `as_of` is set when news or web results were used. `usage` counts every round. The turn runs on the conversation's selected provider and model (`PUT /api/intel/providers/selection`); the chat body cannot change it, and a selection that cannot run is an `error`, never a switch. Before each round the request is trimmed to the model's input limit: the oldest tool results first, then the oldest history ([ADR-002](ADR-002-providers.md) D9).
 
 ### `POST /api/intel/chat/tool-result`
 
@@ -119,6 +120,30 @@ The current conversation as `{"conversation_id", "messages": [{"role", "content"
 ```
 
 `loaded` comes from Ollama's `/api/ps` and is `null` until the first answer loads the model.
+
+The selection adds `provider`, `provider_label`, `kind` (`local`, `remote` or `cloud`), `ready`, `problem` (for example `no_key`, `consent_required`, `local_only`, `ollama_offline`), `usage` (`{"input", "output", "cloud"}` tokens for the conversation) and `budget` (`{"spent", "allowance", "budget"}`, or `null` when off). An API provider is judged from local facts only: the poll never calls a cloud API.
+
+### Chat providers (`/api/intel/providers`)
+
+The proxy answers every route for this machine only, even with `SPECTRE_CHAT_ALLOW_LAN=1`, and refuses a `Sec-Fetch-Site` other than `same-origin` or `none`. Writes need the session token from `GET …/session` in `X-Spectre-Session`, an exact local `Origin` at the proxy, and a JSON body (`DELETE …/key` has none). No route ever returns a key.
+
+| Route | Does |
+|---|---|
+| `GET /api/intel/providers` | `{"providers": [{"id", "label", "kind", "adapter", "docs", "base_url", "base_url_editable", "workspace_id", "params", "chat_completions_models", "key": {"required", "configured", "source", "env", "writable"}, "consent"}], "policy", "keyring", "selection"}` |
+| `GET /api/intel/providers/session` | `{"token"}` for writes |
+| `PUT /api/intel/providers/policy` | `{"local_only"?, "map_context"?, "session_budget"?}`, `session_budget` in cloud tokens, `0` off |
+| `PUT /api/intel/providers/selection` | `{"provider", "model"}` for the current conversation and new ones |
+| `PUT /api/intel/providers/{id}/key` | `{"key"}`, stored in the OS keyring (or `.env` without one); returns the `key` status |
+| `DELETE /api/intel/providers/{id}/key` | removes the stored key; an environment key stays |
+| `PUT /api/intel/providers/{id}/settings` | `{"base_url"?, "workspace_id"?, "chat_completions_models"?, "params"?}`; `params`: `temperature` (not for Anthropic), `max_output_tokens`, `price_in`, `price_out` (USD per 1M tokens), and for Ollama `num_ctx`, `keep_alive` |
+| `PUT /api/intel/providers/{id}/consent` | `{"granted"}` |
+| `POST /api/intel/providers/{id}/test` | `{}`; `{"ok": true, ...}` or `{"ok": false, "code", "message", "retryable"}` |
+| `GET /api/intel/providers/{id}/models` | `{"models": [{"id", "label", "kind", "supports_tools", "capabilities", "context_window", "details"}]}` |
+| `POST /api/intel/providers/{id}/probe` | `{"model"}`: one tiny tool-calling request; `{"ok", "supports_tools"}` |
+| `GET /api/intel/providers/ollama/gpu` | `{"gpu"}` from `nvidia-smi`, or `null` |
+| `POST /api/intel/providers/budget/continue` | `{}`: one more budget for the current conversation; `{"allowance"}` |
+
+Local-only mode refuses a cloud provider's test, model list and probe (`409 {"code": "local_only"}`). Provider failures are `502 {"code", "message", "retryable"}` with the codes of ADR-002 D8.
 
 ### Local voice (`/api/intel/voice`, opt-in)
 
