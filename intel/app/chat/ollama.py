@@ -65,13 +65,22 @@ class OllamaClient:
 
     async def chat(self, payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Stream /api/chat, one parsed NDJSON object per chunk."""
-        body = {**payload, "stream": True}
+        async for chunk in self._ndjson("/api/chat", {**payload, "stream": True}, str(payload.get("model"))):
+            yield chunk
+
+    async def pull(self, model: str) -> AsyncIterator[dict[str, Any]]:
+        """Stream /api/pull: status, and digest, total and completed while a
+        layer downloads; an error line raises."""
+        async for chunk in self._ndjson("/api/pull", {"model": model, "stream": True}, model):
+            yield chunk
+
+    async def _ndjson(self, path: str, body: dict[str, Any], model: str) -> AsyncIterator[dict[str, Any]]:
         try:
             async with self._client.stream(
-                "POST", f"{self.base_url}/api/chat", json=body, timeout=httpx.Timeout(300, connect=5)
+                "POST", f"{self.base_url}{path}", json=body, timeout=httpx.Timeout(300, connect=5)
             ) as response:
                 if response.status_code == 404:
-                    raise OllamaError("model_missing", str(payload.get("model")), status=404)
+                    raise OllamaError("model_missing", model, status=404)
                 if response.status_code >= 400:
                     detail = (await response.aread())[:300].decode("utf-8", "replace")
                     raise OllamaError(

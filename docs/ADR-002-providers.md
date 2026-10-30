@@ -833,6 +833,22 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
   none with it off.
 - **Unverified on every cloud provider until a live run.**
 
+**After P5: Pull model (D11 stretch):**
+
+- **`POST /providers/ollama/pull`** takes `{"model"}` and streams Ollama's own `/api/pull` lines
+  as SSE: `progress {status, digest, total, completed}`, then `done` or `error`.
+  - It is a gated write (session token, exact Origin at the proxy), streamed with no proxy
+    timeout.
+  - The name must be a registry name (`[host/][namespace/]model[:tag]`): no scheme, flag or
+    `..` segment.
+- **Settings → Neural Core → Ollama** has a Pull model row with Ollama's status and a percent,
+  then the refreshed list.
+  - "Stop watching" closes the stream and the request to Ollama. Whether Ollama then stops
+    downloading is not verified, and the UI says it may finish on its own.
+- **Live:** the route against Ollama 0.40.13 with a name the registry lacks streamed `pulling
+  manifest`, then Ollama's "file does not exist" error. A real download was not run, to
+  leave the model store unchanged.
+
 **After P5: fixes from a code and a security review of `2141700a..392da429`:**
 
 - **Usage is recorded however a turn ends.** It is also recorded when Stop or a closed tab

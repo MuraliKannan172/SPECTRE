@@ -487,6 +487,19 @@ test('provider writes forward the session token, never Origin, with an exact loc
     body: '{}',
   });
   assert.equal(tested.status, 200);
+  const pulled = await fetch(`${proxy.url}/api/intel/providers/ollama/pull`, {
+    method: 'POST',
+    headers: { ...json, ...token, origin },
+    body: JSON.stringify({ model: 'qwen3:0.6b' }),
+  });
+  assert.equal(pulled.status, 200);
+  assert.equal(pulled.headers.get('cache-control'), 'no-cache', 'streamed');
+  const unpulled = await fetch(`${proxy.url}/api/intel/providers/ollama/pull`, {
+    method: 'POST',
+    headers: { ...json, ...token },
+    body: '{"model":"x"}',
+  });
+  assert.equal(unpulled.status, 403, 'a pull is a write: it needs the Origin');
 
   assert.deepEqual(
     seen.map((r) => `${r.method} ${r.url}`),
@@ -497,6 +510,7 @@ test('provider writes forward the session token, never Origin, with an exact loc
       'GET /api/intel/providers/session',
       'GET /api/intel/providers/openai/models',
       'POST /api/intel/providers/openai/test',
+      'POST /api/intel/providers/ollama/pull',
     ],
   );
   assert.equal(seen[0].headers['x-spectre-session'], 'abc');

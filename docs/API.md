@@ -141,6 +141,7 @@ The proxy answers every route for this machine only, even with `SPECTRE_CHAT_ALL
 | `POST /api/intel/providers/{id}/test` | `{}`; `{"ok": true, ...}` or `{"ok": false, "code", "message", "retryable"}` |
 | `GET /api/intel/providers/{id}/models` | `{"models": [{"id", "label", "kind", "supports_tools", "capabilities", "context_window", "details"}]}` |
 | `POST /api/intel/providers/{id}/probe` | `{"model"}`: one tiny tool-calling request; `{"ok", "supports_tools"}` |
+| `POST /api/intel/providers/ollama/pull` | `{"model"}`, a registry name: `text/event-stream` of `progress` `{"status", "digest", "total", "completed"}`, then `done` `{"model"}` or `error` `{"code", "message"}`. Closing the stream stops watching; Ollama may finish the download |
 | `GET /api/intel/providers/ollama/gpu` | `{"gpu"}` from `nvidia-smi`, or `null` |
 | `POST /api/intel/providers/budget/continue` | `{}`: one more budget for the current conversation; `{"allowance"}` |
 

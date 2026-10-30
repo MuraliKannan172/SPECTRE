@@ -273,6 +273,17 @@ async function intercept(request) {
   if (route === '/chat/status') return json(status());
   if (route === '/chat/history')
     return json({ conversation_id: 1, messages: [] });
+  if (route === '/providers/ollama/pull' && method === 'POST')
+    return request.respond({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sse([
+        ['progress', { status: 'pulling manifest' }],
+        ['progress', { status: 'pulling 7f2a', total: 200, completed: 100 }],
+        ['progress', { status: 'success' }],
+        ['done', { model: JSON.parse(body).model }],
+      ]),
+    });
   if (route === '/chat' && method === 'POST') {
     turns.push(JSON.parse(body || '{}'));
     return request.respond({
@@ -718,6 +729,44 @@ async function run(page) {
   record(
     'Continue is a gated write, then the turn runs',
     writes.some((w) => w.route === '/providers/budget/continue'),
+  );
+
+  console.log('(v b) PULL MODEL streams Ollama progress...');
+  await openSettings(page);
+  await page.evaluate(() => {
+    const local = [...document.querySelectorAll('.spectre-nc-provider')].find(
+      (b) => b.textContent.includes('Ollama'),
+    );
+    local?.click();
+  });
+  await sleep(800);
+  const pulled = await page.evaluate(async () => {
+    const row = document.querySelector('.spectre-nc-pull');
+    if (!row) return { found: false };
+    const input = row.querySelector('input');
+    input.value = 'qwen3:0.6b';
+    [...row.querySelectorAll('button')].find((b) => !b.hidden)?.click();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return {
+      found: true,
+      message:
+        document.querySelector(
+          '.spectre-nc-settings [role="status"], .spectre-nc-message',
+        )?.textContent || '',
+      said: [...document.querySelectorAll('.spectre-nc-settings p')]
+        .map((n) => n.textContent)
+        .join(' | '),
+    };
+  });
+  record(
+    'Pull model is a gated write that reports Ollama finishing',
+    pulled.found &&
+      writes.some(
+        (w) =>
+          w.route === '/providers/ollama/pull' && w.body.model === 'qwen3:0.6b',
+      ) &&
+      pulled.said.includes('Pulled qwen3:0.6b.'),
+    pulled.found ? pulled.said.slice(0, 160) : 'no pull row',
   );
 
   console.log('(vi) MARKUP from a model renders as text...');

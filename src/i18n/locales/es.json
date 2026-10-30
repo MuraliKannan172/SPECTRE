@@ -3213,5 +3213,14 @@
   "Thinking": "Razonamiento",
   "Reasoning: the model thinks first (more tokens, slower)": "Razonamiento: el modelo piensa antes (más tokens, más lento)",
   "Not in this version for Claude: thinking with tools needs its blocks kept across turns, which is not verified yet.": "No en esta versión para Claude: pensar con herramientas exige conservar sus bloques entre turnos, algo aún no verificado.",
-  "Not offered: this provider has no common switch for reasoning.": "No disponible: este proveedor no tiene un interruptor común de razonamiento."
+  "Not offered: this provider has no common switch for reasoning.": "No disponible: este proveedor no tiene un interruptor común de razonamiento.",
+  "Model to pull, such as qwen3:0.6b": "Modelo a descargar, como qwen3:0.6b",
+  "Model to pull": "Modelo a descargar",
+  "Pull model": "Descargar modelo",
+  "Stop watching": "Dejar de seguir",
+  "Starting…": "Empezando…",
+  "Pulled {model}.": "{model} descargado.",
+  "Ollama could not pull it: {message}": "Ollama no pudo descargarlo: {message}",
+  "Stopped watching. Ollama may finish the download on its own.": "Ya no se sigue. Ollama puede terminar la descarga por su cuenta.",
+  "{status} · {percent}%": "{status} · {percent}%"
 }

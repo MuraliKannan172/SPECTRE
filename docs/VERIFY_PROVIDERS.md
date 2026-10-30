@@ -48,6 +48,8 @@ Ollama 0.40.13 on this machine only:
 - **Ollama `:cloud` models**, which use your ollama.com account.
 - **Saving a key from POWER UP** into the real Windows Credential Manager. The tests use an
   in-memory keyring.
+- **Pull model with a real download** (Settings → Neural Core → Ollama, a small model such as
+  `qwen3:0.6b`). Only the error path ran live, so the model store was left unchanged.
 - **Reasoning turned on** (Settings → Neural Core) for DeepSeek, OpenRouter and OpenAI: fakes
   only. Turn it on and run a tool question in the app; DeepSeek with tools across several turns
   is the case to watch (`reasoning_content` passback).

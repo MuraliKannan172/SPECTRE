@@ -204,3 +204,49 @@ test('a refusal other than the token is not retried', async () => {
   );
   assert.equal(writes, 1);
 });
+
+test('a pull streams Ollama progress with the session token', async () => {
+  const sent = [];
+  const fetchImpl = async (url, init = {}) => {
+    sent.push([url, init]);
+    if (url.endsWith('/session'))
+      return new Response(JSON.stringify({ token: 't1' }), { status: 200 });
+    const frames = [
+      'event: progress\ndata: {"status":"pulling 7f","total":10,"completed":5}\n\n',
+      'event: done\ndata: {"model":"qwen3:0.6b"}\n\n',
+    ];
+    const body = new ReadableStream({
+      start(controller) {
+        for (const frame of frames)
+          controller.enqueue(new TextEncoder().encode(frame));
+        controller.close();
+      },
+    });
+    return new Response(body, { status: 200 });
+  };
+  const events = [];
+  await createProvidersClient({ fetchImpl }).pull('qwen3:0.6b', (name, data) =>
+    events.push([name, data]),
+  );
+  assert.deepEqual(
+    events.map(([name]) => name),
+    ['progress', 'done'],
+  );
+  const [url, init] = sent[1];
+  assert.equal(url, '/api/intel/providers/ollama/pull');
+  assert.equal(init.headers['X-Spectre-Session'], 't1');
+  assert.equal(JSON.parse(init.body).model, 'qwen3:0.6b');
+});
+
+test('pull progress reads as Ollama status and a percent', async () => {
+  const { pullProgress } = await import('./providerSettings.js');
+  assert.equal(
+    pullProgress({ status: 'pulling manifest' }),
+    'pulling manifest',
+  );
+  assert.equal(
+    pullProgress({ status: 'pulling 7f', total: 200, completed: 101 }),
+    'pulling 7f · 50%',
+  );
+  assert.equal(pullProgress({ status: 'x', total: 0, completed: 5 }), 'x');
+});
