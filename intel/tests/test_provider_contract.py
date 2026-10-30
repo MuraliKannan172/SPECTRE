@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
 import pytest
+from fakes_openai_chat import OpenAIChatHarness
+from sse import CANARY
 
 from app.chat.ollama import OllamaClient
 from app.chat.providers import errors
@@ -54,7 +57,10 @@ class MockHarness:
     """The reference: scripts canonical events directly."""
 
     name = "mock"
-    unsupported: dict[str, str] = {"unknown_event": "the mock emits canonical events only"}
+    unsupported: dict[str, str] = {
+        "unknown_event": "the mock emits canonical events only",
+        "key": "the mock takes no API key",
+    }
 
     def __init__(self) -> None:
         self.provider = MockProvider(models=[ModelInfo("m", "m", "local", "yes")])
@@ -115,7 +121,10 @@ class OllamaHarness:
     """A fake Ollama server: /api/tags, /api/show and a scripted /api/chat."""
 
     name = "ollama"
-    unsupported = {"context_too_long": "Ollama documents no context-length error (ADR-002 §1.4)"}
+    unsupported = {
+        "context_too_long": "Ollama documents no context-length error (ADR-002 §1.4)",
+        "key": "Ollama takes no API key",
+    }
 
     def __init__(self) -> None:
         self.replies: list[tuple[int, dict[str, str], list[dict[str, Any]]]] = []
@@ -189,7 +198,7 @@ class OllamaHarness:
         return [(m["tool_name"], m["content"]) for m in messages if m["role"] == "tool"]
 
 
-HARNESSES = [MockHarness, OllamaHarness]
+HARNESSES = [MockHarness, OllamaHarness, OpenAIChatHarness]
 
 
 @pytest.fixture(params=HARNESSES, ids=lambda cls: cls.name)
@@ -281,6 +290,20 @@ def test_401_is_auth_failed_and_never_retried(harness: Any) -> None:
         collect(harness, request(), attempts=3)
     assert raised.value.code == errors.AUTH_FAILED and not raised.value.retryable
     assert harness.upstream_requests == 1
+
+
+def test_a_rejected_key_reaches_no_log_and_no_error_text(
+    harness: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    skip_unsupported(harness, "key")
+    caplog.set_level(logging.DEBUG)  # the SDKs log request details at debug level
+    harness.fail_echoing_key(401)
+    with pytest.raises(ProviderError) as raised:
+        collect(harness, request(), attempts=3)
+    error = raised.value
+    assert error.code == errors.AUTH_FAILED and harness.upstream_requests == 1
+    assert CANARY not in f"{error} {error.detail}" and CANARY not in caplog.text
+    assert error.__cause__ is None and error.__context__ is None, "no link back to the SDK exception"
 
 
 def test_429_honours_retry_after_and_then_succeeds(harness: Any) -> None:
