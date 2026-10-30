@@ -239,6 +239,10 @@ async def verify(
     ollama_http = ollama_http or httpx.AsyncClient(trust_env=False)
     sdk_http = sdk_http or httpx2.AsyncClient(timeout=SDK_TIMEOUT, follow_redirects=False)
     with tempfile.TemporaryDirectory(prefix="spectre-verify-") as scratch:
+        if settings.db_path.exists():
+            out(f"Saved settings from {settings.db_path}")
+        else:
+            out(f"No saved settings at {settings.db_path}; defaults used")
         store = ProviderStore(str(copy_database(settings.db_path, Path(scratch))))
         try:
             return await _verify(provider_id, model, settings, keys, store, ollama_http, sdk_http, out)

@@ -23,6 +23,7 @@ flowchart LR
   Ollama["Ollama (chat model)"]
   Feeds["Open news feeds, GDELT"]
   Internet["Search provider, public web pages"]
+  Cloud["Chat API, optional: Anthropic, OpenAI,<br/>OpenRouter, NVIDIA NIM, DeepSeek"]
 
   Globe --> GevProviders
   NewsUI --> Proxy
@@ -31,6 +32,7 @@ flowchart LR
   Feeds --> Ingest --> Store
   Agent --> Store
   Agent --> Ollama
+  Agent -. "only when selected, after consent" .-> Cloud
   Agent --> Web --> Internet
   Agent -. "client tool call (SSE)" .-> NC
   NC -. "tool result" .-> Proxy
@@ -59,7 +61,7 @@ The browser talks only to `localhost:4173`. Its Content Security Policy is same-
 ### A Neural Core turn
 
 1. **Send.** The panel (`src/neuralCore/panel.js`) posts the question with a snapshot of the view and the enabled layers to `POST /api/intel/chat`. The reply is an SSE stream.
-2. **Refuse or prepare.** The agent (`intel/app/chat/agent.py`) refuses person lookups first (`policy.py`). It then builds the system prompt with the map context and calls Ollama's `/api/chat` with the tool schemas from `shared/tools/neural-core.tools.json`.
+2. **Refuse or prepare.** The agent (`intel/app/chat/agent.py`) refuses person lookups first (`policy.py`). It then builds the system prompt with the map context and calls the conversation's provider with the tool schemas from `shared/tools/neural-core.tools.json`: Ollama's `/api/chat` by default, or a cloud API with the owner's key once that provider has consent ([ADR-002](ADR-002-providers.md)). Each round is trimmed to the model's input limit first.
 3. **Tool rounds,** at most 4:
    - **Server tools** run in the intel service: news search, news near a place, web search, page fetch, layer state, viewport. Web and news text goes back to the model wrapped as untrusted data, with numbered sources.
    - **Globe tools** (fly, zoom, layers, styles, tracking, annotations) go to the browser as a `client_tool` event. The panel runs them through GEV's own action runner (`src/neuralCore/executor.js`, the same path voice uses) and posts the result to `POST /api/intel/chat/tool-result`. The agent waits up to 15 s. A refused action is reported as a failure.

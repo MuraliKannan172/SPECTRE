@@ -798,7 +798,7 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
     (D12).
 - **Live, Ollama only (2026-10-30):**
   - `verify_provider.py ollama` passed list, prompt and tool round trip with
-    `qwen3.5-9b-64k-gpu:latest` in 2 of 3 runs. In the third, Ollama's runner crashed while loading
+    `qwen3.5-9b-64k-gpu:latest` in 3 of 4 runs. In the other, Ollama's runner crashed while loading
     (a CUDA initialisation error), and the script reported `provider_unavailable`.
   - The eval with D9 scored 13/15 with refusals 2/3, then 12/15 and 2/3. The control on the commit
     before D9 scored 12/15 and 3/3.
@@ -807,6 +807,7 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
     alone 8 times scored 7/8 before D9 and 5/8 after, which reads as sampling at temperature
     0.2.
   - The web misses are keyless ddgs searches returning nothing, before D9 too.
+- **Not built:** raising the 12,288-token input ceiling from Settings (D9 offers it); the ceiling is fixed.
 - **No cloud provider has run live.** `docs/VERIFY_PROVIDERS.md` lists what each needs.
 - **Docs:**
   - `docs/KEYS_AND_COSTS.md`, including the warning not to put `ANTHROPIC_API_KEY` in the global
