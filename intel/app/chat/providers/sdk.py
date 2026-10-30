@@ -20,12 +20,12 @@ import httpx2
 import openai
 
 from . import errors
+from .base import DEFAULT_MAX_OUTPUT as DEFAULT_MAX_OUTPUT  # the adapters import it from here
 from .base import Kind
 from .errors import ProviderError, code_for_status, retry_after_seconds
 
 # Replies stream, so there is no total timeout; a stalled read still ends.
 TIMEOUT = httpx2.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
-DEFAULT_MAX_OUTPUT = 4096  # per-turn output guard for API providers (D10)
 LIST_TTL_SECONDS = 600.0
 
 _LOOPBACK = {"localhost", "127.0.0.1", "::1"}

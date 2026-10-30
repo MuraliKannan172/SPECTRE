@@ -19,6 +19,8 @@ Kind = Literal["local", "remote", "cloud"]
 Support = Literal["yes", "no", "unknown"]
 ToolChoice = Literal["auto", "none"]
 
+DEFAULT_MAX_OUTPUT = 4096  # per-turn output guard for API providers (D10)
+
 
 @dataclass(frozen=True)
 class ToolCall:
