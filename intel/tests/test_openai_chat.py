@@ -185,7 +185,7 @@ def test_a_key_is_never_sent_over_http_to_another_machine() -> None:
 def test_the_model_list_reads_tools_vision_context_and_price_and_is_cached() -> None:
     harness = OpenAIChatHarness("openrouter")
     models = {m.id: m for m in asyncio.run(harness.provider.list_models())}
-    assert set(models) == {"m", "plain"}, "embedding models are not chat models"
+    assert set(models) == {"m", "plain", "json-ok"}, "embedding models are not chat models"
     m = models["m"]
     assert (m.supports_tools, m.context_window, m.label) == ("yes", 131072, "Model M")
     assert {"tools", "vision"} <= m.capabilities and m.details["pricing"]["prompt"] == "0.000001"
@@ -202,3 +202,14 @@ def test_tool_arguments_split_across_chunks_arrive_whole() -> None:
     calls = [e.call for e in run(harness, ask()) if isinstance(e, ToolCallEvent)]
     assert [(c.id, c.args) for c in calls] == [("call_lookup_0", {"q": "a long query", "n": 2})]
     assert json.loads(json.dumps(calls[0].args)) == {"q": "a long query", "n": 2}
+
+
+def test_degraded_mode_asks_for_json_only_where_the_model_declares_it() -> None:
+    harness = OpenAIChatHarness("openrouter")
+    asyncio.run(harness.provider.model_caps("plain"))  # fills the cached model list
+    schema = {"type": "object"}
+    for model in ("plain", "json-ok", "not-listed"):
+        harness.answer("{}")
+        run(harness, ChatRequest(model, (Message("user", "hi"),), json_schema=schema))
+    sent = [body.get("response_format") for body in harness.upstream.bodies]
+    assert sent == [None, {"type": "json_schema", "json_schema": {"name": "reply", "schema": schema}}, None]

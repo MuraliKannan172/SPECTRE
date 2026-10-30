@@ -105,6 +105,8 @@ def model_info(data: dict[str, Any], kind: Kind) -> ModelInfo:
         capabilities.add("vision")
     if data.get("reasoning") or (isinstance(supported, list) and "reasoning" in supported):
         capabilities.add("reasoning")
+    if isinstance(supported, list) and {"response_format", "structured_outputs"} & set(supported):
+        capabilities.add("json")
     context = data.get("context_length") or data.get("context_window")
     details = {
         key: data[key]
@@ -204,6 +206,10 @@ class OpenAIChatProvider:
     async def test(self) -> dict[str, Any]:
         return {"ok": True, "models": len(await self.list_models())}
 
+    def _declares_json(self, model: str) -> bool:
+        listed = self._listed[1] if self._listed else []
+        return any(info.id == model and "json" in info.capabilities for info in listed)
+
     # -- chat ----------------------------------------------------------------------
 
     def payload(self, request: ChatRequest) -> dict[str, Any]:
@@ -220,7 +226,9 @@ class OpenAIChatProvider:
             body["tool_choice"] = request.tool_choice
             if self.quirks.tools_need_effort_none:
                 body["reasoning_effort"] = "none"
-        elif request.json_schema:
+        elif request.json_schema and self._declares_json(request.model):
+            # Degraded mode (D3): a JSON response format only where the model's
+            # list entry declares one; otherwise the prompt's instructions alone.
             body["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {"name": "reply", "schema": request.json_schema},

@@ -58,6 +58,7 @@ MODELS = {
             "pricing": {"prompt": "0.000001", "completion": "0.000002"},
         },
         {"id": "plain", "supported_parameters": ["temperature"]},
+        {"id": "json-ok", "supported_parameters": ["temperature", "response_format"]},
         {"id": "text-embedding-3", "supported_parameters": []},
     ],
 }

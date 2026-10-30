@@ -718,8 +718,13 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
   field) from a 400 whose `param` is `reasoning.effort`, and remembered for the life of the
   service, not in `model_caps`.
 - **The tool probe** caches `yes` (the probe tool was called) and `no` (the request was rejected as
-  unsupported) in `model_caps`. A text reply proves nothing: the turn uses native tools and
-  nothing is cached.
+  unsupported) in `model_caps`. A text reply proves nothing: the turn uses native tools, nothing
+  is written to `model_caps`, and the model is not probed again while the service runs.
+- **Consent** covers every non-local provider except Ollama: a custom server on the LAN
+  (`REMOTE`) needs it too. Local-only mode blocks `CLOUD` only.
+- **Degraded mode** asks an OpenAI-compatible provider for a JSON response format only when the
+  model's list entry declares one (`response_format` or `structured_outputs`); otherwise the
+  prompt's instructions alone.
 - **Custom server over LAN `http`:** allowed only while it has no key, and a key is refused while
   its address is LAN `http`; adapters never send a key over `http` off this machine.
 - **Budgets for API providers** are the 16k set (`FULL_BUDGETS`) as a ceiling, lowered by a smaller
