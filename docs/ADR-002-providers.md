@@ -667,7 +667,7 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **Ollama on this machine:** `ollama list`, `/api/version`, `/api/tags`, `/api/show` per model and
   `/api/ps`, recorded in `docs/providers/p0-ollama-probe.json`.
 
-## 8. As built: where P1 and P2 differ from the text above
+## 8. As built: where P1–P3 differ from the text above
 
 - **`:cloud` detection (P1 fix).** `model_caps` read only `/api/show`, which has no `remote_host`,
   so `:cloud` models came back `local`. It now merges `remote_host` from the model's `/api/tags`
@@ -696,3 +696,38 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
   preflight, which a DELETE always triggers.
 - **Tests** run against an in-memory keyring with the provider key variables removed from the
   environment (`intel/tests/conftest.py`).
+
+**P3 (cloud adapters):**
+
+- **Both SDKs use `httpx2`**, not `httpx`; one shared `httpx2` client with explicit timeouts (no
+  total timeout, since replies stream) and no redirects serves every API provider.
+- **SDK objects become dicts at once** (`to_dict`). Typed classes were wrong for event types the
+  SDK does not know; `to_dict` keeps the original `type` and every extra field.
+- **SDK errors are mapped and raised outside the `except` block**, so the new error keeps no link
+  to the SDK exception, whose response holds the `Authorization` header.
+- **`OPENAI_ORG_ID` / `OPENAI_PROJECT_ID`** from the environment would be sent by the `openai` SDK
+  to any base URL; the adapters clear them.
+- **Selection is not in the chat request.** `PUT /providers/selection` (gated, with the token)
+  stores the provider and model on the current conversation and as the last choice, which new
+  conversations start with. `/chat` only reads it, so a LAN viewer can chat but never switch to a
+  provider that spends the owner's key. A selection that cannot run is an error, never a switch.
+- **Chat Completions fallback for OpenAI (deviation from D3):** used only for models listed in the
+  provider's settings (`chat_completions_models`). Learning it from a Responses error waits for a
+  verified error shape.
+- **OpenAI reasoning effort** is learned per model (`none`, then `minimal`, then `low`, then no
+  field) from a 400 whose `param` is `reasoning.effort`, and remembered for the life of the
+  service, not in `model_caps`.
+- **The tool probe** caches `yes` (the probe tool was called) and `no` (the request was rejected as
+  unsupported) in `model_caps`. A text reply proves nothing: the turn uses native tools and
+  nothing is cached.
+- **Custom server over LAN `http`:** allowed only while it has no key, and a key is refused while
+  its address is LAN `http`; adapters never send a key over `http` off this machine.
+- **Budgets for API providers** are the 16k set (`FULL_BUDGETS`) as a ceiling, lowered by a smaller
+  context window. The per-turn output guard is 4096 tokens.
+- **SSE additions (D7):** `turn` and `done` carry `provider` and `model`; `done` adds `usage` and
+  `stop_reason`; `error` adds `provider` and `retryable`.
+- **`provider_state` of a final answer** is stored with it and replayed on later turns (DeepSeek
+  needs this with reasoning on); `/chat/history` never returns it.
+- **UNVERIFIED until a live run with a key:** Anthropic accepting `tool_choice: {type: none}` and
+  cross-turn thinking replay; every provider's context-length error shape; OpenAI's
+  effort-rejection body; NIM `stream_options`; OpenRouter `reasoning_details` passback.

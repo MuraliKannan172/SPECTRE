@@ -17,6 +17,7 @@ from .db import connect, migrate
 class ProviderSettings:
     base_url: str | None = None
     workspace_id: str | None = None
+    chat_completions_models: tuple[str, ...] = ()  # OpenAI models sent to Chat Completions
 
 
 @dataclass(frozen=True)
@@ -48,20 +49,48 @@ class ProviderStore:
     def settings(self, provider_id: str) -> ProviderSettings:
         with self._lock:
             row = self._conn.execute(
-                "SELECT base_url, workspace_id FROM provider_settings WHERE provider_id = ?",
+                "SELECT base_url, workspace_id, params_json FROM provider_settings WHERE provider_id = ?",
                 (provider_id,),
             ).fetchone()
-        return ProviderSettings(row[0], row[1]) if row else ProviderSettings()
+        if not row:
+            return ProviderSettings()
+        params = json.loads(row[2]) if row[2] else {}
+        return ProviderSettings(row[0], row[1], tuple(params.get("chat_completions_models") or ()))
 
     def save_settings(self, provider_id: str, settings: ProviderSettings) -> None:
+        params = {"chat_completions_models": list(settings.chat_completions_models)}
         with self._lock:
             self._conn.execute(
-                "INSERT INTO provider_settings (provider_id, base_url, workspace_id, updated_at)"
-                " VALUES (?, ?, ?, ?) ON CONFLICT (provider_id) DO UPDATE SET"
+                "INSERT INTO provider_settings (provider_id, base_url, workspace_id, params_json, updated_at)"
+                " VALUES (?, ?, ?, ?, ?) ON CONFLICT (provider_id) DO UPDATE SET"
                 " base_url = excluded.base_url, workspace_id = excluded.workspace_id,"
-                " updated_at = excluded.updated_at",
-                (provider_id, settings.base_url, settings.workspace_id, self._now()),
+                " params_json = excluded.params_json, updated_at = excluded.updated_at",
+                (provider_id, settings.base_url, settings.workspace_id, json.dumps(params), self._now()),
             )
+
+    # -- tool-calling probe results (D3), keyed by provider, base URL and model --
+
+    def known_tools(self, provider_id: str, base_url: str, model: str) -> str | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT supports_tools FROM model_caps WHERE provider_id = ? AND base_url = ? AND model = ?",
+                (provider_id, base_url, model),
+            ).fetchone()
+        return str(row[0]) if row and row[0] in ("yes", "no") else None
+
+    def remember_tools(self, provider_id: str, base_url: str, model: str, support: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO model_caps (provider_id, base_url, model, supports_tools, probed_at)"
+                " VALUES (?, ?, ?, ?, ?) ON CONFLICT (provider_id, base_url, model) DO UPDATE SET"
+                " supports_tools = excluded.supports_tools, probed_at = excluded.probed_at",
+                (provider_id, base_url, model, support, self._now()),
+            )
+
+    def forget_tools(self, provider_id: str) -> None:
+        """For "Test tool calling" (P4) and a changed base URL: probe again."""
+        with self._lock:
+            self._conn.execute("DELETE FROM model_caps WHERE provider_id = ?", (provider_id,))
 
     # -- consent -----------------------------------------------------------------
 
@@ -114,3 +143,21 @@ class ProviderStore:
                     (key, json.dumps(bool(value)), now),
                 )
         return self.policy()
+
+    def last_selection(self) -> tuple[str, str] | None:
+        """The provider and model last chosen; a new conversation starts with it."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value_json FROM chat_settings WHERE key = 'selection'"
+            ).fetchone()
+        value = json.loads(row[0]) if row else None
+        return (str(value[0]), str(value[1])) if isinstance(value, list) and len(value) == 2 else None
+
+    def set_last_selection(self, provider_id: str, model: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO chat_settings (key, value_json, updated_at) VALUES ('selection', ?, ?)"
+                " ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json,"
+                " updated_at = excluded.updated_at",
+                (json.dumps([provider_id, model]), self._now()),
+            )

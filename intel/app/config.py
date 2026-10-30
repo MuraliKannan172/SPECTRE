@@ -28,6 +28,9 @@ NON_COMMERCIAL_SOURCES_ENV = "SPECTRE_NONCOMMERCIAL_SOURCES"
 # is the low-resource choice.
 DEFAULT_MODEL = "qwen3.5-9b-64k-gpu:latest"
 LOW_RESOURCE_MODEL = "bonsai-2:9b"
+# Token budgets per turn for a 16k context. Also the ceiling for API providers,
+# whatever their window: every token is billed (ADR-002 D9).
+FULL_BUDGETS = {"history": 3000, "web": 6000, "page": 2500}
 _TRUTHY = {"1", "true", "yes", "on"}
 MIN_POLL_SECONDS = 30
 BRAND_PREFIX = "SPECTRE_"
@@ -148,7 +151,7 @@ class Settings:
         """Token budgets per turn (ADR-001 D5); 8k contexts get the small set."""
         if self.num_ctx <= 8192:
             return {"history": 1500, "web": 2500, "page": 1200}
-        return {"history": 3000, "web": 6000, "page": 2500}
+        return dict(FULL_BUDGETS)
 
     @property
     def stale_after_seconds(self) -> int:

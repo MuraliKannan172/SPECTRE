@@ -580,6 +580,23 @@ test('provider routes stay closed to the LAN even with chat opened to it', async
     assert.equal(res.status, 403, url);
     assert.match(res.body, /providers_not-loopback/);
   }
+  // Nor may a LAN viewer pick the provider, which would spend the owner's key.
+  const pick = replyDouble();
+  await open(
+    {
+      ...lan,
+      method: 'PUT',
+      url: '/providers/selection',
+      headers: {
+        ...lan.headers,
+        origin: 'http://192.168.1.10:4173',
+        'content-type': 'application/json',
+      },
+    },
+    pick,
+  );
+  assert.equal(pick.status, 403);
+  assert.match(pick.body, /providers_not-loopback/);
   // A loopback socket with a foreign Host (DNS rebinding, a tunnel) too.
   const rebound = replyDouble();
   await open(

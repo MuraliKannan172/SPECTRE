@@ -67,13 +67,16 @@ def test_every_tool_result_goes_first_in_one_user_message() -> None:
     harness = AnthropicHarness()
     harness.answer("ok")
     calls = (ToolCall("toolu_0", "lookup", {"q": "a"}), ToolCall("toolu_1", "lookup", {"q": "b"}))
-    run(harness, ask(
-        Message("user", "hi"),
-        Message("assistant", "Checking.", tool_calls=calls, provider_id="anthropic"),
-        Message("tool", "A", tool_call_id="toolu_0", name="lookup"),
-        Message("tool", "B", tool_call_id="toolu_1", name="lookup"),
-        Message("user", "and then?"),
-    ))  # fmt: skip
+    run(
+        harness,
+        ask(
+            Message("user", "hi"),
+            Message("assistant", "Checking.", tool_calls=calls, provider_id="anthropic"),
+            Message("tool", "A", tool_call_id="toolu_0", name="lookup"),
+            Message("tool", "B", tool_call_id="toolu_1", name="lookup"),
+            Message("user", "and then?"),
+        ),
+    )
     messages = harness.upstream.bodies[0]["messages"]
     assert [m["role"] for m in messages] == ["user", "assistant", "user"]
     assert [b["type"] for b in messages[1]["content"]] == ["text", "tool_use", "tool_use"]
@@ -120,8 +123,9 @@ def test_thinking_blocks_come_back_unmodified_to_anthropic_only() -> None:
 
     def assistant_blocks(provider_id: str) -> list[dict[str, Any]]:
         harness.answer("done")
-        assistant = Message("assistant", "", tool_calls=(call,), provider_id=provider_id,
-                            provider_state=done.provider_state)  # fmt: skip
+        assistant = Message(
+            "assistant", "", tool_calls=(call,), provider_id=provider_id, provider_state=done.provider_state
+        )
         run(harness, ask(Message("user", "hi"), assistant, Message("tool", "R", tool_call_id="toolu_0")))
         return harness.upstream.bodies[-1]["messages"][1]["content"]
 
@@ -170,10 +174,21 @@ def test_the_model_list_follows_pages_and_reads_context() -> None:
     def handle(request: httpx2.Request) -> httpx2.Response:
         seen.append(str(request.url.params.get("after_id")))
         if request.url.params.get("after_id") == "a":
-            return httpx2.Response(200, json={"data": [{"id": "b", "display_name": "B"}], "has_more": False,
-                                              "first_id": "b", "last_id": "b"})  # fmt: skip
-        page = {"data": [{"id": "a", "display_name": "Model A", "max_input_tokens": 200000}],
-                "has_more": True, "first_id": "a", "last_id": "a"}  # fmt: skip
+            return httpx2.Response(
+                200,
+                json={
+                    "data": [{"id": "b", "display_name": "B"}],
+                    "has_more": False,
+                    "first_id": "b",
+                    "last_id": "b",
+                },
+            )
+        page = {
+            "data": [{"id": "a", "display_name": "Model A", "max_input_tokens": 200000}],
+            "has_more": True,
+            "first_id": "a",
+            "last_id": "a",
+        }
         return httpx2.Response(200, json=page)
 
     http = httpx2.AsyncClient(transport=httpx2.MockTransport(handle))

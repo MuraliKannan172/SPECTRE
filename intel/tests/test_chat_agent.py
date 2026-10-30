@@ -298,7 +298,10 @@ def test_a_person_query_written_by_the_model_is_refused(make_agent) -> None:  # 
 def test_offline_ollama_is_reported(make_agent) -> None:  # type: ignore[no-untyped-def]
     agent = make_agent(FakeOllama([], offline=True))
     events = collect(agent, turn_for(agent, "hi"))
-    assert events[-1] == ("error", {"code": "ollama_offline", "message": "offline"})
+    assert events[-1] == (
+        "error",
+        {"code": "ollama_offline", "message": "offline", "provider": "ollama", "retryable": True},
+    )
 
 
 def test_models_without_tools_use_the_json_fallback(make_agent) -> None:  # type: ignore[no-untyped-def]

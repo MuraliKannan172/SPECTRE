@@ -93,7 +93,7 @@ const ROUTES = Object.freeze([
   {
     methods: ['PUT'],
     pattern:
-      /^\/providers\/(?:policy|[a-z][a-z0-9_-]{1,31}\/(?:key|settings|consent))$/,
+      /^\/providers\/(?:policy|selection|[a-z][a-z0-9_-]{1,31}\/(?:key|settings|consent))$/,
     providers: true,
     write: true,
     body: JSON_BODY,

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import httpx2
 import keyring
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -30,9 +31,11 @@ from .api.providers import router as providers_router
 from .api.routes import router
 from .api.voice import router as voice_router
 from .chat.agent import Agent
+from .chat.providers.catalog import api_factories
 from .chat.providers.keys import KeyStore
 from .chat.providers.registry import DEFAULT_PATH as PROVIDERS_FILE
 from .chat.providers.registry import Factory, ProviderConfigError, ProviderSet, default_providers
+from .chat.providers.sdk import TIMEOUT as SDK_TIMEOUT
 from .chat.tools import ToolRegistry
 from .config import BRAND_NAME, DEFAULT_DB, DEFAULT_LOGS, Settings, load_settings
 from .geo.gazetteer import Gazetteer
@@ -169,13 +172,23 @@ def create_app(
             backend=keyring_backend if keyring_backend is not None else keyring.get_keyring(),
         )
         provider_store = ProviderStore(str(settings.db_path))
+        # One client for every API provider; no redirects, so a key never follows one.
+        sdk_http = httpx2.AsyncClient(timeout=SDK_TIMEOUT, follow_redirects=False)
+        factories = {
+            **api_factories(
+                sdk_http,
+                workspace_for=lambda pid: provider_store.settings(pid).workspace_id,
+                chat_models_for=lambda pid: frozenset(provider_store.settings(pid).chat_completions_models),
+            ),
+            **(provider_factories or {}),
+        }
         providers, problem = _load_providers(
             path=providers_file,
             ollama_http=ollama_http,
             ollama_host=settings.ollama_host,
             keys=keys,
             store=provider_store,
-            factories=provider_factories,
+            factories=factories,
         )
         app.state.chat_problem = app.state.chat_problem or problem
         app.state.keys = keys
@@ -196,6 +209,9 @@ def create_app(
                 provider=ollama,
                 local_only=lambda: provider_store.policy().local_only,
                 consented=provider_store.consented,
+                providers=lambda pid: providers.get(pid) if providers else None,
+                known_tools=provider_store.known_tools,
+                remember_tools=provider_store.remember_tools,
             )
             if registry is not None and ollama is not None
             else None
@@ -223,6 +239,7 @@ def create_app(
             await scheduler.drain()
             await client.aclose()
             await ollama_http.aclose()
+            await sdk_http.aclose()
             await fetch_http.aclose()
             chats.close()
             provider_store.close()

@@ -15,13 +15,27 @@ from app.chat.providers.registry import ProviderSpec
 SPEC = ProviderSpec(
     "anthropic", "Claude", "anthropic", "cloud", "https://api.anthropic.com", ("ANTHROPIC_API_KEY",)
 )
-_TYPES = {401: "authentication_error", 402: "billing_error", 403: "permission_error", 404: "not_found_error",
-          429: "rate_limit_error", 500: "api_error", 529: "overloaded_error"}  # fmt: skip
+_TYPES = {
+    401: "authentication_error",
+    402: "billing_error",
+    403: "permission_error",
+    404: "not_found_error",
+    429: "rate_limit_error",
+    500: "api_error",
+    529: "overloaded_error",
+}
 
 
 def start(input_tokens: int = 3) -> dict[str, Any]:
-    message = {"id": "msg_1", "type": "message", "role": "assistant", "model": "m", "content": [],
-               "stop_reason": None, "usage": {"input_tokens": input_tokens, "output_tokens": 1}}  # fmt: skip
+    message = {
+        "id": "msg_1",
+        "type": "message",
+        "role": "assistant",
+        "model": "m",
+        "content": [],
+        "stop_reason": None,
+        "usage": {"input_tokens": input_tokens, "output_tokens": 1},
+    }
     return {"type": "message_start", "message": message}
 
 
@@ -60,9 +74,20 @@ class AnthropicHarness:
     def __init__(self, *, key: str | None = CANARY, workspace: str | None = None, models: Any = None) -> None:
         self.upstream = Upstream()
         self.replies: list[Reply] = []
-        pages = models or {"data": [{"id": "m", "type": "model", "display_name": "Model M",
-                                    "max_input_tokens": 200000, "max_tokens": 64000}],
-                           "has_more": False, "first_id": "m", "last_id": "m"}  # fmt: skip
+        pages = models or {
+            "data": [
+                {
+                    "id": "m",
+                    "type": "model",
+                    "display_name": "Model M",
+                    "max_input_tokens": 200000,
+                    "max_tokens": 64000,
+                }
+            ],
+            "has_more": False,
+            "first_id": "m",
+            "last_id": "m",
+        }
         self.http = fake_server(self.upstream, self.replies, lambda: pages)
         self.provider = AnthropicProvider(
             SPEC, SPEC.base_url, lambda: key, http=self.http, workspace=lambda: workspace
@@ -73,8 +98,14 @@ class AnthropicHarness:
 
     def answer(self, *chunks: str) -> None:
         text = [delta(0, type="text_delta", text=piece) for piece in chunks]
-        self.events(start(), block_start(0, {"type": "text", "text": ""}), {"type": "ping"}, *text, stop(0),
-                    *finish("end_turn"))  # fmt: skip
+        self.events(
+            start(),
+            block_start(0, {"type": "text", "text": ""}),
+            {"type": "ping"},
+            *text,
+            stop(0),
+            *finish("end_turn"),
+        )
 
     def tool_calls(self, *calls: tuple[str, dict[str, Any]]) -> None:
         body: list[dict[str, Any]] = []
@@ -100,9 +131,15 @@ class AnthropicHarness:
         self.replies.append((400, {}, body))
 
     def answer_with_unknown_event(self, text: str) -> None:
-        self.events(start(), {"type": "future_event", "x": 1}, block_start(0, {"type": "text", "text": ""}),
-                    delta(0, type="future_delta", foo=1), delta(0, type="text_delta", text=text), stop(0),
-                    *finish("end_turn"))  # fmt: skip
+        self.events(
+            start(),
+            {"type": "future_event", "x": 1},
+            block_start(0, {"type": "text", "text": ""}),
+            delta(0, type="future_delta", foo=1),
+            delta(0, type="text_delta", text=text),
+            stop(0),
+            *finish("end_turn"),
+        )
 
     def long_answer(self, chunks: int) -> None:
         self.answer(*(f"t{n} " for n in range(chunks)))
