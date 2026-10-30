@@ -2629,7 +2629,11 @@
       "src/voice/geminiCaptureWorklet.js",
       "src/ui/statusBadge.js",
       "src/sceneCommandRelease.js",
-      "src/scopeMaskPolicy.js"
+      "src/scopeMaskPolicy.js",
+      "src/neuralCore/powerUpKeys.js",
+      "src/neuralCore/providersClient.js",
+      "src/neuralCore/providersView.js",
+      "src/neuralCore/client.js"
     ],
     "external": [
       "hls.js",

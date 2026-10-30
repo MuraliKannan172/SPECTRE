@@ -1,4 +1,5 @@
 import { createSurfaceKeyboard } from './ui/surfaceKeyboard.js';
+import { mountNeuralCoreKeyRows } from './neuralCore/powerUpKeys.js'; // SPECTRE
 import {
   readStoredCloudVoiceAuthMode,
   writeStoredCloudVoiceAuthMode,
@@ -470,6 +471,12 @@ export async function initKeySetup({
   }
 
   const rowsHost = root.querySelector('[data-key-setup-rows]');
+  // SPECTRE: Neural Core chat keys, stored through the intel service (ADR-002 Q1).
+  mountNeuralCoreKeyRows({
+    documentRef,
+    host: root.querySelector('[data-key-setup-neural-core]'),
+    signal: lifetime.signal,
+  });
   disposePlacement = bindKeySetupPlacement(documentRef, chip);
   const applyButton = root.querySelector('[data-key-setup-apply]');
   const closeButton = root.querySelector('[data-key-setup-close]');
