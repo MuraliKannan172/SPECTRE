@@ -187,6 +187,13 @@ export function statusSummary(status, failureCode = null) {
       text: errorText('ollama_model_missing', { model }),
       search,
     };
+  // An Ollama :cloud model (or a remote Ollama): blocked, or waiting for consent.
+  if (['local_only', 'consent_required'].includes(status.problem))
+    return {
+      tone: 'offline',
+      text: `${model} · ${errorText(status.problem)}`,
+      search,
+    };
   if (status.tools === false)
     return {
       tone: 'degraded',

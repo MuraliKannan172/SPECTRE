@@ -255,7 +255,9 @@ export function mountProviderSettings({
         renderList();
       }),
     );
-    if (provider.kind !== 'local')
+    // Ollama is local, but consent given for its :cloud models must stay revocable.
+    const asksConsent = provider.kind !== 'local' || provider.consent;
+    if (asksConsent)
       buttons.append(
         action(
           document,
@@ -264,7 +266,7 @@ export function mountProviderSettings({
         ),
       );
     detail.append(buttons, testLine);
-    if (provider.kind !== 'local')
+    if (asksConsent)
       detail.append(
         node(
           document,
@@ -423,8 +425,10 @@ export function mountProviderSettings({
     try {
       await providers.saveSettings(provider.id, {
         base_url: inputs.base_url ? inputs.base_url.value.trim() || null : null,
-        workspace_id:
-          inputs.workspace_id?.value.trim() || provider.workspace_id || null,
+        // An emptied field clears the workspace; no field keeps the saved one.
+        workspace_id: inputs.workspace_id
+          ? inputs.workspace_id.value.trim() || null
+          : provider.workspace_id || null,
         chat_completions_models: inputs.chat
           ? inputs.chat.value
               .split(',')
@@ -457,7 +461,26 @@ export function mountProviderSettings({
     if (current === provider.id) renderDetail();
   }
 
+  /** The list, plus a field for a model id the list does not show (a custom
+   * server, a NIM model, or a list that failed). The server validates it. */
   function modelPicker(provider) {
+    const box = pickerList(provider);
+    const typed = node(document, 'input', 'spectre-nc-model-search');
+    typed.placeholder = t('Or type a model id');
+    typed.setAttribute('aria-label', t('Model id'));
+    const manual = node(document, 'div', 'spectre-nc-actions');
+    manual.append(
+      typed,
+      action(document, t('Use this model id'), () => {
+        const id = typed.value.trim();
+        if (id) void choose(provider, id);
+      }),
+    );
+    box.append(manual);
+    return box;
+  }
+
+  function pickerList(provider) {
     const box = node(document, 'div', 'spectre-nc-models');
     box.append(node(document, 'h4', '', t('Models')));
     const state = models.get(provider.id);
@@ -654,13 +677,13 @@ export function mountProviderSettings({
     }
     try {
       await providers.select(provider.id, modelId);
+      await refresh(); // clears the message line, so say it afterwards
       say(
         t('Now using {model} on {provider}.', {
           model: modelId,
           provider: provider.label,
         }),
       );
-      await refresh();
       onSelected();
       return true;
     } catch (error) {

@@ -106,6 +106,18 @@ test('chat status: an API provider is judged by ready/problem, not by Ollama', (
     }),
     { state: 'degraded', detail: 'blocked by local-only mode' },
   );
+  // A :cloud model waiting for consent is not "ok" either.
+  assert.deepEqual(
+    classifyChatStatus({
+      provider: 'ollama',
+      model: 'm:cloud',
+      ollama: { reachable: true },
+      model_present: true,
+      ready: false,
+      problem: 'consent_required',
+    }),
+    { state: 'degraded', detail: 'waiting for consent' },
+  );
 });
 
 test('globe: the basemap in use, or the fallback the map stack took', () => {

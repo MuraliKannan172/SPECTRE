@@ -505,6 +505,23 @@ def test_the_gpu_reading_is_parsed_and_served(client: TestClient, monkeypatch: p
     assert client.get("/api/intel/providers/ollama/gpu", headers={"origin": "http://x"}).status_code == 403
 
 
+def test_a_save_that_keeps_the_address_keeps_the_adapter(client: TestClient) -> None:
+    headers = writer(client)
+    url = "/api/intel/providers/acme/settings"
+    before = client.app.state.providers.get("acme")
+    client.put(
+        url, json={"base_url": "https://api.acme.test/v1", "params": {"temperature": 0.5}}, headers=headers
+    )
+    assert client.app.state.providers.get("acme") is before, "same address: no rebuild, nothing learned lost"
+    client.put(url, json={"base_url": "https://gateway.example.com/v1"}, headers=headers)
+    assert client.app.state.providers.get("acme") is not before
+
+
+def test_status_names_the_provider(client: TestClient) -> None:
+    client.put(SELECTION, json={"provider": "acme", "model": "big-1"}, headers=writer(client))
+    assert client.get(STATUS).json()["provider_label"] == "Acme AI"
+
+
 def test_continue_allows_one_more_budget_and_is_a_gated_write(client: TestClient) -> None:
     url = "/api/intel/providers/budget/continue"
     assert client.post(url, json={}, headers=HEADERS).status_code == 403

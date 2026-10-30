@@ -104,7 +104,10 @@ export function mountProviderControls({
       .snapshot()
       ?.providers.find((p) => p.id === providerId);
     const kind = next?.kind || provider?.kind || 'local';
-    const name = label(providerId);
+    // The status names the provider too, so a reload shows the label at once.
+    const name = settings.snapshot()
+      ? label(providerId)
+      : next?.provider_label || providerId;
     const price = provider ? pricePerMillion(null, provider.params) : null;
     const usage = usageText(next?.usage, price);
     chip.textContent = [kindBadge(kind, name), next?.model, usage]
