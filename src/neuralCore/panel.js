@@ -425,7 +425,13 @@ export function mountNeuralCorePanel({
     const speed = Number.isFinite(done.tokens_per_s)
       ? t('{rate} tokens/s', { rate: done.tokens_per_s })
       : null;
-    entry.meta.textContent = [done.model, speed].filter(Boolean).join(' · ');
+    // A reply that hit the output limit looks finished; say that it is not.
+    const cut = ['length', 'max_tokens'].includes(done.stop_reason)
+      ? t('cut off at the output limit')
+      : null;
+    entry.meta.textContent = [done.model, speed, cut]
+      .filter(Boolean)
+      .join(' · ');
     entry.footer.hidden = false;
     // Only the latest answer can be regenerated.
     for (const node of list.querySelectorAll('.spectre-nc-regenerate'))

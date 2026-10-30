@@ -150,9 +150,18 @@ def test_writes_need_the_session_token_and_json(client: TestClient) -> None:
 
 
 def test_a_browser_request_is_refused_even_for_reading(client: TestClient) -> None:
-    for headers in ({"origin": "http://127.0.0.1:4173"}, {"sec-fetch-site": "cross-site"}):
+    # The proxy forwards neither header, so only a browser talking straight to
+    # the service sends one; an <img> on another localhost port is "same-site".
+    browser = (
+        {"origin": "http://127.0.0.1:4173"},
+        {"sec-fetch-site": "cross-site"},
+        {"sec-fetch-site": "same-site"},
+    )
+    for headers in browser:
         assert client.get("/api/intel/providers", headers=headers).status_code == 403
         assert client.get("/api/intel/providers/session", headers=headers).status_code == 403
+        assert client.get("/api/intel/providers/acme/models", headers=headers).status_code == 403
+    assert client.get("/api/intel/providers", headers={"sec-fetch-site": "none"}).status_code == 200
 
 
 def test_a_key_is_saved_shown_as_configured_and_removed(client: TestClient, memory_keyring: Any) -> None:
@@ -336,7 +345,7 @@ def test_a_canary_key_appears_in_no_artefact(
     assert (tested.json()["ok"], tested.json()["code"]) == (False, "auth_failed")
     assert listed.status_code == 502 and listed.json()["detail"]["code"] == "auth_failed"
     assert events_of(turn.text)[-1][1]["code"] == "auth_failed"
-    assert "Incorrect API key provided: [redacted]" in tested.text
+    assert "The provider rejected the key." in tested.text, "our words, not the echo"
     assert "sent key [redacted]" in caplog.text, "the careless log line ran"
 
     artefacts = {"responses": "\n".join(seen), "logs": caplog.text}

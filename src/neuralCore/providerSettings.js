@@ -251,6 +251,18 @@ export function mountProviderSettings({
       ),
       node(document, 'p', 'spectre-nc-hint', keySourceText(provider.key)),
     );
+    // The service sends a key only to the address it was saved for.
+    if (provider.key.configured && provider.key_reaches_address === false)
+      detail.append(
+        node(
+          document,
+          'p',
+          'spectre-nc-hint',
+          t(
+            'The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.',
+          ),
+        ),
+      );
     const buttons = node(document, 'div', 'spectre-nc-actions');
     if (provider.key.required && provider.key.source !== 'environment')
       buttons.append(
@@ -665,6 +677,13 @@ export function mountProviderSettings({
     const selected = snapshot?.selection?.provider || 'ollama';
     // The model decides: an Ollama provider is local, its :cloud models are not.
     const kind = modelKind || (await kindOf(provider, modelId));
+    // The conversation already goes there only when the same provider is
+    // selected and, for Ollama, the current model is not a local one.
+    const current = snapshot?.selection?.model;
+    const sameDestination =
+      provider.id === selected &&
+      (provider.id !== 'ollama' ||
+        (Boolean(current) && (await kindOf(provider, current)) !== 'local'));
     if (kind !== 'local' && !provider.consent) {
       if (!(await askConsent(provider))) return false;
       try {
@@ -673,11 +692,7 @@ export function mountProviderSettings({
         say(failureText(error));
         return false;
       }
-    } else if (
-      kind !== 'local' &&
-      provider.id !== selected &&
-      historyLength() > 0
-    ) {
+    } else if (kind !== 'local' && !sameDestination && historyLength() > 0) {
       const sure = await confirmDialog({
         document,
         title: t('Send this conversation to {provider}?', {

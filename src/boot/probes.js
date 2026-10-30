@@ -123,6 +123,7 @@ const CHAT_PROBLEMS = Object.freeze({
   no_key: msg('no API key'),
   consent_required: msg('waiting for consent'),
   local_only: msg('blocked by local-only mode'),
+  lan_viewer: msg('cloud models answer on the host only'),
   unknown_provider: msg('provider unavailable'),
 });
 
@@ -142,7 +143,9 @@ export function classifyChatStatus(status) {
   }
   // An Ollama :cloud model (or a remote Ollama) can be blocked or wait for consent.
   if (
-    ['local_only', 'consent_required'].includes(status?.problem) &&
+    ['local_only', 'consent_required', 'lan_viewer'].includes(
+      status?.problem,
+    ) &&
     status?.ollama?.reachable
   )
     return { state: 'degraded', detail: t(CHAT_PROBLEMS[status.problem]) };

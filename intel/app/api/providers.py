@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..chat.probe import probe_tools
 from ..chat.providers.base import ChatProvider, ModelInfo
 from ..chat.providers.errors import ProviderError
-from ..chat.providers.keys import KeyStoreError
+from ..chat.providers.keys import KeyStoreError, host_of, key_reaches
 from ..chat.providers.registry import ProviderSpec, base_url_problem
 from ..chat.providers.sdk import key_may_travel
 from ..store.providers import CONTEXT_CEILING_RANGE, ProviderSettings
@@ -30,7 +30,7 @@ from .chat import _json_body, _same_machine
 router = APIRouter(prefix="/api/intel/providers")
 
 SESSION_HEADER = "x-spectre-session"
-_KEY_ERRORS = {"no_key": 400, "bad_key": 400, "external": 409, "keyring_failed": 503}
+_KEY_ERRORS = {"no_key": 400, "bad_key": 400, "external": 409, "shared_key": 409, "keyring_failed": 503}
 
 
 class KeyBody(BaseModel):
@@ -147,6 +147,10 @@ def _view(state: Any, spec: ProviderSpec) -> dict[str, Any]:
         "params": saved.params,
         "chat_completions_models": list(saved.chat_completions_models),
         "key": state.keys.status(spec).public(),
+        # False when the key was saved for (or comes with) another address: it is not sent here.
+        "key_reaches_address": key_reaches(
+            spec, _base_url(provider, spec), state.provider_store.key_host(spec.id)
+        ),
         "consent": state.provider_store.consented(spec.id),
     }
 
@@ -219,20 +223,26 @@ async def set_policy(body: PolicyBody, request: Request) -> dict[str, Any]:
 async def put_key(provider_id: str, body: KeyBody, request: Request) -> dict[str, Any]:
     state = _writer(request)
     spec = _spec(state, provider_id)
-    if not key_may_travel(_base_url(state.providers.get(spec.id), spec)):
+    address = _base_url(state.providers.get(spec.id), spec)
+    if not key_may_travel(address):
         message = "This server is on plain http on another machine; a key would travel unencrypted"
         raise HTTPException(409, {"code": "key_over_http", "message": message})
     try:
-        return state.keys.set(spec, body.key).public()
+        status = state.keys.set(spec, body.key).public()
     except KeyStoreError as error:
         raise HTTPException(_KEY_ERRORS[error.code], {"code": error.code, "message": str(error)}) from None
+    state.provider_store.set_key_host(spec.id, host_of(address))  # the key goes here and nowhere new
+    return status
 
 
 @router.delete("/{provider_id}/key")
 async def delete_key(provider_id: str, request: Request) -> dict[str, Any]:
     state = _writer(request, body=False)
     try:
-        return state.keys.delete(_spec(state, provider_id)).public()
+        spec = _spec(state, provider_id)
+        status = state.keys.delete(spec).public()
+        state.provider_store.set_key_host(spec.id, None)
+        return status
     except KeyStoreError as error:
         raise HTTPException(_KEY_ERRORS[error.code], {"code": error.code, "message": str(error)}) from None
 
@@ -260,9 +270,15 @@ async def put_settings(provider_id: str, body: SettingsBody, request: Request) -
     saved = ProviderSettings(base_url, body.workspace_id, tuple(body.chat_completions_models), params)
     state.provider_store.save_settings(spec.id, saved)
     target = base_url or spec.base_url
+    before = _base_url(state.providers.get(spec.id), spec)
+    if host_of(target) != host_of(before):
+        # Another host is another recipient: ask for consent again, probe its
+        # models again; a saved key does not follow (keys.key_reaches).
+        state.provider_store.set_consent(spec.id, False)
+        state.provider_store.forget_tools(spec.id)
     # Rebuild only when the address changed: a rebuild drops the adapter's
     # learned reasoning effort and its cached model list.
-    if spec.id != "ollama" and target != _base_url(state.providers.get(spec.id), spec):
+    if spec.id != "ollama" and target != before:
         state.providers.rebuild(spec.id, target)
     return _view(state, spec)
 
@@ -317,6 +333,8 @@ async def probe(provider_id: str, body: ProbeBody, request: Request) -> dict[str
     base_url = _base_url(provider, spec)
     if result:
         state.provider_store.remember_tools(spec.id, base_url, body.model, result)
+    else:  # a text reply proves nothing: a cached "no" must not outlive it
+        state.provider_store.forget_tools(spec.id, base_url, body.model)
     agent = getattr(state, "agent", None)
     if agent is not None:
         agent.forget_unproven(spec.id, base_url, body.model)

@@ -126,9 +126,26 @@ test('the VRAM fit is an estimate and says so', () => {
 test('usage and budget lines', () => {
   assert.equal(usageText({ input: 0, output: 0 }), null);
   assert.equal(usageText({ input: 1200, output: 300 }), '1.5K tokens');
+  const priced = { input: 1_000_000, output: 0 };
   assert.equal(
-    usageText({ input: 1_000_000, output: 0 }, { input: 3, output: 15 }),
+    usageText(
+      { input: 1_000_000, output: 0, priced },
+      { input: 3, output: 15 },
+    ),
     '1,000K tokens · $3',
+  );
+  // Local tokens from earlier in the conversation are counted, never priced.
+  assert.equal(
+    usageText(
+      { input: 3_000_000, output: 0, priced },
+      { input: 3, output: 15 },
+    ),
+    '3,000K tokens · $3',
+  );
+  assert.equal(
+    usageText({ input: 5, output: 5 }, { input: 3, output: 15 }),
+    '10 tokens',
+    'an older service sends no priced share: no cost rather than a wrong one',
   );
   assert.match(
     budgetText({ spent: 100500, allowance: 100000, budget: 100000 }),

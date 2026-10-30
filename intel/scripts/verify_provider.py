@@ -323,7 +323,9 @@ def main(argv: list[str] | None = None) -> int:
     install_log_redaction()
 
     def out(line: str) -> None:
-        print(redact(line), flush=True)
+        # Model ids and replies come from the provider: no escape codes reach the terminal.
+        printable = "".join(ch if ch.isprintable() else "?" for ch in line)
+        print(redact(printable), flush=True)
 
     environ = dict(os.environ)
     return asyncio.run(

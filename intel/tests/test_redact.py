@@ -67,6 +67,32 @@ def test_a_known_value_without_a_key_shape_is_masked_once_registered() -> None:
 def test_provider_errors_never_carry_a_key() -> None:
     error = ProviderError(errors.AUTH_FAILED, f"Incorrect API key provided: {CANARY}", detail=CANARY)
     assert CANARY not in str(error) and CANARY not in error.detail
+    other = ProviderError(errors.RATE_LIMITED, f"slow down {CANARY}", detail=CANARY)
+    assert CANARY not in str(other) and CANARY not in other.detail
+
+
+@pytest.mark.parametrize(
+    "echo",
+    [
+        "Incorrect API key provided: sk-proj-****…abcd.",
+        "Incorrect API key provided: sk-abc***wxyz",
+        "invalid key nvapi-ab**cdef",
+        "key sk-ant-api03-****AbCd rejected",
+        "Incorrect API key provided: ****************_6AA",
+    ],
+)
+def test_masked_key_echoes_lose_prefix_and_suffix(echo: str) -> None:
+    out = redact(echo)
+    assert MASK in out
+    for piece in ("abcd", "wxyz", "cdef", "AbCd", "_6AA", "sk-", "nvapi-"):
+        assert piece not in out
+
+
+def test_a_rejected_key_error_says_only_our_words() -> None:
+    error = ProviderError(
+        errors.AUTH_FAILED, "Incorrect API key provided: sk-pr****xy9", detail="invalid_api_key"
+    )
+    assert (str(error), error.detail) == (errors.AUTH_MESSAGE, "")
 
 
 def test_log_output_is_redacted_including_tracebacks() -> None:

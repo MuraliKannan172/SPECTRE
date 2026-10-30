@@ -166,6 +166,16 @@ class ChatStore:
             ).fetchone()
         return {"input": int(row[0]), "output": int(row[1]), "cloud": int(row[2])}
 
+    def usage_for(self, conversation_id: int, provider_id: str, model: str) -> dict[str, int]:
+        """The tokens one provider and model used here: the ones its price applies to."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0) FROM usage"
+                " WHERE conversation_id = ? AND provider_id = ? AND model = ?",
+                (conversation_id, provider_id, model),
+            ).fetchone()
+        return {"input": int(row[0]), "output": int(row[1])}
+
     def budget_extra(self, conversation_id: int) -> int:
         with self._lock:
             row = self._conn.execute(
@@ -205,9 +215,12 @@ class ChatStore:
             return str(row[1])
 
     def clear(self) -> None:
+        """Every conversation and what it counted: conversation ids are reused
+        after a clear, so usage left behind would land on the next one."""
         with self._lock:
             self._conn.execute("DELETE FROM messages")
             self._conn.execute("DELETE FROM conversations")
+            self._conn.execute("DELETE FROM usage")
 
     def log_tool(
         self,

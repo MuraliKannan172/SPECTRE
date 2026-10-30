@@ -811,6 +811,57 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
   1,048,576 tokens, default 16,384). The API budgets scale with min(window, ceiling) / 16,384
   and the input limit is min(ceiling - 4,096, window - max output); the default reproduces P5
   exactly. Ollama still follows `num_ctx`. Added after P5, with the follow-ups below.
+
+**After P5: fixes from a code and a security review of `2141700a..392da429`:**
+
+- **Usage is recorded however a turn ends.** It is also recorded when Stop or a closed tab
+  ends the turn (the generator is closed at a yield), so the budget and the chip count every
+  billed round.
+- **A reply over 60,000 characters in one round is cut off.** Its stream is closed and it is
+  marked `length`; the panel says "cut off at the output limit" for `length` or `max_tokens`.
+- **The tool probe caches `no` only for a refusal that names tools or functions.** Any other
+  `unsupported_feature` (another 400, NIM 202, moderation) is the turn's error. A Test tool
+  calling that proves nothing clears a cached `no` for that model. Fallback call ids are unique
+  per round.
+- **LAN viewers never run a cloud model.** The proxy marks chat requests from another machine
+  (`X-Spectre-Viewer: lan`, never copied from the client). The agent refuses a cloud model for
+  them as `lan_viewer` before any call, and their status shows `lan_viewer` instead of key or
+  consent state. This closes a LAN viewer spending the owner's key through new conversations,
+  which the per-conversation budget did not stop.
+- **A stored key is sent only to its provider's own host, or the host it was saved for in the
+  app.** A changed base URL gets no key until the key is saved again there. A host change also
+  revokes consent and clears the tool cache. `GET /providers` shows `key_reaches_address`. A key
+  from the environment or `.env` goes only to the provider's own host.
+- **A rejected key's error text is ours** ("The provider rejected the key."), never the
+  provider's, which echoes keys masked (`sk-proj-****…abcd`). Redaction also removes masked
+  forms.
+- **The service refuses any `Sec-Fetch-Site` except `none`.** The proxy forwards none, so only
+  a page reaching the service directly sends one (an `<img>` on another localhost port is
+  `same-site`).
+- **Without a keyring, a chat key never rewrites `OPENAI_API_KEY` in `.env`,** which voice
+  also uses (`shared_key`, 409).
+- **Smaller fixes:**
+  - Clearing history clears its usage rows (conversation ids are reused).
+  - Reasoning state replays only to the model that wrote it.
+  - Replayed state counts toward the context estimate.
+  - With the map switch off, globe-tool results lose observer and camera fields.
+  - An Ollama `:cloud` or `-cloud` tag is cloud even without `remote_host`.
+  - The chat gate is released when a turn fails before it streams.
+  - The proxy waits 120 s, not 15 s, for model lists, tests and probes.
+  - The chip prices only the current model's tokens (`usage.priced`).
+  - Switching from a local Ollama model to a `:cloud` one asks before sending the history.
+  - `verify_provider.py` prints no control characters.
+- **Not changed, with the reason:**
+  - The API client keeps honouring proxy settings from the environment (corporate proxies).
+  - `ANTHROPIC_CUSTOM_HEADERS` is the user's own Anthropic configuration.
+  - The session token is a CSRF control on a single-user machine, not an authenticator against
+    other local accounts.
+  - The `.env` fallback sets no Windows ACL.
+  - The proxy's Host check stays with the upstream allowlist.
+  - Local-only mode blocks cloud models only (a server on your network asks for consent).
+  - Adapters cap no tool-argument size.
+  - The probe's own tokens are not recorded.
+  - The degraded mode's round trip on Anthropic is unverified until a live run.
 - **No cloud provider has run live.** `docs/VERIFY_PROVIDERS.md` lists what each needs.
 - **Docs:**
   - `docs/KEYS_AND_COSTS.md`, including the warning not to put `ANTHROPIC_API_KEY` in the global

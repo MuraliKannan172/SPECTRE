@@ -20,6 +20,10 @@ MASK = "[redacted]"
 MIN_KNOWN_LENGTH = 8
 
 _PATTERNS = (
+    # A key a provider echoes masked ("sk-proj-****…abcd", "nvapi-ab**cdef") still
+    # shows a prefix and suffix: all of it goes.
+    re.compile(r"\b(?:sk-ant|sk|nvapi)-[A-Za-z0-9_\-*.…]*[*…][A-Za-z0-9_\-*.…]*"),
+    re.compile(r"[A-Za-z0-9_\-]*\*{3,}[A-Za-z0-9_\-*.…]*"),
     re.compile(r"\b(?:sk-ant|sk|nvapi)-[A-Za-z0-9_\-]{6,}"),
     re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=\-]{6,}"),
     re.compile(r"(?i)(\b(?:x-)?api[_-]?key[\"']?\s*[:=]\s*[\"']?)[^\s\"',;&]{6,}"),

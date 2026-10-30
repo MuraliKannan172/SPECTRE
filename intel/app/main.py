@@ -32,9 +32,15 @@ from .api.routes import router
 from .api.voice import router as voice_router
 from .chat.agent import Agent
 from .chat.providers.catalog import api_factories
-from .chat.providers.keys import KeyStore
+from .chat.providers.keys import KeyStore, key_reaches
 from .chat.providers.registry import DEFAULT_PATH as PROVIDERS_FILE
-from .chat.providers.registry import Factory, ProviderConfigError, ProviderSet, default_providers
+from .chat.providers.registry import (
+    Factory,
+    ProviderConfigError,
+    ProviderSet,
+    ProviderSpec,
+    default_providers,
+)
 from .chat.providers.sdk import TIMEOUT as SDK_TIMEOUT
 from .chat.tools import ToolRegistry
 from .config import BRAND_NAME, DEFAULT_DB, DEFAULT_LOGS, Settings, load_settings
@@ -79,12 +85,19 @@ def load_providers(
         ),
         **(extra or {}),
     }
+
+    def key_for(spec: ProviderSpec) -> str | None:
+        # Read at request time, so a later key or base URL change applies at once.
+        key = keys.get(spec)
+        address = store.settings(spec.id).base_url or spec.base_url
+        return key if key is None or key_reaches(spec, address, store.key_host(spec.id)) else None
+
     try:
         providers = default_providers(
             ollama_http=ollama_http,
             ollama_host=ollama_host,
             path=path,
-            key_for=keys.get,
+            key_for=key_for,
             factories=factories,
         )
         for spec_id in providers.specs:

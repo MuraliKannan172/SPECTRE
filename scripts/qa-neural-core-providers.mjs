@@ -113,7 +113,12 @@ function status() {
     kind: cloud ? 'cloud' : 'local',
     ready: problem === null,
     problem,
-    usage: { input: 1200, output: 300, cloud: cloud ? 1500 : 0 },
+    usage: {
+      input: 1200,
+      output: 300,
+      cloud: cloud ? 1500 : 0,
+      priced: { input: 1200, output: 300 },
+    },
     budget: { spent: 0, allowance: 100000, budget: 100000 },
     num_ctx: 16384,
     low_resource: false,

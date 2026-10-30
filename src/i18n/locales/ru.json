@@ -3279,5 +3279,9 @@
   "Or type a model id": "Или введите ID модели",
   "Model id": "ID модели",
   "Use this model id": "Использовать этот ID",
-  "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "Предел контекста для моделей API, в токенах (по умолчанию 16384; больше — больше истории и веб-текста, всё оплачивается)"
+  "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "Предел контекста для моделей API, в токенах (по умолчанию 16384; больше — больше истории и веб-текста, всё оплачивается)",
+  "Cloud models answer only on the computer running SPECTRE.": "Облачные модели отвечают только на компьютере, где запущен SPECTRE.",
+  "cloud models answer on the host only": "облачные модели отвечают только на основном компьютере",
+  "cut off at the output limit": "обрезано на пределе вывода",
+  "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "Ключ сохранён для другого адреса, поэтому сюда он не отправляется. Сохраните его снова в POWER UP, чтобы использовать здесь."
 }

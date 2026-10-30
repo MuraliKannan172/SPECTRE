@@ -26,6 +26,7 @@ import math
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
@@ -69,6 +70,7 @@ MAX_TOOL_ROUNDS = 4
 BASE_WINDOW = 16384
 CLIENT_TOOL_TIMEOUT = 15.0
 MAX_CLIENT_RESULT_CHARS = 4000
+MAX_ROUND_CHARS = 60_000  # one round's reply; far above any real answer
 INFO_TOOLS = frozenset({"news_search", "news_near", "web_search", "fetch_page"})
 # Said after the untrusted block, so it reads as ours, not the source's.
 CITE_HINT = "\nCite each fact you use from these sources with its number, like [1]."
@@ -86,6 +88,9 @@ class Turn:
     turn_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     provider_id: str | None = None  # the stored selection; None is the default Ollama model
     model: str | None = None
+    # A viewer on another machine (SPECTRE_CHAT_ALLOW_LAN), as the proxy marks it:
+    # it may chat with local models but never spend the owner's cloud key.
+    lan: bool = False
 
 
 @dataclass(frozen=True)
@@ -233,7 +238,7 @@ class Agent:
         """After "Test tool calling", the cached answer decides, not this run's memory."""
         self._unproven.discard((provider_id, base_url, model))
 
-    def _egress_refusal(self, provider: ChatProvider, kind: str) -> dict[str, Any] | None:
+    def _egress_refusal(self, provider: ChatProvider, kind: str, lan: bool = False) -> dict[str, Any] | None:
         """ADR-002 D6: local-only mode blocks every cloud model, Ollama's
         :cloud ones included, and every non-local model needs consent first,
         a server on your network and Ollama's :cloud models too (the panel
@@ -241,6 +246,10 @@ class Agent:
         on the model's (an Ollama provider is local, its :cloud models are not)."""
         if kind == "local":
             return None
+        if kind == "cloud" and lan:
+            return _refusal(
+                "lan_viewer", "Cloud models answer only on the computer running SPECTRE.", provider
+            )
         if kind == "cloud" and self.local_only():
             return _refusal("local_only", "Local-only mode is on, so cloud models are blocked.", provider)
         if not self.consented(provider.id):
@@ -261,14 +270,14 @@ class Agent:
                 "retryable": False,
             }
         model = turn.model or self.settings.ollama_model
-        refusal = self._egress_refusal(provider, provider.kind)
+        refusal = self._egress_refusal(provider, provider.kind, turn.lan)
         if refusal:
             return refusal
         try:
             info = await provider.model_caps(model)
         except ProviderError as error:
             return _error_event(error)
-        refusal = self._egress_refusal(provider, info.kind)
+        refusal = self._egress_refusal(provider, info.kind, turn.lan)
         if refusal:
             return refusal
         params = self.params_for(provider.id)
@@ -320,7 +329,9 @@ class Agent:
     def _now_local(self) -> str:
         return dt.datetime.fromtimestamp(self.clock()).astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
-    def _history(self, history: list[dict[str, Any]], tokens: int, density: float) -> list[Message]:
+    def _history(
+        self, history: list[dict[str, Any]], tokens: int, density: float, model: str
+    ) -> list[Message]:
         budget = int(tokens * density)
         kept: list[Message] = []
         for message in reversed(history):
@@ -336,7 +347,9 @@ class Agent:
                     content,
                     provider_id=message.get("provider_id"),
                     model=message.get("model"),
-                    provider_state=message.get("provider_state"),
+                    # Reasoning state is tied to the model that wrote it (signatures,
+                    # encrypted items): another model of the same provider gets none.
+                    provider_state=message.get("provider_state") if message.get("model") == model else None,
                 )
             )
         while kept and kept[-1].role != "user":  # an answer whose question did not fit
@@ -399,7 +412,7 @@ class Agent:
             system += _fallback_instructions(self.registry)
         messages: list[Message] = [
             Message("system", system),
-            *self._history(turn.history, plan.budgets["history"], plan.chars_per_token),
+            *self._history(turn.history, plan.budgets["history"], plan.chars_per_token, plan.model),
             Message("user", turn.message),
         ]
         limit = int(plan.input_limit * plan.chars_per_token)
@@ -418,6 +431,7 @@ class Agent:
         stop = "stop"
         rounds = 0
         provider = plan.provider
+        failure: ProviderError | None = None
         try:
             for rounds in range(1, MAX_TOOL_ROUNDS + 2):
                 allow_tools = rounds <= MAX_TOOL_ROUNDS
@@ -430,27 +444,31 @@ class Agent:
                 events = stream_with_retries(
                     functools.partial(provider.stream, request), attempts=provider.max_attempts
                 )
-                async for event in events:
-                    if isinstance(event, TextDelta):
-                        piece = think.feed(event.text)
-                        if piece:
-                            content += piece
-                            if native:
-                                yield "token", {"text": piece}
-                    elif isinstance(event, ToolCallEvent):
-                        calls.append(event.call)
-                    elif isinstance(event, Usage):
-                        usage = event
-                        spent[0] += event.input
-                        spent[1] += event.output
-                        density = chars_per_token(sent, event.input)
-                        if density:
-                            self._density[(provider.id, plan.model)] = density
-                    elif isinstance(event, Done):
-                        provider_state = event.provider_state
-                        stop = event.stop_reason
+                async with aclosing(events):
+                    async for event in events:
+                        if isinstance(event, TextDelta):
+                            piece = think.feed(event.text)
+                            if piece:
+                                content += piece
+                                if native:
+                                    yield "token", {"text": piece}
+                            if len(content) > MAX_ROUND_CHARS:  # a runaway reply: stop paying for it
+                                stop = "length"
+                                break
+                        elif isinstance(event, ToolCallEvent):
+                            calls.append(event.call)
+                        elif isinstance(event, Usage):
+                            usage = event
+                            spent[0] += event.input
+                            spent[1] += event.output
+                            density = chars_per_token(sent, event.input)
+                            if density:
+                                self._density[(provider.id, plan.model)] = density
+                        elif isinstance(event, Done):
+                            provider_state = event.provider_state
+                            stop = event.stop_reason
                 if not native:
-                    content, calls = _parse_fallback(content)
+                    content, calls = _parse_fallback(content, rounds)
                     if content:
                         yield "token", {"text": content}
                 answer.append(content)
@@ -475,10 +493,14 @@ class Agent:
                             yield kind, data
                     messages.append(Message("tool", result, tool_call_id=call.id, name=call.name))
         except ProviderError as error:
-            self._record_usage(turn, plan, spent)  # rounds before the failure were billed
-            yield "error", _error_event(error)
+            failure = error
+        finally:
+            # Every billed round counts, also when the turn failed, was stopped or
+            # the browser went away (the generator is closed at a yield).
+            self._record_usage(turn, plan, spent)
+        if failure is not None:
+            yield "error", _error_event(failure)
             return
-        self._record_usage(turn, plan, spent)
         text = "".join(answer).strip()
         eval_count = usage.output
         eval_seconds = usage.output_seconds or 0
@@ -544,7 +566,7 @@ class Agent:
             yield "tool_status", {"tool": name, "state": "error", "code": "invalid_arguments"}
         elif check.kind == "client":
             text, status = "", "ok"
-            async for event in self._client_tool(name, args, turn):
+            async for event in self._client_tool(name, args, turn, state.get("map_shared", True)):
                 if event[0] == "result":
                     text, status = event[1]["text"], event[1]["status"]
                 else:
@@ -572,7 +594,9 @@ class Agent:
         )
         yield "result", {"text": text}
 
-    async def _client_tool(self, name: str, args: dict[str, Any], turn: Turn) -> AsyncIterator[Event]:
+    async def _client_tool(
+        self, name: str, args: dict[str, Any], turn: Turn, map_shared: bool = True
+    ) -> AsyncIterator[Event]:
         call_id = uuid.uuid4().hex[:12]
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         self._pending[(turn.turn_id, call_id)] = future
@@ -587,9 +611,10 @@ class Agent:
         finally:
             self._pending.pop((turn.turn_id, call_id), None)
         ok = bool(payload.get("ok"))
-        body = json.dumps(
-            payload.get("result") if ok else {"error": payload.get("error")}, ensure_ascii=False
-        )
+        result = payload.get("result") if ok else {"error": payload.get("error")}
+        if not map_shared:  # the map switch covers the camera a globe tool reports
+            result = _without_view(result)
+        body = json.dumps(result, ensure_ascii=False)
         yield "tool_status", {"tool": name, "state": "done" if ok else "error"}
         text = wrap_untrusted(f"globe:{name}", body[:MAX_CLIENT_RESULT_CHARS])
         yield "result", {"text": text if ok else f"error: {body[:500]}", "status": "ok" if ok else "failed"}
@@ -726,7 +751,20 @@ def _fallback_instructions(registry: ToolRegistry) -> str:
     )
 
 
-def _parse_fallback(content: str) -> tuple[str, list[ToolCall]]:
+VIEW_KEYS = frozenset({"observer", "camera", "viewport", "view", "cameraPosition"})
+
+
+def _without_view(value: Any) -> Any:
+    """A globe-tool result without the camera or observer position, which
+    some tools fall back to when no place was given (D6 map switch)."""
+    if isinstance(value, dict):
+        return {k: _without_view(v) for k, v in value.items() if k not in VIEW_KEYS}
+    if isinstance(value, list):
+        return [_without_view(v) for v in value]
+    return value
+
+
+def _parse_fallback(content: str, round_number: int = 0) -> tuple[str, list[ToolCall]]:
     try:
         data = json.loads(content.strip())
     except ValueError:
@@ -735,5 +773,6 @@ def _parse_fallback(content: str) -> tuple[str, list[ToolCall]]:
         return content, []
     tool = data.get("tool")
     if tool and tool != "none":
-        return "", [ToolCall(id="call_0", name=str(tool), args=normalize_args(data.get("arguments") or {}))]
+        call_id = f"call_{round_number}"  # unique per round: providers pair results by id
+        return "", [ToolCall(id=call_id, name=str(tool), args=normalize_args(data.get("arguments") or {}))]
     return str(data.get("answer") or ""), []

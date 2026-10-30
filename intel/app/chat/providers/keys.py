@@ -23,6 +23,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from keyring.backend import KeyringBackend
 from keyring.backends import fail, null
@@ -35,6 +36,8 @@ from .registry import ProviderSpec
 log = logging.getLogger("spectre.intel.keys")
 
 SERVICE = "SPECTRE Neural Core"
+# .env names another feature reads too: a chat key never rewrites them (voice uses this one).
+SHARED_ENV = frozenset({"OPENAI_API_KEY"})
 Source = Literal["environment", "keyring", "env_file"]
 # Every provider's documented key format fits; unquoted in .env, no comment marker.
 _VALUE = re.compile(r"^[A-Za-z0-9._~+/=:-]{8,512}$")
@@ -69,6 +72,17 @@ class KeyStatus:
             "env": list(self.env),
             "writable": self.writable,
         }
+
+
+def host_of(url: str) -> str:
+    return (urlsplit(url).hostname or "").lower()
+
+
+def key_reaches(spec: ProviderSpec, url: str, saved_for: str | None) -> bool:
+    """A stored key goes to its provider's own host, or to the host it was
+    saved for in the app. A base URL changed afterwards gets no key until the
+    key is saved again there, so a settings write alone cannot redirect it."""
+    return host_of(url) in {host_of(spec.base_url), saved_for}
 
 
 def usable_backend(backend: KeyringBackend | None) -> KeyringBackend | None:
@@ -145,6 +159,8 @@ class KeyStore:
         if not _VALUE.match(value):
             raise KeyStoreError("bad_key", "an API key is 8 to 512 characters with no spaces")
         register(value)
+        if self._backend is None:
+            self._refuse_shared(spec)
         if self._backend is not None:
             try:
                 self._backend.set_password(SERVICE, spec.id, value)
@@ -168,8 +184,16 @@ class KeyStore:
             except KeyringError as error:
                 raise KeyStoreError("keyring_failed", "the OS keyring refused the change") from error
         else:
+            self._refuse_shared(spec)
             _upsert_env(self._env_file, spec.key_env[0], None)
         return self.status(spec)
+
+    def _refuse_shared(self, spec: ProviderSpec) -> None:
+        """Without a keyring a chat key lives in .env, where some names belong to
+        another feature too (OPENAI_API_KEY is also voice's): never change those."""
+        if spec.key_env[0] in SHARED_ENV:
+            message = f"{spec.key_env[0]} in .env is also the voice key; with no OS keyring, change it there"
+            raise KeyStoreError("shared_key", message)
 
 
 def _upsert_env(path: Path, name: str, value: str | None) -> None:

@@ -27,6 +27,8 @@ from ..chat.ollama import OllamaError
 from ..chat.providers.errors import ProviderError
 
 router = APIRouter(prefix="/api/intel/chat")
+# Set by the app's proxy on chat requests from another machine (server/providers/intel.js).
+LAN_HEADER = "x-spectre-viewer"
 
 MAX_CONTEXT_BYTES = 8 * 1024
 MAX_RESULT_BYTES = 32 * 1024
@@ -93,7 +95,11 @@ class ChatGate:
 
 
 def _same_machine(request: Request) -> None:
-    if request.headers.get("origin") is not None or request.headers.get("sec-fetch-site") == "cross-site":
+    """The proxy forwards neither Origin nor Sec-Fetch-Site, so either one means
+    a browser page reached the service directly; only a typed URL ("none") is
+    let through."""
+    fetch_site = request.headers.get("sec-fetch-site")
+    if request.headers.get("origin") is not None or fetch_site not in (None, "none"):
         raise HTTPException(403, {"code": "cross_origin"})
 
 
@@ -120,6 +126,33 @@ def _services(request: Request) -> Any:
     return state
 
 
+def _prepare_turn(state: Any, body: ChatRequest, request: Request, turn_id: str) -> Turn:
+    """The conversation, history and selection for one turn, with the question
+    saved. The caller releases the gate when this fails."""
+    chats = state.chats
+    # No id continues the current conversation (the one the panel shows).
+    conversation = chats.ensure_conversation(body.conversation_id or chats.current_conversation())
+    if body.regenerate:
+        message = chats.drop_last_answer(conversation)
+        if message is None:
+            raise HTTPException(422, {"code": "nothing_to_regenerate"})
+    else:
+        message = body.message.strip()
+    history = chats.history(conversation)
+    # The provider and model come only from the stored selection, which only
+    # the gated /providers/selection route changes (ADR-002 D5).
+    store = getattr(state, "provider_store", None)
+    chosen = chats.selection(conversation) or (store.last_selection() if store else None)
+    turn = Turn(conversation, message, body.viewport, body.layer_state, history, turn_id=turn_id)
+    if chosen:
+        turn.provider_id, turn.model = chosen
+    # The proxy marks a viewer on another machine and never forwards a client's
+    # own copy of the header: such a viewer never runs a cloud model.
+    turn.lan = request.headers.get(LAN_HEADER) == "lan"
+    chats.add_message(conversation, "user", message)
+    return turn
+
+
 @router.post("")
 async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
     _json_body(request)
@@ -131,26 +164,11 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
         raise HTTPException(422, {"code": "empty_message"})
     turn_id = uuid.uuid4().hex
     gate.claim(turn_id)  # busy and rate checks come before anything changes
-    chats = state.chats
-    # No id continues the current conversation (the one the panel shows).
-    conversation = chats.ensure_conversation(body.conversation_id or chats.current_conversation())
-    if body.regenerate:
-        message = chats.drop_last_answer(conversation)
-        if message is None:
-            gate.release(turn_id)
-            raise HTTPException(422, {"code": "nothing_to_regenerate"})
-    else:
-        message = body.message.strip()
-    history = chats.history(conversation)
-    # The provider and model come only from the stored selection, which only
-    # the gated /providers/selection route changes: a LAN viewer can chat but
-    # never switch to a provider that spends the owner's key (ADR-002 D5).
-    store = getattr(state, "provider_store", None)
-    chosen = chats.selection(conversation) or (store.last_selection() if store else None)
-    turn = Turn(conversation, message, body.viewport, body.layer_state, history, turn_id=turn_id)
-    if chosen:
-        turn.provider_id, turn.model = chosen
-    chats.add_message(conversation, "user", message)
+    try:
+        turn = _prepare_turn(state, body, request, turn_id)
+    except BaseException:
+        gate.release(turn_id)  # nothing streams yet, so stream() would never release it
+        raise
 
     async def stream() -> AsyncIterator[str]:
         events = state.agent.run(turn)
@@ -249,12 +267,18 @@ async def status(request: Request) -> dict[str, Any]:
         "tools": None,
         "loaded": None,
     }
+    if result["usage"] is not None and conversation is not None:
+        # A price applies to its own model's tokens only, never to free local ones.
+        result["usage"]["priced"] = chats.usage_for(conversation, provider_id, model)
     agent = getattr(state, "agent", None)
     if agent is None:
         result["problem"] = "chat_unavailable"
         return result
     if provider_id != "ollama":
         result.update(_api_readiness(state, provider_id, policy))
+        if request.headers.get(LAN_HEADER) == "lan" and result["kind"] == "cloud":
+            # Never key or consent state to another machine, and never a cloud turn.
+            result.update(ready=False, problem="lan_viewer")
         return result
     try:
         result["ollama"] = {"reachable": True, "version": await agent.ollama.version()}
@@ -286,6 +310,8 @@ async def status(request: Request) -> dict[str, Any]:
         result["problem"] = (
             "ollama_model_missing" if result["model_present"] is False else "model_check_failed"
         )
+    elif result["kind"] == "cloud" and request.headers.get(LAN_HEADER) == "lan":
+        result["problem"] = "lan_viewer"
     elif result["kind"] == "cloud" and policy and policy.local_only:
         result["problem"] = "local_only"
     elif result["kind"] in ("cloud", "remote") and store and not store.consented("ollama"):
