@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
-from ..config import FULL_BUDGETS, Settings
+from ..config import FULL_BUDGETS, Settings, budgets_for
 from ..schema import iso
 from ..store.chat import ChatStore
 from ..store.news import NewsQuery, NewsStore
@@ -38,7 +38,7 @@ from ..web.fetch import FetchError, PageFetcher
 from ..web.guard import BlockedURL
 from ..web.search import SearchError, SearchService
 from .ollama import OllamaClient
-from .policy import REFUSAL, person_lookup, system_prompt, wrap_untrusted
+from .policy import MAP_WITHHELD, REFUSAL, person_lookup, system_prompt, wrap_untrusted
 from .probe import probe_tools
 from .providers.base import (
     ChatProvider,
@@ -88,6 +88,8 @@ class Plan:
     model: str
     native: bool
     budgets: dict[str, int]
+    kind: str = "local"  # the model's: decides consent, the map switch and the budget
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 def api_budgets(window: int | None) -> dict[str, int]:
@@ -162,8 +164,14 @@ class Agent:
         providers: Callable[[str], ChatProvider | None] = lambda provider_id: None,
         known_tools: Callable[[str, str, str], str | None] = lambda provider_id, base_url, model: None,
         remember_tools: Callable[[str, str, str, str], None] = lambda provider_id, base_url, model, s: None,
+        map_context: Callable[[], bool] = lambda: True,
+        session_budget: Callable[[], int] = lambda: 0,
+        params_for: Callable[[str], dict[str, Any]] = lambda provider_id: {},
     ) -> None:
         self.settings = settings
+        self.map_context = map_context
+        self.session_budget = session_budget
+        self.params_for = params_for
         # The status route and the eval still read Ollama directly.
         self.ollama = ollama
         self.provider = provider or OllamaProvider(ollama)
@@ -199,6 +207,10 @@ class Agent:
         """Local-only mode is on and the provider itself is a cloud API, so no
         call may reach it, not even a capability lookup carrying the key."""
         return self.provider.kind == "cloud" and self.local_only()
+
+    def forget_unproven(self, provider_id: str, base_url: str, model: str) -> None:
+        """After "Test tool calling", the cached answer decides, not this run's memory."""
+        self._unproven.discard((provider_id, base_url, model))
 
     def _egress_refusal(self, provider: ChatProvider, kind: str) -> dict[str, Any] | None:
         """ADR-002 D6: local-only mode blocks every cloud model, Ollama's
@@ -239,8 +251,10 @@ class Agent:
         refusal = self._egress_refusal(provider, info.kind)
         if refusal:
             return refusal
+        params = self.params_for(provider.id)
         if provider.id == "ollama":
-            return Plan(provider, model, "tools" in info.capabilities, self.settings.budgets)
+            budgets = budgets_for(int(params.get("num_ctx") or self.settings.num_ctx))
+            return Plan(provider, model, "tools" in info.capabilities, budgets, info.kind, params)
         support = info.supports_tools
         if support == "unknown":
             base_url = str(getattr(provider, "base_url", ""))
@@ -258,7 +272,7 @@ class Agent:
                     # cache row, and no second probe while the service runs (D10).
                     self._unproven.add(key)
                 support = probed or "yes"
-        return Plan(provider, model, support == "yes", api_budgets(info.context_window))
+        return Plan(provider, model, support == "yes", api_budgets(info.context_window), info.kind, params)
 
     # -- the turn --------------------------------------------------------------
 
@@ -287,24 +301,26 @@ class Agent:
         return list(reversed(kept))
 
     def _request(
-        self, messages: list[Message], model: str, *, native: bool, allow_tools: bool
+        self, messages: list[Message], plan: Plan, *, native: bool, allow_tools: bool
     ) -> ChatRequest:
         """One round's request. A native model always gets the tool list; the
         last round asks for an answer with tool_choice "none" (the adapter
         decides how its API takes that). A model without native tools gets
         the JSON fallback format instead, except in the last round."""
+        params = {
+            "think": self.settings.ollama_think,
+            "keep_alive": self.settings.ollama_keep_alive,
+            "num_ctx": self.settings.num_ctx,
+            "temperature": 0.2,
+            **plan.params,  # the user's per-provider settings (P4), validated by the API
+        }
         return ChatRequest(
-            model=model,
+            model=plan.model,
             messages=tuple(messages),
             tools=tuple(self.registry.all_tools) if native else (),
             tool_choice="auto" if allow_tools else "none",
             json_schema=FALLBACK_FORMAT if allow_tools and not native else None,
-            params={
-                "think": self.settings.ollama_think,
-                "keep_alive": self.settings.ollama_keep_alive,
-                "num_ctx": self.settings.num_ctx,
-                "temperature": 0.2,
-            },
+            params=params,
         )
 
     async def run(self, turn: Turn) -> AsyncIterator[Event]:
@@ -323,9 +339,18 @@ class Agent:
         if not isinstance(plan, Plan):
             yield "error", plan
             return
+        over = self._over_budget(turn, plan)
+        if over:
+            yield "budget", over
+            return
         native = plan.native
+        # The map switch (D6): a non-local model gets the viewport and layers only when allowed.
+        map_shared = plan.kind == "local" or self.map_context()
         system = system_prompt(
-            now_local=self._now_local(), viewport=turn.viewport, layer_state=turn.layer_state
+            now_local=self._now_local(),
+            viewport=turn.viewport,
+            layer_state=turn.layer_state,
+            map_shared=map_shared,
         )
         if not native:
             system += _fallback_instructions(self.registry)
@@ -335,9 +360,15 @@ class Agent:
             Message("user", turn.message),
         ]
         sources = Sources()
-        state: dict[str, Any] = {"web_chars": 0, "info": False, "budgets": plan.budgets}
+        state: dict[str, Any] = {
+            "web_chars": 0,
+            "info": False,
+            "budgets": plan.budgets,
+            "map_shared": map_shared,
+        }
         answer: list[str] = []
         usage = Usage(0, 0)
+        spent = [0, 0]  # every round is billed, not just the last
         stop = "stop"
         rounds = 0
         provider = plan.provider
@@ -347,7 +378,7 @@ class Agent:
                 think = ThinkFilter()
                 content, calls = "", []
                 provider_state: dict[str, Any] | None = None
-                request = self._request(messages, plan.model, native=native, allow_tools=allow_tools)
+                request = self._request(messages, plan, native=native, allow_tools=allow_tools)
                 events = stream_with_retries(
                     functools.partial(provider.stream, request), attempts=provider.max_attempts
                 )
@@ -362,6 +393,8 @@ class Agent:
                         calls.append(event.call)
                     elif isinstance(event, Usage):
                         usage = event
+                        spent[0] += event.input
+                        spent[1] += event.output
                     elif isinstance(event, Done):
                         provider_state = event.provider_state
                         stop = event.stop_reason
@@ -391,8 +424,10 @@ class Agent:
                             yield kind, data
                     messages.append(Message("tool", result, tool_call_id=call.id, name=call.name))
         except ProviderError as error:
+            self._record_usage(turn, plan, spent)  # rounds before the failure were billed
             yield "error", _error_event(error)
             return
+        self._record_usage(turn, plan, spent)
         text = "".join(answer).strip()
         eval_count = usage.output
         eval_seconds = usage.output_seconds or 0
@@ -400,7 +435,7 @@ class Agent:
         done = {
             "model": plan.model,
             "provider": provider.id,
-            "usage": {"input": usage.input, "output": usage.output},
+            "usage": {"input": spent[0], "output": spent[1]},
             "stop_reason": stop,
             "eval_count": eval_count,
             "prompt_eval_count": usage.input,
@@ -422,6 +457,27 @@ class Agent:
             provider_state=provider_state,  # e.g. DeepSeek reasoning, needed on later turns (D2)
         )
         yield "done", done
+
+    def _over_budget(self, turn: Turn, plan: Plan) -> dict[str, int] | None:
+        """The `budget` event when this conversation's cloud tokens reached the
+        soft budget plus what Continue allowed (D10); None to go on."""
+        budget = self.session_budget()
+        if plan.kind != "cloud" or budget <= 0:
+            return None
+        spent = self.chats.usage_totals(turn.conversation_id)["cloud"]
+        allowance = budget + self.chats.budget_extra(turn.conversation_id)
+        return {"spent": spent, "allowance": allowance, "budget": budget} if spent >= allowance else None
+
+    def _record_usage(self, turn: Turn, plan: Plan, spent: list[int]) -> None:
+        if spent[0] or spent[1]:
+            self.chats.record_usage(
+                turn.conversation_id,
+                provider_id=plan.provider.id,
+                model=plan.model,
+                kind=plan.kind,
+                tokens_in=spent[0],
+                tokens_out=spent[1],
+            )
 
     # -- tools -----------------------------------------------------------------
 
@@ -490,6 +546,8 @@ class Agent:
     async def _server_tool(
         self, name: str, args: dict[str, Any], turn: Turn, sources: Sources, state: dict[str, Any]
     ) -> tuple[str, list[dict[str, Any]]]:
+        if name in ("viewport", "layer_state") and not state.get("map_shared", True):
+            return MAP_WITHHELD, []
         if name == "viewport":
             return json.dumps(turn.viewport or {}, ensure_ascii=False)[:2000], []
         if name == "layer_state":

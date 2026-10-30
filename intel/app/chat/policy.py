@@ -104,8 +104,15 @@ _PROMPT = (
 )
 
 
+MAP_WITHHELD = "Withheld: the user's settings keep the map from this provider."
+
+
 def system_prompt(
-    *, now_local: str, viewport: dict[str, Any] | None, layer_state: dict[str, Any] | None
+    *,
+    now_local: str,
+    viewport: dict[str, Any] | None,
+    layer_state: dict[str, Any] | None,
+    map_shared: bool = True,
 ) -> str:
     head = "\n".join(_PROMPT).format(brand=BRAND_NAME, now=now_local)
-    return f"{head}\n{map_context(viewport, layer_state)}"
+    return f"{head}\n{map_context(viewport, layer_state) if map_shared else MAP_WITHHELD}"

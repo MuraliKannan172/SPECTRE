@@ -217,10 +217,28 @@ async def clear_history(request: Request) -> Response:
 
 @router.get("/status")
 async def status(request: Request) -> dict[str, Any]:
+    """The selected provider and model with a provider-neutral `ready` /
+    `problem` pair (ADR-002 D7); every earlier field stays. An API provider's
+    readiness comes from local facts only (key, consent, local-only mode), so
+    this poll never calls a cloud API. Ollama is checked as before."""
     state = request.app.state
     settings = state.settings
+    chats = getattr(state, "chats", None)
+    store = getattr(state, "provider_store", None)
+    conversation = chats.current_conversation() if chats else None
+    chosen = (chats.selection(conversation) if chats and conversation else None) or (
+        store.last_selection() if store else None
+    )
+    provider_id, model = chosen or ("ollama", settings.ollama_model)
+    policy = store.policy() if store else None
     result: dict[str, Any] = {
-        "model": settings.ollama_model,
+        "model": model,
+        "provider": provider_id,
+        "kind": None,
+        "ready": False,
+        "problem": None,
+        "usage": chats.usage_totals(conversation) if chats else None,
+        "budget": _budget_view(chats, conversation, policy),
         "num_ctx": settings.num_ctx,
         "low_resource": settings.low_resource,
         "search": state.search.status() if getattr(state, "search", None) else None,
@@ -232,29 +250,67 @@ async def status(request: Request) -> dict[str, Any]:
     }
     agent = getattr(state, "agent", None)
     if agent is None:
+        result["problem"] = "chat_unavailable"
+        return result
+    if provider_id != "ollama":
+        result.update(_api_readiness(state, provider_id, policy))
         return result
     try:
         result["ollama"] = {"reachable": True, "version": await agent.ollama.version()}
     except OllamaError as error:
         result["ollama"]["error"] = error.code
+        result["problem"] = "ollama_offline"
         return result
     try:
         # Under local-only mode a cloud provider gets no call at all, not even this lookup.
         if not agent.local_only_blocks():
-            capabilities = await agent.capabilities()
+            info = await agent.provider.model_caps(model)
             result["model_present"] = True
-            result["tools"] = "tools" in capabilities
+            result["tools"] = "tools" in info.capabilities
+            result["kind"] = info.kind
     except ProviderError as error:
         result["model_present"] = False if error.detail == "not_found" else None
     try:
-        for model in await agent.ollama.ps():
-            if model.get("name") == settings.ollama_model or model.get("model") == settings.ollama_model:
+        for loaded in await agent.ollama.ps():
+            if model in (loaded.get("name"), loaded.get("model")):
                 result["loaded"] = {
-                    "size_vram": model.get("size_vram"),
-                    "size": model.get("size"),
-                    "expires_at": model.get("expires_at"),
-                    "context_length": model.get("context_length"),
+                    "size_vram": loaded.get("size_vram"),
+                    "size": loaded.get("size"),
+                    "expires_at": loaded.get("expires_at"),
+                    "context_length": loaded.get("context_length"),
                 }
     except OllamaError:
         pass
+    if result["model_present"] is not True:
+        result["problem"] = (
+            "ollama_model_missing" if result["model_present"] is False else "model_check_failed"
+        )
+    elif result["kind"] == "cloud" and policy and policy.local_only:
+        result["problem"] = "local_only"
+    result["ready"] = result["problem"] is None
     return result
+
+
+def _budget_view(chats: Any, conversation: int | None, policy: Any) -> dict[str, int] | None:
+    if chats is None or policy is None or policy.session_budget <= 0:
+        return None
+    extra = chats.budget_extra(conversation) if conversation else 0
+    spent = chats.usage_totals(conversation)["cloud"]
+    return {"spent": spent, "allowance": policy.session_budget + extra, "budget": policy.session_budget}
+
+
+def _api_readiness(state: Any, provider_id: str, policy: Any) -> dict[str, Any]:
+    providers = getattr(state, "providers", None)
+    provider = providers.get(provider_id) if providers else None
+    if provider is None:
+        return {"kind": None, "ready": False, "problem": "unknown_provider"}
+    spec = providers.specs[provider_id]
+    kind = provider.kind
+    problem = None
+    if not state.keys.status(spec).configured and not spec.key_optional:
+        problem = "no_key"
+    elif kind == "cloud" and policy is not None and policy.local_only:
+        problem = "local_only"
+    elif kind != "local" and not state.provider_store.consented(provider_id):
+        problem = "consent_required"
+    return {"kind": kind, "ready": problem is None, "problem": problem}

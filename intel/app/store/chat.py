@@ -133,6 +133,54 @@ class ChatStore:
             ).fetchone()
         return (str(row[0]), str(row[1])) if row and row[0] and row[1] else None
 
+    # -- usage and the soft budget (ADR-002 D10, migration 0004) -------------------
+
+    def record_usage(
+        self,
+        conversation_id: int,
+        *,
+        provider_id: str,
+        model: str,
+        kind: str,
+        tokens_in: int,
+        tokens_out: int,
+    ) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO usage (ts, conversation_id, provider_id, model, kind,"
+                " input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (int(time.time()), conversation_id, provider_id, model, kind, tokens_in, tokens_out),
+            )
+
+    def usage_totals(self, conversation_id: int | None) -> dict[str, int]:
+        """Tokens this conversation used: all of them, and the cloud share
+        that counts against the budget."""
+        if conversation_id is None:
+            return {"input": 0, "output": 0, "cloud": 0}
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0),"
+                " COALESCE(SUM(CASE WHEN kind = 'cloud' THEN input_tokens + output_tokens END), 0)"
+                " FROM usage WHERE conversation_id = ?",
+                (conversation_id,),
+            ).fetchone()
+        return {"input": int(row[0]), "output": int(row[1]), "cloud": int(row[2])}
+
+    def budget_extra(self, conversation_id: int) -> int:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT budget_extra FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def raise_budget(self, conversation_id: int, tokens: int) -> int:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE conversations SET budget_extra = budget_extra + ? WHERE id = ?",
+                (tokens, conversation_id),
+            )
+        return self.budget_extra(conversation_id)
+
     def set_selection(self, conversation_id: int, provider_id: str, model: str) -> None:
         with self._lock:
             self._conn.execute(

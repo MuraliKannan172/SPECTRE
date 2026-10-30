@@ -126,7 +126,8 @@ def test_the_list_shows_every_provider_without_any_key(client: TestClient) -> No
         "writable": True,
     }
     assert (acme["kind"], acme["consent"]) == ("cloud", False)
-    assert listed["policy"] == {"local_only": False, "map_context": True} and listed["keyring"] is True
+    assert listed["policy"] == {"local_only": False, "map_context": True, "session_budget": 100_000}
+    assert listed["keyring"] is True
 
 
 def test_writes_need_the_session_token_and_json(client: TestClient) -> None:
@@ -238,6 +239,7 @@ def test_local_only_blocks_testing_and_listing_cloud_providers(client: TestClien
     assert client.put("/api/intel/providers/policy", json={"local_only": True}, headers=headers).json() == {
         "local_only": True,
         "map_context": True,
+        "session_budget": 100_000,
     }
     tested = client.post("/api/intel/providers/acme/test", json={}, headers=headers)
     listed = client.get("/api/intel/providers/acme/models")

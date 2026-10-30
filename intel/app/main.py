@@ -212,6 +212,9 @@ def create_app(
                 providers=lambda pid: providers.get(pid) if providers else None,
                 known_tools=provider_store.known_tools,
                 remember_tools=provider_store.remember_tools,
+                map_context=lambda: provider_store.policy().map_context,
+                session_budget=lambda: provider_store.policy().session_budget,
+                params_for=lambda pid: provider_store.settings(pid).params,
             )
             if registry is not None and ollama is not None
             else None

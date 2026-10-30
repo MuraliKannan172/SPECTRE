@@ -31,6 +31,15 @@ LOW_RESOURCE_MODEL = "bonsai-2:9b"
 # Token budgets per turn for a 16k context. Also the ceiling for API providers,
 # whatever their window: every token is billed (ADR-002 D9).
 FULL_BUDGETS = {"history": 3000, "web": 6000, "page": 2500}
+
+
+def budgets_for(num_ctx: int) -> dict[str, int]:
+    """Token budgets per turn (ADR-001 D5); 8k contexts get the small set."""
+    if num_ctx <= 8192:
+        return {"history": 1500, "web": 2500, "page": 1200}
+    return dict(FULL_BUDGETS)
+
+
 _TRUTHY = {"1", "true", "yes", "on"}
 MIN_POLL_SECONDS = 30
 BRAND_PREFIX = "SPECTRE_"
@@ -149,9 +158,7 @@ class Settings:
     @property
     def budgets(self) -> dict[str, int]:
         """Token budgets per turn (ADR-001 D5); 8k contexts get the small set."""
-        if self.num_ctx <= 8192:
-            return {"history": 1500, "web": 2500, "page": 1200}
-        return dict(FULL_BUDGETS)
+        return budgets_for(self.num_ctx)
 
     @property
     def stale_after_seconds(self) -> int:
