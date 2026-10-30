@@ -736,3 +736,27 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **UNVERIFIED until a live run with a key:** Anthropic accepting `tool_choice: {type: none}` and
   cross-turn thinking replay; every provider's context-length error shape; OpenAI's
   effort-rejection body; NIM `stream_options`; OpenRouter `reasoning_details` passback.
+
+**P4 (UI and its backend):**
+
+- **The map switch is applied:** with it off, a non-local model gets no viewport or layers in
+  the prompt, and the map tools answer that the map is withheld.
+- **Consent covers Ollama too:** its `:cloud` models and an Ollama on another machine need
+  consent, asked by the panel (picker, or "Allow and retry" on a refused turn).
+- **Budget (D10):** cloud tokens per conversation (default 100k, 0 off); usage counts every
+  round and is recorded by kind (migration `0004`). "Continue" is a gated write
+  (`POST /providers/budget/continue`), never a chat-body flag.
+- **Parameters:** temperature, max output tokens, user prices per 1M, Ollama `num_ctx` and
+  `keep_alive`, validated per provider and applied; Ollama's budgets follow its `num_ctx`.
+- **No reasoning toggle yet:** the D7 `thinking` event is not rendered, so the toggle would do
+  nothing visible; DeepSeek thinking stays off. Left for P5 or later.
+- **`/chat/status` (D7)** reports the selection with `kind`, `ready`, `problem`, usage and
+  budget; an API provider is judged from local facts only, so the poll never calls a cloud API.
+  The boot overlay and the panel read that pair, and a service without it classifies as before.
+- **The UI** lives in `src/neuralCore/provider*.js` and `confirmDialog.js` beside the panel: a
+  header chip (badge, model, session tokens and cost), a quick switch of favourites, the
+  settings view, a consent dialog (focus starts on Cancel, Tab stays inside, Escape cancels),
+  recovery actions on a failed turn (Allow and retry, Continue, Retry, Choose another model,
+  Set the key in POWER UP) and a footer disclaimer that names where the model runs.
+  Favourites and the VRAM budget are per-browser conveniences in `localStorage`; the session
+  token is kept in memory only.

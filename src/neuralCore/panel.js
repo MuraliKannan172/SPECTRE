@@ -10,12 +10,16 @@
 import { BRANDING } from '../branding.js';
 import { t } from '../i18n/index.js';
 import { NeuralCoreError } from './client.js';
+import { mountProviderControls } from './providerControls.js';
+import { createProvidersClient } from './providersClient.js';
+import { budgetText } from './providersView.js';
 import {
   answerSegments,
   endsWithAsOf,
   errorText,
   statusSummary,
   toolLabel,
+  turnErrorCode,
   voiceTimingText,
 } from './view.js';
 import {
@@ -85,6 +89,7 @@ export function mountNeuralCorePanel({
   onOpen = () => {},
   localVoice = voiceSupported(),
   now = () => performance.now(),
+  providers = createProvidersClient(),
 }) {
   const body = document.body;
   const launcher = button(
@@ -212,8 +217,21 @@ export function mountNeuralCorePanel({
       'Local model; answers can be wrong. Not for navigation or emergencies. It will not locate or track people.',
     ),
   );
+  // ADR-002 P4: provider chip, quick switch and settings view (providerControls.js).
+  const controls = mountProviderControls({
+    document,
+    providers,
+    panel,
+    disclaimer,
+    historyLength: () => list.querySelectorAll('.spectre-nc-user').length,
+    onChanged: () => void refreshStatus(),
+  });
+  header.insertBefore(controls.chip, clearButton);
+  header.insertBefore(controls.switcher, clearButton);
+  panel.dataset.view = 'chat';
   panel.append(
     header,
+    controls.settings,
     statusLine,
     searchLine,
     list,
@@ -253,6 +271,7 @@ export function mountNeuralCorePanel({
       const status = await client.status();
       model = status?.model || model;
       summary = statusSummary(status);
+      controls.update(status);
     } catch (error) {
       summary = statusSummary(
         null,
@@ -413,11 +432,24 @@ export function mountNeuralCorePanel({
     entry.regenerate.hidden = Boolean(done.refused);
   }
 
-  function fail(entry, code) {
-    entry.error.textContent = errorText(code, { model });
+  function fail(entry, code, text = null) {
+    entry.error.textContent = text || errorText(code, { model });
     entry.error.hidden = false;
     entry.footer.hidden = false;
     entry.copy.hidden = !entry.raw;
+    // What can be done about it; never a silent switch (ADR-002 D6).
+    const actions = controls.recovery(code);
+    if (!actions.length) return;
+    const row = element(document, 'span', 'spectre-nc-recovery');
+    for (const { label, run } of actions) {
+      const choice = button(document, 'spectre-nc-action', label);
+      choice.addEventListener(
+        'click',
+        () => void run(() => send({ regenerate: true }, entry)),
+      );
+      row.append(choice);
+    }
+    entry.error.append(document.createTextNode(' '), row);
   }
 
   async function copyText(entry) {
@@ -577,7 +609,10 @@ export function mountNeuralCorePanel({
             announcer.textContent = t('Answer ready');
           } else if (name === 'error') {
             clearWaiting();
-            fail(entry, data.code);
+            fail(entry, turnErrorCode(data));
+          } else if (name === 'budget') {
+            clearWaiting();
+            fail(entry, 'budget', budgetText(data));
           }
           keepScrolled(stick);
         },

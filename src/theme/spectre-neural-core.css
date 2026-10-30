@@ -447,3 +447,243 @@ body.mobile-shell .spectre-nc {
 body.mobile-shell[data-mobile-sheet] .spectre-nc {
   display: none;
 }
+
+/* ADR-002 P4: provider chip, quick switch, settings view, consent dialog. */
+.spectre-nc-chip,
+.spectre-nc-switch {
+  max-width: 220px;
+  overflow: hidden;
+  padding: 2px 8px;
+  border: 1px solid var(--sp-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sp-text-dim);
+  font: 400 11px/1.5 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.spectre-nc-chip[data-kind='cloud'] {
+  border-color: var(--sp-warn);
+  color: var(--sp-text);
+}
+
+.spectre-nc-switch {
+  background: var(--sp-surface);
+}
+
+.spectre-nc[data-view='settings']
+  > :not(.spectre-nc-header, .spectre-nc-settings, .spectre-nc-disclaimer) {
+  display: none;
+}
+
+.spectre-nc-settings {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 12px 12px;
+  color: var(--sp-text);
+  font: 400 12px/1.5 var(--font-sans);
+}
+
+.spectre-nc-settings h2,
+.spectre-nc-settings h3,
+.spectre-nc-settings h4 {
+  margin: 8px 0 4px;
+  font: 600 12px/1.4 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.spectre-nc-policy {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--sp-border);
+  border-radius: 4px;
+}
+
+.spectre-nc-toggle,
+.spectre-nc-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.spectre-nc-field input {
+  min-width: 0;
+  flex: 1 1 140px;
+  padding: 2px 6px;
+  border: 1px solid var(--sp-border);
+  border-radius: 4px;
+  background: var(--sp-surface-2);
+  color: var(--sp-text);
+  font: 400 12px/1.5 var(--font-mono);
+}
+
+.spectre-nc-provider-list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.spectre-nc-provider {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--sp-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sp-text);
+  font: 400 12px/1.5 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.spectre-nc-provider[aria-current='true'] {
+  border-color: var(--sp-red-deep);
+}
+
+.spectre-nc-provider[data-state='error'] .spectre-nc-provider-state,
+.spectre-nc-settings .spectre-nc-error {
+  color: var(--sp-red-on-raised);
+}
+
+.spectre-nc-provider[data-state='connected'] .spectre-nc-provider-state {
+  color: var(--sp-ok);
+}
+
+.spectre-nc-badge,
+.spectre-nc-chip-cap {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--sp-border);
+  border-radius: 3px;
+  color: var(--sp-text-dim);
+  font: 400 10px/1.6 var(--font-mono);
+  white-space: nowrap;
+}
+
+.spectre-nc-hint,
+.spectre-nc-settings-message {
+  margin: 4px 0;
+  color: var(--sp-text-dim);
+}
+
+.spectre-nc-actions,
+.spectre-nc-chips,
+.spectre-nc-recovery {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.spectre-nc-advanced {
+  margin: 8px 0;
+}
+
+.spectre-nc-advanced > :not(summary) {
+  margin-top: 6px;
+}
+
+.spectre-nc-model-search {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 4px 0;
+  padding: 3px 6px;
+  border: 1px solid var(--sp-border);
+  border-radius: 4px;
+  background: var(--sp-surface-2);
+  color: var(--sp-text);
+}
+
+.spectre-nc-model-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spectre-nc-model {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--sp-border);
+}
+
+.spectre-nc-model-name {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.spectre-nc-model .spectre-nc-hint[data-fits='false'] {
+  color: var(--sp-warn);
+}
+
+.spectre-nc-star {
+  border: 0;
+  background: transparent;
+  color: var(--sp-warn);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.spectre-nc-dialog-backdrop {
+  position: fixed;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  inset: 0;
+  padding: 16px;
+  background: rgb(0 0 0 / 55%);
+}
+
+.spectre-nc-dialog {
+  max-width: 420px;
+  padding: 16px;
+  border: 1px solid var(--sp-red-deep);
+  border-radius: 6px;
+  background: var(--sp-surface);
+  color: var(--sp-text);
+  font: 400 13px/1.5 var(--font-sans);
+}
+
+.spectre-nc-dialog h2 {
+  margin: 0 0 8px;
+  font: 600 14px/1.4 var(--font-sans);
+}
+
+.spectre-nc-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.spectre-nc-dialog-actions button {
+  padding: 4px 12px;
+  border: 1px solid var(--sp-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sp-text);
+  cursor: pointer;
+}
+
+.spectre-nc-dialog-actions .spectre-nc-dialog-confirm {
+  border-color: var(--sp-red-deep);
+}
+
+.spectre-nc-dialog button:focus-visible,
+.spectre-nc-settings :focus-visible {
+  outline: 2px solid var(--sp-red);
+  outline-offset: 2px;
+}

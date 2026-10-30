@@ -287,6 +287,8 @@ async def status(request: Request) -> dict[str, Any]:
         )
     elif result["kind"] == "cloud" and policy and policy.local_only:
         result["problem"] = "local_only"
+    elif result["kind"] in ("cloud", "remote") and store and not store.consented("ollama"):
+        result["problem"] = "consent_required"  # a :cloud model, or Ollama on another machine
     result["ready"] = result["problem"] is None
     return result
 

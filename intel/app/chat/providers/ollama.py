@@ -116,6 +116,8 @@ class OllamaProvider:
         remote = entry.get("remote_host")
         if remote:
             details["remote_host"] = remote
+        if isinstance(entry.get("size"), int):
+            details["size"] = entry["size"]  # bytes on disk, for the VRAM estimate (D11)
         return ModelInfo(
             id=name,
             label=name,
