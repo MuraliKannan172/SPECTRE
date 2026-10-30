@@ -131,7 +131,7 @@ The proxy answers every route for this machine only, even with `SPECTRE_CHAT_ALL
 |---|---|
 | `GET /api/intel/providers` | `{"providers": [{"id", "label", "kind", "adapter", "docs", "base_url", "base_url_editable", "workspace_id", "params", "chat_completions_models", "key": {"required", "configured", "source", "env", "writable"}, "consent"}], "policy", "keyring", "selection"}` |
 | `GET /api/intel/providers/session` | `{"token"}` for writes |
-| `PUT /api/intel/providers/policy` | `{"local_only"?, "map_context"?, "session_budget"?}`, `session_budget` in cloud tokens, `0` off |
+| `PUT /api/intel/providers/policy` | `{"local_only"?, "map_context"?, "session_budget"?, "context_ceiling"?}`: `session_budget` in cloud tokens, `0` off; `context_ceiling` in tokens (4096 to 1048576, default 16384) for API models |
 | `PUT /api/intel/providers/selection` | `{"provider", "model"}` for the current conversation and new ones |
 | `PUT /api/intel/providers/{id}/key` | `{"key"}`, stored in the OS keyring (or `.env` without one); returns the `key` status |
 | `DELETE /api/intel/providers/{id}/key` | removes the stored key; an environment key stays |

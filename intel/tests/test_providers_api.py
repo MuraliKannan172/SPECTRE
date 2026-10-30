@@ -127,7 +127,12 @@ def test_the_list_shows_every_provider_without_any_key(client: TestClient) -> No
         "writable": True,
     }
     assert (acme["kind"], acme["consent"]) == ("cloud", False)
-    assert listed["policy"] == {"local_only": False, "map_context": True, "session_budget": 100_000}
+    assert listed["policy"] == {
+        "local_only": False,
+        "map_context": True,
+        "session_budget": 100_000,
+        "context_ceiling": 16_384,
+    }
     assert listed["keyring"] is True
 
 
@@ -241,6 +246,7 @@ def test_local_only_blocks_testing_and_listing_cloud_providers(client: TestClien
         "local_only": True,
         "map_context": True,
         "session_budget": 100_000,
+        "context_ceiling": 16_384,
     }
     tested = client.post("/api/intel/providers/acme/test", json={}, headers=headers)
     listed = client.get("/api/intel/providers/acme/models")
@@ -530,3 +536,14 @@ def test_continue_allows_one_more_budget_and_is_a_gated_write(client: TestClient
     client.put(SELECTION, json={"provider": "acme", "model": "big-1"}, headers=headers)
     assert client.post(url, json={}, headers=headers).json() == {"allowance": 200_000}
     assert client.get(STATUS).json()["budget"]["allowance"] == 200_000
+
+
+def test_the_context_ceiling_is_a_validated_policy_write(client: TestClient) -> None:
+    url = "/api/intel/providers/policy"
+    headers = writer(client)
+    assert (
+        client.put(url, json={"context_ceiling": 65_536}, headers=headers).json()["context_ceiling"] == 65_536
+    )
+    for bad in (1000, 2_000_000, "big"):
+        assert client.put(url, json={"context_ceiling": bad}, headers=headers).status_code == 422
+    assert client.get("/api/intel/providers").json()["policy"]["context_ceiling"] == 65_536

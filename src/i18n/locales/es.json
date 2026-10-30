@@ -3204,5 +3204,6 @@
   "Optional: only if your server asks for one.": "Opcional: solo si tu servidor la pide.",
   "Or type a model id": "O escribe un ID de modelo",
   "Model id": "ID de modelo",
-  "Use this model id": "Usar este ID de modelo"
+  "Use this model id": "Usar este ID de modelo",
+  "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "Límite de contexto para modelos de API, en tokens (16384 por defecto; más envía más historial y texto web, todo facturado)"
 }

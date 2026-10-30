@@ -22,6 +22,8 @@ import { errorText } from './view.js';
 const FAVOURITES_KEY = 'spectre.neuralCore.favourites';
 const VRAM_KEY = 'spectre.neuralCore.vramGb';
 const DEFAULT_VRAM_GB = 8;
+// The service's accepted range for the API models' context ceiling (ADR-002 D9).
+const CONTEXT_CEILING = [4096, 1_048_576];
 
 function load(storage, key, fallback) {
   try {
@@ -158,6 +160,16 @@ export function mountProviderSettings({
       if (Number.isFinite(value) && value >= 0)
         void savePolicy({ session_budget: value });
     });
+    const ceiling = numberInput(document, policy.context_ceiling, {
+      min: CONTEXT_CEILING[0],
+      max: CONTEXT_CEILING[1],
+      step: 1024,
+    });
+    ceiling.addEventListener('change', () => {
+      const value = Math.round(Number(ceiling.value));
+      if (value >= CONTEXT_CEILING[0] && value <= CONTEXT_CEILING[1])
+        void savePolicy({ context_ceiling: value });
+    });
     policyBox.append(
       toggle(t('Local-only mode: block every cloud model'), 'local_only'),
       toggle(
@@ -168,6 +180,13 @@ export function mountProviderSettings({
         document,
         t('Cloud tokens per conversation before asking (0 is off)'),
         budget,
+      ),
+      field(
+        document,
+        t(
+          'Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)',
+        ),
+        ceiling,
       ),
     );
   }

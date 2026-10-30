@@ -807,7 +807,10 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
     alone 8 times scored 7/8 before D9 and 5/8 after, which reads as sampling at temperature
     0.2.
   - The web misses are keyless ddgs searches returning nothing, before D9 too.
-- **Not built:** raising the 12,288-token input ceiling from Settings (D9 offers it); the ceiling is fixed.
+- **The context ceiling** (D9) is the `context_ceiling` policy (Settings → Neural Core, 4,096 to
+  1,048,576 tokens, default 16,384). The API budgets scale with min(window, ceiling) / 16,384
+  and the input limit is min(ceiling - 4,096, window - max output); the default reproduces P5
+  exactly. Ollama still follows `num_ctx`. Added after P5, with the follow-ups below.
 - **No cloud provider has run live.** `docs/VERIFY_PROVIDERS.md` lists what each needs.
 - **Docs:**
   - `docs/KEYS_AND_COSTS.md`, including the warning not to put `ANTHROPIC_API_KEY` in the global

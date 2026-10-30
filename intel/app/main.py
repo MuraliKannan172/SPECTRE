@@ -217,6 +217,7 @@ def create_app(
                 remember_tools=provider_store.remember_tools,
                 map_context=lambda: provider_store.policy().map_context,
                 session_budget=lambda: provider_store.policy().session_budget,
+                context_ceiling=lambda: provider_store.policy().context_ceiling,
                 params_for=lambda pid: provider_store.settings(pid).params,
             )
             if registry is not None and ollama is not None

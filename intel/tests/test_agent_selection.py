@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from test_chat_agent import CLIENT_TOOLS, FakeFetcher, FakeSearch
 
-from app.chat.agent import Agent, Turn, api_budgets
+from app.chat.agent import Agent, Turn, api_budgets, api_input_limit
 from app.chat.ollama import OllamaClient
 from app.chat.policy import MAP_WITHHELD
 from app.chat.probe import PROBE_NAME
@@ -57,6 +57,7 @@ class World:
         map_context: bool = True,
         session_budget: int = 0,
         params: dict[str, Any] | None = None,
+        context_ceiling: int = 16_384,
     ) -> None:
         self.settings = Settings(
             db_path=tmp_path / "t.db",
@@ -86,6 +87,7 @@ class World:
             providers=lambda provider_id: selected if provider_id == selected.id else None,
             known_tools=lambda *key: known,
             remember_tools=lambda *row: self.remembered.append(row),
+            context_ceiling=lambda: context_ceiling,
         )
         self.conversation = self.chats.ensure_conversation(None)
 
@@ -211,6 +213,27 @@ def test_a_probe_that_fails_on_the_key_is_the_turn_error(world) -> None:  # type
 def test_api_budgets_never_exceed_the_16k_set_and_shrink_with_a_small_window() -> None:
     assert api_budgets(None) == FULL_BUDGETS == api_budgets(1_000_000)
     assert api_budgets(8192) == {name: tokens // 2 for name, tokens in FULL_BUDGETS.items()}
+
+
+def test_a_raised_ceiling_grows_budgets_and_input_only_as_far_as_the_window() -> None:
+    four_times = {name: tokens * 4 for name, tokens in FULL_BUDGETS.items()}
+    assert api_budgets(1_000_000, 65_536) == four_times == api_budgets(None, 65_536)
+    assert api_budgets(32_768, 65_536) == {name: tokens * 2 for name, tokens in FULL_BUDGETS.items()}
+    assert api_input_limit(None, 4096) == api_input_limit(1_000_000, 8192) == 12_288, "today's ceiling"
+    assert api_input_limit(1_000_000, 4096, 65_536) == 61_440
+    assert api_input_limit(32_768, 4096, 65_536) == 28_672, "the model's window still caps it"
+    assert api_input_limit(8192, 4096, 4096) == 1024, "never below the floor"
+
+
+def test_the_plan_reads_the_ceiling_for_api_models_only(world) -> None:  # type: ignore[no-untyped-def]
+    def plan_for(made: World) -> Any:
+        turn = Turn(made.conversation, "hi", provider_id="acme", model="big-1")
+        return asyncio.run(made.agent._plan(turn))
+
+    default = plan_for(world(Cloud([], models=[info("yes", 200_000)])))
+    assert (default.budgets, default.input_limit) == (FULL_BUDGETS, 12_288)
+    raised = plan_for(world(Cloud([], models=[info("yes", 200_000)]), context_ceiling=65_536))
+    assert raised.input_limit == 61_440 and raised.budgets["history"] == FULL_BUDGETS["history"] * 4
 
 
 def test_the_final_answer_keeps_its_provider_state_for_the_next_turn_only(world) -> None:  # type: ignore[no-untyped-def]

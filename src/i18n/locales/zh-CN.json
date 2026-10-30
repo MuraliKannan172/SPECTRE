@@ -3056,5 +3056,6 @@
   "Optional: only if your server asks for one.": "可选：仅当你的服务器需要时。",
   "Or type a model id": "或输入模型 ID",
   "Model id": "模型 ID",
-  "Use this model id": "使用此模型 ID"
+  "Use this model id": "使用此模型 ID",
+  "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "API 模型的上下文上限，以 token 计（默认 16384；更大会发送更多历史和网页文本，均计费）"
 }

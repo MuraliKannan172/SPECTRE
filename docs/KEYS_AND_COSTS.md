@@ -93,10 +93,12 @@ The guards:
 
 - **Output per request:** 4,096 tokens by default (Max output tokens in Settings → Neural Core).
 - **Rounds:** at most 4 tool rounds per turn.
-- **Input per request:** at most 12,288 tokens (a 16k window less the output guard), lower for
-  models with a smaller window. Over it, the oldest tool results are trimmed first, then the
-  oldest history. The estimate starts at 4 characters per token and tightens to what the
-  provider reports.
+- **Input per request:** at most 12,288 tokens (a 16k context ceiling less the output guard),
+  lower for models with a smaller window. Over it, the oldest tool results are trimmed first,
+  then the oldest history. The estimate starts at 4 characters per token and tightens to what
+  the provider reports. **Context ceiling for API models** in Settings → Neural Core changes
+  the 16,384: raising it sends more history and web text per turn (budgets and limit scale
+  with it, up to the model's own window), and every one of those tokens is billed.
 - **Per conversation:** a soft budget of 100,000 cloud tokens (Settings → Neural Core; 0 turns it
   off). When it is reached, the chat pauses until you press Continue, which allows one more
   budget's worth.

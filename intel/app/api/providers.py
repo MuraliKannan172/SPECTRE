@@ -24,7 +24,7 @@ from ..chat.providers.errors import ProviderError
 from ..chat.providers.keys import KeyStoreError
 from ..chat.providers.registry import ProviderSpec, base_url_problem
 from ..chat.providers.sdk import key_may_travel
-from ..store.providers import ProviderSettings
+from ..store.providers import CONTEXT_CEILING_RANGE, ProviderSettings
 from .chat import _json_body, _same_machine
 
 router = APIRouter(prefix="/api/intel/providers")
@@ -87,6 +87,8 @@ class PolicyBody(BaseModel):
     local_only: bool | None = None
     map_context: bool | None = None
     session_budget: int | None = Field(None, ge=0, le=10_000_000)  # cloud tokens; 0 is off
+    # tokens an API model's turn may use (D9)
+    context_ceiling: int | None = Field(None, ge=CONTEXT_CEILING_RANGE[0], le=CONTEXT_CEILING_RANGE[1])
 
 
 class TestBody(BaseModel):
@@ -205,7 +207,10 @@ async def session(request: Request) -> dict[str, str]:
 async def set_policy(body: PolicyBody, request: Request) -> dict[str, Any]:
     state = _writer(request)
     policy = state.provider_store.set_policy(
-        local_only=body.local_only, map_context=body.map_context, session_budget=body.session_budget
+        local_only=body.local_only,
+        map_context=body.map_context,
+        session_budget=body.session_budget,
+        context_ceiling=body.context_ceiling,
     )
     return asdict(policy)
 
