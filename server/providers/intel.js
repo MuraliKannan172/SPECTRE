@@ -115,6 +115,15 @@ const ROUTES = Object.freeze([
     body: JSON_BODY,
     slow: true, // a probe may wait out a Retry-After before it answers
   },
+  {
+    // Pull model: Ollama's download progress, streamed for as long as it takes.
+    methods: ['POST'],
+    pattern: /^\/providers\/ollama\/pull$/,
+    providers: true,
+    write: true,
+    body: JSON_BODY,
+    stream: /^\/providers\/ollama\/pull$/,
+  },
 ]);
 const FORWARD_REQUEST_HEADERS = ['accept', 'last-event-id'];
 const SESSION_HEADER = 'x-spectre-session';

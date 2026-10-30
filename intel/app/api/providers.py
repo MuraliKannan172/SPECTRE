@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+from collections.abc import AsyncIterator
 from dataclasses import asdict
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..chat.ollama import OllamaError
 from ..chat.probe import probe_tools
 from ..chat.providers.base import ChatProvider, ModelInfo
 from ..chat.providers.errors import ProviderError
@@ -25,7 +28,7 @@ from ..chat.providers.keys import KeyStoreError, host_of, key_reaches
 from ..chat.providers.registry import ProviderSpec, base_url_problem
 from ..chat.providers.sdk import key_may_travel
 from ..store.providers import CONTEXT_CEILING_RANGE, ProviderSettings
-from .chat import _json_body, _same_machine
+from .chat import _json_body, _same_machine, _sse
 
 router = APIRouter(prefix="/api/intel/providers")
 
@@ -80,6 +83,19 @@ class SelectionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     provider: str = Field(..., max_length=32)
     model: ModelId
+
+
+# An Ollama registry name: [host/][namespace/]model[:tag]. Every segment starts
+# with a letter or digit, so no scheme, flag or '..' segment gets through.
+OLLAMA_NAME = r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*){0,3}(?::[A-Za-z0-9._-]{1,80})?$"
+
+
+PULL_FIELDS = ("status", "digest", "total", "completed")  # never anything else Ollama sends
+
+
+class PullBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str = Field(..., max_length=200, pattern=OLLAMA_NAME)
 
 
 class ConsentBody(BaseModel):
@@ -346,6 +362,32 @@ async def probe(provider_id: str, body: ProbeBody, request: Request) -> dict[str
     if agent is not None:
         agent.forget_unproven(spec.id, base_url, body.model)
     return {"ok": True, "supports_tools": result or "unknown"}
+
+
+@router.post("/ollama/pull")
+async def pull_model(body: PullBody, request: Request) -> StreamingResponse:
+    """Pull model (D11): Ollama's own progress as SSE (`progress`, then `done`
+    or `error`). Leaving the page closes this stream and the request to
+    Ollama; whether Ollama then stops downloading is up to Ollama."""
+    state = _writer(request)
+    provider = state.providers.get("ollama")
+    client = getattr(provider, "client", None)
+    if client is None:
+        raise HTTPException(503, {"code": "chat_unavailable"})
+
+    async def stream() -> AsyncIterator[str]:
+        try:
+            async for chunk in client.pull(body.model):
+                yield _sse("progress", {key: chunk.get(key) for key in PULL_FIELDS})
+            yield _sse("done", {"model": body.model})
+        except OllamaError as error:
+            yield _sse("error", {"code": error.code, "message": str(error)[:300]})
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/ollama/gpu")

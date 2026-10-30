@@ -3065,5 +3065,14 @@
   "Thinking": "思考过程",
   "Reasoning: the model thinks first (more tokens, slower)": "推理：模型先思考（更多 token，更慢）",
   "Not in this version for Claude: thinking with tools needs its blocks kept across turns, which is not verified yet.": "此版本暂不支持 Claude：带工具的思考需要跨轮保留其思考块，这一点尚未验证。",
-  "Not offered: this provider has no common switch for reasoning.": "不提供：此提供商没有通用的推理开关。"
+  "Not offered: this provider has no common switch for reasoning.": "不提供：此提供商没有通用的推理开关。",
+  "Model to pull, such as qwen3:0.6b": "要拉取的模型，例如 qwen3:0.6b",
+  "Model to pull": "要拉取的模型",
+  "Pull model": "拉取模型",
+  "Stop watching": "停止跟踪",
+  "Starting…": "正在开始…",
+  "Pulled {model}.": "已拉取 {model}。",
+  "Ollama could not pull it: {message}": "Ollama 无法拉取：{message}",
+  "Stopped watching. Ollama may finish the download on its own.": "已停止跟踪。Ollama 可能会自行完成下载。",
+  "{status} · {percent}%": "{status} · {percent}%"
 }

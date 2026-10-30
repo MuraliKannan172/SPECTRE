@@ -83,6 +83,14 @@ function failureText(error) {
   return errorText(error?.code || 'network');
 }
 
+/** One pull progress line: Ollama's own status, with a percent while a layer downloads. */
+export function pullProgress({ status, total, completed } = {}) {
+  const text = String(status || '');
+  if (!(total > 0) || !Number.isFinite(completed)) return text;
+  const percent = Math.min(100, Math.floor((completed / total) * 100));
+  return t('{status} · {percent}%', { status: text, percent });
+}
+
 /**
  * @param {{document: Document, providers: ReturnType<
  *   import('./providersClient.js').createProvidersClient>, storage?: Storage,
@@ -552,7 +560,59 @@ export function mountProviderSettings({
       }),
     );
     box.append(manual);
+    if (provider.id === 'ollama') box.append(...pullRow(provider));
     return box;
+  }
+
+  /** Pull model (D11): Ollama downloads a model by name and reports progress.
+   * Stopping only stops watching; Ollama may finish the download anyway. */
+  function pullRow(provider) {
+    const row = node(document, 'div', 'spectre-nc-actions spectre-nc-pull');
+    const name = node(document, 'input', 'spectre-nc-model-search');
+    name.placeholder = t('Model to pull, such as qwen3:0.6b');
+    name.setAttribute('aria-label', t('Model to pull'));
+    const line = node(document, 'p', 'spectre-nc-hint');
+    line.setAttribute('role', 'status');
+    let watching = null;
+    const stop = action(document, t('Stop watching'), () => watching?.abort());
+    stop.hidden = true;
+    const start = action(document, t('Pull model'), async () => {
+      const model = name.value.trim();
+      if (!model || watching) return;
+      watching = new AbortController();
+      start.disabled = true;
+      stop.hidden = false;
+      line.textContent = t('Starting…');
+      let finished = null;
+      try {
+        await providers.pull(
+          model,
+          (event, data) => {
+            if (event === 'progress') line.textContent = pullProgress(data);
+            else if (event === 'done')
+              finished = t('Pulled {model}.', { model });
+            else if (event === 'error')
+              finished = t('Ollama could not pull it: {message}', {
+                message: data.message || data.code,
+              });
+          },
+          watching.signal,
+        );
+      } catch (error) {
+        finished =
+          error?.name === 'AbortError'
+            ? t('Stopped watching. Ollama may finish the download on its own.')
+            : failureText(error);
+      } finally {
+        watching = null;
+        start.disabled = false;
+        stop.hidden = true;
+      }
+      await loadModels(provider); // redraws the list (and this row)
+      say(finished || '');
+    });
+    row.append(name, start, stop);
+    return [row, line];
   }
 
   function pickerList(provider) {
