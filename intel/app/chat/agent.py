@@ -44,6 +44,7 @@ from .providers.base import (
     ChatRequest,
     Done,
     Message,
+    ModelInfo,
     TextDelta,
     ToolCall,
     ToolCallEvent,
@@ -137,6 +138,8 @@ class Agent:
         open_only: Callable[[], bool] = lambda: True,
         clock: Callable[[], float] = time.time,
         provider: ChatProvider | None = None,
+        local_only: Callable[[], bool] = lambda: False,
+        consented: Callable[[str], bool] = lambda provider_id: False,
     ) -> None:
         self.settings = settings
         # The status route and the eval still read Ollama directly.
@@ -148,6 +151,8 @@ class Agent:
         self.fetcher = fetcher
         self.registry = registry
         self.open_only = open_only
+        self.local_only = local_only
+        self.consented = consented
         self.clock = clock
         self._pending: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
 
@@ -163,6 +168,21 @@ class Agent:
     async def capabilities(self) -> frozenset[str]:
         """The selected model's capabilities (the provider caches them)."""
         return (await self.provider.model_caps(self.settings.ollama_model)).capabilities
+
+    def _egress_refusal(self, info: ModelInfo) -> dict[str, Any] | None:
+        """ADR-002 D6: local-only mode blocks every cloud model, Ollama's
+        :cloud ones included; any other cloud provider needs consent first.
+        Ollama :cloud models skip consent until the panel can ask for it (P4)."""
+        if info.kind != "cloud":
+            return None
+        if self.local_only():
+            return {"code": "local_only", "message": "Local-only mode is on, so cloud models are blocked."}
+        if self.provider.id != "ollama" and not self.consented(self.provider.id):
+            return {
+                "code": "consent_required",
+                "message": f"{self.provider.id} has not been allowed to receive this conversation yet.",
+            }
+        return None
 
     # -- the turn --------------------------------------------------------------
 
@@ -220,11 +240,15 @@ class Agent:
             )
             return
         try:
-            capabilities = await self.capabilities()
+            info = await self.provider.model_caps(self.settings.ollama_model)
         except ProviderError as error:
             yield "error", _error_event(error)
             return
-        native = "tools" in capabilities
+        refusal = self._egress_refusal(info)
+        if refusal:
+            yield "error", refusal
+            return
+        native = "tools" in info.capabilities
         system = system_prompt(
             now_local=self._now_local(), viewport=turn.viewport, layer_state=turn.layer_state
         )

@@ -397,3 +397,185 @@ test('voice refuses other sites, the wrong type, oversize audio and the LAN', as
   assert.match(refused.body, /voice_local_only/);
   assert.equal(reached, 0);
 });
+
+/** A minimal response double for handler-level tests. */
+function replyDouble() {
+  const res = { status: 0, body: '' };
+  res.writeHead = (code) => (res.status = code);
+  res.end = (text = '') => (res.body = String(text));
+  res.once = () => {};
+  return res;
+}
+
+test('provider writes forward the session token, never Origin, with an exact local Origin', async (t) => {
+  const seen = [];
+  const upstream = await listen(async (req, res) => {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    seen.push({ method: req.method, url: req.url, headers: req.headers, body });
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end('{}');
+  });
+  const proxy = await proxyFor(upstream.url);
+  t.after(() => closeAll(upstream.server, proxy.server));
+  const origin = proxy.url;
+  const token = { 'x-spectre-session': 'abc' };
+  const json = { 'content-type': 'application/json' };
+
+  const put = await fetch(`${proxy.url}/api/intel/providers/openai/key`, {
+    method: 'PUT',
+    headers: { ...json, ...token, origin },
+    body: JSON.stringify({ key: 'sk-x' }),
+  });
+  assert.equal(put.status, 200);
+  const removed = await fetch(`${proxy.url}/api/intel/providers/openai/key`, {
+    method: 'DELETE',
+    headers: { ...token, origin },
+  });
+  assert.equal(removed.status, 200);
+  for (const path of [
+    '/api/intel/providers',
+    '/api/intel/providers/session',
+    '/api/intel/providers/openai/models',
+  ]) {
+    assert.equal((await fetch(`${proxy.url}${path}`)).status, 200, path);
+  }
+  const tested = await fetch(`${proxy.url}/api/intel/providers/openai/test`, {
+    method: 'POST',
+    headers: { ...json, ...token, origin },
+    body: '{}',
+  });
+  assert.equal(tested.status, 200);
+
+  assert.deepEqual(
+    seen.map((r) => `${r.method} ${r.url}`),
+    [
+      'PUT /api/intel/providers/openai/key',
+      'DELETE /api/intel/providers/openai/key',
+      'GET /api/intel/providers',
+      'GET /api/intel/providers/session',
+      'GET /api/intel/providers/openai/models',
+      'POST /api/intel/providers/openai/test',
+    ],
+  );
+  assert.equal(seen[0].headers['x-spectre-session'], 'abc');
+  assert.equal(seen[0].headers.origin, undefined);
+  assert.equal(seen[0].body, '{"key":"sk-x"}');
+
+  // The token is a provider-route header only.
+  await fetch(`${proxy.url}/api/intel/chat/status`, { headers: token });
+  assert.equal(seen.at(-1).headers['x-spectre-session'], undefined);
+});
+
+test('provider routes refuse other sites, missing Origin, non-JSON, proxies and sharing', async (t) => {
+  let reached = 0;
+  const upstream = await listen((_req, res) => {
+    reached += 1;
+    res.writeHead(200).end('{}');
+  });
+  const proxy = await proxyFor(upstream.url);
+  t.after(() => closeAll(upstream.server, proxy.server));
+  const origin = proxy.url;
+  const url = `${proxy.url}/api/intel/providers/openai/key`;
+  const json = { 'content-type': 'application/json' };
+  const put = (headers, body = '{"key":"sk-x"}') =>
+    fetch(url, { method: 'PUT', headers, body });
+  const error = async (response) => (await response.json()).error;
+
+  assert.equal(await error(await put(json)), 'providers_origin-required');
+  assert.equal(
+    await error(await put({ ...json, origin: 'https://evil.example' })),
+    'providers_cross-origin',
+  );
+  assert.equal(
+    await error(await put({ 'content-type': 'text/plain', origin })),
+    'providers_content-type',
+  );
+  assert.equal(
+    await error(await put({ ...json, origin, 'x-forwarded-for': '1.2.3.4' })),
+    'providers_proxied',
+  );
+  assert.equal(
+    await error(
+      await fetch(`${proxy.url}/api/intel/providers`, {
+        headers: { origin: 'https://evil.example' },
+      }),
+    ),
+    'providers_cross-origin',
+  );
+  assert.equal(
+    await error(await fetch(url, { method: 'DELETE' })),
+    'providers_origin-required',
+  );
+  for (const path of [
+    '/api/intel/providers/Bad/key',
+    '/api/intel/providers/openai/secret',
+    '/api/intel/providers/openai/key/x',
+  ]) {
+    const response = await fetch(`${proxy.url}${path}`, {
+      method: 'PUT',
+      headers: { ...json, origin },
+      body: '{}',
+    });
+    assert.equal(response.status, 404, path);
+  }
+  assert.equal(
+    (await fetch(`${proxy.url}/api/intel/providers/policy`)).status,
+    405,
+  );
+  assert.equal(reached, 0);
+
+  const shared = createIntelHandler({
+    target: upstream.url,
+    env: { PINOKIO_SHARE_CLOUDFLARE: '1' },
+  });
+  const res = replyDouble();
+  await shared(
+    {
+      method: 'GET',
+      url: '/providers',
+      headers: { host: '127.0.0.1:4173' },
+      socket: { remoteAddress: '127.0.0.1' },
+    },
+    res,
+  );
+  assert.equal(res.status, 403);
+  assert.match(res.body, /providers_sharing/);
+  assert.equal(reached, 0);
+});
+
+test('provider routes stay closed to the LAN even with chat opened to it', async () => {
+  let calls = 0;
+  const fakeRequest = () => {
+    calls += 1;
+    return { on() {}, once() {}, setTimeout() {}, end() {}, destroy() {} };
+  };
+  const open = createIntelHandler({
+    request: fakeRequest,
+    env: { SPECTRE_CHAT_ALLOW_LAN: '1' },
+  });
+  const lan = {
+    method: 'GET',
+    headers: { host: '192.168.1.10:4173' },
+    socket: { remoteAddress: '192.168.1.40' },
+  };
+  for (const url of ['/providers', '/providers/session']) {
+    const res = replyDouble();
+    await open({ ...lan, url }, res);
+    assert.equal(res.status, 403, url);
+    assert.match(res.body, /providers_not-loopback/);
+  }
+  // A loopback socket with a foreign Host (DNS rebinding, a tunnel) too.
+  const rebound = replyDouble();
+  await open(
+    {
+      ...lan,
+      url: '/providers',
+      socket: { remoteAddress: '127.0.0.1' },
+      headers: { host: 'attacker.example' },
+    },
+    rebound,
+  );
+  assert.match(rebound.body, /providers_not-local-host/);
+  await open({ ...lan, url: '/chat/status' }, replyDouble());
+  assert.equal(calls, 1, 'only the chat read reached the service');
+});

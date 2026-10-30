@@ -88,9 +88,13 @@ def test_a_malformed_key_is_refused(tmp_path: Path, value: str) -> None:
     assert raised.value.code == "bad_key" and memory.values == {}
 
 
-def test_a_provider_without_a_key_refuses_one(tmp_path: Path) -> None:
-    keys, _, _ = store_with(tmp_path)
-    assert keys.status(OLLAMA).public()["required"] is False
+def test_a_provider_without_a_key_refuses_one_and_never_reads_the_keyring(tmp_path: Path) -> None:
+    class Untouchable(MemoryKeyring):
+        def get_password(self, service: str, username: str) -> str | None:
+            raise AssertionError("a keyless provider read the keyring")
+
+    keys = KeyStore(boot_env={}, env_file=tmp_path / ".env", backend=Untouchable())
+    assert keys.status(OLLAMA).public()["required"] is False and keys.get(OLLAMA) is None
     with pytest.raises(KeyStoreError) as raised:
         keys.set(OLLAMA, CANARY)
     assert raised.value.code == "no_key"

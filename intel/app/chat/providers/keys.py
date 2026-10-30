@@ -100,6 +100,8 @@ class KeyStore:
             return None
 
     def _lookup(self, spec: ProviderSpec) -> tuple[str, Source] | None:
+        if not spec.key_env:
+            return None  # a provider without a key never touches the keyring
         for name in spec.key_env:
             value = (self._boot.get(name) or "").strip()
             if value:

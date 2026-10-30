@@ -240,7 +240,8 @@ def test_a_base_url_override_wins_over_the_file(tmp_path: Path) -> None:
     path = _yaml(tmp_path, "providers:\n  - {id: x1, adapter: mock, kind: local, base_url: 'http://a'}\n")
     built = build_providers(
         load_specs(path, ADAPTERS),
-        {"mock": lambda spec, url: (spec.id, url)},  # type: ignore[dict-item]
+        {"mock": lambda spec, url, key: (spec.id, url, key())},  # type: ignore[dict-item]
         base_urls={"x1": "http://b"},
+        key_for=lambda spec: f"key-for-{spec.id}",
     )
-    assert built == {"x1": ("x1", "http://b")}
+    assert built == {"x1": ("x1", "http://b", "key-for-x1")}

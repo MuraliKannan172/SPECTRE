@@ -1,5 +1,7 @@
 import http from 'node:http';
 
+import { admitKeySetupRequest } from '../../src/keySetupCore.mjs';
+
 /**
  * SPECTRE: same-origin proxy from /api/intel/* to the local intel service
  * (intel/, FastAPI on 127.0.0.1:8100). The browser never talks to the service
@@ -13,6 +15,11 @@ import http from 'node:http';
  *   come from this page's own origin and carry a body of the route's type and
  *   size: JSON of at most 64 KB, or for /voice/transcribe one recorded
  *   question (audio, at most 2 MB).
+ * - Provider routes (/providers..., keys and Neural Core provider settings)
+ *   pass the same gate as POWER UP, admitKeySetupRequest: never proxied or
+ *   shared, a loopback socket, a local Host, and every write with an exact
+ *   local Origin. SPECTRE_CHAT_ALLOW_LAN never opens them. Only these routes
+ *   forward X-Spectre-Session, the token the service requires on writes.
  * - The target is loopback only. SPECTRE_INTEL_URL may move the port, never
  *   the host off this machine.
  * - Host is set to the target's, which the service's DNS-rebinding allowlist
@@ -78,8 +85,35 @@ const ROUTES = Object.freeze([
     write: true,
     body: JSON_BODY,
   },
+  {
+    methods: ['GET'],
+    pattern: /^\/providers(?:\/session|\/[a-z][a-z0-9_-]{1,31}\/models)?$/,
+    providers: true,
+  },
+  {
+    methods: ['PUT'],
+    pattern:
+      /^\/providers\/(?:policy|[a-z][a-z0-9_-]{1,31}\/(?:key|settings|consent))$/,
+    providers: true,
+    write: true,
+    body: JSON_BODY,
+  },
+  {
+    methods: ['DELETE'],
+    pattern: /^\/providers\/[a-z][a-z0-9_-]{1,31}\/key$/,
+    providers: true,
+    write: true,
+  },
+  {
+    methods: ['POST'],
+    pattern: /^\/providers\/[a-z][a-z0-9_-]{1,31}\/test$/,
+    providers: true,
+    write: true,
+    body: JSON_BODY,
+  },
 ]);
 const FORWARD_REQUEST_HEADERS = ['accept', 'last-event-id'];
+const SESSION_HEADER = 'x-spectre-session';
 const FORWARD_RESPONSE_HEADERS = [
   'content-type',
   'cache-control',
@@ -152,6 +186,25 @@ function readBody(req, limit) {
   });
 }
 
+/**
+ * POWER UP's admission gate for a provider route. Every write is gated as a
+ * POST, so it needs an exact local Origin. A write without a body (DELETE of
+ * a key) skips only the JSON check, which exists to force a CORS preflight
+ * that a DELETE always triggers anyway.
+ */
+function admitProviderRequest(req, route, env) {
+  return admitKeySetupRequest({
+    method: route.write ? 'POST' : 'GET',
+    remoteAddress: req.socket?.remoteAddress,
+    hostHeader: req.headers.host,
+    protocol: req.socket?.encrypted ? 'https:' : 'http:',
+    origin: req.headers.origin,
+    contentType: route.body ? req.headers['content-type'] : 'application/json',
+    proxyHeaders: req.headers,
+    env,
+  });
+}
+
 /** The route for this path and method, or the status that refuses it. */
 function routeFor(path, method) {
   const matches = ROUTES.filter((route) => route.pattern.test(path));
@@ -190,12 +243,22 @@ export function createIntelHandler({
       });
       return;
     }
+    if (route.providers) {
+      const gate = admitProviderRequest(req, route, env);
+      if (!gate.ok) {
+        sendJson(res, gate.status, { error: `providers_${gate.code}` });
+        return;
+      }
+    }
     if (route.write && !sameOrigin(req)) {
       sendJson(res, 403, { error: 'cross_origin' });
       return;
     }
     const headers = { host: base.host };
-    for (const name of FORWARD_REQUEST_HEADERS) {
+    const forwarded = route.providers
+      ? [...FORWARD_REQUEST_HEADERS, SESSION_HEADER]
+      : FORWARD_REQUEST_HEADERS;
+    for (const name of forwarded) {
       if (typeof req.headers[name] === 'string')
         headers[name] = req.headers[name];
     }

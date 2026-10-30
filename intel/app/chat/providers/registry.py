@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -67,6 +68,23 @@ def _spec(entry: Any, adapters: Mapping[str, object]) -> ProviderSpec:
     )
 
 
+_LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+
+
+def base_url_problem(url: str) -> str | None:
+    """Why a user-supplied base URL is refused, or None. The URL receives the
+    key, so it must be https, or http on this machine only (a local server)."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if parts.scheme not in ("http", "https") or not host:
+        return "must be an http(s) URL"
+    if parts.username or parts.password or parts.query or parts.fragment:
+        return "must not carry credentials, a query or a fragment"
+    if parts.scheme == "http" and host not in _LOOPBACK:
+        return "must use https unless the server is on this machine"
+    return None
+
+
 def load_specs(path: Path, adapters: Mapping[str, object]) -> list[ProviderSpec]:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -81,7 +99,14 @@ def load_specs(path: Path, adapters: Mapping[str, object]) -> list[ProviderSpec]
     return specs
 
 
-Factory = Callable[[ProviderSpec, str], ChatProvider]
+KeyGetter = Callable[[], str | None]
+# An adapter gets a key getter, never the key: a key saved later is used on
+# the next request, and no adapter holds a key it could print.
+Factory = Callable[[ProviderSpec, str, KeyGetter], ChatProvider]
+
+
+def _no_key(spec: ProviderSpec) -> str | None:
+    return None
 
 
 def build_providers(
@@ -89,19 +114,59 @@ def build_providers(
     factories: Mapping[str, Factory],
     *,
     base_urls: Mapping[str, str] | None = None,
+    key_for: Callable[[ProviderSpec], str | None] = _no_key,
 ) -> dict[str, ChatProvider]:
     """One adapter per spec; `base_urls` overrides a spec's default URL."""
     overrides = base_urls or {}
-    return {spec.id: factories[spec.adapter](spec, overrides.get(spec.id) or spec.base_url) for spec in specs}
+    return {
+        spec.id: factories[spec.adapter](
+            spec, overrides.get(spec.id) or spec.base_url, partial(key_for, spec)
+        )
+        for spec in specs
+    }
+
+
+@dataclass
+class ProviderSet:
+    """The running providers and what built them, so one can be rebuilt when
+    its base URL changes."""
+
+    specs: dict[str, ProviderSpec]
+    providers: dict[str, ChatProvider]
+    factories: Mapping[str, Factory]
+    key_for: Callable[[ProviderSpec], str | None] = _no_key
+
+    def get(self, provider_id: str) -> ChatProvider | None:
+        return self.providers.get(provider_id)
+
+    def rebuild(self, provider_id: str, base_url: str) -> ChatProvider:
+        spec = self.specs[provider_id]
+        provider = self.factories[spec.adapter](spec, base_url, partial(self.key_for, spec))
+        self.providers = {**self.providers, provider_id: provider}
+        return provider
+
+
+def ollama_factory(http: httpx.AsyncClient) -> Factory:
+    return lambda spec, url, key: OllamaProvider(OllamaClient(url, http))
 
 
 def default_providers(
-    *, ollama_http: httpx.AsyncClient, ollama_host: str, path: Path = DEFAULT_PATH
-) -> dict[str, ChatProvider]:
-    """The service's providers, from the YAML file. OLLAMA_HOST wins over the
-    file's Ollama URL."""
-    factories: dict[str, Factory] = {
-        "ollama": lambda spec, url: OllamaProvider(OllamaClient(url, ollama_http)),
-    }
-    specs = load_specs(path, factories)
-    return build_providers(specs, factories, base_urls={"ollama": ollama_host})
+    *,
+    ollama_http: httpx.AsyncClient,
+    ollama_host: str,
+    path: Path = DEFAULT_PATH,
+    key_for: Callable[[ProviderSpec], str | None] = _no_key,
+    base_urls: Mapping[str, str] | None = None,
+    factories: Mapping[str, Factory] | None = None,
+) -> ProviderSet:
+    """The service's providers, from the YAML file. `base_urls` holds saved
+    overrides; OLLAMA_HOST always wins for Ollama."""
+    all_factories = {"ollama": ollama_factory(ollama_http), **(factories or {})}
+    specs = load_specs(path, all_factories)
+    urls = {**(base_urls or {}), "ollama": ollama_host}
+    return ProviderSet(
+        specs={spec.id: spec for spec in specs},
+        providers=build_providers(specs, all_factories, base_urls=urls, key_for=key_for),
+        factories=all_factories,
+        key_for=key_for,
+    )
