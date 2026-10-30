@@ -93,6 +93,10 @@ smoke test and should pass in full. `npm run qa:neural-core` (same setup,
 mocked chat endpoints) is the Neural Core panel smoke test and should pass
 in full. `npm run qa:spectre-boot` (same setup, mocked intel endpoints) is
 the boot overlay and brand glitch smoke test and should pass in full.
+`npm run qa:neural-core-providers` (same setup, a stateful mock of the
+provider routes) covers the provider chip and settings, keys typed in POWER
+UP (a canary key never stored in the browser), the consent dialog, no silent
+fallback, the budget, markup injection and 390 px; it should pass in full.
 
 The Neural Core eval needs Ollama and network for web search:
 `uv run --project intel python intel/scripts/neural_core_eval.py --model <tag>`.

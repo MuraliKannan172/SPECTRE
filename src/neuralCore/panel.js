@@ -223,7 +223,8 @@ export function mountNeuralCorePanel({
     providers,
     panel,
     disclaimer,
-    historyLength: () => list.querySelectorAll('.spectre-nc-user').length,
+    historyLength: () =>
+      list.querySelectorAll('.spectre-nc-msg.is-user').length,
     onChanged: () => void refreshStatus(),
   });
   header.insertBefore(controls.chip, clearButton);
