@@ -2940,5 +2940,21 @@
   "GLOBE ENGINE": "地球引擎",
   "INTEL SERVICE": "情报服务",
   "PRESS ANY KEY OR CLICK TO SKIP": "按任意键或点击以跳过",
-  "{name} startup status": "{name} 启动状态"
+  "{name} startup status": "{name} 启动状态",
+  "no API key": "无 API 密钥",
+  "waiting for consent": "等待同意",
+  "blocked by local-only mode": "已被仅本地模式阻止",
+  "provider unavailable": "提供方不可用",
+  "The provider refused the API key. Check it in POWER UP.": "提供方拒绝了 API 密钥。请在 POWER UP 中检查。",
+  "No API key is set for this provider. Add one in POWER UP.": "此提供方未设置 API 密钥。请在 POWER UP 中添加。",
+  "The provider account is out of credit or over its spending limit.": "提供方账户余额不足或已超出支出上限。",
+  "The provider is rate-limiting requests. Wait a moment.": "提供方正在限制请求频率。请稍候。",
+  "The provider does not know the model {model}.": "提供方不认识模型 {model}。",
+  "This conversation is too long for the model. Clear the history and ask again.": "此对话对该模型而言过长。请清除历史记录后重新提问。",
+  "The provider does not support this request.": "提供方不支持此请求。",
+  "The provider is unavailable right now. Try again shortly.": "提供方目前不可用。请稍后重试。",
+  "This provider has not been allowed to receive the conversation yet.": "尚未允许此提供方接收对话。",
+  "Local-only mode is on, so cloud models are blocked.": "仅本地模式已开启，云端模型被阻止。",
+  "The selected provider is not available.": "所选提供方不可用。",
+  "{label} · ready": "{label} · 就绪"
 }

@@ -52,7 +52,38 @@ const ERRORS = Object.freeze({
   chat_local_only: msg('The Neural Core answers only on this computer.'),
   nothing_to_regenerate: msg('There is no answer to regenerate.'),
   network: msg('Could not reach the app server.'),
+  // API providers (ADR-002 D8); the provider is named in the panel header.
+  auth_failed: msg('The provider refused the API key. Check it in POWER UP.'),
+  no_key: msg('No API key is set for this provider. Add one in POWER UP.'),
+  quota_exceeded: msg(
+    'The provider account is out of credit or over its spending limit.',
+  ),
+  provider_rate_limited: msg(
+    'The provider is rate-limiting requests. Wait a moment.',
+  ),
+  model_not_found: msg('The provider does not know the model {model}.'),
+  context_too_long: msg(
+    'This conversation is too long for the model. Clear the history and ask again.',
+  ),
+  unsupported_feature: msg('The provider does not support this request.'),
+  provider_unavailable: msg(
+    'The provider is unavailable right now. Try again shortly.',
+  ),
+  consent_required: msg(
+    'This provider has not been allowed to receive the conversation yet.',
+  ),
+  local_only: msg('Local-only mode is on, so cloud models are blocked.'),
+  unknown_provider: msg('The selected provider is not available.'),
 });
+
+/** The error code to show for an SSE error: a provider's rate limit is not
+ * the panel's own per-minute limit. */
+export function turnErrorCode(data) {
+  const code = String(data?.code || '');
+  if (code === 'rate_limited' && data?.provider && data.provider !== 'ollama')
+    return 'provider_rate_limited';
+  return code;
+}
 
 /** The failure message for an error code from the service or proxy. */
 export function errorText(code, { model = '' } = {}) {
@@ -116,6 +147,15 @@ export function endsWithAsOf(text) {
  * The header readout from GET /api/intel/chat/status (or the failure to get it).
  * @returns {{tone: 'ready'|'idle'|'degraded'|'offline', text: string, search: string|null}}
  */
+/** A status for a selected API provider, from a service that reports it. */
+export function isApiSelection(status) {
+  return Boolean(
+    status?.provider &&
+    status.provider !== 'ollama' &&
+    typeof status.ready === 'boolean',
+  );
+}
+
 export function statusSummary(status, failureCode = null) {
   if (failureCode)
     return { tone: 'offline', text: errorText(failureCode), search: null };
@@ -127,6 +167,18 @@ export function statusSummary(status, failureCode = null) {
       text: translateKnown(status.chat_problem),
       search,
     };
+  // An API provider is judged by the provider-neutral pair (ADR-002 D7);
+  // Ollama, and a service from before it, as before.
+  if (isApiSelection(status)) {
+    const label = `${status.provider} · ${model}`;
+    if (status.ready)
+      return { tone: 'ready', text: t('{label} · ready', { label }), search };
+    return {
+      tone: 'offline',
+      text: `${label} · ${errorText(status.problem || 'unknown_provider', { model })}`,
+      search,
+    };
+  }
   if (!status?.ollama?.reachable)
     return { tone: 'offline', text: errorText('ollama_offline'), search };
   if (status.model_present === false)

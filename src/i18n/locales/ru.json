@@ -3162,5 +3162,21 @@
   "GLOBE ENGINE": "ДВИЖОК ГЛОБУСА",
   "INTEL SERVICE": "СЕРВИС РАЗВЕДКИ",
   "PRESS ANY KEY OR CLICK TO SKIP": "НАЖМИТЕ ЛЮБУЮ КЛАВИШУ ИЛИ ЩЁЛКНИТЕ, ЧТОБЫ ПРОПУСТИТЬ",
-  "{name} startup status": "Состояние запуска {name}"
+  "{name} startup status": "Состояние запуска {name}",
+  "no API key": "нет ключа API",
+  "waiting for consent": "ожидает согласия",
+  "blocked by local-only mode": "заблокировано локальным режимом",
+  "provider unavailable": "провайдер недоступен",
+  "The provider refused the API key. Check it in POWER UP.": "Провайдер отклонил ключ API. Проверьте его в POWER UP.",
+  "No API key is set for this provider. Add one in POWER UP.": "Для этого провайдера не задан ключ API. Добавьте его в POWER UP.",
+  "The provider account is out of credit or over its spending limit.": "На счёте провайдера закончились средства или превышен лимит расходов.",
+  "The provider is rate-limiting requests. Wait a moment.": "Провайдер ограничивает частоту запросов. Подождите немного.",
+  "The provider does not know the model {model}.": "Провайдер не знает модель {model}.",
+  "This conversation is too long for the model. Clear the history and ask again.": "Этот разговор слишком длинный для модели. Очистите историю и спросите снова.",
+  "The provider does not support this request.": "Провайдер не поддерживает этот запрос.",
+  "The provider is unavailable right now. Try again shortly.": "Провайдер сейчас недоступен. Повторите попытку чуть позже.",
+  "This provider has not been allowed to receive the conversation yet.": "Этому провайдеру ещё не разрешено получать разговор.",
+  "Local-only mode is on, so cloud models are blocked.": "Включён локальный режим, поэтому облачные модели заблокированы.",
+  "The selected provider is not available.": "Выбранный провайдер недоступен.",
+  "{label} · ready": "{label} · готов"
 }
