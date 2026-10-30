@@ -24,6 +24,13 @@ const VRAM_KEY = 'spectre.neuralCore.vramGb';
 const DEFAULT_VRAM_GB = 8;
 // The service's accepted range for the API models' context ceiling (ADR-002 D9).
 const CONTEXT_CEILING = [4096, 1_048_576];
+// Where the service accepts the reasoning switch (REASONING_PROVIDERS, D11).
+const REASONING_PROVIDERS = new Set([
+  'ollama',
+  'deepseek',
+  'openrouter',
+  'openai',
+]);
 
 function load(storage, key, fallback) {
   try {
@@ -391,6 +398,7 @@ export function mountProviderSettings({
     form.append(
       field(document, t('Max output tokens'), inputs.max_output_tokens),
     );
+    form.append(...reasoningSwitch(provider, params, inputs));
     if (provider.id === 'ollama') {
       inputs.num_ctx = numberInput(document, params.num_ctx, {
         min: 2048,
@@ -440,9 +448,39 @@ export function mountProviderSettings({
     return form;
   }
 
+  /** The reasoning switch (D11): off unless turned on, and offered only where
+   * the service has a verified way to ask for it; elsewhere it shows why not. */
+  function reasoningSwitch(provider, params, inputs) {
+    const offered = REASONING_PROVIDERS.has(provider.id);
+    const box = node(document, 'input');
+    box.type = 'checkbox';
+    box.checked = offered && params.reasoning === true;
+    box.disabled = !offered;
+    if (offered) inputs.reasoning = box;
+    const label = node(document, 'label', 'spectre-nc-toggle');
+    label.append(
+      box,
+      node(
+        document,
+        'span',
+        '',
+        t('Reasoning: the model thinks first (more tokens, slower)'),
+      ),
+    );
+    if (offered) return [label];
+    const why =
+      provider.adapter === 'anthropic'
+        ? t(
+            'Not in this version for Claude: thinking with tools needs its blocks kept across turns, which is not verified yet.',
+          )
+        : t('Not offered: this provider has no common switch for reasoning.');
+    return [label, node(document, 'p', 'spectre-nc-hint', why)];
+  }
+
   async function saveSettings(provider, inputs) {
     const number = (input) =>
       input && input.value !== '' ? Number(input.value) : undefined;
+    const saved = provider.params?.reasoning;
     const params = {
       temperature: number(inputs.temperature),
       max_output_tokens: number(inputs.max_output_tokens),
@@ -450,6 +488,12 @@ export function mountProviderSettings({
       keep_alive: inputs.keep_alive?.value.trim() || undefined,
       price_in: number(inputs.price_in),
       price_out: number(inputs.price_out),
+      // Sent once it was ever on; never sent otherwise, so OLLAMA_THINK still applies.
+      reasoning: inputs.reasoning?.checked
+        ? true
+        : saved !== undefined
+          ? false
+          : undefined,
     };
     for (const key of Object.keys(params))
       if (params[key] === undefined) delete params[key];

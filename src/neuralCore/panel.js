@@ -337,6 +337,14 @@ export function mountNeuralCorePanel({
   function addAssistant() {
     const item = element(document, 'li', 'spectre-nc-msg is-assistant');
     const tools = element(document, 'ul', 'spectre-nc-tools');
+    // The model's thinking, when reasoning is on: collapsed, plain text, never kept.
+    const thinking = element(document, 'details', 'spectre-nc-thinking');
+    const thinkingText = element(document, 'div', 'spectre-nc-thinking-text');
+    thinking.append(
+      element(document, 'summary', '', t('Thinking')),
+      thinkingText,
+    );
+    thinking.hidden = true;
     const text = element(document, 'div', 'spectre-nc-text');
     const sources = element(document, 'ol', 'spectre-nc-sources');
     const asOf = element(document, 'p', 'spectre-nc-asof');
@@ -353,12 +361,15 @@ export function mountNeuralCorePanel({
     );
     footer.append(meta, voiceMeta, copy, regenerate);
     for (const node of [sources, asOf, error, footer]) node.hidden = true;
-    item.append(tools, text, sources, asOf, error, footer);
+    item.append(tools, thinking, text, sources, asOf, error, footer);
     list.append(item);
     empty.hidden = true;
     const entry = {
       item,
       tools,
+      thinking,
+      thinkingText,
+      thought: '',
       text,
       sources,
       asOf,
@@ -610,6 +621,11 @@ export function mountNeuralCorePanel({
             entry.raw += data.text || '';
             renderText(entry.text, entry.raw, entry.citations);
             speech?.push(data.text || '');
+          } else if (name === 'thinking') {
+            clearWaiting();
+            entry.thought += data.text || '';
+            entry.thinkingText.textContent = entry.thought; // model output: text only
+            entry.thinking.hidden = false;
           } else if (name === 'tool_status') {
             clearWaiting();
             toolChip(entry, data);

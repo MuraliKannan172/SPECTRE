@@ -279,6 +279,30 @@ a.spectre-nc-cite:hover {
   color: var(--sp-text-dim);
 }
 
+/* The model's thinking (reasoning on): collapsed by default, quieter than the answer. */
+.spectre-nc-thinking {
+  margin: 4px 0;
+  color: var(--sp-text-dim);
+  font: 400 11px/1.45 var(--font-mono);
+}
+
+.spectre-nc-thinking summary {
+  cursor: pointer;
+  color: var(--sp-text-faint);
+}
+
+.spectre-nc-thinking summary:focus-visible {
+  outline: 1px solid var(--sp-text-dim);
+  outline-offset: 2px;
+}
+
+.spectre-nc-thinking-text {
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .spectre-nc-error {
   color: var(--sp-warn);
 }

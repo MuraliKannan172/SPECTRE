@@ -3061,5 +3061,9 @@
   "Cloud models answer only on the computer running SPECTRE.": "云端模型只在运行 SPECTRE 的电脑上回答。",
   "cloud models answer on the host only": "云端模型只在主机上回答",
   "cut off at the output limit": "在输出上限处被截断",
-  "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "该密钥是为另一个地址保存的，因此不会发送到此地址。请在 POWER UP 中重新保存以在此使用。"
+  "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "该密钥是为另一个地址保存的，因此不会发送到此地址。请在 POWER UP 中重新保存以在此使用。",
+  "Thinking": "思考过程",
+  "Reasoning: the model thinks first (more tokens, slower)": "推理：模型先思考（更多 token，更慢）",
+  "Not in this version for Claude: thinking with tools needs its blocks kept across turns, which is not verified yet.": "此版本暂不支持 Claude：带工具的思考需要跨轮保留其思考块，这一点尚未验证。",
+  "Not offered: this provider has no common switch for reasoning.": "不提供：此提供商没有通用的推理开关。"
 }

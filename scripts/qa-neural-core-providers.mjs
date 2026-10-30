@@ -185,6 +185,7 @@ const TURNS = {
   markup: () =>
     sse([
       turnStart(),
+      ['thinking', { text: 'Plan: <img src=y onerror="window.__pwned=3">' }],
       ['token', { text: 'Look: <img src=x onerror="window.__pwned=1"> ' }],
       ['token', { text: '<script>window.__pwned=2</script> done.' }],
       done(),
@@ -362,6 +363,11 @@ const lastAnswer = (page) =>
         ...(last?.querySelectorAll('.spectre-nc-recovery button') || []),
       ].map((b) => b.textContent),
       images: last?.querySelectorAll('.spectre-nc-text img').length ?? -1,
+      thinking:
+        last?.querySelector('.spectre-nc-thinking-text')?.textContent || '',
+      thinkingOpen: last?.querySelector('.spectre-nc-thinking')?.open ?? null,
+      thinkingImages:
+        last?.querySelectorAll('.spectre-nc-thinking img').length ?? -1,
     };
   });
 
@@ -726,6 +732,13 @@ async function run(page) {
       answer.text.includes('<img src=x') &&
       answer.text.includes('<script>'),
     `pwned=${pwned}, images=${answer.images}`,
+  );
+  record(
+    'Thinking shows collapsed, as text, and runs nothing',
+    answer.thinking.includes('<img src=y') &&
+      answer.thinkingImages === 0 &&
+      answer.thinkingOpen === false,
+    `open=${answer.thinkingOpen}, images=${answer.thinkingImages}`,
   );
 
   console.log(

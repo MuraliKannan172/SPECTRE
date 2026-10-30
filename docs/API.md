@@ -91,6 +91,7 @@ The response is `text/event-stream`:
 | `done` | `{"model", "provider", "usage": {"input", "output"}, "stop_reason", "tokens_per_s", "eval_count", "prompt_eval_count", "as_of", "citations", "degraded", "rounds", "seconds", "refused"?}` |
 | `error` | `{"code", "message", "provider"?, "retryable"?}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped`, `consent_required`, `local_only`, `lan_viewer`, `auth_failed`, `rate_limited`; a rejected key's message is always "The provider rejected the key." |
 | `budget` | `{"spent", "allowance", "budget"}`: the conversation reached its cloud token budget, and nothing was sent |
+| `thinking` | `{"text"}`: the model's thinking when reasoning is on; shown collapsed, never stored |
 
 At most 4 tool rounds run per turn, and the final request asks for an answer, not a call. `as_of` is set when news or web results were used. `usage` counts every round. The turn runs on the conversation's selected provider and model (`PUT /api/intel/providers/selection`); the chat body cannot change it, and a selection that cannot run is an `error`, never a switch. Before each round the request is trimmed to the model's input limit: the oldest tool results first, then the oldest history ([ADR-002](ADR-002-providers.md) D9).
 
@@ -135,7 +136,7 @@ The proxy answers every route for this machine only, even with `SPECTRE_CHAT_ALL
 | `PUT /api/intel/providers/selection` | `{"provider", "model"}` for the current conversation and new ones |
 | `PUT /api/intel/providers/{id}/key` | `{"key"}`, stored in the OS keyring (or `.env` without one); returns the `key` status |
 | `DELETE /api/intel/providers/{id}/key` | removes the stored key; an environment key stays |
-| `PUT /api/intel/providers/{id}/settings` | `{"base_url"?, "workspace_id"?, "chat_completions_models"?, "params"?}`; `params`: `temperature` (not for Anthropic), `max_output_tokens`, `price_in`, `price_out` (USD per 1M tokens), and for Ollama `num_ctx`, `keep_alive` |
+| `PUT /api/intel/providers/{id}/settings` | `{"base_url"?, "workspace_id"?, "chat_completions_models"?, "params"?}`; `params`: `temperature` (not for Anthropic), `max_output_tokens`, `price_in`, `price_out` (USD per 1M tokens), `reasoning` (Ollama, DeepSeek, OpenRouter, OpenAI only), and for Ollama `num_ctx`, `keep_alive` |
 | `PUT /api/intel/providers/{id}/consent` | `{"granted"}` |
 | `POST /api/intel/providers/{id}/test` | `{}`; `{"ok": true, ...}` or `{"ok": false, "code", "message", "retryable"}` |
 | `GET /api/intel/providers/{id}/models` | `{"models": [{"id", "label", "kind", "supports_tools", "capabilities", "context_window", "details"}]}` |

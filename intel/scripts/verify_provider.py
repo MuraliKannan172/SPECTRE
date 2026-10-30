@@ -48,6 +48,7 @@ from keyring.backend import KeyringBackend
 INTEL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INTEL_DIR))
 
+from app.chat.agent import REASONING_MAX_OUTPUT  # noqa: E402
 from app.chat.providers.base import (  # noqa: E402
     ChatProvider,
     ChatRequest,
@@ -211,7 +212,7 @@ async def tool_step(provider: ChatProvider, model: str, params: dict[str, Any], 
 
 def request_params(settings: Settings, saved: Mapping[str, Any]) -> dict[str, Any]:
     """The agent's defaults and the saved per-provider parameters, with a
-    small output cap."""
+    small output cap (larger with reasoning on: thinking shares it)."""
     params: dict[str, Any] = {
         "think": settings.ollama_think,
         "keep_alive": settings.ollama_keep_alive,
@@ -219,7 +220,11 @@ def request_params(settings: Settings, saved: Mapping[str, Any]) -> dict[str, An
         "temperature": 0.2,
         **saved,
     }
-    params["max_output_tokens"] = min(int(params.get("max_output_tokens") or MAX_OUTPUT), MAX_OUTPUT)
+    cap = MAX_OUTPUT
+    if "reasoning" in saved:  # as the agent maps it (Ollama calls it think)
+        params["think"] = bool(saved["reasoning"])
+        cap = REASONING_MAX_OUTPUT if saved["reasoning"] else MAX_OUTPUT
+    params["max_output_tokens"] = min(int(params.get("max_output_tokens") or cap), cap)
     return params
 
 

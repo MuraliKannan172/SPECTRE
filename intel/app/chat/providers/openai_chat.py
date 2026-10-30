@@ -59,10 +59,12 @@ class Quirks:
     disable_thinking: bool = False  # DeepSeek: thinking is on unless turned off
     reasoning_content_back: bool = False  # DeepSeek: 400 without it once tools are used
     tools_need_effort_none: bool = False  # OpenAI Chat Completions, GPT-5.4 and later
+    reasoning_switch: bool = False  # OpenRouter: reasoning {enabled: true} when asked for
 
 
 QUIRKS = {
     "deepseek": Quirks(disable_thinking=True, reasoning_content_back=True),
+    "openrouter": Quirks(reasoning_switch=True),
     "openai": Quirks(
         max_tokens_field="max_completion_tokens", temperature=False, tools_need_effort_none=True
     ),
@@ -239,6 +241,8 @@ class OpenAIChatProvider:
             body["temperature"] = params["temperature"]
         if self.quirks.disable_thinking and not params.get("reasoning"):
             body["extra_body"] = {"thinking": {"type": "disabled"}}
+        if self.quirks.reasoning_switch and params.get("reasoning"):
+            body["extra_body"] = {"reasoning": {"enabled": True}}
         return body
 
     async def stream(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:

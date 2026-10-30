@@ -43,6 +43,7 @@ from .openai_chat import OpenAIChatProvider
 from .registry import KeyGetter, ProviderSpec
 from .sdk import DEFAULT_MAX_OUTPUT, SDK_ERRORS, classify, provider_error
 
+REASONING_EFFORT = "medium"  # when the user turns reasoning on (D11)
 EFFORTS = ("none", "minimal", "low")
 # Not chat models, on OpenAI's own list (it carries no capability data).
 _NOT_RESPONSES = ("realtime", "audio", "image", "search", "computer-use", "codex-mini")
@@ -154,6 +155,9 @@ class OpenAIResponsesProvider:
         client = self.chat.client()
         known = request.model in self._effort
         ladder: tuple[str | None, ...] = (self._effort[request.model],) if known else (*EFFORTS, None)
+        if request.params.get("reasoning"):
+            # Asked for: one fixed effort, and the learned lowest one stays as it was.
+            ladder = (REASONING_EFFORT,)
         for effort in ladder:
             failure: ProviderError | None = None
             rejected = False
@@ -167,7 +171,8 @@ class OpenAIResponsesProvider:
             if failure is not None:
                 raise failure
             if not rejected:
-                self._effort[request.model] = effort
+                if not request.params.get("reasoning"):
+                    self._effort[request.model] = effort
                 return opened
         raise ProviderError(errors.UNSUPPORTED_FEATURE, "No reasoning effort was accepted", provider=self.id)
 

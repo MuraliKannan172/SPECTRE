@@ -56,6 +56,7 @@ from .providers.base import (
     Done,
     Message,
     TextDelta,
+    ThinkingDelta,
     ToolCall,
     ToolCallEvent,
     Usage,
@@ -71,6 +72,9 @@ BASE_WINDOW = 16384
 CLIENT_TOOL_TIMEOUT = 15.0
 MAX_CLIENT_RESULT_CHARS = 4000
 MAX_ROUND_CHARS = 60_000  # one round's reply; far above any real answer
+# Thinking shares the output budget, so a reasoning turn gets more room.
+REASONING_MAX_OUTPUT = 8192
+OLLAMA_THINKING_RESERVE = 4096
 INFO_TOOLS = frozenset({"news_search", "news_near", "web_search", "fetch_page"})
 # Said after the untrusted block, so it reads as ours, not the source's.
 CITE_HINT = "\nCite each fact you use from these sources with its number, like [1]."
@@ -284,6 +288,8 @@ class Agent:
         density = self._density.get((provider.id, model), CHARS_PER_TOKEN)
         if provider.id == "ollama":
             num_ctx = int(params.get("num_ctx") or self.settings.num_ctx)
+            thinks = bool(params["reasoning"]) if "reasoning" in params else self.settings.ollama_think
+            reserve = OLLAMA_THINKING_RESERVE if thinks else OLLAMA_OUTPUT_RESERVE
             return Plan(
                 provider,
                 model,
@@ -291,7 +297,7 @@ class Agent:
                 budgets_for(num_ctx),
                 info.kind,
                 params,
-                input_limit=num_ctx - OLLAMA_OUTPUT_RESERVE,
+                input_limit=num_ctx - reserve,
                 chars_per_token=density,
             )
         support = info.supports_tools
@@ -311,7 +317,8 @@ class Agent:
                     # cache row, and no second probe while the service runs (D10).
                     self._unproven.add(key)
                 support = probed or "yes"
-        max_output = int(params.get("max_output_tokens") or DEFAULT_MAX_OUTPUT)
+        default_output = REASONING_MAX_OUTPUT if params.get("reasoning") else DEFAULT_MAX_OUTPUT
+        max_output = int(params.get("max_output_tokens") or default_output)
         ceiling = self.context_ceiling()
         return Plan(
             provider,
@@ -370,6 +377,10 @@ class Agent:
             "temperature": 0.2,
             **plan.params,  # the user's per-provider settings (P4), validated by the API
         }
+        if "reasoning" in plan.params:  # absent: every request as before
+            params["think"] = bool(plan.params["reasoning"])  # Ollama's name for it
+            if plan.params["reasoning"] and "max_output_tokens" not in plan.params:
+                params["max_output_tokens"] = REASONING_MAX_OUTPUT
         return ChatRequest(
             model=plan.model,
             messages=tuple(messages),
@@ -437,6 +448,7 @@ class Agent:
                 allow_tools = rounds <= MAX_TOOL_ROUNDS
                 think = ThinkFilter()
                 content, calls = "", []
+                thought = 0
                 provider_state: dict[str, Any] | None = None
                 messages = fit(messages, limit, fixed)
                 request = self._request(messages, plan, native=native, allow_tools=allow_tools)
@@ -453,6 +465,14 @@ class Agent:
                                 if native:
                                     yield "token", {"text": piece}
                             if len(content) > MAX_ROUND_CHARS:  # a runaway reply: stop paying for it
+                                stop = "length"
+                                break
+                        elif isinstance(event, ThinkingDelta):
+                            # Shown collapsed, never stored or replayed as text (D7).
+                            thought += len(event.text)
+                            if event.text:
+                                yield "thinking", {"text": event.text}
+                            if thought > MAX_ROUND_CHARS:
                                 stop = "length"
                                 break
                         elif isinstance(event, ToolCallEvent):
