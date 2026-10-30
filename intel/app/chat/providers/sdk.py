@@ -100,6 +100,8 @@ def classify(status: int | None, body: Any, text: str = "") -> str:
         return errors.QUOTA_EXCEEDED
     if "insufficient_system_resource" in blob:
         return errors.PROVIDER_UNAVAILABLE
+    if "rate_limit" in blob:  # also mid-stream, where there is no status
+        return errors.RATE_LIMITED
     mapped = _ANTHROPIC_TYPES.get(str(inner.get("type") or ""))
     if mapped:
         return mapped

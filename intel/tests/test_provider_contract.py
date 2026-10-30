@@ -18,6 +18,7 @@ import httpx
 import pytest
 from fakes_anthropic import AnthropicHarness
 from fakes_openai_chat import OpenAIChatHarness
+from fakes_openai_responses import ResponsesHarness
 from sse import CANARY
 
 from app.chat.ollama import OllamaClient
@@ -199,7 +200,7 @@ class OllamaHarness:
         return [(m["tool_name"], m["content"]) for m in messages if m["role"] == "tool"]
 
 
-HARNESSES = [MockHarness, OllamaHarness, OpenAIChatHarness, AnthropicHarness]
+HARNESSES = [MockHarness, OllamaHarness, OpenAIChatHarness, AnthropicHarness, ResponsesHarness]
 
 
 @pytest.fixture(params=HARNESSES, ids=lambda cls: cls.name)
