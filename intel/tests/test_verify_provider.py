@@ -62,6 +62,7 @@ def test_ollama_passes_a_listing_a_prompt_and_a_tool_round_trip(settings: Settin
     fake.tags = [{"name": "m:1", "capabilities": ["completion", "tools"]}]
     code, out = run(settings, "ollama", "m:1", ollama=fake)
     assert code == 0, out
+    assert out.startswith(f"No saved settings at {settings.db_path}; defaults used")
     for line in ("PASS 1 list models: 1 listed", "PASS 2 short prompt: 'ready'", "PASS 3 tool call"):
         assert line in out
     assert "PASS 3 tool result: 'The sum is 42.'" in out and out.endswith("RESULT PASS")
@@ -128,6 +129,7 @@ def test_local_only_mode_stops_a_cloud_check_and_the_database_is_only_read(setti
     api = OpenAIChatHarness()
     code, out = run(settings, "openrouter", "m", environ={"OPENROUTER_API_KEY": CANARY}, api=api)
     assert code == 2 and "Local-only mode is on" in out
+    assert out.startswith(f"Saved settings from {settings.db_path}")
     assert api.upstream.paths == [], "not even the model list"
     assert settings.db_path.read_bytes() == before
     # A read-only open of a WAL database leaves SQLite's index and an empty log, no data.

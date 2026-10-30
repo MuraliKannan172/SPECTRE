@@ -30,7 +30,7 @@ Keys and prices: [KEYS_AND_COSTS.md](KEYS_AND_COSTS.md). Design: [ADR-002](ADR-0
 Ollama 0.40.13 on this machine only:
 
 - **The check script:** `verify_provider.py ollama` passed all three steps with
-  `qwen3.5-9b-64k-gpu:latest` in 2 of 3 runs (output below).
+  `qwen3.5-9b-64k-gpu:latest` in 3 of 4 runs (output below).
   - In the other run, step 2 failed as `provider_unavailable`: Ollama's model runner crashed
     while loading (`CUDA error: shared object initialization failed`).
   - Step 3 then passed on a fresh runner, and the next run passed in full.
@@ -123,6 +123,7 @@ Exit status:
 
 ```text
 > uv run --project intel python intel/scripts/verify_provider.py ollama
+Saved settings from C:\Users\Murali Kannan\Workspace\Claude\SKYNET\intel\data\spectre.db
 Ollama at http://127.0.0.1:11434 (local)
 PASS 1 list models: 8 listed
        nemotron-3.5-bolt:e4b  [local, tools yes]

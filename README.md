@@ -144,7 +144,7 @@ Some free sources allow only personal, non-commercial use, so SPECTRE leaves the
   - The model has no shell, file or code tools.
 - **Ollama's own setting.** If `npm run doctor` warns that Ollama answers on your network address, Ollama is reachable from other machines with no authentication; turn that off in Ollama's settings unless you need it.
 
-The full checklist, with evidence, is in [docs/phase6/security-checklist.md](docs/phase6/security-checklist.md).
+The full checklist, with evidence, is in [docs/phase6/security-checklist.md](docs/phase6/security-checklist.md). Chat provider keys and cloud models came later: [docs/KEYS_AND_COSTS.md](docs/KEYS_AND_COSTS.md) and [ADR-002](docs/ADR-002-providers.md) §8 cover them.
 
 ## Responsible use
 
