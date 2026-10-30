@@ -3206,8 +3206,6 @@
   "Model id": "ID de modelo",
   "Use this model id": "Usar este ID de modelo",
   "Context ceiling for API models, in tokens (16384 by default; more sends more history and web text, all billed)": "Límite de contexto para modelos de API, en tokens (16384 por defecto; más envía más historial y texto web, todo facturado)",
-  "Cloud models answer only on the computer running SPECTRE.": "Los modelos en la nube solo responden en el ordenador que ejecuta SPECTRE.",
-  "cloud models answer on the host only": "los modelos en la nube solo responden en el equipo anfitrión",
   "cut off at the output limit": "cortada en el límite de salida",
   "The key was saved for another address, so it is not sent to this one. Save it again in POWER UP to use it here.": "La clave se guardó para otra dirección, así que no se envía a esta. Guárdala de nuevo en POWER UP para usarla aquí.",
   "Thinking": "Razonamiento",
@@ -3222,5 +3220,11 @@
   "Pulled {model}.": "{model} descargado.",
   "Ollama could not pull it: {message}": "Ollama no pudo descargarlo: {message}",
   "Stopped watching. Ollama may finish the download on its own.": "Ya no se sigue. Ollama puede terminar la descarga por su cuenta.",
-  "{status} · {percent}%": "{status} · {percent}%"
+  "{status} · {percent}%": "{status} · {percent}%",
+  "Cloud and network models answer only on the computer running SPECTRE.": "Los modelos en la nube y de red solo responden en el ordenador que ejecuta SPECTRE.",
+  "cloud and network models answer on the host only": "los modelos en la nube y de red solo responden en el equipo anfitrión",
+  "The key was saved for another address, so it was not sent. Save it again in POWER UP for this address.": "La clave se guardó para otra dirección, así que no se envió. Guárdala de nuevo en POWER UP para esta dirección.",
+  "key saved for another address": "clave guardada para otra dirección",
+  "Without an OS keyring this would change OPENAI_API_KEY in .env, which voice also uses; change it there.": "Sin un llavero del sistema esto cambiaría OPENAI_API_KEY en .env, que también usa la voz; cámbiala allí.",
+  "This key comes from the environment and goes only to the provider's own address. To use this address, remove it there and save it in POWER UP.": "Esta clave viene del entorno y solo va a la dirección propia del proveedor. Para usar esta dirección, quítala de allí y guárdala en POWER UP."
 }

@@ -89,7 +89,7 @@ The response is `text/event-stream`:
 | `client_tool` | `{"turn_id", "call_id", "name", "args"}`: a globe tool for the browser to run |
 | `citation` | `{"n", "url", "title", "source"}`: source `[n]` of this turn |
 | `done` | `{"model", "provider", "usage": {"input", "output"}, "stop_reason", "tokens_per_s", "eval_count", "prompt_eval_count", "as_of", "citations", "degraded", "rounds", "seconds", "refused"?}` |
-| `error` | `{"code", "message", "provider"?, "retryable"?}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped`, `consent_required`, `local_only`, `lan_viewer`, `auth_failed`, `rate_limited`; a rejected key's message is always "The provider rejected the key." |
+| `error` | `{"code", "message", "provider"?, "retryable"?}`, e.g. `ollama_offline`, `ollama_model_missing`, `stopped`, `consent_required`, `local_only`, `lan_viewer`, `key_not_sent`, `auth_failed`, `rate_limited`; a rejected key's message is always "The provider rejected the key." |
 | `budget` | `{"spent", "allowance", "budget"}`: the conversation reached its cloud token budget, and nothing was sent |
 | `thinking` | `{"text"}`: the model's thinking when reasoning is on; shown collapsed, never stored |
 
@@ -122,7 +122,7 @@ The current conversation as `{"conversation_id", "messages": [{"role", "content"
 
 `loaded` comes from Ollama's `/api/ps` and is `null` until the first answer loads the model.
 
-The selection adds `provider`, `provider_label`, `kind` (`local`, `remote` or `cloud`), `ready`, `problem` (for example `no_key`, `consent_required`, `local_only`, `ollama_offline`), `usage` (`{"input", "output", "cloud"}` tokens for the conversation, and `priced`: the selected model's own `{"input", "output"}`, which a price applies to) and `budget` (`{"spent", "allowance", "budget"}`, or `null` when off). An API provider is judged from local facts only: the poll never calls a cloud API.
+The selection adds `provider`, `provider_label`, `kind` (`local`, `remote` or `cloud`), `ready`, `problem` (for example `no_key`, `key_not_sent`, `consent_required`, `local_only`, `lan_viewer`, `ollama_offline`), `usage` (`{"input", "output", "cloud"}` tokens for the conversation, and `priced`: the selected model's own `{"input", "output"}`, which a price applies to) and `budget` (`{"spent", "allowance", "budget"}`, or `null` when off). An API provider is judged from local facts only: the poll never calls a cloud API.
 
 ### Chat providers (`/api/intel/providers`)
 
@@ -141,7 +141,7 @@ The proxy answers every route for this machine only, even with `SPECTRE_CHAT_ALL
 | `POST /api/intel/providers/{id}/test` | `{}`; `{"ok": true, ...}` or `{"ok": false, "code", "message", "retryable"}` |
 | `GET /api/intel/providers/{id}/models` | `{"models": [{"id", "label", "kind", "supports_tools", "capabilities", "context_window", "details"}]}` |
 | `POST /api/intel/providers/{id}/probe` | `{"model"}`: one tiny tool-calling request; `{"ok", "supports_tools"}` |
-| `POST /api/intel/providers/ollama/pull` | `{"model"}`, a registry name: `text/event-stream` of `progress` `{"status", "digest", "total", "completed"}`, then `done` `{"model"}` or `error` `{"code", "message"}`. Closing the stream stops watching; Ollama may finish the download |
+| `POST /api/intel/providers/ollama/pull` | `{"model"}`, a registry name: `text/event-stream` of `progress` `{"status", "digest", "total", "completed"}`, then `done` `{"model"}` (only after Ollama's `success`) or `error` `{"code", "message"}` (`incomplete` when the stream ended first). Closing the stream stops watching; Ollama may finish the download |
 | `GET /api/intel/providers/ollama/gpu` | `{"gpu"}` from `nvidia-smi`, or `null` |
 | `POST /api/intel/providers/budget/continue` | `{}`: one more budget for the current conversation; `{"allowance"}` |
 

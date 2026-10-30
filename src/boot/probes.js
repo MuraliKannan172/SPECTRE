@@ -123,7 +123,8 @@ const CHAT_PROBLEMS = Object.freeze({
   no_key: msg('no API key'),
   consent_required: msg('waiting for consent'),
   local_only: msg('blocked by local-only mode'),
-  lan_viewer: msg('cloud models answer on the host only'),
+  lan_viewer: msg('cloud and network models answer on the host only'),
+  key_not_sent: msg('key saved for another address'),
   unknown_provider: msg('provider unavailable'),
 });
 

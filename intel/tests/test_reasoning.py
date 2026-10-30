@@ -86,3 +86,27 @@ def test_the_switch_is_offered_only_where_it_is_verified(tmp_path: Path, provide
     assert saved.status_code == status
     if status == 400:
         assert saved.json()["detail"]["params"] == ["reasoning"]
+
+
+def test_the_thinking_reserve_never_empties_a_small_window(make_agent) -> None:  # type: ignore[no-untyped-def]
+    agent = make_agent(FakeOllama([]))
+    agent.params_for = lambda provider_id: {"reasoning": True, "num_ctx": 4096}
+    plan = asyncio.run(agent._plan(turn_for(agent, "hi")))
+    assert plan.input_limit == 2048
+
+
+def test_openai_reasoning_falls_back_to_no_effort_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    from test_openai_responses import effort_rejected
+
+    harness = ResponsesHarness()
+    harness.replies.append(effort_rejected())
+    harness.answer("ok")
+
+    async def go() -> None:
+        request = ChatRequest("plain-model", (Message("user", "hi"),), params={"reasoning": True})
+        async for _ in harness.provider.stream(request):
+            pass
+
+    asyncio.run(go())
+    assert "reasoning" not in harness.upstream.bodies[-1], "a model that takes no effort is still asked"
+    assert "plain-model" not in harness.provider._effort

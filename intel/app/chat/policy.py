@@ -37,8 +37,8 @@ _PERSON_PATTERNS = [
     re.compile(
         r"\b(?:which|what)\s+(?:\w+\s+)?(?:street|road|avenue|house|building|apartment|flat|address|"
         rf"neighbou?rhood)\b.{{0,30}}?\b(?:he|she|they|{_RELATION})\b.{{0,15}}?"
-        r"\b(?:lives?|living|stays?|staying)\b(?!-)",
-        re.I,
+        r"\b(?:lives?|living)\b(?!-)",
+        re.I | re.S,
     ),
     # locating or tracking a person
     re.compile(

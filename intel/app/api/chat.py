@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..chat.agent import Turn
 from ..chat.ollama import OllamaError
 from ..chat.providers.errors import ProviderError
+from ..chat.providers.keys import key_reaches
 
 router = APIRouter(prefix="/api/intel/chat")
 # Set by the app's proxy on chat requests from another machine (server/providers/intel.js).
@@ -276,7 +277,7 @@ async def status(request: Request) -> dict[str, Any]:
         return result
     if provider_id != "ollama":
         result.update(_api_readiness(state, provider_id, policy))
-        if request.headers.get(LAN_HEADER) == "lan" and result["kind"] == "cloud":
+        if request.headers.get(LAN_HEADER) == "lan" and result["kind"] not in (None, "local"):
             # Never key or consent state to another machine, and never a cloud turn.
             result.update(ready=False, problem="lan_viewer")
         return result
@@ -310,7 +311,7 @@ async def status(request: Request) -> dict[str, Any]:
         result["problem"] = (
             "ollama_model_missing" if result["model_present"] is False else "model_check_failed"
         )
-    elif result["kind"] == "cloud" and request.headers.get(LAN_HEADER) == "lan":
+    elif result["kind"] in ("cloud", "remote") and request.headers.get(LAN_HEADER) == "lan":
         result["problem"] = "lan_viewer"
     elif result["kind"] == "cloud" and policy and policy.local_only:
         result["problem"] = "local_only"
@@ -342,8 +343,12 @@ def _api_readiness(state: Any, provider_id: str, policy: Any) -> dict[str, Any]:
     spec = providers.specs[provider_id]
     kind = provider.kind
     problem = None
-    if not state.keys.status(spec).configured and not spec.key_optional:
+    configured = state.keys.status(spec).configured
+    address = str(getattr(provider, "base_url", "") or spec.base_url)
+    if not configured and not spec.key_optional:
         problem = "no_key"
+    elif configured and not key_reaches(spec, address, state.provider_store.key_host(provider_id)):
+        problem = "key_not_sent"
     elif kind == "cloud" and policy is not None and policy.local_only:
         problem = "local_only"
     elif kind != "local" and not state.provider_store.consented(provider_id):

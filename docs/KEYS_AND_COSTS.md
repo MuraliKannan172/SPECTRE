@@ -58,7 +58,8 @@ Keys stay in the intel service. They are never sent to the browser or written to
 history, the logs, error messages or URLs; the API reports only whether a key is set and where it
 came from. Keys can be changed only from this machine, with the page's session token, never by a
 LAN viewer. A LAN viewer (with `SPECTRE_CHAT_ALLOW_LAN=1`) can chat with local models only: a
-cloud model never runs for another machine, so nobody else spends your key.
+cloud model, or a server on another machine, never runs for them, so nobody else spends your
+key.
 
 ## Do not put keys in your global Windows environment
 

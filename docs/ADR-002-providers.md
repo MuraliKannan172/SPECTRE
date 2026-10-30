@@ -833,6 +833,46 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
   none with it off.
 - **Unverified on every cloud provider until a live run.**
 
+**After P5: fixes from a second review, of the follow-ups `392da429..f46d9a23`:**
+
+- **Redaction runs in linear time.** The masked-key patterns had unbounded runs (about 1 s for
+  20,000 characters, on every log record); they are now bounded and anchored.
+- **A withheld key says so.** The key getter raises `key_not_sent` instead of sending a keyless
+  request that would come back as "rejected the key". `/chat/status` reports `key_not_sent`.
+  The settings view explains an environment key: it goes only to the provider's own address, so
+  move it into POWER UP to use another.
+- **A round cut at the 60,000-character cap is counted.** Its usage never arrives, so input and
+  output are estimated from characters.
+- **LAN viewers get local models only.** A model on another machine (`remote`) is refused too,
+  since it may hold a key. The proxy also marks a viewer that arrives through a proxy on this
+  machine (forwarding headers).
+- **A model that lists no window keeps the 16k budgets,** whatever the ceiling.
+- **The Ollama thinking reserve follows the switch only.** It never takes more than half of
+  `num_ctx`.
+- **OpenAI with reasoning on tries `medium`, then no effort field.** On the Chat Completions
+  fallback, tools still force effort `none`, so the switch does nothing there.
+- **Pull model:**
+  - `done` only after Ollama's `success` line; otherwise `error` `incomplete`.
+  - A line that is not a JSON object is `bad_response`.
+  - Any registry host is allowed, and local-only mode does not block pulls: a pull sends no
+    conversation.
+- **The person guard** matches `lives`/`living` only ("what building did they stay in during the
+  earthquake" is allowed again) and spans line breaks.
+- **The map switch** strips only `observer`, `viewport` and `cameraPosition`, so a CCTV `camera`
+  record stays.
+- **POWER UP** explains `shared_key`.
+- **Not changed:** a rejected key's text stays ours, also for a 403 that might have named a
+  permission.
+
+**After P5: the eval with every follow-up** (`docs/providers/followups-eval-*.json`, 2026-10-30):
+11/15, refusals 3/3.
+
+- **R3** now refuses before the model runs (the guard), so it no longer measures the model.
+- **N4 and N5** made the same calls as in P5 but found no stories. Their stories had passed the
+  72-hour window since that afternoon, because the store had ingested nothing for 34.5 hours;
+  the news path is unchanged.
+- **W4 and W5** got empty keyless ddgs searches, as before.
+
 **After P5: Pull model (D11 stretch):**
 
 - **`POST /providers/ollama/pull`** takes `{"model"}` and streams Ollama's own `/api/pull` lines

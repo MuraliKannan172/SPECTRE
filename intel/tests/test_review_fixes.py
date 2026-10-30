@@ -5,6 +5,7 @@ reasoning state per model, the map switch on globe results, runaway replies."""
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from app.chat.providers import errors
 from app.chat.providers.base import Done, Message, TextDelta, Usage
 from app.chat.providers.errors import ProviderError
 from app.chat.providers.ollama import OllamaProvider
+from app.redact import redact
 from app.store.chat import ChatStore
 
 world = selection.world  # the shared fixture
@@ -121,16 +123,21 @@ def test_replayed_reasoning_counts_toward_the_context_estimate() -> None:
 
 
 def test_with_the_map_switch_off_globe_results_lose_the_camera() -> None:
-    result = {"ok": True, "observer": {"latitude": 1, "longitude": 2}, "passes": [{"camera": {}, "t": 5}]}
+    result = {"ok": True, "observer": {"latitude": 1}, "passes": [{"cameraPosition": {}, "t": 5}]}
     assert _without_view(result) == {"ok": True, "passes": [{"t": 5}]}
+    cctv = {"camera": {"id": "cam-7", "name": "Bridge"}}
+    assert _without_view(cctv) == cctv, "a CCTV camera is data, not the view"
 
 
 def test_a_runaway_reply_is_cut_off_and_marked(world) -> None:  # type: ignore[no-untyped-def]
     cloud = Cloud(
         [[TextDelta("x" * 70_000), TextDelta("never read"), Usage(1, 1), Done("stop")]], models=[info("yes")]
     )
-    done = world(cloud).turn()[-1][1]
+    made = world(cloud)
+    done = made.turn()[-1][1]
     assert done["stop_reason"] == "length"
+    assert done["usage"]["output"] >= 70_000 // 4, "the cut round is counted, estimated"
+    assert made.chats.usage_totals(made.conversation)["output"] == done["usage"]["output"]
 
 
 def test_fallback_call_ids_differ_between_rounds() -> None:
@@ -160,9 +167,11 @@ def test_a_new_base_url_gets_no_saved_key_and_needs_consent_again(
             f"{acme}/settings", json={"base_url": "https://gateway.example.com/v1"}, headers=headers
         )
         assert (moved.json()["key_reaches_address"], moved.json()["consent"]) == (False, False)
-        assert client.app.state.providers.get("acme")._key() is None, (
-            "a settings write alone redirects no key"
-        )
+        with pytest.raises(ProviderError) as withheld:
+            client.app.state.providers.get("acme")._key()
+        assert withheld.value.code == "key_not_sent", "a settings write alone redirects no key, and says so"
+        client.put(SELECTION, json={"provider": "acme", "model": "big-1"}, headers=headers)
+        assert client.get(STATUS).json()["problem"] == "key_not_sent"
         client.put(f"{acme}/key", json={"key": "sk-acme-0123456789"}, headers=headers)
         assert client.app.state.providers.get("acme")._key() == "sk-acme-0123456789", "saved again, for here"
 
@@ -180,3 +189,24 @@ def test_the_status_prices_only_the_current_models_tokens(tmp_path: Path) -> Non
         )
         usage = client.get(STATUS).json()["usage"]
     assert (usage["input"], usage["output"], usage["priced"]) == (910, 55, {"input": 10, "output": 5})
+
+
+def test_a_lan_viewer_gets_no_network_model_either(world) -> None:  # type: ignore[no-untyped-def]
+    class Network(Cloud):
+        kind = "remote"
+
+    server = Network([answer("Never.")], models=[info("yes")])
+    made = world(server)
+    turn = Turn(made.conversation, "hi", provider_id="acme", model="big-1", lan=True)
+
+    async def run() -> list[tuple[str, dict[str, Any]]]:
+        return [event async for event in made.agent.run(turn)]
+
+    assert asyncio.run(run())[-1][1]["code"] == "lan_viewer" and server.requests == []
+
+
+@pytest.mark.parametrize("text", ["a" * 20_000, "sk-" * 7_000, "x" * 5_000 + "***", "nvapi-" * 3_000])
+def test_redaction_stays_fast_on_long_lines(text: str) -> None:
+    started = time.perf_counter()
+    redact(text)
+    assert time.perf_counter() - started < 0.25

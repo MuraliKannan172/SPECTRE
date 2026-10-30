@@ -377,9 +377,16 @@ async def pull_model(body: PullBody, request: Request) -> StreamingResponse:
 
     async def stream() -> AsyncIterator[str]:
         try:
+            succeeded = False
             async for chunk in client.pull(body.model):
+                succeeded = chunk.get("status") == "success"
                 yield _sse("progress", {key: chunk.get(key) for key in PULL_FIELDS})
-            yield _sse("done", {"model": body.model})
+            if succeeded:
+                yield _sse("done", {"model": body.model})
+            else:  # the stream ended without Ollama's success line
+                yield _sse(
+                    "error", {"code": "incomplete", "message": "Ollama stopped before the pull finished"}
+                )
         except OllamaError as error:
             yield _sse("error", {"code": error.code, "message": str(error)[:300]})
 

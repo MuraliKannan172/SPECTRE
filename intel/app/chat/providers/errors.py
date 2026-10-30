@@ -14,6 +14,7 @@ import time
 from ...redact import redact
 
 AUTH_FAILED = "auth_failed"
+KEY_NOT_SENT_CODE = "key_not_sent"
 RATE_LIMITED = "rate_limited"
 QUOTA_EXCEEDED = "quota_exceeded"
 MODEL_NOT_FOUND = "model_not_found"
@@ -25,6 +26,7 @@ NETWORK = "network"
 CODES = frozenset(
     {
         AUTH_FAILED,
+        KEY_NOT_SENT_CODE,
         RATE_LIMITED,
         QUOTA_EXCEEDED,
         MODEL_NOT_FOUND,
@@ -36,6 +38,7 @@ CODES = frozenset(
 )
 RETRYABLE = frozenset({RATE_LIMITED, PROVIDER_UNAVAILABLE, NETWORK})
 AUTH_MESSAGE = "The provider rejected the key."
+KEY_NOT_SENT = "The key was saved for another address, so it was not sent to this one."
 
 
 class ProviderError(RuntimeError):
