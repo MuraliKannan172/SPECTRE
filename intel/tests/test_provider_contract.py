@@ -152,8 +152,15 @@ class OllamaHarness:
 
     @staticmethod
     def _done(**extra: Any) -> dict[str, Any]:
-        return {"message": {"role": "assistant", "content": ""}, "done": True, "done_reason": "stop",
-                "prompt_eval_count": 3, "eval_count": 2, "eval_duration": 10**9, **extra}  # fmt: skip
+        return {
+            "message": {"role": "assistant", "content": ""},
+            "done": True,
+            "done_reason": "stop",
+            "prompt_eval_count": 3,
+            "eval_count": 2,
+            "eval_duration": 10**9,
+            **extra,
+        }
 
     def answer(self, *chunks: str) -> None:
         body = [{"message": {"role": "assistant", "content": text}, "done": False} for text in chunks]
@@ -263,7 +270,7 @@ def test_a_parallel_tool_round_trip(harness: Any) -> None:
             tool_calls=tuple(calls),
             provider_id=harness.provider.id,
             provider_state=done.provider_state,
-        ),  # fmt: skip
+        ),
         Message("tool", "A", tool_call_id=calls[0].id, name="lookup"),
         Message("tool", "B", tool_call_id=calls[1].id, name="lookup"),
     )

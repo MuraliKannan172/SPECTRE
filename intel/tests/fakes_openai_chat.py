@@ -43,7 +43,7 @@ SPECS = {
         "http://127.0.0.1:1234/v1",
         ("SPECTRE_CUSTOM_API_KEY",),
         key_optional=True,
-    ),  # fmt: skip
+    ),
 }
 
 MODELS = {

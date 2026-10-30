@@ -1,13 +1,15 @@
 # Neural Core chat providers (ADR-002 D1). No keys, ever: keys live in the
-# environment, the OS keyring or the owner-only .env (ADR-002 D5).
+# environment, the OS keyring or the owner-only .env (ADR-002 D5). No model
+# IDs either: the user picks one from the provider's live list (D12).
 #
-#   id        stable identifier, stored with conversations and messages
-#   label     what the panel shows
-#   adapter   the adapter class in app/chat/providers/
-#   kind      local | remote | cloud: the badge before any per-model rule
-#   base_url  default endpoint; a user override wins (OLLAMA_HOST for ollama)
-#   key_env   environment variables that may hold its key
-#   docs      where its API is documented
+#   id            stable identifier, stored with conversations and messages
+#   label         what the panel shows
+#   adapter       ollama | openai_compat | anthropic | openai (app/chat/providers/)
+#   kind          local | remote | cloud: the badge before any per-model rule
+#   base_url      default endpoint; a user override wins (OLLAMA_HOST for ollama)
+#   key_env       environment variables that may hold its key
+#   key_optional  the provider also works without a key
+#   docs          where its API is documented
 
 providers:
   - id: ollama
@@ -17,3 +19,54 @@ providers:
     base_url: http://127.0.0.1:11434
     key_env: []
     docs: https://docs.ollama.com/api
+
+  - id: anthropic
+    label: Claude (Anthropic API)
+    adapter: anthropic
+    kind: cloud
+    base_url: https://api.anthropic.com
+    key_env: [ANTHROPIC_API_KEY]
+    docs: https://docs.claude.com/en/api/messages
+
+  - id: openai
+    label: ChatGPT (OpenAI API)
+    adapter: openai
+    kind: cloud
+    base_url: https://api.openai.com/v1
+    key_env: [OPENAI_API_KEY]
+    docs: https://platform.openai.com/docs/api-reference/responses
+
+  - id: openrouter
+    label: OpenRouter
+    adapter: openai_compat
+    kind: cloud
+    base_url: https://openrouter.ai/api/v1
+    key_env: [OPENROUTER_API_KEY]
+    docs: https://openrouter.ai/docs/api-reference/overview
+
+  - id: nvidia
+    label: NVIDIA NIM
+    adapter: openai_compat
+    kind: cloud
+    base_url: https://integrate.api.nvidia.com/v1
+    key_env: [NVIDIA_API_KEY]
+    docs: https://docs.api.nvidia.com/nim/reference/
+
+  - id: deepseek
+    label: DeepSeek
+    adapter: openai_compat
+    kind: cloud
+    base_url: https://api.deepseek.com
+    key_env: [DEEPSEEK_API_KEY]
+    docs: https://api-docs.deepseek.com/
+
+  # A server you run (LM Studio, vLLM, llama.cpp). Its badge follows its
+  # address: LOCAL on this machine, REMOTE on your network, CLOUD otherwise.
+  - id: custom
+    label: Custom (OpenAI-compatible)
+    adapter: openai_compat
+    kind: local
+    base_url: http://127.0.0.1:1234/v1
+    key_env: [SPECTRE_CUSTOM_API_KEY]
+    key_optional: true
+    docs: https://platform.openai.com/docs/api-reference/chat

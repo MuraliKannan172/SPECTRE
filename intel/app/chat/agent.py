@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
-from ..config import Settings
+from ..config import FULL_BUDGETS, Settings
 from ..schema import iso
 from ..store.chat import ChatStore
 from ..store.news import NewsQuery, NewsStore
@@ -39,6 +39,7 @@ from ..web.guard import BlockedURL
 from ..web.search import SearchError, SearchService
 from .ollama import OllamaClient
 from .policy import REFUSAL, person_lookup, system_prompt, wrap_untrusted
+from .probe import probe_tools
 from .providers.base import (
     ChatProvider,
     ChatRequest,
@@ -56,6 +57,7 @@ from .providers.retry import stream_with_retries
 from .tools import ToolRegistry
 
 MAX_TOOL_ROUNDS = 4
+BASE_WINDOW = 16384
 CLIENT_TOOL_TIMEOUT = 15.0
 CHARS_PER_TOKEN = 4
 MAX_CLIENT_RESULT_CHARS = 4000
@@ -74,6 +76,24 @@ class Turn:
     layer_state: dict[str, Any] | None = None
     history: list[dict[str, Any]] = field(default_factory=list)
     turn_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    provider_id: str | None = None  # the stored selection; None is the default Ollama model
+    model: str | None = None
+
+
+@dataclass(frozen=True)
+class Plan:
+    """What a turn runs on, settled before the first round."""
+
+    provider: ChatProvider
+    model: str
+    native: bool
+    budgets: dict[str, int]
+
+
+def api_budgets(window: int | None) -> dict[str, int]:
+    """FULL_BUDGETS as a ceiling; a smaller context window lowers them (D9)."""
+    scale = min(1.0, window / BASE_WINDOW) if window else 1.0
+    return {name: int(tokens * scale) for name, tokens in FULL_BUDGETS.items()}
 
 
 class Sources:
@@ -139,6 +159,9 @@ class Agent:
         provider: ChatProvider | None = None,
         local_only: Callable[[], bool] = lambda: False,
         consented: Callable[[str], bool] = lambda provider_id: False,
+        providers: Callable[[str], ChatProvider | None] = lambda provider_id: None,
+        known_tools: Callable[[str, str, str], str | None] = lambda provider_id, base_url, model: None,
+        remember_tools: Callable[[str, str, str, str], None] = lambda provider_id, base_url, model, s: None,
     ) -> None:
         self.settings = settings
         # The status route and the eval still read Ollama directly.
@@ -152,6 +175,9 @@ class Agent:
         self.open_only = open_only
         self.local_only = local_only
         self.consented = consented
+        self.providers = providers
+        self.known_tools = known_tools
+        self.remember_tools = remember_tools
         self.clock = clock
         self._pending: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
 
@@ -173,7 +199,7 @@ class Agent:
         call may reach it, not even a capability lookup carrying the key."""
         return self.provider.kind == "cloud" and self.local_only()
 
-    def _egress_refusal(self, kind: str) -> dict[str, Any] | None:
+    def _egress_refusal(self, provider: ChatProvider, kind: str) -> dict[str, Any] | None:
         """ADR-002 D6: local-only mode blocks every cloud model, Ollama's
         :cloud ones included; any other cloud provider needs consent first.
         Ollama :cloud models skip consent until the panel can ask for it (P4).
@@ -182,21 +208,58 @@ class Agent:
         if kind != "cloud":
             return None
         if self.local_only():
-            return {"code": "local_only", "message": "Local-only mode is on, so cloud models are blocked."}
-        if self.provider.id != "ollama" and not self.consented(self.provider.id):
-            return {
-                "code": "consent_required",
-                "message": f"{self.provider.id} has not been allowed to receive this conversation yet.",
-            }
+            return _refusal("local_only", "Local-only mode is on, so cloud models are blocked.", provider)
+        if provider.id != "ollama" and not self.consented(provider.id):
+            message = f"{provider.id} has not been allowed to receive this conversation yet."
+            return _refusal("consent_required", message, provider)
         return None
+
+    async def _plan(self, turn: Turn) -> Plan | dict[str, Any]:
+        """The turn's provider, model, tool mode and budgets, or the error that
+        stops it. A stored selection that cannot run is an error, never a
+        quiet switch to another provider (D6)."""
+        provider = self.providers(turn.provider_id) if turn.provider_id else self.provider
+        if provider is None:
+            return {
+                "code": "unknown_provider",
+                "message": "The selected provider is not available.",
+                "provider": turn.provider_id,
+                "retryable": False,
+            }
+        model = turn.model or self.settings.ollama_model
+        refusal = self._egress_refusal(provider, provider.kind)
+        if refusal:
+            return refusal
+        try:
+            info = await provider.model_caps(model)
+        except ProviderError as error:
+            return _error_event(error)
+        refusal = self._egress_refusal(provider, info.kind)
+        if refusal:
+            return refusal
+        if provider.id == "ollama":
+            return Plan(provider, model, "tools" in info.capabilities, self.settings.budgets)
+        support = info.supports_tools
+        if support == "unknown":
+            base_url = str(getattr(provider, "base_url", ""))
+            support = self.known_tools(provider.id, base_url, model) or "unknown"
+            if support == "unknown":
+                try:
+                    probed = await probe_tools(provider, model)
+                except ProviderError as error:
+                    return _error_event(error)
+                if probed:
+                    self.remember_tools(provider.id, base_url, model, probed)
+                support = probed or "yes"  # the API took the tools; nothing proven, nothing cached
+        return Plan(provider, model, support == "yes", api_budgets(info.context_window))
 
     # -- the turn --------------------------------------------------------------
 
     def _now_local(self) -> str:
         return dt.datetime.fromtimestamp(self.clock()).astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
-    def _history(self, history: list[dict[str, Any]]) -> list[Message]:
-        budget = self.settings.budgets["history"] * CHARS_PER_TOKEN
+    def _history(self, history: list[dict[str, Any]], tokens: int) -> list[Message]:
+        budget = tokens * CHARS_PER_TOKEN
         kept: list[Message] = []
         for message in reversed(history):
             content = str(message.get("content") or "")
@@ -211,17 +274,20 @@ class Agent:
                     content,
                     provider_id=message.get("provider_id"),
                     model=message.get("model"),
+                    provider_state=message.get("provider_state"),
                 )
             )
         return list(reversed(kept))
 
-    def _request(self, messages: list[Message], *, native: bool, allow_tools: bool) -> ChatRequest:
+    def _request(
+        self, messages: list[Message], model: str, *, native: bool, allow_tools: bool
+    ) -> ChatRequest:
         """One round's request. A native model always gets the tool list; the
         last round asks for an answer with tool_choice "none" (the adapter
         decides how its API takes that). A model without native tools gets
         the JSON fallback format instead, except in the last round."""
         return ChatRequest(
-            model=self.settings.ollama_model,
+            model=model,
             messages=tuple(messages),
             tools=tuple(self.registry.all_tools) if native else (),
             tool_choice="auto" if allow_tools else "none",
@@ -236,29 +302,21 @@ class Agent:
 
     async def run(self, turn: Turn) -> AsyncIterator[Event]:
         started = self.clock()
-        yield "turn", {"turn_id": turn.turn_id, "conversation_id": turn.conversation_id}
+        chosen = {
+            "provider": turn.provider_id or self.provider.id,
+            "model": turn.model or self.settings.ollama_model,
+        }
+        yield "turn", {"turn_id": turn.turn_id, "conversation_id": turn.conversation_id, **chosen}
         if person_lookup(turn.message):
             yield "token", {"text": REFUSAL}
             self.chats.add_message(turn.conversation_id, "assistant", REFUSAL, meta={"refused": True})
-            yield (
-                "done",
-                {"model": self.settings.ollama_model, "refused": True, "as_of": None, "citations": []},
-            )
+            yield "done", {**chosen, "refused": True, "as_of": None, "citations": []}
             return
-        refusal = self._egress_refusal(self.provider.kind)
-        if refusal:
-            yield "error", refusal
+        plan = await self._plan(turn)
+        if not isinstance(plan, Plan):
+            yield "error", plan
             return
-        try:
-            info = await self.provider.model_caps(self.settings.ollama_model)
-        except ProviderError as error:
-            yield "error", _error_event(error)
-            return
-        refusal = self._egress_refusal(info.kind)
-        if refusal:
-            yield "error", refusal
-            return
-        native = "tools" in info.capabilities
+        native = plan.native
         system = system_prompt(
             now_local=self._now_local(), viewport=turn.viewport, layer_state=turn.layer_state
         )
@@ -266,22 +324,23 @@ class Agent:
             system += _fallback_instructions(self.registry)
         messages: list[Message] = [
             Message("system", system),
-            *self._history(turn.history),
+            *self._history(turn.history, plan.budgets["history"]),
             Message("user", turn.message),
         ]
         sources = Sources()
-        state = {"web_chars": 0, "info": False}
+        state: dict[str, Any] = {"web_chars": 0, "info": False, "budgets": plan.budgets}
         answer: list[str] = []
         usage = Usage(0, 0)
+        stop = "stop"
         rounds = 0
-        provider = self.provider
+        provider = plan.provider
         try:
             for rounds in range(1, MAX_TOOL_ROUNDS + 2):
                 allow_tools = rounds <= MAX_TOOL_ROUNDS
                 think = ThinkFilter()
                 content, calls = "", []
                 provider_state: dict[str, Any] | None = None
-                request = self._request(messages, native=native, allow_tools=allow_tools)
+                request = self._request(messages, plan.model, native=native, allow_tools=allow_tools)
                 events = stream_with_retries(
                     functools.partial(provider.stream, request), attempts=provider.max_attempts
                 )
@@ -298,6 +357,7 @@ class Agent:
                         usage = event
                     elif isinstance(event, Done):
                         provider_state = event.provider_state
+                        stop = event.stop_reason
                 if not native:
                     content, calls = _parse_fallback(content)
                     if content:
@@ -331,7 +391,10 @@ class Agent:
         eval_seconds = usage.output_seconds or 0
         as_of = self._now_local() if state["info"] else None
         done = {
-            "model": self.settings.ollama_model,
+            "model": plan.model,
+            "provider": provider.id,
+            "usage": {"input": usage.input, "output": usage.output},
+            "stop_reason": stop,
             "eval_count": eval_count,
             "prompt_eval_count": usage.input,
             "tokens_per_s": round(eval_count / eval_seconds, 1) if eval_seconds else None,
@@ -348,7 +411,8 @@ class Agent:
             citations=sources.items,
             meta={k: done[k] for k in ("model", "as_of", "degraded", "tokens_per_s")},
             provider_id=provider.id,
-            model=self.settings.ollama_model,
+            model=plan.model,
+            provider_state=provider_state,  # e.g. DeepSeek reasoning, needed on later turns (D2)
         )
         yield "done", done
 
@@ -425,7 +489,7 @@ class Agent:
             return json.dumps(turn.layer_state or {}, ensure_ascii=False)[:2000], []
         if name in ("news_search", "news_near"):
             return self._news(name, args, sources)
-        budget = self.settings.budgets["web"] * CHARS_PER_TOKEN - state["web_chars"]
+        budget = state["budgets"]["web"] * CHARS_PER_TOKEN - state["web_chars"]
         if budget <= 200:
             return "error: this turn's web reading budget is used up; answer from what you have.", []
         if name == "web_search":
@@ -447,7 +511,7 @@ class Agent:
             state["web_chars"] += len(text)
             return text, new
         if name == "fetch_page":
-            limit = min(self.settings.budgets["page"] * CHARS_PER_TOKEN, budget)
+            limit = min(state["budgets"]["page"] * CHARS_PER_TOKEN, budget)
             page = await self.fetcher.fetch(args["url"], max_chars=limit)
             number, fresh = sources.add(page.url, page.title, _host(page.url))
             note = " (truncated)" if page.truncated else ""
@@ -509,7 +573,16 @@ def _error_event(error: ProviderError) -> dict[str, Any]:
     """The SSE error. Ollama keeps the `ollama_<code>` codes the panel knows;
     other providers send the taxonomy code (ADR-002 D7)."""
     code = f"ollama_{error.detail}" if error.provider == "ollama" and error.detail else error.code
-    return {"code": code, "message": str(error)}
+    return {
+        "code": code,
+        "message": str(error),
+        "provider": error.provider or None,
+        "retryable": error.retryable,
+    }
+
+
+def _refusal(code: str, message: str, provider: ChatProvider) -> dict[str, Any]:
+    return {"code": code, "message": message, "provider": provider.id, "retryable": False}
 
 
 # -- constrained-JSON fallback (models without native tool calling) ----------

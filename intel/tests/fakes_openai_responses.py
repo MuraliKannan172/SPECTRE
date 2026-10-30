@@ -34,11 +34,22 @@ def completed(input_tokens: int = 3, output_tokens: int = 2) -> dict[str, Any]:
 
 def message_events(text_chunks: tuple[str, ...], index: int = 0) -> list[dict[str, Any]]:
     item = {"type": "message", "id": f"msg_{index}", "role": "assistant", "content": []}
-    deltas = [{"type": "response.output_text.delta", "item_id": f"msg_{index}", "output_index": index,
-               "content_index": 0, "delta": piece} for piece in text_chunks]  # fmt: skip
+    deltas = [
+        {
+            "type": "response.output_text.delta",
+            "item_id": f"msg_{index}",
+            "output_index": index,
+            "content_index": 0,
+            "delta": piece,
+        }
+        for piece in text_chunks
+    ]
     done_item = {**item, "content": [{"type": "output_text", "text": "".join(text_chunks)}]}
-    return [{"type": "response.output_item.added", "output_index": index, "item": item}, *deltas,
-            {"type": "response.output_item.done", "output_index": index, "item": done_item}]  # fmt: skip
+    return [
+        {"type": "response.output_item.added", "output_index": index, "item": item},
+        *deltas,
+        {"type": "response.output_item.done", "output_index": index, "item": done_item},
+    ]
 
 
 def call_events(index: int, call_id: str, name: str, args: dict[str, Any]) -> list[dict[str, Any]]:
@@ -49,9 +60,12 @@ def call_events(index: int, call_id: str, name: str, args: dict[str, Any]) -> li
         {"type": "response.function_call_arguments.delta", "item_id": f"fc_{index}", "delta": text[:4]},
         {"type": "response.function_call_arguments.delta", "item_id": f"fc_{index}", "delta": text[4:]},
         {"type": "response.function_call_arguments.done", "item_id": f"fc_{index}", "arguments": text},
-        {"type": "response.output_item.done", "output_index": index,
-         "item": {**item, "arguments": text, "status": "completed"}},
-    ]  # fmt: skip
+        {
+            "type": "response.output_item.done",
+            "output_index": index,
+            "item": {**item, "arguments": text, "status": "completed"},
+        },
+    ]
 
 
 def error_body(status: int, message: str = "scripted", **extra: Any) -> dict[str, Any]:
@@ -76,8 +90,11 @@ class ResponsesHarness:
         self.replies.append((200, {}, event_frames(*events)))
 
     def answer(self, *chunks: str) -> None:
-        self.events({"type": "response.created", "response": {"id": "resp_1", "status": "in_progress"}},
-                    *message_events(chunks), completed())  # fmt: skip
+        self.events(
+            {"type": "response.created", "response": {"id": "resp_1", "status": "in_progress"}},
+            *message_events(chunks),
+            completed(),
+        )
 
     def tool_calls(self, *calls: tuple[str, dict[str, Any]]) -> None:
         body = [
@@ -100,8 +117,11 @@ class ResponsesHarness:
         self.replies.append((400, {}, body))
 
     def answer_with_unknown_event(self, text: str) -> None:
-        self.events({"type": "response.future_event", "sequence_number": 1, "x": 2},
-                    *message_events((text,)), completed())  # fmt: skip
+        self.events(
+            {"type": "response.future_event", "sequence_number": 1, "x": 2},
+            *message_events((text,)),
+            completed(),
+        )
 
     def long_answer(self, chunks: int) -> None:
         self.answer(*(f"t{n} " for n in range(chunks)))

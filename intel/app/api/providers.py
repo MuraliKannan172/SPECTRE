@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hmac
 from dataclasses import asdict
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +21,7 @@ from ..chat.providers.base import ChatProvider, ModelInfo
 from ..chat.providers.errors import ProviderError
 from ..chat.providers.keys import KeyStoreError
 from ..chat.providers.registry import ProviderSpec, base_url_problem
+from ..chat.providers.sdk import key_may_travel
 from ..store.providers import ProviderSettings
 from .chat import _json_body, _same_machine
 
@@ -35,10 +36,21 @@ class KeyBody(BaseModel):
     key: str = Field(..., min_length=1, max_length=1024)
 
 
+MODEL_ID = r"^[A-Za-z0-9._:/@+-]{1,200}$"
+ModelId = Annotated[str, Field(pattern=MODEL_ID)]
+
+
 class SettingsBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     base_url: str | None = Field(None, max_length=512)
     workspace_id: str | None = Field(None, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    chat_completions_models: list[ModelId] = Field(default_factory=list, max_length=20)
+
+
+class SelectionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider: str = Field(..., max_length=32)
+    model: ModelId
 
 
 class ConsentBody(BaseModel):
@@ -132,7 +144,28 @@ async def list_providers(request: Request) -> dict[str, Any]:
         "providers": [_view(state, spec) for spec in state.providers.specs.values()],
         "policy": {"local_only": policy.local_only, "map_context": policy.map_context},
         "keyring": state.keys.keyring_available,
+        "selection": _selection(state),
     }
+
+
+def _selection(state: Any) -> dict[str, str] | None:
+    """The current conversation's choice, else the last one (a new
+    conversation starts with it); None means the default Ollama model."""
+    current = state.chats.current_conversation()
+    chosen = (state.chats.selection(current) if current else None) or state.provider_store.last_selection()
+    return {"provider": chosen[0], "model": chosen[1]} if chosen else None
+
+
+@router.put("/selection")
+async def put_selection(body: SelectionBody, request: Request) -> dict[str, Any]:
+    """Choose the provider and model for the current conversation, and for
+    new ones. Consent and local-only mode are checked when a turn runs."""
+    state = _writer(request)
+    spec = _spec(state, body.provider)
+    conversation = state.chats.ensure_conversation(state.chats.current_conversation())
+    state.chats.set_selection(conversation, spec.id, body.model)
+    state.provider_store.set_last_selection(spec.id, body.model)
+    return {"conversation_id": conversation, "selection": _selection(state)}
 
 
 @router.get("/session")
@@ -150,8 +183,12 @@ async def set_policy(body: PolicyBody, request: Request) -> dict[str, bool]:
 @router.put("/{provider_id}/key")
 async def put_key(provider_id: str, body: KeyBody, request: Request) -> dict[str, Any]:
     state = _writer(request)
+    spec = _spec(state, provider_id)
+    if not key_may_travel(_base_url(state.providers.get(spec.id), spec)):
+        message = "This server is on plain http on another machine; a key would travel unencrypted"
+        raise HTTPException(409, {"code": "key_over_http", "message": message})
     try:
-        return state.keys.set(_spec(state, provider_id), body.key).public()
+        return state.keys.set(spec, body.key).public()
     except KeyStoreError as error:
         raise HTTPException(_KEY_ERRORS[error.code], {"code": error.code, "message": str(error)}) from None
 
@@ -175,10 +212,12 @@ async def put_settings(provider_id: str, body: SettingsBody, request: Request) -
             raise HTTPException(
                 409, {"code": "set_in_environment", "message": "Ollama's address comes from OLLAMA_HOST"}
             )
-        problem = base_url_problem(base_url)
+        keyless = spec.key_optional and not state.keys.status(spec).configured
+        problem = base_url_problem(base_url, allow_lan_http=keyless)
         if problem:
             raise HTTPException(400, {"code": "bad_base_url", "message": f"The base URL {problem}"})
-    state.provider_store.save_settings(spec.id, ProviderSettings(base_url, body.workspace_id))
+    saved = ProviderSettings(base_url, body.workspace_id, tuple(body.chat_completions_models))
+    state.provider_store.save_settings(spec.id, saved)
     if spec.id != "ollama":
         state.providers.rebuild(spec.id, base_url or spec.base_url)
     return _view(state, spec)

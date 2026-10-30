@@ -141,8 +141,15 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
             raise HTTPException(422, {"code": "nothing_to_regenerate"})
     else:
         message = body.message.strip()
-    history = chats.messages(conversation)
+    history = chats.history(conversation)
+    # The provider and model come only from the stored selection, which only
+    # the gated /providers/selection route changes: a LAN viewer can chat but
+    # never switch to a provider that spends the owner's key (ADR-002 D5).
+    store = getattr(state, "provider_store", None)
+    chosen = chats.selection(conversation) or (store.last_selection() if store else None)
     turn = Turn(conversation, message, body.viewport, body.layer_state, history, turn_id=turn_id)
+    if chosen:
+        turn.provider_id, turn.model = chosen
     chats.add_message(conversation, "user", message)
 
     async def stream() -> AsyncIterator[str]:

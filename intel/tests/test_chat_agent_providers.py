@@ -128,7 +128,10 @@ def test_a_retryable_error_before_any_text_is_retried(run_with) -> None:  # type
 def test_an_auth_failure_is_reported_once_with_its_taxonomy_code(run_with) -> None:  # type: ignore[no-untyped-def]
     provider = MockProvider([[ProviderError(errors.AUTH_FAILED, "bad key", provider="mock")]], models=[MODEL])
     events = run_with(provider)
-    assert events[-1] == ("error", {"code": "auth_failed", "message": "bad key"})
+    assert events[-1] == (
+        "error",
+        {"code": "auth_failed", "message": "bad key", "provider": "mock", "retryable": False},
+    )
     assert provider.opened == 1
 
 

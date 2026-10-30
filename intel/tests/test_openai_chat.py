@@ -75,8 +75,12 @@ def test_openrouter_reasoning_details_are_kept_in_order_and_replayed() -> None:
         {"type": "reasoning.text", "text": "a", "index": 0},
         {"type": "reasoning.encrypted", "data": "x"},
     ]
-    harness.stream(chunk({"reasoning_details": details[:1]}), chunk({"reasoning_details": details[1:]}),
-                   chunk({"content": "ok"}, "stop"), USAGE)  # fmt: skip
+    harness.stream(
+        chunk({"reasoning_details": details[:1]}),
+        chunk({"reasoning_details": details[1:]}),
+        chunk({"content": "ok"}, "stop"),
+        USAGE,
+    )
     done = run(harness, ask())[-1]
     assert done.provider_state == {"reasoning_details": details}
     harness.answer("again")

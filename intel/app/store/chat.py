@@ -62,12 +62,13 @@ class ChatStore:
         meta: dict[str, Any] | None = None,
         provider_id: str | None = None,
         model: str | None = None,
+        provider_state: dict[str, Any] | None = None,
     ) -> int:
         now = int(time.time())
         with self._lock:
             cursor = self._conn.execute(
                 "INSERT INTO messages (conversation_id, role, content, citations_json, meta_json,"
-                " provider_id, model, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                " provider_id, model, provider_state_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     conversation_id,
                     role,
@@ -76,6 +77,7 @@ class ChatStore:
                     json.dumps(meta) if meta else None,
                     provider_id,
                     model,
+                    json.dumps(provider_state) if provider_state else None,
                     now,
                 ),
             )
@@ -102,6 +104,41 @@ class ChatStore:
             }
             for row in reversed(rows)
         ]
+
+    def history(self, conversation_id: int, limit: int = MAX_HISTORY_MESSAGES) -> list[dict[str, Any]]:
+        """messages() plus provider_state, for the agent only. It is opaque
+        provider data (thinking signatures, encrypted reasoning) that the
+        history route never sends to the browser."""
+        rows = self.messages(conversation_id, limit)
+        if not rows:
+            return rows
+        with self._lock:
+            states = dict(
+                self._conn.execute(
+                    "SELECT id, provider_state_json FROM messages WHERE conversation_id = ?"
+                    " AND provider_state_json IS NOT NULL AND id >= ?",
+                    (conversation_id, rows[0]["id"]),
+                ).fetchall()
+            )
+        return [
+            {**row, "provider_state": json.loads(states[row["id"]]) if row["id"] in states else None}
+            for row in rows
+        ]
+
+    def selection(self, conversation_id: int) -> tuple[str, str] | None:
+        """The provider and model chosen for a conversation (ADR-002 D4)."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT provider_id, model FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+        return (str(row[0]), str(row[1])) if row and row[0] and row[1] else None
+
+    def set_selection(self, conversation_id: int, provider_id: str, model: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE conversations SET provider_id = ?, model = ? WHERE id = ?",
+                (provider_id, model, conversation_id),
+            )
 
     def drop_last_answer(self, conversation_id: int) -> str | None:
         """For regenerate: delete the answer after the last user message and

@@ -77,9 +77,9 @@ class EchoProvider:
         yield  # pragma: no cover - makes this an async generator
 
 
-def make_app(tmp_path: Path, fake: FakeOllama | None = None) -> Any:
+def make_app(tmp_path: Path, fake: FakeOllama | None = None, providers_yaml: str = PROVIDERS_YAML) -> Any:
     providers_file = tmp_path / "providers.yaml"
-    providers_file.write_text(PROVIDERS_YAML, encoding="utf-8")
+    providers_file.write_text(providers_yaml, encoding="utf-8")
     fake = fake or FakeOllama([])
 
     def ollama(request: httpx.Request) -> httpx.Response:
@@ -273,7 +273,12 @@ def test_local_only_blocks_an_ollama_cloud_model_before_anything_is_sent(tmp_pat
         turn = client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS)
     assert events_of(turn.text)[-1] == (
         "error",
-        {"code": "local_only", "message": "Local-only mode is on, so cloud models are blocked."},
+        {
+            "code": "local_only",
+            "message": "Local-only mode is on, so cloud models are blocked.",
+            "provider": "ollama",
+            "retryable": False,
+        },
     )
     assert fake.requests == []
 
@@ -317,3 +322,62 @@ def test_a_canary_key_appears_in_no_artefact(
     assert {"intel.db", "responses", "logs"} <= set(artefacts)
     leaked = [name for name, text in artefacts.items() if CANARY in text or CANARY[8:] in text]
     assert leaked == []
+
+
+# -- selection (P3) -----------------------------------------------------------------
+
+CUSTOM_YAML = PROVIDERS_YAML + (
+    "  - {id: custom, label: Custom, adapter: echo, kind: local, base_url: 'http://127.0.0.1:1234/v1',"
+    " key_env: [SPECTRE_CUSTOM_API_KEY], key_optional: true}\n"
+)
+SELECTION = "/api/intel/providers/selection"
+
+
+def test_the_selection_is_a_gated_write_the_chat_body_cannot_change(client: TestClient) -> None:
+    body = {"provider": "acme", "model": "big-1"}
+    assert client.put(SELECTION, json=body, headers=HEADERS).status_code == 403
+    chosen = client.put(SELECTION, json=body, headers=writer(client))
+    assert chosen.status_code == 200 and chosen.json()["selection"] == body
+    assert client.get("/api/intel/providers").json()["selection"] == body
+    sneaky = client.post("/api/intel/chat", json={"message": "hi", "provider": "ollama"}, headers=HEADERS)
+    assert sneaky.status_code == 422, "a LAN viewer can chat but not pick the provider"
+    unknown = client.put(SELECTION, json={"provider": "nobody", "model": "m"}, headers=writer(client))
+    spaced = client.put(SELECTION, json={"provider": "acme", "model": "two words"}, headers=writer(client))
+    assert (unknown.status_code, spaced.status_code) == (404, 422)
+
+
+def test_turns_run_on_the_selection_and_a_new_conversation_keeps_it(client: TestClient) -> None:
+    headers = writer(client)
+    acme = client.app.state.providers.get("acme")
+    client.put(SELECTION, json={"provider": "acme", "model": "big-1"}, headers=headers)
+    client.put("/api/intel/providers/acme/consent", json={"granted": True}, headers=headers)
+    first = events_of(client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS).text)
+    assert first[0][1]["provider"] == "acme" and first[-1][1]["provider"] == "acme"
+    assert client.delete("/api/intel/chat/history", headers=HEADERS).status_code == 204
+    again = events_of(client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS).text)
+    assert again[0][1]["provider"] == "acme" and acme.calls.count("stream") == 2
+
+
+def test_a_keyless_custom_server_may_use_http_on_the_network_but_never_with_a_key(tmp_path: Path) -> None:
+    with TestClient(make_app(tmp_path, providers_yaml=CUSTOM_YAML), base_url="http://127.0.0.1") as client:
+        headers = writer(client)
+        lan = {"base_url": "http://192.168.1.5:1234/v1"}
+        loopback = {"base_url": "http://127.0.0.1:1234/v1"}
+        key = {"key": "lmstudio-key-1"}
+        custom = "/api/intel/providers/custom"
+        assert client.put(f"{custom}/settings", json=lan, headers=headers).status_code == 200
+        refused = client.put(f"{custom}/key", json=key, headers=headers)
+        assert refused.status_code == 409 and refused.json()["detail"]["code"] == "key_over_http"
+        assert client.put("/api/intel/providers/acme/settings", json=lan, headers=headers).status_code == 400
+        assert client.put(f"{custom}/settings", json=loopback, headers=headers).status_code == 200
+        assert client.put(f"{custom}/key", json=key, headers=headers).status_code == 200
+        assert client.put(f"{custom}/settings", json=lan, headers=headers).status_code == 400
+
+
+def test_models_marked_for_chat_completions_are_saved(client: TestClient) -> None:
+    body = {"chat_completions_models": ["older-1", "older-2"]}
+    assert (
+        client.put("/api/intel/providers/acme/settings", json=body, headers=writer(client)).status_code == 200
+    )
+    saved = client.app.state.provider_store.settings("acme")
+    assert saved.chat_completions_models == ("older-1", "older-2")

@@ -73,9 +73,10 @@ def _spec(entry: Any, adapters: Mapping[str, object]) -> ProviderSpec:
 _LOOPBACK = {"localhost", "127.0.0.1", "::1"}
 
 
-def base_url_problem(url: str) -> str | None:
+def base_url_problem(url: str, *, allow_lan_http: bool = False) -> str | None:
     """Why a user-supplied base URL is refused, or None. The URL receives the
-    key, so it must be https, or http on this machine only (a local server)."""
+    key, so it must be https, or http on this machine. A server that takes no
+    key may also use http on the local network (`allow_lan_http`)."""
     parts = urlsplit(url)
     host = (parts.hostname or "").lower()
     if parts.scheme not in ("http", "https") or not host:
@@ -83,7 +84,10 @@ def base_url_problem(url: str) -> str | None:
     if parts.username or parts.password or parts.query or parts.fragment:
         return "must not carry credentials, a query or a fragment"
     if parts.scheme == "http" and host not in _LOOPBACK:
-        return "must use https unless the server is on this machine"
+        from .sdk import endpoint_kind  # late: sdk imports the SDKs
+
+        if not (allow_lan_http and endpoint_kind(url) == "remote"):
+            return "must use https unless the server is on this machine (or on your network, without a key)"
     return None
 
 

@@ -198,9 +198,13 @@ ADAPTERS = {"ollama": object(), "mock": object()}
 
 
 def test_the_shipped_provider_file_loads() -> None:
-    specs = load_specs(DEFAULT_PATH, ADAPTERS)
-    assert [spec.id for spec in specs] == ["ollama"]
-    assert specs[0].kind == "local" and specs[0].key_env == ()
+    adapters = dict.fromkeys(("ollama", "anthropic", "openai", "openai_compat"), object())
+    specs = {spec.id: spec for spec in load_specs(DEFAULT_PATH, adapters)}
+    assert list(specs) == ["ollama", "anthropic", "openai", "openrouter", "nvidia", "deepseek", "custom"]
+    assert specs["ollama"].kind == "local" and specs["ollama"].key_env == ()
+    assert all(spec.base_url.startswith("https://") for spec in specs.values() if spec.kind == "cloud")
+    assert specs["custom"].key_optional and not specs["openai"].key_optional
+    assert specs["openai"].key_env == ("OPENAI_API_KEY",), "shared with POWER UP's voice key (D5)"
 
 
 @pytest.mark.parametrize(
