@@ -17,7 +17,7 @@ export class NeuralCoreError extends Error {
   }
 }
 
-async function failure(response) {
+export async function failure(response) {
   let code = `http_${response.status}`;
   try {
     const body = await response.json();

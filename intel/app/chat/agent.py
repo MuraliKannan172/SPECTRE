@@ -214,16 +214,15 @@ class Agent:
 
     def _egress_refusal(self, provider: ChatProvider, kind: str) -> dict[str, Any] | None:
         """ADR-002 D6: local-only mode blocks every cloud model, Ollama's
-        :cloud ones included; any other cloud provider needs consent first.
-        Ollama :cloud models skip consent until the panel can ask for it (P4).
-        Checked on the provider's kind before any call, then on the model's
-        (an Ollama provider is local, but its :cloud models are not)."""
+        :cloud ones included, and every non-local model needs consent first,
+        a server on your network and Ollama's :cloud models too (the panel
+        asks for it, P4). Checked on the provider's kind before any call, then
+        on the model's (an Ollama provider is local, its :cloud models are not)."""
         if kind == "local":
             return None
         if kind == "cloud" and self.local_only():
             return _refusal("local_only", "Local-only mode is on, so cloud models are blocked.", provider)
-        # Consent covers any non-local provider, a server on your network too.
-        if provider.id != "ollama" and not self.consented(provider.id):
+        if not self.consented(provider.id):
             message = f"{provider.id} has not been allowed to receive this conversation yet."
             return _refusal("consent_required", message, provider)
         return None

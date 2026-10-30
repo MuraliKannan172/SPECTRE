@@ -286,6 +286,21 @@ def test_local_only_blocks_an_ollama_cloud_model_before_anything_is_sent(tmp_pat
     assert fake.requests == []
 
 
+def test_an_ollama_cloud_model_needs_consent_and_then_runs(tmp_path: Path) -> None:
+    fake = FakeOllama([say("From ollama.com.")])
+    fake.tags = [{"name": DEFAULT_MODEL, "remote_host": "https://ollama.com"}]
+    with TestClient(make_app(tmp_path, fake), base_url="http://127.0.0.1") as client:
+        waiting = client.get("/api/intel/chat/status").json()
+        refused = client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS)
+        client.put("/api/intel/providers/ollama/consent", json={"granted": True}, headers=writer(client))
+        allowed = client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS)
+        ready = client.get("/api/intel/chat/status").json()
+    assert (waiting["kind"], waiting["problem"]) == ("cloud", "consent_required")
+    assert events_of(refused.text)[-1][1]["code"] == "consent_required"
+    assert ("token", {"text": "From ollama.com."}) in events_of(allowed.text)
+    assert ready["ready"] is True and len(fake.requests) == 1
+
+
 def test_a_canary_key_appears_in_no_artefact(
     tmp_path: Path, caplog: pytest.LogCaptureFixture, memory_keyring: Any
 ) -> None:

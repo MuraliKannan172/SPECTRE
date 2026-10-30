@@ -141,6 +141,9 @@ def _view(state: Any, spec: ProviderSpec) -> dict[str, Any]:
         "base_url": _base_url(provider, spec),
         "base_url_editable": spec.id != "ollama",
         "workspace_id": saved.workspace_id,
+        "adapter": spec.adapter,
+        "params": saved.params,
+        "chat_completions_models": list(saved.chat_completions_models),
         "key": state.keys.status(spec).public(),
         "consent": state.provider_store.consented(spec.id),
     }

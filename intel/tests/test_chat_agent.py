@@ -129,7 +129,7 @@ def make_agent(tmp_path: Path):  # type: ignore[no-untyped-def]
         client = httpx.AsyncClient(transport=httpx.MockTransport(fake))
         agent = Agent(
             settings=settings,
-            ollama=OllamaClient("http://ollama.test", client),
+            ollama=OllamaClient("http://127.0.0.1:11434", client),  # local, as by default
             news=news,
             chats=chats,
             search=search or FakeSearch([]),
