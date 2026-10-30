@@ -676,7 +676,12 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
 - **Factories take a key getter**, not a key: a key saved later is used on the next request, and
   no adapter holds a key it could print.
 - **Local-only mode** blocks a cloud model at turn start, and also a cloud provider's connection
-  test and model list: no request reaches a cloud API while it is on.
+  test and model list: no request reaches a cloud API while it is on. A cloud provider is refused
+  on its own kind before any call (a capability lookup would carry the key), and the status route
+  skips its lookup; Ollama `:cloud` models are refused on the model's kind.
+- **Provider reads through the proxy** also refuse a `Sec-Fetch-Site` other than `same-origin`
+  or `none`: an `<img>` on another page (even another localhost port) sends no Origin, and a
+  model list makes the service call out with the stored key.
 - **Consent** is enforced at turn start for every cloud provider except Ollama's `:cloud` models,
   which wait for the P4 consent dialog; enforcing it now would lock out a `:cloud` user with no
   way to consent. Until P4 they are blocked only by local-only mode.

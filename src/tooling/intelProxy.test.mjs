@@ -437,7 +437,10 @@ test('provider writes forward the session token, never Origin, with an exact loc
     '/api/intel/providers/session',
     '/api/intel/providers/openai/models',
   ]) {
-    assert.equal((await fetch(`${proxy.url}${path}`)).status, 200, path);
+    const response = await fetch(`${proxy.url}${path}`, {
+      headers: { 'sec-fetch-site': 'same-origin' },
+    });
+    assert.equal(response.status, 200, path);
   }
   const tested = await fetch(`${proxy.url}/api/intel/providers/openai/test`, {
     method: 'POST',
@@ -506,6 +509,19 @@ test('provider routes refuse other sites, missing Origin, non-JSON, proxies and 
     await error(await fetch(url, { method: 'DELETE' })),
     'providers_origin-required',
   );
+  // An <img> or link from another page, even another localhost port, sends
+  // no Origin but does send Sec-Fetch-Site; reading models would spend the key.
+  for (const site of ['cross-site', 'same-site']) {
+    assert.equal(
+      await error(
+        await fetch(`${proxy.url}/api/intel/providers/openai/models`, {
+          headers: { 'sec-fetch-site': site },
+        }),
+      ),
+      'providers_cross-site',
+      site,
+    );
+  }
   for (const path of [
     '/api/intel/providers/Bad/key',
     '/api/intel/providers/openai/secret',

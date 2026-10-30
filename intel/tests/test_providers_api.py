@@ -51,6 +51,7 @@ class EchoProvider:
         self.id = spec.id
         self.base_url = base_url
         self._key = key
+        self.calls: list[str] = []  # every call would reach the cloud API with the key
 
     def _refused(self) -> ProviderError:
         log.warning("sent key %s to %s", self._key(), self.base_url)
@@ -59,15 +60,19 @@ class EchoProvider:
         )
 
     async def list_models(self) -> list[ModelInfo]:
+        self.calls.append("list_models")
         raise self._refused()
 
     async def model_caps(self, model: str) -> ModelInfo:
+        self.calls.append("model_caps")
         return ModelInfo(model, model, "cloud", "yes", capabilities=frozenset({"completion", "tools"}))
 
     async def test(self) -> dict[str, Any]:
+        self.calls.append("test")
         raise self._refused()
 
     async def stream(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:
+        self.calls.append("stream")
         raise self._refused()
         yield  # pragma: no cover - makes this an async generator
 
@@ -242,6 +247,22 @@ def test_local_only_blocks_testing_and_listing_cloud_providers(client: TestClien
         "ok": True,
         "version": "0.40.13",
     }
+
+
+def test_local_only_makes_no_call_at_all_to_a_cloud_provider(client: TestClient) -> None:
+    headers = writer(client)
+    acme = client.app.state.providers.get("acme")
+    client.app.state.agent.provider = acme
+    client.put("/api/intel/providers/acme/consent", json={"granted": True}, headers=headers)
+    client.put("/api/intel/providers/policy", json={"local_only": True}, headers=headers)
+
+    status = client.get("/api/intel/chat/status")
+    turn = client.post("/api/intel/chat", json={"message": "hi"}, headers=HEADERS)
+    client.post("/api/intel/providers/acme/test", json={}, headers=headers)
+    client.get("/api/intel/providers/acme/models")
+
+    assert status.status_code == 200 and events_of(turn.text)[-1][1]["code"] == "local_only"
+    assert acme.calls == []
 
 
 def test_local_only_blocks_an_ollama_cloud_model_before_anything_is_sent(tmp_path: Path) -> None:

@@ -44,7 +44,6 @@ from .providers.base import (
     ChatRequest,
     Done,
     Message,
-    ModelInfo,
     TextDelta,
     ToolCall,
     ToolCallEvent,
@@ -169,11 +168,18 @@ class Agent:
         """The selected model's capabilities (the provider caches them)."""
         return (await self.provider.model_caps(self.settings.ollama_model)).capabilities
 
-    def _egress_refusal(self, info: ModelInfo) -> dict[str, Any] | None:
+    def local_only_blocks(self) -> bool:
+        """Local-only mode is on and the provider itself is a cloud API, so no
+        call may reach it, not even a capability lookup carrying the key."""
+        return self.provider.kind == "cloud" and self.local_only()
+
+    def _egress_refusal(self, kind: str) -> dict[str, Any] | None:
         """ADR-002 D6: local-only mode blocks every cloud model, Ollama's
         :cloud ones included; any other cloud provider needs consent first.
-        Ollama :cloud models skip consent until the panel can ask for it (P4)."""
-        if info.kind != "cloud":
+        Ollama :cloud models skip consent until the panel can ask for it (P4).
+        Checked on the provider's kind before any call, then on the model's
+        (an Ollama provider is local, but its :cloud models are not)."""
+        if kind != "cloud":
             return None
         if self.local_only():
             return {"code": "local_only", "message": "Local-only mode is on, so cloud models are blocked."}
@@ -239,12 +245,16 @@ class Agent:
                 {"model": self.settings.ollama_model, "refused": True, "as_of": None, "citations": []},
             )
             return
+        refusal = self._egress_refusal(self.provider.kind)
+        if refusal:
+            yield "error", refusal
+            return
         try:
             info = await self.provider.model_caps(self.settings.ollama_model)
         except ProviderError as error:
             yield "error", _error_event(error)
             return
-        refusal = self._egress_refusal(info)
+        refusal = self._egress_refusal(info.kind)
         if refusal:
             yield "error", refusal
             return
