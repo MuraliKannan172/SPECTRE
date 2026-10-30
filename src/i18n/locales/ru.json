@@ -3275,5 +3275,8 @@
   "NEURAL CORE CHAT KEYS": "КЛЮЧИ ЧАТА NEURAL CORE",
   "Saved in your OS keyring by the intel service, not in .env. Saving here does not restart anything.": "Служба intel сохраняет их в хранилище ключей ОС, а не в .env. Сохранение здесь ничего не перезапускает.",
   "No key yet.": "Ключа пока нет.",
-  "Optional: only if your server asks for one.": "Необязательно: только если ваш сервер его требует."
+  "Optional: only if your server asks for one.": "Необязательно: только если ваш сервер его требует.",
+  "Or type a model id": "Или введите ID модели",
+  "Model id": "ID модели",
+  "Use this model id": "Использовать этот ID"
 }

@@ -760,3 +760,11 @@ All read on **2026-10-29**. Paths are relative to the site named on each line; p
   Set the key in POWER UP) and a footer disclaimer that names where the model runs.
   Favourites and the VRAM budget are per-browser conveniences in `localStorage`; the session
   token is kept in memory only.
+- **No fallback model list (deviation from D11):** instead of a short list marked `verify`, the
+  picker has a field for any model id, which the server validates; it covers a custom server,
+  a NIM model and a list that failed, without shipping model IDs that go stale.
+- **Keys are typed in POWER UP** (Q1): a NEURAL CORE CHAT KEYS section stores through the intel
+  service (OS keyring), never through POWER UP's own `.env` save, and loads only when POWER UP
+  opens. The settings view shows where each key comes from.
+- **Not built:** Pull model (stretch), the reasoning toggle and `thinking` rendering, and D9's
+  trimming of the oldest tool results first and correcting the estimate from reported usage.

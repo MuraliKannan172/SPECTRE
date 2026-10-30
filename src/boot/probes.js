@@ -140,8 +140,12 @@ export function classifyChatStatus(status) {
       CHAT_PROBLEMS[status.problem] || CHAT_PROBLEMS.unknown_provider;
     return { state: 'degraded', detail: t(problem) };
   }
-  if (status?.problem === 'local_only' && status?.ollama?.reachable)
-    return { state: 'degraded', detail: t(CHAT_PROBLEMS.local_only) };
+  // An Ollama :cloud model (or a remote Ollama) can be blocked or wait for consent.
+  if (
+    ['local_only', 'consent_required'].includes(status?.problem) &&
+    status?.ollama?.reachable
+  )
+    return { state: 'degraded', detail: t(CHAT_PROBLEMS[status.problem]) };
   if (!status?.ollama?.reachable)
     return { state: 'offline', detail: t('Ollama not reachable') };
   const model = String(status.model || '');

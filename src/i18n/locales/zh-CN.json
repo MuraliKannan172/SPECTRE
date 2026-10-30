@@ -3053,5 +3053,8 @@
   "NEURAL CORE CHAT KEYS": "NEURAL CORE 聊天密钥",
   "Saved in your OS keyring by the intel service, not in .env. Saving here does not restart anything.": "由 intel 服务保存在操作系统钥匙串中，而非 .env。在此保存不会重启任何内容。",
   "No key yet.": "尚无密钥。",
-  "Optional: only if your server asks for one.": "可选：仅当你的服务器需要时。"
+  "Optional: only if your server asks for one.": "可选：仅当你的服务器需要时。",
+  "Or type a model id": "或输入模型 ID",
+  "Model id": "模型 ID",
+  "Use this model id": "使用此模型 ID"
 }

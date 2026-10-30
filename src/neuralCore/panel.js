@@ -444,9 +444,16 @@ export function mountNeuralCorePanel({
     const row = element(document, 'span', 'spectre-nc-recovery');
     for (const { label, run } of actions) {
       const choice = button(document, 'spectre-nc-action', label);
-      choice.addEventListener(
-        'click',
-        () => void run(() => send({ regenerate: true }, entry)),
+      // A refused write (a LAN viewer, a restarted service) says so here.
+      choice.addEventListener('click', () =>
+        Promise.resolve(run(() => send({ regenerate: true }, entry))).catch(
+          (error) => {
+            entry.error.textContent = errorText(
+              error instanceof NeuralCoreError ? error.code : 'network',
+              { model },
+            );
+          },
+        ),
       );
       row.append(choice);
     }

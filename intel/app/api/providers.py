@@ -254,8 +254,11 @@ async def put_settings(provider_id: str, body: SettingsBody, request: Request) -
         raise HTTPException(400, {"code": "unsupported_param", "params": refused})
     saved = ProviderSettings(base_url, body.workspace_id, tuple(body.chat_completions_models), params)
     state.provider_store.save_settings(spec.id, saved)
-    if spec.id != "ollama":
-        state.providers.rebuild(spec.id, base_url or spec.base_url)
+    target = base_url or spec.base_url
+    # Rebuild only when the address changed: a rebuild drops the adapter's
+    # learned reasoning effort and its cached model list.
+    if spec.id != "ollama" and target != _base_url(state.providers.get(spec.id), spec):
+        state.providers.rebuild(spec.id, target)
     return _view(state, spec)
 
 

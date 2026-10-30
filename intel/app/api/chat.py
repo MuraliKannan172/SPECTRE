@@ -234,6 +234,7 @@ async def status(request: Request) -> dict[str, Any]:
     result: dict[str, Any] = {
         "model": model,
         "provider": provider_id,
+        "provider_label": _provider_label(state, provider_id),
         "kind": None,
         "ready": False,
         "problem": None,
@@ -291,6 +292,12 @@ async def status(request: Request) -> dict[str, Any]:
         result["problem"] = "consent_required"  # a :cloud model, or Ollama on another machine
     result["ready"] = result["problem"] is None
     return result
+
+
+def _provider_label(state: Any, provider_id: str) -> str:
+    providers = getattr(state, "providers", None)
+    spec = providers.specs.get(provider_id) if providers else None
+    return spec.label if spec else provider_id
 
 
 def _budget_view(chats: Any, conversation: int | None, policy: Any) -> dict[str, int] | None:

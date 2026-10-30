@@ -262,6 +262,21 @@ test('labels and errors describe real state', () => {
     statusSummary({ ...api, ready: false, problem: 'consent_required' }).text,
     'deepseek · d1 · This provider has not been allowed to receive the conversation yet.',
   );
+  // An Ollama :cloud model waiting for consent does not read as loaded.
+  const cloudOllama = statusSummary({
+    provider: 'ollama',
+    model: 'beam:cloud',
+    ollama: { reachable: true },
+    model_present: true,
+    ready: false,
+    problem: 'consent_required',
+    loaded: { size_vram: 1 },
+  });
+  assert.equal(cloudOllama.tone, 'offline');
+  assert.match(
+    cloudOllama.text,
+    /^beam:cloud · This provider has not been allowed/,
+  );
   assert.equal(
     turnErrorCode({ code: 'rate_limited', provider: 'openai' }),
     'provider_rate_limited',

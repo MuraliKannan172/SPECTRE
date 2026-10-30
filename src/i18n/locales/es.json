@@ -3201,5 +3201,8 @@
   "NEURAL CORE CHAT KEYS": "CLAVES DEL CHAT NEURAL CORE",
   "Saved in your OS keyring by the intel service, not in .env. Saving here does not restart anything.": "El servicio intel las guarda en el llavero del sistema, no en .env. Guardar aquí no reinicia nada.",
   "No key yet.": "Aún no hay clave.",
-  "Optional: only if your server asks for one.": "Opcional: solo si tu servidor la pide."
+  "Optional: only if your server asks for one.": "Opcional: solo si tu servidor la pide.",
+  "Or type a model id": "O escribe un ID de modelo",
+  "Model id": "ID de modelo",
+  "Use this model id": "Usar este ID de modelo"
 }
