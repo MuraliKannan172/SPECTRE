@@ -37,10 +37,19 @@ from ..store.news import NewsQuery, NewsStore
 from ..web.fetch import FetchError, PageFetcher
 from ..web.guard import BlockedURL
 from ..web.search import SearchError, SearchService
+from .context import (
+    CHARS_PER_TOKEN,
+    OLLAMA_OUTPUT_RESERVE,
+    chars_per_token,
+    fit,
+    message_chars,
+    tools_chars,
+)
 from .ollama import OllamaClient
 from .policy import MAP_WITHHELD, REFUSAL, person_lookup, system_prompt, wrap_untrusted
 from .probe import probe_tools
 from .providers.base import (
+    DEFAULT_MAX_OUTPUT,
     ChatProvider,
     ChatRequest,
     Done,
@@ -59,7 +68,6 @@ from .tools import ToolRegistry
 MAX_TOOL_ROUNDS = 4
 BASE_WINDOW = 16384
 CLIENT_TOOL_TIMEOUT = 15.0
-CHARS_PER_TOKEN = 4
 MAX_CLIENT_RESULT_CHARS = 4000
 INFO_TOOLS = frozenset({"news_search", "news_near", "web_search", "fetch_page"})
 # Said after the untrusted block, so it reads as ours, not the source's.
@@ -90,12 +98,20 @@ class Plan:
     budgets: dict[str, int]
     kind: str = "local"  # the model's: decides consent, the map switch and the budget
     params: dict[str, Any] = field(default_factory=dict)
+    input_limit: int = BASE_WINDOW - DEFAULT_MAX_OUTPUT  # tokens one round may send (D9)
+    chars_per_token: float = CHARS_PER_TOKEN
 
 
 def api_budgets(window: int | None) -> dict[str, int]:
     """FULL_BUDGETS as a ceiling; a smaller context window lowers them (D9)."""
     scale = min(1.0, window / BASE_WINDOW) if window else 1.0
     return {name: int(tokens * scale) for name, tokens in FULL_BUDGETS.items()}
+
+
+def api_input_limit(window: int | None, max_output: int) -> int:
+    """Input tokens per round for an API model: the 16k window less the default
+    output guard as a ceiling, lowered by the model's own window less its output."""
+    return max(1024, min(BASE_WINDOW - DEFAULT_MAX_OUTPUT, (window or BASE_WINDOW) - max_output))
 
 
 class Sources:
@@ -187,6 +203,8 @@ class Agent:
         self.known_tools = known_tools
         self.remember_tools = remember_tools
         self._unproven: set[tuple[str, str, str]] = set()
+        # Characters per token seen in reported usage, per provider and model (D9).
+        self._density: dict[tuple[str, str], float] = {}
         self.clock = clock
         self._pending: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
 
@@ -251,9 +269,19 @@ class Agent:
         if refusal:
             return refusal
         params = self.params_for(provider.id)
+        density = self._density.get((provider.id, model), CHARS_PER_TOKEN)
         if provider.id == "ollama":
-            budgets = budgets_for(int(params.get("num_ctx") or self.settings.num_ctx))
-            return Plan(provider, model, "tools" in info.capabilities, budgets, info.kind, params)
+            num_ctx = int(params.get("num_ctx") or self.settings.num_ctx)
+            return Plan(
+                provider,
+                model,
+                "tools" in info.capabilities,
+                budgets_for(num_ctx),
+                info.kind,
+                params,
+                input_limit=num_ctx - OLLAMA_OUTPUT_RESERVE,
+                chars_per_token=density,
+            )
         support = info.supports_tools
         if support == "unknown":
             base_url = str(getattr(provider, "base_url", ""))
@@ -271,15 +299,25 @@ class Agent:
                     # cache row, and no second probe while the service runs (D10).
                     self._unproven.add(key)
                 support = probed or "yes"
-        return Plan(provider, model, support == "yes", api_budgets(info.context_window), info.kind, params)
+        max_output = int(params.get("max_output_tokens") or DEFAULT_MAX_OUTPUT)
+        return Plan(
+            provider,
+            model,
+            support == "yes",
+            api_budgets(info.context_window),
+            info.kind,
+            params,
+            input_limit=api_input_limit(info.context_window, max_output),
+            chars_per_token=density,
+        )
 
     # -- the turn --------------------------------------------------------------
 
     def _now_local(self) -> str:
         return dt.datetime.fromtimestamp(self.clock()).astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
-    def _history(self, history: list[dict[str, Any]], tokens: int) -> list[Message]:
-        budget = tokens * CHARS_PER_TOKEN
+    def _history(self, history: list[dict[str, Any]], tokens: int, density: float) -> list[Message]:
+        budget = int(tokens * density)
         kept: list[Message] = []
         for message in reversed(history):
             content = str(message.get("content") or "")
@@ -297,6 +335,8 @@ class Agent:
                     provider_state=message.get("provider_state"),
                 )
             )
+        while kept and kept[-1].role != "user":  # an answer whose question did not fit
+            kept.pop()
         return list(reversed(kept))
 
     def _request(
@@ -355,14 +395,17 @@ class Agent:
             system += _fallback_instructions(self.registry)
         messages: list[Message] = [
             Message("system", system),
-            *self._history(turn.history, plan.budgets["history"]),
+            *self._history(turn.history, plan.budgets["history"], plan.chars_per_token),
             Message("user", turn.message),
         ]
+        limit = int(plan.input_limit * plan.chars_per_token)
+        fixed = tools_chars(self.registry.all_tools) if native else 0
         sources = Sources()
         state: dict[str, Any] = {
             "web_chars": 0,
             "info": False,
             "budgets": plan.budgets,
+            "density": plan.chars_per_token,
             "map_shared": map_shared,
         }
         answer: list[str] = []
@@ -377,7 +420,9 @@ class Agent:
                 think = ThinkFilter()
                 content, calls = "", []
                 provider_state: dict[str, Any] | None = None
+                messages = fit(messages, limit, fixed)
                 request = self._request(messages, plan, native=native, allow_tools=allow_tools)
+                sent = sum(map(message_chars, request.messages)) + tools_chars(request.tools)
                 events = stream_with_retries(
                     functools.partial(provider.stream, request), attempts=provider.max_attempts
                 )
@@ -394,6 +439,9 @@ class Agent:
                         usage = event
                         spent[0] += event.input
                         spent[1] += event.output
+                        density = chars_per_token(sent, event.input)
+                        if density:
+                            self._density[(provider.id, plan.model)] = density
                     elif isinstance(event, Done):
                         provider_state = event.provider_state
                         stop = event.stop_reason
@@ -553,7 +601,7 @@ class Agent:
             return json.dumps(turn.layer_state or {}, ensure_ascii=False)[:2000], []
         if name in ("news_search", "news_near"):
             return self._news(name, args, sources)
-        budget = state["budgets"]["web"] * CHARS_PER_TOKEN - state["web_chars"]
+        budget = int(state["budgets"]["web"] * state["density"]) - state["web_chars"]
         if budget <= 200:
             return "error: this turn's web reading budget is used up; answer from what you have.", []
         if name == "web_search":
@@ -575,7 +623,7 @@ class Agent:
             state["web_chars"] += len(text)
             return text, new
         if name == "fetch_page":
-            limit = min(state["budgets"]["page"] * CHARS_PER_TOKEN, budget)
+            limit = min(int(state["budgets"]["page"] * state["density"]), budget)
             page = await self.fetcher.fetch(args["url"], max_chars=limit)
             number, fresh = sources.add(page.url, page.title, _host(page.url))
             note = " (truncated)" if page.truncated else ""
