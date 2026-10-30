@@ -178,6 +178,7 @@ class Agent:
         self.providers = providers
         self.known_tools = known_tools
         self.remember_tools = remember_tools
+        self._unproven: set[tuple[str, str, str]] = set()
         self.clock = clock
         self._pending: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
 
@@ -205,10 +206,11 @@ class Agent:
         Ollama :cloud models skip consent until the panel can ask for it (P4).
         Checked on the provider's kind before any call, then on the model's
         (an Ollama provider is local, but its :cloud models are not)."""
-        if kind != "cloud":
+        if kind == "local":
             return None
-        if self.local_only():
+        if kind == "cloud" and self.local_only():
             return _refusal("local_only", "Local-only mode is on, so cloud models are blocked.", provider)
+        # Consent covers any non-local provider, a server on your network too.
         if provider.id != "ollama" and not self.consented(provider.id):
             message = f"{provider.id} has not been allowed to receive this conversation yet."
             return _refusal("consent_required", message, provider)
@@ -242,15 +244,20 @@ class Agent:
         support = info.supports_tools
         if support == "unknown":
             base_url = str(getattr(provider, "base_url", ""))
-            support = self.known_tools(provider.id, base_url, model) or "unknown"
+            key = (provider.id, base_url, model)
+            support = self.known_tools(*key) or ("yes" if key in self._unproven else "unknown")
             if support == "unknown":
                 try:
                     probed = await probe_tools(provider, model)
                 except ProviderError as error:
                     return _error_event(error)
                 if probed:
-                    self.remember_tools(provider.id, base_url, model, probed)
-                support = probed or "yes"  # the API took the tools; nothing proven, nothing cached
+                    self.remember_tools(*key, probed)
+                else:
+                    # The API took the tools but proved nothing: native tools, no
+                    # cache row, and no second probe while the service runs (D10).
+                    self._unproven.add(key)
+                support = probed or "yes"
         return Plan(provider, model, support == "yes", api_budgets(info.context_window))
 
     # -- the turn --------------------------------------------------------------

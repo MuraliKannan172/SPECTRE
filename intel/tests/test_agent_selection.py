@@ -45,7 +45,15 @@ def probe_call() -> list[Any]:
 
 
 class World:
-    def __init__(self, tmp_path: Path, selected: MockProvider, *, known: str | None = None) -> None:
+    def __init__(
+        self,
+        tmp_path: Path,
+        selected: MockProvider,
+        *,
+        known: str | None = None,
+        consented: bool = True,
+        local_only: bool = False,
+    ) -> None:
         self.settings = Settings(
             db_path=tmp_path / "t.db",
             feeds_default=tmp_path / "f.yaml",
@@ -66,7 +74,8 @@ class World:
             registry=ToolRegistry(CLIENT_TOOLS),
             clock=lambda: 1_790_000_000.0,
             provider=MockProvider(),  # the default Ollama stand-in: must never be used here
-            consented=lambda provider_id: True,
+            consented=lambda provider_id: consented,
+            local_only=lambda: local_only,
             providers=lambda provider_id: selected if provider_id == selected.id else None,
             known_tools=lambda *key: known,
             remember_tools=lambda *row: self.remembered.append(row),
@@ -156,10 +165,28 @@ def test_a_rejected_tool_request_means_no_and_the_turn_runs_degraded(world) -> N
 
 
 def test_a_text_reply_to_the_probe_proves_nothing_and_is_not_cached(world) -> None:  # type: ignore[no-untyped-def]
-    cloud = Cloud([answer("I would rather not."), answer("Native anyway.")], models=[info()])
+    cloud = Cloud(
+        [answer("I would rather not."), answer("Native anyway."), answer("Again.")], models=[info()]
+    )
     made = world(cloud)
     events = made.turn()
     assert made.remembered == [] and cloud.requests[1].tools and events[-1][1]["degraded"] is False
+    made.turn()
+    probes = [r for r in cloud.requests if r.tools and r.tools[0]["function"]["name"] == PROBE_NAME]
+    assert len(probes) == 1 and len(cloud.requests) == 3, "no second probe while the service runs"
+
+
+class Lan(Cloud):
+    id = "acme"
+    kind = "remote"
+
+
+def test_a_server_on_the_network_needs_consent_but_local_only_lets_it_through(world) -> None:  # type: ignore[no-untyped-def]
+    lan = Lan([answer("From the LAN.")], models=[ModelInfo("big-1", "Big 1", "remote", "yes")])
+    refused = world(lan, consented=False).turn()
+    assert refused[-1][1]["code"] == "consent_required" and lan.opened == 0
+    allowed = world(lan, local_only=True).turn()
+    assert ("token", {"text": "From the LAN."}) in allowed
 
 
 def test_a_cached_result_skips_the_probe(world) -> None:  # type: ignore[no-untyped-def]
