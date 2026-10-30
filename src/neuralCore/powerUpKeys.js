@@ -182,6 +182,19 @@ export function mountNeuralCoreKeyRows({
     );
   }
 
-  void render();
+  // Ask the intel service only when POWER UP opens (it adds `visible`), not
+  // on every page load: no request, and no console error, while it is closed.
+  const dialog = host.closest('#key-setup');
+  const isOpen = () => Boolean(dialog?.classList.contains('visible'));
+  let wasOpen = false;
+  const watch = new MutationObserver(() => {
+    const open = isOpen();
+    if (open && !wasOpen) void render();
+    wasOpen = open;
+  });
+  if (dialog)
+    watch.observe(dialog, { attributes: true, attributeFilter: ['class'] });
+  signal?.addEventListener('abort', () => watch.disconnect(), { once: true });
+  if (!dialog || isOpen()) void render();
   return { render };
 }
