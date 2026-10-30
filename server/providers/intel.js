@@ -191,8 +191,20 @@ function readBody(req, limit) {
  * POST, so it needs an exact local Origin. A write without a body (DELETE of
  * a key) skips only the JSON check, which exists to force a CORS preflight
  * that a DELETE always triggers anyway.
+ *
+ * Reads need one more rule than POWER UP's: an <img> on another page sends
+ * no Origin, yet GET /providers/{id}/models makes the service call out with
+ * the stored key. So, as in localRequestGate.mjs, a Sec-Fetch-Site other
+ * than same-origin or none (a typed URL) is refused, including same-site:
+ * another port on localhost is same-site.
  */
 function admitProviderRequest(req, route, env) {
+  const site = String(req.headers['sec-fetch-site'] || '')
+    .trim()
+    .toLowerCase();
+  if (site !== '' && site !== 'same-origin' && site !== 'none') {
+    return { ok: false, status: 403, code: 'cross-site' };
+  }
   return admitKeySetupRequest({
     method: route.write ? 'POST' : 'GET',
     remoteAddress: req.socket?.remoteAddress,

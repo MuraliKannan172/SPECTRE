@@ -232,9 +232,11 @@ async def status(request: Request) -> dict[str, Any]:
         result["ollama"]["error"] = error.code
         return result
     try:
-        capabilities = await agent.capabilities()
-        result["model_present"] = True
-        result["tools"] = "tools" in capabilities
+        # Under local-only mode a cloud provider gets no call at all, not even this lookup.
+        if not agent.local_only_blocks():
+            capabilities = await agent.capabilities()
+            result["model_present"] = True
+            result["tools"] = "tools" in capabilities
     except ProviderError as error:
         result["model_present"] = False if error.detail == "not_found" else None
     try:

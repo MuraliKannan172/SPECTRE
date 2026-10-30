@@ -179,6 +179,21 @@ def test_local_only_mode_blocks_a_cloud_model_even_with_consent(run_with) -> Non
     assert provider.opened == 0
 
 
+def test_local_only_mode_stops_a_cloud_provider_before_any_call(run_with) -> None:  # type: ignore[no-untyped-def]
+    class CountingCloud(MockProvider):
+        kind = "cloud"
+        caps_calls = 0
+
+        async def model_caps(self, model: str) -> ModelInfo:
+            self.caps_calls += 1  # a real cloud adapter would send the key here
+            return await super().model_caps(model)
+
+    provider = CountingCloud([answer("Never sent.")], models=[MODEL])
+    events = run_with(provider, local_only=True)
+    assert events[-1][1]["code"] == "local_only"
+    assert (provider.caps_calls, provider.opened) == (0, 0)
+
+
 def test_local_only_mode_leaves_a_local_model_alone(run_with) -> None:  # type: ignore[no-untyped-def]
     local = ModelInfo("m:1", "m:1", "local", "yes", capabilities=frozenset({"completion", "tools"}))
     provider = MockProvider([answer("Local answer.")], models=[local])
