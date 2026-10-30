@@ -16,6 +16,7 @@ from typing import Any
 
 import httpx
 import pytest
+from fakes_anthropic import AnthropicHarness
 from fakes_openai_chat import OpenAIChatHarness
 from sse import CANARY
 
@@ -198,7 +199,7 @@ class OllamaHarness:
         return [(m["tool_name"], m["content"]) for m in messages if m["role"] == "tool"]
 
 
-HARNESSES = [MockHarness, OllamaHarness, OpenAIChatHarness]
+HARNESSES = [MockHarness, OllamaHarness, OpenAIChatHarness, AnthropicHarness]
 
 
 @pytest.fixture(params=HARNESSES, ids=lambda cls: cls.name)
