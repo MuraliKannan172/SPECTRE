@@ -85,6 +85,10 @@ under the full suite's parallel load, and passes alone in about 1.5 s once
 they are stopped. `src/terrainHeightsBounds.test.mjs` fails
 ("1 !== 2") once a dev server has written `.gev-cache/terrain-heights.json`,
 because the test reads the real cache; it passes with that file moved aside.
+`src/tools/mcpPanelKey.test.mjs` ("concurrent malformed-file repairs return
+the same persisted key") spawns two Node processes that wait on each other
+behind a 5 s wall-clock barrier; it failed once under full-suite load
+(2026-10-30) and passes alone and in the next full run.
 Anything else failing is a regression.
 
 `npm run qa:spectre-news` (needs `npm run dev` on port 4173; fixtures only,
@@ -92,7 +96,15 @@ no intel service or network) is the News, Natural Events and share-link
 smoke test and should pass in full. `npm run qa:neural-core` (same setup,
 mocked chat endpoints) is the Neural Core panel smoke test and should pass
 in full. `npm run qa:spectre-boot` (same setup, mocked intel endpoints) is
-the boot overlay and brand glitch smoke test and should pass in full.
+the boot overlay and brand glitch smoke test; on this machine it passes 24/26
+(2026-10-30, the same on `main` before the providers work). "No console errors
+on load" fails while `.env` holds a Google Maps key that Google refuses (a 403
+from `tile.googleapis.com/v1/3dtiles/root.json`). "INTEL SERVICE is NO
+RESPONSE after about 3 s" (limit 5 s) reads 7.5 s here: the probe's 3 s timer
+waits behind the app's start-up on the main thread (5.9 s with hardware GL,
+11 s against the production build). Run it on a fresh dev server twice: the
+first run after a start also times out the globe and layer rows while Vite
+builds its dependencies. Any other failure is a regression.
 `npm run qa:neural-core-providers` (same setup, a stateful mock of the
 provider routes) covers the provider chip and settings, keys typed in POWER
 UP (a canary key never stored in the browser), the consent dialog, no silent
