@@ -10,6 +10,44 @@ apply to the upstream code SPECTRE contains. SPECTRE's own changes are also
 offered under the MIT License. SPECTRE is not affiliated with or endorsed by
 God's Eye View or its authors.
 
+## Third-party data and assets (not MIT)
+
+The MIT License in [LICENSE](LICENSE) covers the source code only.
+
+The datasets bundled under `src/data/local_data/`, and all data fetched from
+third-party providers at runtime, are owned by their respective sources and
+are NOT licensed under MIT. They are included/visualized for convenience and
+remain subject to their own licenses and terms. Notably:
+
+- Datacenters and Dams (OpenStreetMap / Open Infrastructure Map extracts):
+  Open Database License (ODbL) 1.0 — attribution + share-alike on the data.
+- TeleGeography Submarine Cable Map: CC BY-NC-SA 3.0 — NonCommercial +
+  ShareAlike. SPECTRE does NOT ship it; `scripts/fetch-optional-data.ps1` lets
+  you download it for personal, non-commercial use into a gitignored folder.
+
+SPECTRE removed upstream's Bhote Koshi event imagery and derived river
+centerline (CC BY-NC 4.0); see [What SPECTRE changed](#what-spectre-changed).
+
+Live sources (Google Maps, OpenSky, adsb.lol, AISStream, CelesTrak, USGS,
+OSM Overpass, City of Austin, GBFS) are fetched at runtime under each
+provider's terms; some (e.g. Google Maps, OpenSky) restrict commercial use
+and require you to supply your own credentials. SPECTRE keeps the
+personal-use-only ones (OpenSky, Open-Meteo's free API, Google News RSS,
+adsbdb routes) off until you turn on Non-commercial sources.
+
+The fonts SPECTRE bundles are under the SIL Open Font License 1.1 (JetBrains
+Mono, Inter, Rajdhani) and the Apache License 2.0 (Material Symbols); see
+[Third-party components added by SPECTRE](#third-party-components-added-by-spectre).
+
+In short: the MIT grant does not extend to any third-party data. See
+[DATA_SOURCES.md](DATA_SOURCES.md) for the full per-source license +
+attribution summary, and remove any dataset whose terms don't fit your use.
+
+The 3D models under `public/models/` are also third-party works and are NOT
+licensed under MIT. They remain under their individual licenses. See
+[public/models/README.md](public/models/README.md) for the author, source,
+license, modification notice, and attribution covering each model file.
+
 ## What SPECTRE changed
 
 Every change below is in the git history; the design is in

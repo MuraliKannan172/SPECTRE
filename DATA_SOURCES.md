@@ -276,7 +276,7 @@ The optional Local ADS-B layer and the broadcast-FM receiver use radio you recei
 
 ## Bundled snapshots
 
-Static datasets shipped in the repo for an out-of-the-box experience. **None are MIT** — each keeps its own license (see the carve-out in [LICENSE](LICENSE)). Each folder also has its own provenance README.
+Static datasets shipped in the repo for an out-of-the-box experience. **None are MIT** — each keeps its own license (see the carve-out in [NOTICE.md](NOTICE.md#third-party-data-and-assets-not-mit)). Each folder also has its own provenance README.
 
 SPECTRE removed upstream's Bhote Koshi event pack (CC BY-NC 4.0) and does not bundle the TeleGeography cables (see [SPECTRE changes](#spectre-changes)). The snapshots below are under `src/data/local_data/`.
 
